@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -53,11 +53,11 @@ namespace scidb {
 
 /// returns or throws an exception if the input matrices are not suitable for ScaLAPACK
 /// processing.
-void                      checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query,
+void                      checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query,
                                                size_t nMatsMin, size_t nMatsMax);
 
 /// constructs distinct dimension names, from names that may or may not be distinct
-std::pair<string, string> ScaLAPACKDistinctDimensionNames(const string& a, const string& b);
+std::pair<std::string, std::string> ScaLAPACKDistinctDimensionNames(const std::string& a, const std::string& b);
 
 void log4cxx_debug_dimensions(const std::string& prefix, const Dimensions& dims);
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -47,9 +47,9 @@ public:
         ADD_PARAM_CONSTANT("string");
     }
 
-    ArrayDesc inferSchema(vector<ArrayDesc> inputSchemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(vector<ArrayDesc> inputSchemas, std::shared_ptr<Query> query)
     {
-        const string &filePath = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_STRING).getString();
+        const string &filePath = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_STRING).getString();
 
         FITSParser parser(filePath);
 
@@ -63,7 +63,7 @@ public:
 
         Dimensions dims(1,DimensionDesc("N", 0, 0, end, end, size, 0));
 
-        return ArrayDesc("", attrs, dims);
+        return ArrayDesc("", attrs, dims, defaultPartitioning());
     }
 
 };

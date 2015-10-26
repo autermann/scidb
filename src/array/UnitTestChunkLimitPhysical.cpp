@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <array/Metadata.h>
 #include <system/Cluster.h>
 #include <query/Query.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
@@ -52,7 +52,7 @@ public:
     {
     }
 
-    void preSingleExecute(shared_ptr<Query> query)
+    void preSingleExecute(std::shared_ptr<Query> query)
     {
     }
 
@@ -130,7 +130,7 @@ public:
      * @param[in]    count  the number of values to put into the chunk
      * @param[in]    mode   the iteration mode for the chunk iterator
      */
-    void buildRandomArrayChunk(shared_ptr<Query>& query,
+    void buildRandomArrayChunk(std::shared_ptr<Query>& query,
                                MemArray& array,
                                TypeId type,
                                int count,
@@ -138,8 +138,8 @@ public:
     {
         Coordinates coord(1);
         coord[0] = 0;
-        shared_ptr<ArrayIterator> arrayIter = array.getIterator(0);
-        shared_ptr<ChunkIterator> chunkIter = 
+        std::shared_ptr<ArrayIterator> arrayIter = array.getIterator(0);
+        std::shared_ptr<ChunkIterator> chunkIter =
             ((MemChunk&)arrayIter->newChunk(coord)).getIterator(query, mode);
 
         if (!chunkIter->setPosition(coord))
@@ -147,7 +147,7 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) <<
                 "UnitTestChunkLimit" << "Failed to set position in chunk";
         }
-        
+
         for (int j = 0; j < count; j++)
         {
             Value v;
@@ -179,7 +179,7 @@ public:
      *
      * @throw SCIDB_SE_INTERNAL::SCIDB_LE_UNITTEST_FAILED
      */
-    void testOnce_ChunkLimit(boost::shared_ptr<Query>& query,
+    void testOnce_ChunkLimit(std::shared_ptr<Query>& query,
                              string const& limit,
                              TypeId const& type,
                              int count,
@@ -188,7 +188,7 @@ public:
     {
         bool failed = false;
 
-        LOG4CXX_DEBUG(logger, "ChunkLimit UnitTest Attempt [type=" << type << "][count=" << count 
+        LOG4CXX_DEBUG(logger, "ChunkLimit UnitTest Attempt [type=" << type << "][count=" << count
                       << "][mode=" << mode << "][expectFail=" << expectFail << "]");
 
         // Array schema
@@ -197,14 +197,14 @@ public:
 
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), 0, count, count, 0);
-        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions);
+        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
 
         // Test array
-        shared_ptr<MemArray> array(new MemArray(schema, query));
+        std::shared_ptr<MemArray> array(new MemArray(schema, query));
 
         // set the chunk size limit
         std::string oldLimit;
-        try 
+        try
         {
             oldLimit = Config::getInstance()->setOptionValue("chunk-size-limit-mb",
                                                              limit);
@@ -218,7 +218,7 @@ public:
         }
 
         // try to create the chunk
-        try 
+        try
         {
             buildRandomArrayChunk(query, *array, type, count, mode);
         }
@@ -237,9 +237,9 @@ public:
                 failed = true;
             }
         }
-        
+
         // set the chunk size limit back
-        try 
+        try
         {
             Config::getInstance()->setOptionValue("chunk-size-limit-mb",
                                                   oldLimit);
@@ -254,20 +254,20 @@ public:
 
         if (failed)
         {
-            LOG4CXX_DEBUG(logger, "ChunkLimit UnitTest Failed [type=" << type << "][count=" << count 
+            LOG4CXX_DEBUG(logger, "ChunkLimit UnitTest Failed [type=" << type << "][count=" << count
                           << "][mode=" << mode << "][expectFail=" << expectFail << "]");
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestChunkLimitPhysical" << "unexpected status";
         }
         else
         {
-            LOG4CXX_DEBUG(logger, "ChunkLimit UnitTest Success [type=" << type << "][count=" << count 
+            LOG4CXX_DEBUG(logger, "ChunkLimit UnitTest Success [type=" << type << "][count=" << count
                           << "][mode=" << mode << "][expectFail=" << expectFail << "]");
         }
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
-                                     boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
+                                     std::shared_ptr<Query> query)
     {
         srand(time(NULL));
 
@@ -280,7 +280,7 @@ public:
         testOnce_ChunkLimit(query, "2", TID_STRING, 500000, 0, true);
         testOnce_ChunkLimit(query, "2", TID_STRING, 500000, ChunkIterator::SEQUENTIAL_WRITE, true);
 
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 
 };

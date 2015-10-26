@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -94,7 +94,7 @@ ArenaPtr addThreading(const Options& o)
         return p;                                        // ...no need to add
     }
 
-    return boost::make_shared<ThreadedArena>(p);         // Attach decoration
+    return std::make_shared<ThreadedArena>(p);         // Attach decoration
 }
 
 /****************************************************************************/

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -20,25 +20,25 @@
 # END_COPYRIGHT
 #
 #
-#  This script is intended to show off the SciDB engine at the XLDB 2010 
+#  This script is intended to show off the SciDB engine at the XLDB 2010
 #  meeting at SLAC in California. We will focus here on the DML workload,
-#  rather than the entire CREATE / LOAD stuff, mostly because load takes 
-#  a long time to do. 
+#  rather than the entire CREATE / LOAD stuff, mostly because load takes
+#  a long time to do.
 #
-# Environment variables. 
-SCIDB_HOME=../../..    
+# Environment variables.
+SCIDB_HOME=../../..
 SCIDB_BIN=$SCIDB_HOME/bin
 DATA_HOME=/tmp
 DATA_FILE=$DATA_HOME/Data
 #
-# Phase 1: Set up. 
+# Phase 1: Set up.
 #
 QN1="list ('arrays')"
 QN2="remove (Big)"
 QN3="CREATE ARRAY Big < A1:int32, B1:double, C1:char > [ I=0:999,100,0, J=0:999,100,0 ]"
 QN4="load (Big, '$DATA_FILE')"
 #
-# Create the "big data" load file. 
+# Create the "big data" load file.
 #
 echo "#!/bin/sh"
 echo "# "
@@ -58,13 +58,13 @@ do
 #	echo "#   Query = $Query"
 	echo "# "
 	echo "$SCIDB_BIN/iquery --afl -n -q \"$Query\" \> /dev/null"
-	
+
 	QNNum=`expr $QNNum + 1`;
 done
 #
-# Phase 2: The queries. 
+# Phase 2: The queries.
 #
-#	SELECT COUNT(*) FROM Big; 
+#	SELECT COUNT(*) FROM Big;
 #
 QS1="aggregate ( Big, count(*) )"
 #
@@ -72,33 +72,33 @@ QS1="aggregate ( Big, count(*) )"
 #
 QS2="subarray ( Big, 500, 500, 510, 510 )"
 #
-#   SELECT * FROM Big A 
+#   SELECT * FROM Big A
 #    WHERE A.I BETWEEN :I1 AND :I2 AND A.J BETWEEN :J1 AND :J2 AND A.C1 = 'X';
 #
 QS3="filter ( subarray ( Big, 500, 500, 510, 510 ), C1 = 'X')"
 #
-#    SELECT COUNT(*) FROM Big 
+#    SELECT COUNT(*) FROM Big
 #     WHERE A.I BETWEEN :I1 AND :I2 AND A.J BETWEEN :J1 AND :J2
 #    GROUP BY A.I;
 #
 QS4="aggregate ( subarray ( Big, 500, 500, 510, 510 ), sum(A1), I)"
 #
-#    SELECT COUNT(*) FROM Big 
+#    SELECT COUNT(*) FROM Big
 #     WHERE A.I BETWEEN :I1 AND :I2 AND A.J BETWEEN :J1 AND :J2
 #       AND C1 = char('X')
 #    GROUP BY A.I;
 #
 QS5="aggregate ( filter ( subarray ( Big, 500, 500, 510, 510 ), C1 = 'X'), count(*), I)"
 #
-#  Bigger box? 
+#  Bigger box?
 #
 QS6="aggregate ( filter ( subarray ( Big, 490, 490, 530, 530 ), C1 = 'X'), count(*), I)"
 #
 #
 QS7="
-project ( 
-  apply ( 
-	join ( 
+project (
+  apply (
+	join (
 		subarray ( Big , 499, 499, 509, 509 ) AS Ar1,
 		subarray ( Big , 501, 501, 511, 511 ) AS Ar2
 	),
@@ -113,17 +113,17 @@ project (
 #
 #
 QS8="
-aggregate ( 
-	filter ( 
-		project ( 
-  			apply ( 
-				join ( 
+aggregate (
+	filter (
+		project (
+  			apply (
+				join (
 					subarray ( Big , 500, 500, 510, 510 ) AS Ar1,
 					subarray ( Big , 501, 501, 511, 511 ) AS Ar2
 				),
 			Diff,
 			Ar1.B1 - Ar2.B1
-  			), 
+  			),
 		Diff
 		),
 	Diff > 0
@@ -141,34 +141,34 @@ aggregate (
 # D). This should be re-written.
 
 QS9="
-apply ( 
-	join ( 
-		aggregate ( 
-			filter ( 
-				project ( 
-  					apply ( 
-						join ( 
+apply (
+	join (
+		aggregate (
+			filter (
+				project (
+  					apply (
+						join (
 							subarray ( Big , 500, 500, 550, 550 ) AS Ar1,
 							subarray ( Big , 500, 501, 550, 551 ) AS Ar2
 						),
 					Diff,
 					Ar1.B1 - Ar2.B1
-  					), 
+  					),
 				Diff
 				),
 				Diff > 0
 			)
 		, count(*)) AS N,
-   	aggregate ( 
-        	project (  
-            	apply ( 
-                	join ( 
+   	aggregate (
+        	project (
+            	apply (
+                	join (
                     	subarray ( Big , 500, 500, 550, 550 ) AS Ar1,
                     	subarray ( Big , 500, 501, 550, 551 ) AS Ar2
                 	),
             	Diff,
             	Ar1.B1 - Ar2.B1
-            	), 
+            	),
         	Diff
         	)
     	, count(*)) AS D
@@ -195,39 +195,39 @@ apply (
 #
 #
 QS10="
-apply ( 
-    join ( 
-        aggregate ( 
-            filter ( 
-                project ( 
+apply (
+    join (
+        aggregate (
+            filter (
+                project (
 					filter (
-                    	apply ( 
-                        	join ( 
+                    	apply (
+                        	join (
                             	subarray ( Big , 500, 500, 550, 550 ) AS Ar1,
                             	subarray ( Big , 500, 501, 550, 551 ) AS Ar2
                         	),
                     	Diff,
                     	Ar1.B1 - Ar2.B1
-                    	), 
-             		Ar1.C1 = Ar2.C1 
+                    	),
+             		Ar1.C1 = Ar2.C1
 					)
                 Diff
                 ),
                 Diff > 0
             )
         , count(*)) AS N,
-    	aggregate ( 
-        	project (  
-		    	filter ( 
-                	apply ( 
-                   		join ( 
+    	aggregate (
+        	project (
+		    	filter (
+                	apply (
+                   		join (
                        		subarray ( Big , 500, 500, 550, 550 ) AS Ar3,
                        		subarray ( Big , 500, 501, 550, 551 ) AS Ar4
                    		),
                		Diff,
                		Ar3.B1 - Ar4.B1
-               		), 
-             	Ar3.C1 = Ar4.C1 
+               		),
+             	Ar3.C1 = Ar4.C1
 				),
         	Diff
 			),
@@ -248,7 +248,7 @@ do
 #    echo "#   Query = $Query"
     echo "# "
     echo $SCIDB_BIN/iquery --afl -q \"$Query\"
-    
+
     QNNum=`expr $QNNum + 1`;
 done
 

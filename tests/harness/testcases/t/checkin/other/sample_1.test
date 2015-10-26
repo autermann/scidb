@@ -1,5 +1,5 @@
 --setup
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
+create array A <a:int32> [x=0:999,100,0,y=0:999,100,0]
 --igdata "store(build(A,iif(x+y=0,1,x+y)),A)"
 
 --test

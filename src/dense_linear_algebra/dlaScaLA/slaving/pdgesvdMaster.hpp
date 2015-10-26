@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@
 // corresponding wrappers.
 //
 // The followin ScaLAPACK "driver routines" are supported at this time:
-// 
+//
 // ScaLAPACK    (MASTER-SIDE) WRAPPER
 // pdgesvd_     pdgesvdMaster
 //
@@ -55,7 +55,7 @@ namespace scidb {
 /// S (sigma or singular values)
 /// U (U or left singular vectors)
 /// V* (V congugate-transpose or right singular vectors congugate transpose)
-/// 
+///
 /// The difference is that the "Master" version sends the command to a program
 /// called "mpi_slave_scidb" and that process mmap/shmem's the buffer into its address
 /// space, calls pdgesvd_() and returns.  The slave process is used so that if
@@ -65,9 +65,9 @@ namespace scidb {
 /// except restart.
 ///
 void pdgesvdMaster(Query* query,  // or do I need only the ctx?
-                   boost::shared_ptr<MpiOperatorContext>& ctx,
-                   boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
-                   const string& ipcName, // can this be in the ctx too?
+                   std::shared_ptr<MpiOperatorContext>& ctx,
+                   std::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
+                   const std::string& ipcName, // can this be in the ctx too?
                    void * argsBuf,
                    // the following args are common to all scalapack slave operators:
                    const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
@@ -76,7 +76,7 @@ void pdgesvdMaster(Query* query,  // or do I need only the ctx?
                    const char &jobU, const char &jobVT,
                    const slpp::int_t& M, const slpp::int_t &N,
                    double *A, const slpp::int_t &IA, const slpp::int_t &JA, const slpp::desc_t& DESC_A,
-                   double *S, 
+                   double *S,
                    double *U,  const slpp::int_t &IU,  const slpp::int_t &JU,  const slpp::desc_t& DESC_U,
                    double *VT, const slpp::int_t &IVT, const slpp::int_t &JVT, const slpp::desc_t& DESC_VT,
                    slpp::int_t &INFO);

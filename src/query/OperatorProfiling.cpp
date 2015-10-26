@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,8 +40,8 @@ using namespace boost;
 namespace scidb
 {
 
-boost::shared_ptr< Array> PhysicalOperator::executeWrapper(std::vector< boost::shared_ptr< Array> >& arrays,
-                                                           boost::shared_ptr<Query> query)
+std::shared_ptr< Array> PhysicalOperator::executeWrapper(std::vector< std::shared_ptr< Array> >& arrays,
+                                                           std::shared_ptr<Query> query)
 {
         return execute(arrays, query);
 }

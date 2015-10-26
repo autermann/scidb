@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,7 +42,7 @@ namespace scidb
  */
 class AttributeComparator
 {
-  public:
+public:
     AttributeComparator()
      : _less(0)
     {}
@@ -51,7 +51,10 @@ class AttributeComparator
      : _less(getComparison(tid))
     {}
 
-  public:
+public:
+    /**
+     * @return _less(v1,v2) == true.
+     */
     bool operator()(const Value& v1, const Value& v2) const
     {
         const Value* operands[2] = {&v1,&v2};
@@ -60,7 +63,7 @@ class AttributeComparator
         return result.getBool();
     }
 
-  private:
+private:
     static FunctionPointer getComparison(TypeId tid)
     {
         std::vector<TypeId>          inputTypes(2,tid);
@@ -75,10 +78,10 @@ class AttributeComparator
         return functionDesc.getFuncPtr();
     }
 
-  private:
+private:
     FunctionPointer _less;
 };
 
-}
+} // namespace
 
 #endif /* ATTRIBUTECOMPARATOR_H_ */

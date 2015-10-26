@@ -4,8 +4,8 @@
 *
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,9 +20,9 @@
 * along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 *
 * END_COPYRIGHT
-* 
-** 
-** About: 
+*
+**
+** About:
 **
 ** How to Build:
 
@@ -40,48 +40,48 @@ dgenerator.o: dgenerator.cpp
 **
 The new arguments are:
 
-	-U - When this option is provided, create an updated array as in 
-		 "create updatable array foobar....", if not provided a 
+	-U - When this option is provided, create an updated array as in
+		 "create updatable array foobar....", if not provided a
 		 non-updatedable array is created.
 
-	-A - where as is the dimension syntax associated with the array you 
-	     want to create.  Program will only support two dimensions, 
-		 but will support up to 128 dimensions with no change once the 
-	     data generation code has been fixed to support it 
+	-A - where as is the dimension syntax associated with the array you
+	     want to create.  Program will only support two dimensions,
+		 but will support up to 128 dimensions with no change once the
+	     data generation code has been fixed to support it
 
-			(e.g. -A-Ab=0:99,10,0 -Ac=0:99,10,0). 
-		
-		The syntax is the same as used by scidb, but almost no checking 
+			(e.g. -A-Ab=0:99,10,0 -Ac=0:99,10,0).
+
+		The syntax is the same as used by scidb, but almost no checking
 		is done.
 
-	-Tfilename - filename to store the table create syntax. A file named 
+	-Tfilename - filename to store the table create syntax. A file named
 	    "filename.txt" will be created.
 
 	-R - random data generation for each cell
 
-	-D - generate data based off the current cell number (give nice 
-	     incremental data for numerics and testing. 
+	-D - generate data based off the current cell number (give nice
+	     incremental data for numerics and testing.
 
-	-P - Probability, 1.0 is a dense array with all cells containing data, 
-		 less than 1 means that some cells will not contain data.  
+	-P - Probability, 1.0 is a dense array with all cells containing data,
+		 less than 1 means that some cells will not contain data.
 		 Probabilty equals percentage of cells to fill with data.
 
-	-I, -J - exist for compatability with existing data generation 
-	    code.  Basically sets nRowChunks and nColChunks respectively.  
-		Control size of data file.  These have to change when 
+	-I, -J - exist for compatability with existing data generation
+	    code.  Basically sets nRowChunks and nColChunks respectively.
+		Control size of data file.  These have to change when
 		multi-dimensional array creation is supported.
 
-	-C - A list of attribute types created for your array. This is a 
-		string made of of the characters NSCGR. This allows the creation 
-		of up to 128 attributes for an array by simply including as 
-		many of the 4 letters as desired in any combination. 
+	-C - A list of attribute types created for your array. This is a
+		string made of of the characters NSCGR. This allows the creation
+		of up to 128 attributes for an array by simply including as
+		many of the 4 letters as desired in any combination.
 
-					C is a char attribute. 
-					N is an int32 attribute. 
-					S is a string attribute. 
+					C is a char attribute.
+					N is an int32 attribute.
+					S is a string attribute.
 					G is a double attribute.
 					R is a rational attribute.
-					M is a int8 
+					M is a int8
 					O is a int16
 
 Running dgenerator with the following paramaters:
@@ -94,7 +94,7 @@ Running dgenerator with the following paramaters:
 
 The generated data will be redirected to foobar.data
 
-** 
+**
 */
 #include <vector>
 #include <iostream>
@@ -106,7 +106,7 @@ The generated data will be redirected to foobar.data
 
 #include <assert.h>
 
-#define MAX_DIMENSION_CNT 128 
+#define MAX_DIMENSION_CNT 128
 #define MAX_ATTRIBUTES_CNT 128
 #define MAX_FILENAME_SIZE 128
 #define MAX_LGBUFFER_SIZE 2048
@@ -123,8 +123,8 @@ struct arrayInfo {
 int columnNumber = 0;
 
 void
-int2str ( const int v, 
-		  char * out ) 
+int2str ( const int v,
+		  char * out )
 {
 	int lv = v;
 	int off = 0;
@@ -132,7 +132,7 @@ int2str ( const int v,
 	assert((NULL != out));
 	assert((0 <= v));
 
-	do { 
+	do {
 		out[off]=('A'+(lv%26));
 		lv/=26;
 		off++;
@@ -153,11 +153,11 @@ usage(char * szProg)
 }
 
 void
-print_random_attr ( const int nTypeCnt, const char * szTypesListStr) 
+print_random_attr ( const int nTypeCnt, const char * szTypesListStr)
 {
 	char szString[32];
 	printf("(");
-	for(int c = 0; c < nTypeCnt; c++) { 
+	for(int c = 0; c < nTypeCnt; c++) {
 		if (c) printf(", ");
 
 		switch(toupper(szTypesListStr[c])) {
@@ -183,10 +183,10 @@ print_random_attr ( const int nTypeCnt, const char * szTypesListStr)
 			break;
                         case 'M':       /* int8_t */
 				printf("%d", (int) (random()%128));
-                        break; 
+                        break;
                         case 'O':       /* int16_t */
                                 printf("%d", (int) (random()%32768));
-                        break; 
+                        break;
 			default:	/* nothing */
 		    break;
 		}
@@ -195,13 +195,13 @@ print_random_attr ( const int nTypeCnt, const char * szTypesListStr)
 }
 
 void
-print_det_attr ( const int nTypeCnt, const char * szTypesListStr, 
-				 const int nCellNum, const int nCellMax ) 
+print_det_attr ( const int nTypeCnt, const char * szTypesListStr,
+				 const int nCellNum, const int nCellMax )
 {
-	char szString[32]; 
-	
+	char szString[32];
+
 	printf("(");
-	for(int c = 0; c < nTypeCnt; c++) { 
+	for(int c = 0; c < nTypeCnt; c++) {
 		if (c) printf(", ");
 
 		switch(toupper(szTypesListStr[c])) {
@@ -227,7 +227,7 @@ print_det_attr ( const int nTypeCnt, const char * szTypesListStr,
 			break;
                         case 'M':       /* int8_t */
                                 printf("%d", (nCellNum%128));
-                        break; 
+                        break;
                         case 'O':       /* int16_t */
                                 printf("%d", (nCellNum%32768));
                         break;
@@ -260,9 +260,9 @@ create_attributes( const char * szTypesListStr, const int nTypeCnt, char * szTab
         char columnPrefix[]     = "COL";
 	char szPtr[128];
 	szTableSyntax = strncat( szTableSyntax, " < ",3);
-	
-	for(int c = 0; c < nTypeCnt && columnNumber < 128; c++) { 
-    		if (c) szTableSyntax = strncat( szTableSyntax, ",",1); 
+
+	for(int c = 0; c < nTypeCnt && columnNumber < 128; c++) {
+    		if (c) szTableSyntax = strncat( szTableSyntax, ",",1);
 		nWritten = sprintf(szPtr, "%s", columnPrefix);
 		nWritten += sprintf(&szPtr[nWritten], "%3.3d", columnNumber);
                 columnNumber++;
@@ -271,14 +271,14 @@ create_attributes( const char * szTypesListStr, const int nTypeCnt, char * szTab
 				nWritten += sprintf(&szPtr[nWritten], "%s", "G");
 				nWritten += sprintf(&szPtr[nWritten], "%s", ": double ");
 				//printf("%s\n",&szPtr[0]);
-				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );				
+				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );
 				//printf("%s\n",szTableSyntax);
 			 break;
 
 			case 'N':	/* integer */
 				nWritten += sprintf(&szPtr[nWritten], "%s", "N");
 				nWritten += sprintf(&szPtr[nWritten], "%s", ": int32 ");
-				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );				
+				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );
 				//printf("%s\n",szTableSyntax);
 			break;
 
@@ -288,16 +288,16 @@ create_attributes( const char * szTypesListStr, const int nTypeCnt, char * szTab
 				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );
 				//printf("%s\n",szTableSyntax);
  			break;
- 
+
  			case 'C':	/* char */
 				nWritten += sprintf(&szPtr[nWritten], "%s", "C");
 				nWritten += sprintf(&szPtr[nWritten], "%s", ": char ");
 				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );
- 			break; 
+ 			break;
 			case 'R':	/* rational */
 				nWritten += sprintf(&szPtr[nWritten], "%s", "R");
 				nWritten += sprintf(&szPtr[nWritten], "%s", ": rational ");
-				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );				
+				szTableSyntax = strncat( szTableSyntax, szPtr, (strlen(szPtr)-1) );
 				//printf("%s\n",szTableSyntax);
 			break;
 			case 'M':       /* rational */
@@ -326,7 +326,7 @@ create_attributes( const char * szTypesListStr, const int nTypeCnt, char * szTab
 void
 finish_attributes(char * szTableSyntax) {
 	szTableSyntax = strncat( szTableSyntax, " > ", 3);
- 
+
 
 }
 void
@@ -336,7 +336,7 @@ finish_arrays(char * szTableSyntax) {
 }
 void
 finish_statement(char * szTableSyntax) {
-//      remove " so we can use create statement in file as -f option to iquery	
+//      remove " so we can use create statement in file as -f option to iquery
 //	szTableSyntax = strncat( szTableSyntax, "\"", 1);
 }
 void
@@ -348,7 +348,7 @@ write_tablesyntax_file (const char * szString, const char * szTableSyntax) {
 	char  * szPtr2 = szSyntax;
 	int	  nResult = 0;
 	FILE * pFile;
-	
+
         memset(szPtr, 0, (sizeof(szFileName)));
 	strncpy(szFileName, szString, strlen(szString) );
 	strcpy(szSyntax, szTableSyntax );
@@ -364,14 +364,14 @@ write_tablesyntax_file (const char * szString, const char * szTableSyntax) {
 		printf ("%s%s\n", "Failed writing create table string:", szTableSyntax);
 		exit(1);
 	}
-        fclose(pFile); 
+        fclose(pFile);
 }
 
 
 int processArrayInfo(char * szArrayInfo, int nDimensionCnt) {
-	
+
     char * szPtr = NULL;
-	
+
 	arrayInfo * aInfo = &arrayDimensionInfo[nDimensionCnt];
 
    	//Initialize struct string
@@ -387,7 +387,7 @@ int processArrayInfo(char * szArrayInfo, int nDimensionCnt) {
         }
 
 	//printf("The array definition is: %s\n",&arrayDimensionInfo[nDimensionCnt].szArrayDefinition[0]);
-  
+
     //Now convert the array dimensions into integer format so they can be used later.
     szPtr = strchr( &arrayDimensionInfo[nDimensionCnt].szArrayDefinition[0], '=');
     szPtr++;
@@ -401,7 +401,7 @@ int processArrayInfo(char * szArrayInfo, int nDimensionCnt) {
  	szPtr = strchr(szPtr, ',');
     szPtr++;
 	aInfo->nOverlap = atoi(szPtr);
-	//printf("struct content is: %d, %d, %d, %d\n", aInfo->nStart, aInfo->nFinish, aInfo->nDataItemsPerChunck, aInfo->nOverlap);      
+	//printf("struct content is: %d, %d, %d, %d\n", aInfo->nStart, aInfo->nFinish, aInfo->nDataItemsPerChunck, aInfo->nOverlap);
     //Check the numbers
     if (aInfo->nStart != 0) {
        printf("Failure 2 in processArrayInfo: Array start must be 0.\n");
@@ -409,13 +409,13 @@ int processArrayInfo(char * szArrayInfo, int nDimensionCnt) {
     }
 	assert((0 < aInfo->nFinish));
 	assert((0 < aInfo->nDataItemsPerChunck));
-	assert((-1 < aInfo->nOverlap));       
- 
+	assert((-1 < aInfo->nOverlap));
+
 	return ++nDimensionCnt;
 }
 
-void 
-coords2Buffer ( int * coord, size_t len, char * szBuffer ) 
+void
+coords2Buffer ( int * coord, size_t len, char * szBuffer )
 {
 	assert ((NULL != coord));
 	assert ((NULL != szBuffer));
@@ -425,10 +425,10 @@ coords2Buffer ( int * coord, size_t len, char * szBuffer )
 
 	strcpy ( szBuffer, "{ ");
 
-	for ( size_t i = 0; i < len; i++) { 
-		if ( i ) 
+	for ( size_t i = 0; i < len; i++) {
+		if ( i )
 			sprintf ( szLocal, ", %d", coord[i]);
-		else 
+		else
 			sprintf ( szLocal, "%d", coord[i]);
 
 		strcat ( szBuffer, szLocal );
@@ -438,7 +438,7 @@ coords2Buffer ( int * coord, size_t len, char * szBuffer )
 }
 
 int
-main (int argc, char ** argv ) 
+main (int argc, char ** argv )
 {
     /*
 }   ** Loop over the input until EOF, placing a line's worth of tokens
@@ -455,17 +455,17 @@ main (int argc, char ** argv )
 	int  	nCellNum	= 	0;
 	int 	nCellMax	=  	0;
     int     nDimensionCnt	=	0;
-	double  dbProb          =       0.0;    
+	double  dbProb          =       0.0;
    	char *  szPtr 		= 	NULL;
 	bool    bUpdatable		= false;
 	bool    bTableCreateSyntax 	= false;
-	char    szTableSyntax[MAX_LGBUFFER_SIZE] =	{"  "}; 
+	char    szTableSyntax[MAX_LGBUFFER_SIZE] =	{"  "};
     char    szFileName[MAX_FILENAME_SIZE];
 	char    szString[MAX_MEDBUFFER_SIZE];
    	char   	szTypesListStr[MAX_MEDBUFFER_SIZE];
 	int 	coord[MAX_DIMENSION_CNT];
 	int 	chunkPos[MAX_DIMENSION_CNT];
- 
+
 
 
 	//printf("%s%u\n", "argc is:", argc);
@@ -475,7 +475,7 @@ main (int argc, char ** argv )
         memset(szFileName, 0, (sizeof(szFileName)));
         memset(szTableSyntax, 0, (sizeof(szTableSyntax)));
         memset(szTypesListStr, 0, (sizeof(szTypesListStr)));
-	
+
 	if (argc > 1 ) {
 		for (nCount = 1; nCount < argc; nCount++) {
                         memset(szString, 0, sizeof(szString));
@@ -485,14 +485,14 @@ main (int argc, char ** argv )
 					usage(argv[0]);
                 			exit(0);
 
-            		} 
-            //printf("arg length is: %i\n", (int) strlen(argv[nCount])); 
-		switch(toupper(szString[1])) { 
+            		}
+            //printf("arg length is: %i\n", (int) strlen(argv[nCount]));
+		switch(toupper(szString[1])) {
 				case 'R':
-					nIsRandom = 1; 
+					nIsRandom = 1;
 		 		break;
 				case 'D':
-					nIsRandom = 0; 
+					nIsRandom = 0;
 		 		break;
 				case 'T':
 					bTableCreateSyntax = 1;
@@ -509,7 +509,7 @@ main (int argc, char ** argv )
                                 case 'P':
 					dbProb = atof(&szString[2]);
 					assert((0.0 < dbProb));
-					assert((1.0 >= dbProb));	
+					assert((1.0 >= dbProb));
 				break;
 				case 'I':
 					nRowChunks = atoi(&szString[2]);
@@ -528,7 +528,7 @@ main (int argc, char ** argv )
 					//printf("Data Definitions are: %s\n",&szString[2]);
                 		break;
 				case 'U': //make array updatable.
-					bUpdatable = 1; 
+					bUpdatable = 1;
                 		break;
 				default:
 					usage(argv[0]);
@@ -542,7 +542,7 @@ main (int argc, char ** argv )
 		usage(argv[0]);
 		exit(0);
 	}
-#ifdef  __UNDEFINED__ 
+#ifdef  __UNDEFINED__
  	int count;
 
  	printf ("This program, \"%s\", was called with:\n",argv[0]);
@@ -551,7 +551,7 @@ main (int argc, char ** argv )
       		for (count = 1; count < argc; count++) {
 	  		printf("argv[%d] = %s\n", count, argv[count]);
 		}
-    	}	
+    	}
   	else
     	{
       		printf("The command had no other arguments.\n");
@@ -559,7 +559,7 @@ main (int argc, char ** argv )
 #endif
 	initialize_syntax(szFileName,szTableSyntax,bUpdatable);
 	nTypeCnt = strlen(szTypesListStr);
-	
+
 
 	if ( bTableCreateSyntax ) {
 		szPtr = &szTypesListStr[0];
@@ -576,21 +576,21 @@ main (int argc, char ** argv )
 		finish_arrays(szPtr);
 		finish_statement(szPtr);
 		write_tablesyntax_file(szFileName, szTableSyntax);
-	}	
-	
-	if (0.1 <= dbProb) 
-		nIsDense = 1; 
-	
+	}
+
+	if (0.1 <= dbProb)
+		nIsDense = 1;
+
 	//** Some calculation, keeping new argv processing compatable with existing code until attribute generation is updated for any number of array definitions.
         nRowsInChunk = arrayDimensionInfo[0].nDataItemsPerChunck;
         nColsInChunk = arrayDimensionInfo[1].nDataItemsPerChunck;
 		nCellMax = nRowChunks * nRowsInChunk * nColChunks * nColsInChunk;
         //printf("chunkinfo is: %d,%d, %d, %d\n", nRowChunks , nRowsInChunk , nColChunks , nColsInChunk);
-      
-	//New code to be used when attribute and array generation are updated to allow any number of arrays. 
+
+	//New code to be used when attribute and array generation are updated to allow any number of arrays.
 	//Establish base by first multiply the maxinum number of elements in each array together.
- 	//Now factor in the chunking factor for each array except the first. 
-#ifdef __UNDEFINED__ 
+ 	//Now factor in the chunking factor for each array except the first.
+#ifdef __UNDEFINED__
 	nCellMax = arrayDimensionInfo[0].nFinish + 1;
     	for (int i = 1; i < nDimensionCnt; i++) {
 		nCellMax = (arrayDimensionInfo[i].nFinish +  1) * nCellMax;
@@ -598,42 +598,42 @@ main (int argc, char ** argv )
 	for (int i = 1; i < nDimensionCnt; i++) {
                 nCellMax = (arrayDimensionInfo[i].nDataItemsPerChunck) * nCellMax;
         }
-        //printf("base + itemsperchunk=%d\n",nCellMax); 
-#endif 
+        //printf("base + itemsperchunk=%d\n",nCellMax);
+#endif
 	srandom(time(0));
-	if (0 == nIsDense) { 
+	if (0 == nIsDense) {
 		/*
 		** This is the SPARSE representation.
 		*/
-		for(int i = 0;i < nRowChunks; i++ ) { 
-			for(int j = 0;j < nColChunks; j++ ) { 
-			
-				if (i+j) { 
+		for(int i = 0;i < nRowChunks; i++ ) {
+			for(int j = 0;j < nColChunks; j++ ) {
+
+				if (i+j) {
 					printf("\n;\n{ %d, %d } [[", i, j);
-				} else { 
+				} else {
 					printf("{ %d, %d } [[", i, j );
 				}
 
 				nCount = 0;
-	
-				for (int n = 0; n < nRowsInChunk; n++ ) { 
-					for (int m = 0; m < nColsInChunk; m++ ) { 
 
-						nCellNum = (((i * nRowsInChunk) + n) * 
-										(nRowsInChunk * nRowChunks )) + 
+				for (int n = 0; n < nRowsInChunk; n++ ) {
+					for (int m = 0; m < nColsInChunk; m++ ) {
+
+						nCellNum = (((i * nRowsInChunk) + n) *
+										(nRowsInChunk * nRowChunks )) +
 									 ((j * nColsInChunk) + m) ;
 
 						if(dbProb > ((double)random() / (double)INT_MAX))
 						{
 							printf(" {%d, %d} ",
-								i * nRowsInChunk + n, 
+								i * nRowsInChunk + n,
 								j * nColsInChunk + m
 							);
-							
-							if (nIsRandom) 
+
+							if (nIsRandom)
 								print_random_attr( nTypeCnt, szTypesListStr );
 							else {
-								print_det_attr( nTypeCnt, szTypesListStr, 
+								print_det_attr( nTypeCnt, szTypesListStr,
 												nCellNum, nCellMax);
 							}
 							nCount++;
@@ -645,29 +645,29 @@ main (int argc, char ** argv )
 		}
 		printf("\n");
 
-	} else { 
+	} else {
 		/*
 		** Dense data.
 		*/
-		for(int i = 0;i < nRowChunks; i++ ) { 
-			for(int j = 0;j < nColChunks; j++ ) { 
+		for(int i = 0;i < nRowChunks; i++ ) {
+			for(int j = 0;j < nColChunks; j++ ) {
 				nCount = 0;
 
 				if (i+j)
 					printf(";\n[\n");
-				else 
+				else
 					printf("[\n");
 
-				for (int n = 0; n < nRowsInChunk; n++ ) { 
+				for (int n = 0; n < nRowsInChunk; n++ ) {
 
 					if (n)
 						printf(",\n[ ");
-					else 
+					else
 						printf("[ ");
 
-					for (int m = 0; m < nColsInChunk; m++ ) { 
+					for (int m = 0; m < nColsInChunk; m++ ) {
 
-						if (m) printf(", "); 
+						if (m) printf(", ");
 
 #ifdef  __UNDEFINED__
 
@@ -676,32 +676,32 @@ printf("||  i (RowChunks)	=   %3d ||\n", i);
 printf("||	  RowsInChunk  =   %3d ||\n", nRowsInChunk);
 printf("||  n (RowsInChunk)  =   %3d ||\n", n);
 printf("||	  nRowChunks   =   %3d ||\n", nRowChunks );
-printf("||  j (ColChunks)	=   %3d ||\n", j); 
-printf("||	  nColsInChunk =   %3d ||\n", nColsInChunk); 
+printf("||  j (ColChunks)	=   %3d ||\n", j);
+printf("||	  nColsInChunk =   %3d ||\n", nColsInChunk);
 printf("||  m (nColsInChunk) =   %3d ||\n", m);
 printf("||	  nColChunks   =   %3d ||\n", nColChunks);
 printf("+=============================+\n");
 
-#endif 
+#endif
 						//
-						// Tricky bit here .... 
-						// 
-						nCellNum = (((i * nRowsInChunk) + n) * 
-						//				(nRowsInChunk * nRowChunks )) + 
-						  				(nColsInChunk * nColChunks )) + 
+						// Tricky bit here ....
+						//
+						nCellNum = (((i * nRowsInChunk) + n) *
+						//				(nRowsInChunk * nRowChunks )) +
+						  				(nColsInChunk * nColChunks )) +
 									 ((j * nColsInChunk) + m) ;
 
-						if ((1.0 == dbProb) || 
-							(dbProb > ((double)random() / (double)INT_MAX))) 
+						if ((1.0 == dbProb) ||
+							(dbProb > ((double)random() / (double)INT_MAX)))
 						{
 
-							if (nIsRandom) 
+							if (nIsRandom)
 								print_random_attr( nTypeCnt, szTypesListStr );
 							else {
-								print_det_attr( nTypeCnt, szTypesListStr, 
+								print_det_attr( nTypeCnt, szTypesListStr,
 												nCellNum, nCellMax);
 							}
-						} else { 
+						} else {
 							print_empty_attr();
 						}
 						nCount++;

@@ -53,14 +53,8 @@ SCIDB QUERY : <slice(A,x,5000)>
 SCIDB QUERY : <store(subarray(B,0,0,5,5),Bsub)>
 {0,0}[[{0,0}(10)]]
 
-SCIDB QUERY : <concat(subarray(A,0,0,5,5),Bsub)>
-{0,0}[[{0,0}(10)]];[[{6,0}(10)]]
-
 SCIDB QUERY : <store(between(B,0,0,5,5),Bbetw)>
 {0,0}[[{0,0}(10)]]
-
-SCIDB QUERY : <concat(between(A,0,0,5,5),scan(Bbetw,true))>
-[An error expected at this place for the query "concat(between(A,0,0,5,5),scan(Bbetw,true))". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT.]
 
 SCIDB QUERY : <aggregate(join(C,C),count(*))>
 {0}[{0}(3)]

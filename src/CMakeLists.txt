@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -24,6 +24,7 @@ add_subdirectory("capi")
 add_subdirectory("network")
 add_subdirectory("system")
 add_subdirectory("smgr")
+add_subdirectory("usr_namespace")
 add_subdirectory("util")
 add_subdirectory("mpi")
 add_subdirectory("dense_linear_algebra")
@@ -39,14 +40,14 @@ if (NOT WITHOUT_SERVER)
             "../include/query/*.h" "../include/util/*.h")
 
     set(CMAKE_VERBOSE_MAKEFILE ON)
-    add_executable(scidb network/entry.cpp dense_linear_algebra/blas/initMathLibs.cpp ${include_src})
+    add_executable(scidb network/entry.cpp network/GlobalNew.cpp dense_linear_algebra/blas/initMathLibs.cpp ${include_src})
 
     # removes the symbols from scidb and puts them in a separate file
     extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "scidb" scidb)
     set_target_properties(scidb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
     target_link_libraries(scidb network_lib util_lib system_lib qproc_lib array_lib
         ${LIBRT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
-        ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+        ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${CityHash_LIBRARY})
 endif()
 
 message(STATUS "****************** END src/CMakeLists.txt ******************")

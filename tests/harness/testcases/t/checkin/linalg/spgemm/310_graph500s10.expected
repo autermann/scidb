@@ -13,7 +13,7 @@
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "load(pairs_scale10, '${TEST_DATA_DIR}/graph500scale10.scidb.txt')">
 Query was executed successfully
 
-SCIDB QUERY : <store(redimension(apply(pairs_scale10, v, 1.0), mat_scale10),mat_scale10)>
+SCIDB QUERY : <store(redimension(apply(pairs_scale10, v, 1.0), mat_scale10,false),mat_scale10)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <store(spgemm(mat_scale10, mat_scale10, 'rightReplicate=true'), product_scale10true)>

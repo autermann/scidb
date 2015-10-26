@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -73,17 +73,17 @@ class LogicalMpiTest: public LogicalOperator
     LogicalOperator(logicalName, alias)
     {
     }
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         vector<AttributeDesc> attributes(1);
         attributes[0] = AttributeDesc((AttributeID)0, "mpi_test_attribute",  TID_STRING, 0, 0);
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("mpi_test_dimension"), Coordinate(0), Coordinate(0), uint32_t(0), uint32_t(0));
-        return ArrayDesc("mpi_test_array", attributes, dimensions);
+        return ArrayDesc("mpi_test_array", attributes, dimensions, defaultPartitioning());
     }
 
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalMpiTest, "mpi_test");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalMpiTest, "_mpi_test");
 
 }  // namespace scidb

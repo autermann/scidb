@@ -6,9 +6,9 @@
 --set-format dcsv
 --start-igdata
 --aql CREATE ARRAY raw <pos: int64, device: int64, val: float> [offset=0:*,5,0]  
---shell  --command="csv2scidb -p NNN -s 1 < $DOC_DATA/raw.csv > $DOC_DATA/raw.scidb "
+--shell  --command="sed 1d $DOC_DATA/raw.csv > /tmp/raw.load "
 --stop-igdata
---shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD raw FROM '${TEST_DATA_DIR}/doc/raw.scidb'""
+--shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD raw FROM '/tmp/raw.load' as 'csv'""
 --start-igdata
 --aql create array A <val: float> [device=1:5,5,0, pos=1:5,5,0]  
 --stop-igdata
@@ -28,6 +28,7 @@ redimension(A,Position, min(val) as minVal, avg(val) as avgVal, max(val) as maxV
 
 --cleanup
 
+--shell --command " rm -f /tmp/raw.load "
 remove(raw)
 remove(A)
 remove(Position)

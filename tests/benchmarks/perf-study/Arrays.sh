@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -21,10 +21,10 @@
 #
 #
 #   File:  Arrays.sh
-# 
-#   About: 
 #
-#   This script takes 5 arguments: 
+#   About:
+#
+#   This script takes 5 arguments:
 #
 #   Arrays.sh Chunk_Count Chunk_Length Zipf Sparsity Instance
 #
@@ -42,7 +42,7 @@ echo "+================================================"
 echo ""
 date
 echo ""
-#  
+#
 # set -x
 #
 LEN_I=`expr $1 "*" $2 - 1`;
@@ -53,13 +53,13 @@ INST=$5;
 Port=$6;
 LABEL="Array_${ZIPF}_${SPRS}";
 #
-#  ADMIN 1: Nuke the previous instance to clean up the space. 
+#  ADMIN 1: Nuke the previous instance to clean up the space.
 yes | scidb.py initall $INST
 scidb.py startall $INST
 #
 sleep 3;
 #
-#  DDL 1: Create array with 5 attributes for loading. 
+#  DDL 1: Create array with 5 attributes for loading.
 CMD="CREATE ARRAY Test_Array_Raw <
     I           : int64,
     J           : int64,
@@ -84,8 +84,8 @@ CMD="CREATE ARRAY Test_Array <
 echo "${CMD}"
 time -p iquery --port $Port -aq "$CMD"
 #
-#    Populating this array using the build() is problematic, as here are three 
-#  attributes and the distributions are awkward. So instead I will use the 
+#    Populating this array using the build() is problematic, as here are three
+#  attributes and the distributions are awkward. So instead I will use the
 #  external gen_matrix executable to generate the data, and load it using a
 #  pipe.
 #
@@ -96,11 +96,11 @@ mkfifo /tmp/Load.pipe
 echo "gen_matrix -rb $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe"
 gen_matrix -rb $1 $1 $2 $2 $ZIPF $SPRS NNG > /tmp/Load.pipe &
 #
-#  Time the load. 
+#  Time the load.
 /usr/bin/time -f "QLoad $LABEL Load %e" iquery --port $Port -nq "load Test_Array_Raw FROM '/tmp/Load.pipe' AS '(INT64,INT64,INT64,INT64,DOUBLE)';"
 #
 #  DML 1: How many cells in this array?
-CMD="join ( 
+CMD="join (
         build ( < s : string > [ I=0:0,1,0 ], 'Size_Count_For ${LABEL}'),
         aggregate ( Test_Array_Raw, count(*) )
 )";
@@ -108,12 +108,12 @@ CMD="join (
 echo $CMD
 #
 /usr/bin/time -f "${LABEL} Cell_Count %e" iquery --port $Port -taq "$CMD"
-# 
-#  Find out how big storage.data1 on the 0 instance is. 
+#
+#  Find out how big storage.data1 on the 0 instance is.
 #
 du -b $SCIDB_DATA_DIR/000/0/storage.data1
 #
-# save() the array, and compress it. 
+# save() the array, and compress it.
 #
 CMD="
 save ( Test_Array_Raw, '${OUT_FILE}', 0, '(INT64,INT64,INT64,INT64,DOUBLE)')
@@ -124,7 +124,7 @@ date;
 # /usr/bin/time -f "QSave %e" iquery --port $Port -r /dev/null -naq "${CMD}"
 ps -eo comm,%mem | grep SciDB-000-0
 #
-# Compress it. 
+# Compress it.
 # gzip ${OUT_FILE}
 #
-# END 
+# END

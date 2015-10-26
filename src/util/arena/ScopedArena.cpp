@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -67,18 +67,20 @@ void Page::free(Arena*& arena)
 
 /**
  *  Construct a resetting arena that allocates storage o.pagesize() bytes at a
- *  time from the %arena o.parent(). Actually, we increment the page size just
- *  a bit to make room for a header - class Page - in which we put a finalizer
- *  and pointer back to the %arena; thus we're reusing the finalizer machinery
- *  to arrange for our pages to, in a sense, 'destroy themselves'.
+ *  time from the %arena o.parent().
+ *
+ *  We adjust the page size in order to allow enough room for a header - class
+ *  Page - in which we shall place a finalizer and pointer back to the %arena;
+ *  thus we're reusing the finalization machinery to arrange for our pages to,
+ *  in a sense, 'destroy themselves'.
  */
     ScopedArena::ScopedArena(const Options& o)
                : LimitedArena(o),
-                 _size(align(sizeof(Page) + o.pagesize())),
+                 _size(align(std::max(o.pagesize(),sizeof(Page)))),
                  _next(0),
                  _last(0)
 {
-    assert(consistent());                                // Check consistency
+    assert(consistent());                                // Verify consistency
 }
 
 /**
@@ -146,6 +148,7 @@ void* ScopedArena::allocate(size_t n,finalizer_t f)
         _list.push_back(p);                              // ...add to the list
     }
 
+    assert(consistent());                                // Verify consistency
     return p;                                            // The new allocation
 }
 
@@ -162,6 +165,7 @@ void* ScopedArena::allocate(size_t n,finalizer_t f,count_t c)
         _list.push_back(p);                              // ...add to the list
     }
 
+    assert(consistent());                                // Verify consistency
     return p;                                            // The new allocation
 }
 
@@ -174,6 +178,8 @@ void ScopedArena::recycle(void* payload)
     {
         LimitedArena::recycle(payload);                  // ...validate header
     }
+
+    assert(consistent());                                // Verify consistency
 }
 
 /**
@@ -215,6 +221,7 @@ void* ScopedArena::doMalloc(size_t size)
     _next    += size;                                    // Then step over it
 
     assert(aligned(p));                                  // Check it's aligned
+    assert(consistent());                                // Verify consistency
     return p;                                            // The new allocation
 }
 
@@ -223,7 +230,9 @@ void* ScopedArena::doMalloc(size_t size)
  *  recovered when reset() is next called.
  */
 void ScopedArena::doFree(void*,size_t)
-{}
+{
+    assert(consistent());                                // Verify consistency
+}
 
 /**
  *  Reset the %arena, finalizing allocations that have not yet been explicitly
@@ -244,7 +253,7 @@ void ScopedArena::reset()
     _list.clear();                                       // Discard finalizers
     _next = _last = 0;                                   // Reset current page
     LimitedArena::reset();                               // Now reset our base
-    assert(consistent());                                // Check we're kosher
+    assert(consistent());                                // Verify consistency
 }
 
 /**
@@ -259,7 +268,6 @@ bool ScopedArena::consistent() const
 
     assert(aligned(_size));                              // Validate page size
     assert(aligned(sizeof(Page)));                       // And header size
-    assert(_list.size() <= _allocations);                // Check page list
     assert(_next<=_last && _last<=_next+_size);          // Check page extent
     assert(iff(_next==0,_last==0));                      // Both, or neither
 
@@ -274,7 +282,7 @@ bool ScopedArena::consistent() const
  */
 ArenaPtr newScopedArena(const Options& o)
 {
-    return boost::make_shared<ScopedArena>(o);           // Allocate new arena
+    return std::make_shared<ScopedArena>(o);           // Allocate new arena
 }
 
 /****************************************************************************/

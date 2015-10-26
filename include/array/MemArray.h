@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,8 +34,7 @@
 #include <vector>
 #include <map>
 #include <assert.h>
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 #include <query/Query.h>
 #include <util/FileIO.h>
@@ -43,9 +42,6 @@
 #include <util/CoordinatesMapper.h>
 #include <array/Tile.h>
 #include <util/DataStore.h>
-
-using namespace std;
-using namespace boost;
 
 namespace scidb
 {
@@ -155,15 +151,15 @@ namespace scidb
         //
         // Sparse chunk iterator
         //
-        virtual string const& getName() const;
+        virtual std::string const& getName() const;
         virtual ArrayID getHandle() const;
 
         virtual ArrayDesc const& getArrayDesc() const;
 
-        virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
-        virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
+        virtual std::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
+        virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
 
-        MemArray(ArrayDesc const& arr, boost::shared_ptr<Query> const& query);
+        MemArray(ArrayDesc const& arr, std::shared_ptr<Query> const& query);
 
         /**
          * Construct by first creating an empty MemArray with the shape of input,
@@ -177,7 +173,7 @@ namespace scidb
          * array does not support the independent scanning of attributes
          * (i.e. MergeSortArray).
          */
-        MemArray(boost::shared_ptr<Array>& input, boost::shared_ptr<Query> const& query, bool vertical = true);
+        MemArray(const std::shared_ptr<Array>& input, std::shared_ptr<Query> const& query, bool vertical = true);
         ~MemArray();
 
         /**
@@ -195,8 +191,8 @@ namespace scidb
         void swapOut();
         void pinChunk(LruMemChunk& chunk);
         void unpinChunk(LruMemChunk& chunk);
-        shared_ptr<DataStore> _datastore;
-        map<Address, LruMemChunk> _chunks;
+        std::shared_ptr<DataStore> _datastore;
+        std::map<Address, LruMemChunk> _chunks;
         Mutex _mutex;
     private:
         MemArray(const MemArray&);
@@ -208,18 +204,18 @@ namespace scidb
     class MemArrayIterator : public ArrayIterator
     {
       private:
-        map<Address, LruMemChunk>::iterator curr;
-        map<Address, LruMemChunk>::iterator last;
+        std::map<Address, LruMemChunk>::iterator curr;
+        std::map<Address, LruMemChunk>::iterator last;
         MemArray& _array;
         Address addr;
         Chunk* currChunk;
-        boost::shared_ptr<Array> parent;
+        std::shared_ptr<Array> parent;
         bool positioned;
 
         void position();
 
       public:
-        void setParentArray(boost::shared_ptr<Array> arr) {
+        void setParentArray(std::shared_ptr<Array> arr) {
             parent = arr;
         }
         MemArrayIterator(MemArray& arr, AttributeID attId);
@@ -233,7 +229,7 @@ namespace scidb
         Chunk& newChunk(Coordinates const& pos);
         Chunk& newChunk(Coordinates const& pos, int compressionMethod);
         void deleteChunk(Chunk& chunk);
-        virtual boost::shared_ptr<Query> getQuery()
+        virtual std::shared_ptr<Query> getQuery()
         {
             return Query::getValidQueryPtr(_array._query);
         }

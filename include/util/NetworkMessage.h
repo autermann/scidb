@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,19 +28,19 @@
 #ifndef NETWORK_MESSAGE_H_
 #define NETWORK_MESSAGE_H_
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <google/protobuf/message.h>
 
 namespace scidb
 {
    typedef ::google::protobuf::Message Message;
-   typedef boost::shared_ptr<Message> MessagePtr;
+   typedef std::shared_ptr<Message> MessagePtr;
    typedef uint16_t MessageID;
 
    /// Reserved message ID not used for any message
    const MessageID SYSTEM_NONE_MSG_ID = 0;
    /// Message IDs for internal SciDB messages are strictly less than this value
-   const MessageID SYSTEM_MAX_MSG_ID = 29;
+   const MessageID SYSTEM_MAX_MSG_ID = 34;
 
    /**
     * Messageg types used by SciDB plugins

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -53,17 +53,17 @@ public:
      * CrossBetween is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkIterator method.
      */
-    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
-                                      boost::shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
+                                      std::shared_ptr<Query> query)
     {
         // Ensure inputArray supports random access, and rangesArray is replicated.
         assert(inputArrays.size() == 2);
-        shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
-        shared_ptr<Array> rangesArray = redistributeToRandomAccess(inputArrays[1], query, psReplication,
+        std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+        std::shared_ptr<Array> rangesArray = redistributeToRandomAccess(inputArrays[1], query, psReplication,
                                                                    ALL_INSTANCE_MASK,
-                                                                   shared_ptr<DistributionMapper>(),
+                                                                   std::shared_ptr<CoordinateTranslator>(),
                                                                    0,
-                                                                   shared_ptr<PartitioningSchemaData>());
+                                                                   std::shared_ptr<PartitioningSchemaData>());
 
         // Some variables.
         SchemaUtils schemaUtilsInputArray(inputArray);
@@ -75,14 +75,14 @@ public:
         // Set up a MultiConstIterators to process the array iterators simultaneously.
         SpatialRangesPtr spatialRangesPtr = make_shared<SpatialRanges>(nDims);
 
-        vector<shared_ptr<ConstIterator> > rangesArrayIters(nDims*2);
+        vector<std::shared_ptr<ConstIterator> > rangesArrayIters(nDims*2);
         for (size_t i=0; i<nDims*2; ++i) {
             rangesArrayIters[i] = rangesArray->getConstIterator(i);
         }
         MultiConstIterators multiItersRangesArray(rangesArrayIters);
         while (!multiItersRangesArray.end()) {
             // Set up a MultiConstIterators to process the chunk iterators simultaneously.
-            vector<shared_ptr<ConstIterator> > rangesChunkIters(nDims*2);
+            vector<std::shared_ptr<ConstIterator> > rangesChunkIters(nDims*2);
             for (size_t i=0; i<nDims*2; ++i) {
                 rangesChunkIters[i] = dynamic_pointer_cast<ConstArrayIterator>(rangesArrayIters[i])->getChunk().getConstIterator();
             }
@@ -106,7 +106,7 @@ public:
         }
 
         // Return a CrossBetweenArray.
-        return boost::shared_ptr< Array>(make_shared<BetweenArray>(_schema, spatialRangesPtr, inputArray));
+        return std::shared_ptr< Array>(make_shared<BetweenArray>(_schema, spatialRangesPtr, inputArray));
    }
 };
 

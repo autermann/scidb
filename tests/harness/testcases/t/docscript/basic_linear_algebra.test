@@ -1,6 +1,7 @@
 
 --test
 --start-query-logging
+load_library('dense_linear_algebra')  
 
 --set-format dcsv
 --start-igdata
@@ -42,10 +43,7 @@ show(m3x2)
 --set-format dense
 scan(m3x2)  
 --set-format dcsv
---start-igdata
-load_library('dense_linear_algebra')  
 --set-format dense
---stop-igdata
 --aql SELECT * FROM gesvd(m3x2, 'right')  
 --aql SELECT * FROM gesvd(m3x2, 'left')  
 --aql SELECT * FROM gesvd(m3x2, 'values')  

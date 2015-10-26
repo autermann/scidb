@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -64,6 +64,10 @@
 # include "SciDBAPI.h"
 # include "array/Array.h"
 # include "smgr/io/ArrayWriter.h"
+
+#include <network/BaseConnection.h>
+#include <network/proto/scidb_msg.pb.h>
+
 
 # define TESTCASE_COMMAND_SETUP             "--setup"
 # define TESTCASE_COMMAND_TEST              "--test"
@@ -157,6 +161,142 @@ string DefaultExecutor :: getErrorCodeFromException (const string &errstr)
 	return codestr;
 }
 
+void DefaultExecutor :: newClientStart(
+    void* connection,
+    const std::string &name,
+    const std::string &password)
+{
+    log4cxx::LoggerPtr logger = log4cxx::Logger::getRootLogger();
+
+    LOG4CXX_DEBUG(logger,
+        "newClientStart("
+            << "  name="     << name     << ","
+            << "  password=********)");
+
+    scidb::BaseConnection *baseConnection =
+        static_cast<scidb::BaseConnection*>(connection);
+
+    // --- send newClientStart message --- //
+    std::shared_ptr<scidb::MessageDesc> msgNewClientStart =
+        std::make_shared<scidb::MessageDesc>(scidb::mtNewClientStart);
+
+    LOG4CXX_DEBUG(logger,
+        "newClientStart Sending newClientStart");
+
+    std::shared_ptr<scidb::MessageDesc> resultMessage;
+
+
+    resultMessage = baseConnection->
+        sendAndReadMessage<scidb::MessageDesc>(
+            msgNewClientStart);
+
+    bool done = false;
+    do
+    {
+        switch(resultMessage->getMessageType())
+        {
+            case scidb::mtSecurityMessage:
+            {
+                std::string   strMessage;
+                uint32_t      messageType;
+                std::string   userResponse;
+
+                // --- display the information in the SecurityMessage --- //
+                {
+                    std::shared_ptr<scidb_msg::SecurityMessage> record =
+                        resultMessage->getRecord<scidb_msg::SecurityMessage>();
+
+                    strMessage   = record->msg();
+                    messageType  = record->msg_type();
+
+                    LOG4CXX_DEBUG(logger,
+                        "newClientStart message="
+                        << strMessage
+                        << " type=" << (uint32_t) messageType);
+
+                    LOG4CXX_DEBUG(logger,
+                        "newClientStart getInputFromFile("
+                        << strMessage << ", "
+                        << "  name=" << name << ", "
+                        << "  password=********)");
+
+                    transform(
+                        strMessage.begin(),
+                        strMessage.end(),
+                        strMessage.begin(),
+                        ::tolower );
+                    if(strMessage.compare("login:") == 0) {
+                        userResponse = name;
+                    } else if(strMessage.compare("password:") == 0) {
+                        userResponse = password;
+                    } else {
+                        throw USER_EXCEPTION(
+                            scidb::SCIDB_SE_INTERNAL,
+                            scidb::SCIDB_LE_UNKNOWN_REQUEST);
+                    }
+
+                    LOG4CXX_DEBUG(logger, "newClientStart"
+                        << "  message=" << strMessage
+                        << "  response=" << userResponse);
+
+                    if(0 == userResponse.length())
+                    {
+                        LOG4CXX_ERROR(logger, "invalid buffer length");
+                        throw USER_EXCEPTION(
+                            scidb::SCIDB_SE_INTERNAL,
+                            scidb::SCIDB_LE_INVALID_BUFFER_LENGTH);
+                    }
+                }
+
+
+                // --- send SecurityMessageResponse --- //
+                {
+                    std::shared_ptr<scidb::MessageDesc> msgSecurityMessageResponse =
+                        std::make_shared<scidb::MessageDesc>(
+                            scidb::mtSecurityMessageResponse);
+
+                    std::shared_ptr<scidb_msg::SecurityMessageResponse> record =
+                        msgSecurityMessageResponse->getRecord<
+                            scidb_msg::SecurityMessageResponse>();
+
+                    record->set_response(userResponse.c_str());
+
+                    LOG4CXX_DEBUG(logger,
+                        "newClientStart sendResponse(\""
+                            << record->response()
+                            << "\""
+                            << ")");
+
+                    resultMessage =
+                        baseConnection->sendAndReadMessage<scidb::MessageDesc>(
+                            msgSecurityMessageResponse);
+                }
+            } break;
+
+            case scidb::mtNewClientComplete:
+            {
+                std::shared_ptr<scidb_msg::NewClientComplete> record =
+                    resultMessage->getRecord<scidb_msg::NewClientComplete>();
+
+                LOG4CXX_DEBUG(logger,
+                    "newClient mtNewClientComplete"
+                    << " Authenticated="
+                    << (record->authenticated() ? "true" : "false"));
+              done=true;
+            } break;
+
+            case scidb::mtError:
+              LOG4CXX_ERROR(logger, "newClient mtError");
+              throw USER_EXCEPTION(
+                  scidb::SCIDB_SE_INITIALIZATION,
+                  scidb::SCIDB_LE_CONNECTION_SETUP);
+            break;
+        }  // switch(resultMessage->getMessageType()) { ... }
+    } while(!done);
+}
+
+
+
 int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorCommandOptions *errorInfo)
 {
 	scidb::QueryResult queryResult;
@@ -184,6 +324,11 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		if (_dbconnection == 0)
 		{
 			_dbconnection = _scidb.connect (_ie.connectionString, _ie.scidbPort);
+
+            newClientStart(
+                _dbconnection,
+                _ie.userName,
+                _ie.userPassword);
 		}
 
 
@@ -194,12 +339,12 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		 **/
 		if (queryResult.selective && _ignoredata_flag == false)
 		{
-            scidb::ArrayWriter::save (*queryResult.array, queryoutput_file, boost::shared_ptr<scidb::Query>(), _outputFormat);
+            scidb::ArrayWriter::save (*queryResult.array, queryoutput_file, std::shared_ptr<scidb::Query>(), _outputFormat);
 		}
 		else if (queryResult.selective && _ignoredata_flag == true)
 		{
 			scidb::AttributeID nAttrs = (scidb::AttributeID)queryResult.array->getArrayDesc().getAttributes().size();
-			std::vector< boost::shared_ptr<scidb::ConstArrayIterator> >iterators(nAttrs);
+			std::vector< std::shared_ptr<scidb::ConstArrayIterator> >iterators(nAttrs);
 			for (scidb::AttributeID i = 0; i < nAttrs; i++)
 			{
 				iterators[i] = queryResult.array->getConstIterator(i);
@@ -2709,6 +2854,8 @@ void DefaultExecutor :: printExecutorEnvironment (void)
 	LOG4CXX_INFO (_logger, "_ie.log_file : "         << _ie.log_file);
 
 	LOG4CXX_INFO (_logger, "_ie.logger_name : "     << _ie.logger_name);
+	LOG4CXX_INFO (_logger, "_ie.userName : "        << _ie.userName);
+	LOG4CXX_INFO (_logger, "_ie.userPassword : "    << "********");
 
 	LOG4CXX_INFO (_logger, "Done Printing executor Environment...");
 }
@@ -2830,7 +2977,9 @@ void DefaultExecutor :: copyToLocal (const InfoForExecutor &ie)
 	_ie.timerfile          = ie.timerfile;
 	_ie.log_file           = ie.log_file;
 
-	_ie.logger_name       = ie.logger_name;
+	_ie.logger_name        = ie.logger_name;
+	_ie.userName           = ie.userName;
+	_ie.userPassword       = ie.userPassword;
 }
 
 int DefaultExecutor :: execute (InfoForExecutor &ie)

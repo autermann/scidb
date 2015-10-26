@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -101,9 +101,7 @@ void setOutputMatrixToAlgebraDefault(float_tt* dst, size_t numVal, log4cxx::Logg
     LOG4CXX_DEBUG(SCALAPACKPHYSICAL_HPP_logger, "setOutputMatrixToAlgebraDefault took " << timer.stop());
 }
 
-void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
-                    slpp::int_t NPROW, slpp::int_t NPCOL,
-                    slpp::int_t MYPROW, slpp::int_t MYPCOL,
+void checkBlacsInfo(std::shared_ptr<Query>& query, const blacs::context_t&,
                     const std::string& callerLabel) ;
 
 ///
@@ -111,9 +109,9 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
 /// range of sizes and are generally only implemented for
 /// square block sizes.  Check these constraints
 ///
-void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
+void extractArrayToScaLAPACK(std::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
                              slpp::int_t nPRow, slpp::int_t nPCol,
-                             slpp::int_t myPRow, slpp::int_t myPCol, const shared_ptr<Query>& query);
+                             slpp::int_t myPRow, slpp::int_t myPCol, const std::shared_ptr<Query>& query);
 
 class ScaLAPACKPhysical : public MPIPhysical
 {
@@ -139,12 +137,12 @@ public:
     virtual bool                    changesDistribution(const std::vector<ArrayDesc> & inputSchemas) const
                                     { return true; }
 
-    virtual ArrayDistribution       getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext       getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                           const std::vector< ArrayDesc> & inputSchemas) const
-                                    { return ArrayDistribution(psScaLAPACK); }
+                                    { return RedistributeContext(psScaLAPACK); }
 
-    virtual bool                    requiresRepart(ArrayDesc const& inputSchema) const;
-    virtual ArrayDesc               getRepartSchema(ArrayDesc const& inputSchema) const;
+    virtual bool                    requiresRedimensionOrRepartition(ArrayDesc const& inputSchema) const;
+    virtual ArrayDesc               getRedimensionOrRepartitionSchema(ArrayDesc const& inputSchema) const;
 
     // extending API
 
@@ -166,13 +164,13 @@ public:
      *                      this routine is working would be significant to the log line.
      * @return              outputArray redistributed to psHashPartitioned.
      */
-    shared_ptr<Array> redistributeOutputArrayForTiming(shared_ptr<Array>& outputArray, shared_ptr<Query>& query, const std::string& callerLabel);
+    std::shared_ptr<Array> redistributeOutputArrayForTiming(std::shared_ptr<Array>& outputArray, std::shared_ptr<Query>& query, const std::string& callerLabel);
 
     /**
      * Make the provided inputArrays conform to the general requirements of ScaLAPACK operators, e.g.
      * that they have acceptable chunk size and distribution.
      *
-     * NOTE: the automatic repart() is not implemented yet, but we located inside this method.
+     * NOTE: the automatic reshape() is not implemented yet, but we located inside this method.
      * NOTE: at some point this may also include extractToScaLAPACK, so that it completely processes a single
      *       input into ScaLAPACK memory, at which point a multi-input version will be acceptable again.
      *
@@ -182,7 +180,7 @@ public:
      *                      this routine is working would be significant to the log line.
      * @return              transformed or passed-through inputArrays, as appropriate
      */
-    std::vector<shared_ptr<Array> > redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query, const std::string& callerLabel);
+    std::vector<std::shared_ptr<Array> > redistributeInputArrays(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query>& query, const std::string& callerLabel);
 
     /**
      * Make the provided inputArray conform to the general requirements of ScaLAPACK operators, e.g.
@@ -205,9 +203,9 @@ public:
      *                      this routine is significant when reading the log line.
      * @return              transformed or passed-through inputArray, as appropriate
      */
-    shared_ptr<Array> redistributeInputArray(shared_ptr<Array>& inputArray,
-                                             const shared_ptr<PartitioningSchemaDataForScaLAPACK>& schemeData,
-                                             shared_ptr<Query>& query, const std::string& callerLabel);
+    std::shared_ptr<Array> redistributeInputArray(std::shared_ptr<Array>& inputArray,
+                                             const std::shared_ptr<PartitioningSchemaDataForScaLAPACK>& schemeData,
+                                             std::shared_ptr<Query>& query, const std::string& callerLabel);
 
     /**
      * Initialize the ScaLAPACK BLACS (Basic Linear Algebra Communications Systems).
@@ -215,7 +213,7 @@ public:
      * @param query         Current query
      * @return              Whether the instance participates in the ScaLAPACK computation or may instead
      */
-    bool                            doBlacsInit(std::vector< shared_ptr<Array> >& redistributedInputs, shared_ptr<Query>& query, const std::string& callerLabel);
+    blacs::context_t                doBlacsInit(std::vector< std::shared_ptr<Array> >& redistributedInputs, std::shared_ptr<Query>& query, const std::string& callerLabel);
 
     /**
      * compute the correct ScaLAPACK BLACS process grid size for a particular set of input Arrays (Matrices)
@@ -224,7 +222,7 @@ public:
      * @param callerLabel           identify the context of the call, essential for nested operator debugging
      * @return                      the BLACS grid size
      */
-    virtual procRowCol_t            getBlacsGridSize(std::vector< shared_ptr<Array> >& redistributedInputs, shared_ptr<Query>& query, const std::string& callerLabel);
+    virtual procRowCol_t            getBlacsGridSize(std::vector< std::shared_ptr<Array> >& redistributedInputs, std::shared_ptr<Query>& query, const std::string& callerLabel);
 
     /**
      * a standard way to test INFO returned by a slave,
@@ -242,11 +240,11 @@ protected:
     /// very handy for the operators
     typedef std::tr1::array<size_t, 2 > matSize_t;
     /// get matrix size as vector
-    matSize_t getMatSize(boost::shared_ptr<Array>& array) const;
+    matSize_t getMatSize(std::shared_ptr<Array>& array) const;
     /// get matrix chunk size as vector
-    matSize_t getMatChunkSize(boost::shared_ptr<Array>& array) const;
+    matSize_t getMatChunkSize(std::shared_ptr<Array>& array) const;
 
-    void checkInputArray(boost::shared_ptr<Array>& Ain) const ;
+    void checkInputArray(std::shared_ptr<Array>& Ain) const ;
 
 private:
     GridSizeRule_e          _gridRule;  // some operators need special rules for determining the
@@ -254,7 +252,7 @@ private:
 };
 
 
-inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(boost::shared_ptr<Array>& array) const
+inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(std::shared_ptr<Array>& array) const
 {
     assert(array->getArrayDesc().getDimensions().size() == 2);
 
@@ -265,7 +263,7 @@ inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(boost::shared_
 }
 
 
-inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatChunkSize(boost::shared_ptr<Array>& array) const
+inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatChunkSize(std::shared_ptr<Array>& array) const
 {
     assert(array->getArrayDesc().getDimensions().size() == 2);
 

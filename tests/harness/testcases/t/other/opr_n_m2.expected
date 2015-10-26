@@ -455,45 +455,6 @@ SCIDB QUERY : <cross_join(A as a1,A as a2,a1.x,a2.x)>
 {7,2,1} 15,16
 {7,2,2} 15,15
 
-SCIDB QUERY : <concat(A,A)>
-{x,y} a
-{0,0} 10
-{0,1} 9
-{0,2} 8
-{1,0} null
-{1,1} null
-{1,2} null
-{3,0} null
-{3,1} null
-{3,2} null
-{4,0} 14
-{4,1} 13
-{4,2} 12
-{6,0} 16
-{6,1} 15
-{6,2} 14
-{7,0} 17
-{7,1} 16
-{7,2} 15
-{8,0} 10
-{8,1} 9
-{8,2} 8
-{9,0} null
-{9,1} null
-{9,2} null
-{11,0} null
-{11,1} null
-{11,2} null
-{12,0} 14
-{12,1} 13
-{12,2} 12
-{14,0} 16
-{14,1} 15
-{14,2} 14
-{15,0} 17
-{15,1} 16
-{15,2} 15
-
 SCIDB QUERY : <filter(A,x%2=1)>
 {x,y} a
 {1,0} null
@@ -602,27 +563,6 @@ SCIDB QUERY : <project(apply(A,z,a+10),z)>
 {7,1} 26
 {7,2} 25
 
-SCIDB QUERY : <reverse(A)>
-{x,y} a
-{0,0} 15
-{0,1} 16
-{0,2} 17
-{1,0} 14
-{1,1} 15
-{1,2} 16
-{3,0} 12
-{3,1} 13
-{3,2} 14
-{4,0} null
-{4,1} null
-{4,2} null
-{6,0} null
-{6,1} null
-{6,2} null
-{7,0} 8
-{7,1} 9
-{7,2} 10
-
 SCIDB QUERY : <repart(A,<a:int32 null> [x=0:7,2,2,y=0:2,1,1])>
 {x,y} a
 {0,0} 10
@@ -649,11 +589,6 @@ SCIDB QUERY : <bernoulli(A,0.5,1)>
 
 SCIDB QUERY : <bernoulli(A,0.5,1)>
 [Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <lookup(join(build(<x:int64>[j=0:2,3,0],j),build(<y:int64>[i=0:2,3,0],i)),A)>
-{j} a
-{0} 10
-{1} null
 
 SCIDB QUERY : <store(build(A,iif(x=1,null,x*10+y)),A)>
 {x,y} a
@@ -687,33 +622,6 @@ SCIDB QUERY : <slice(A,x,1)>
 {0} null
 {1} null
 {2} null
-
-SCIDB QUERY : <thin(A,0,1,0,1)>
-{x,y} a
-{0,0} 0
-{0,1} 1
-{0,2} 2
-{1,0} null
-{1,1} null
-{1,2} null
-{2,0} 20
-{2,1} 21
-{2,2} 22
-{3,0} 30
-{3,1} 31
-{3,2} 32
-{4,0} 40
-{4,1} 41
-{4,2} 42
-{5,0} 50
-{5,1} 51
-{5,2} 52
-{6,0} 60
-{6,1} 61
-{6,2} 62
-{7,0} 70
-{7,1} 71
-{7,2} 72
 
 SCIDB QUERY : <transpose(A)>
 {y,x} a

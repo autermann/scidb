@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,11 +33,11 @@
 #ifndef LOGICALEXPRESSION_H_
 #define LOGICALEXPRESSION_H_
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "query/TypeSystem.h"
+#include <array/Metadata.h>
+#include <array/Array.h>
+#include <query/TypeSystem.h>
 
 namespace scidb
 {
@@ -45,18 +45,18 @@ namespace scidb
 class ParsingContext;
 
 /**
- * Base class for logical expressions
+ * Base class for logical expressions.
  */
 class LogicalExpression
 {
 public:
-	LogicalExpression(const boost::shared_ptr<ParsingContext>& parsingContext):
+	LogicalExpression(const std::shared_ptr<ParsingContext>& parsingContext):
 		_parsingContext(parsingContext)
 	{}
 
-    virtual ~LogicalExpression() {} /**< To make base class virtual */
+    virtual ~LogicalExpression() {}
 
-	boost::shared_ptr<ParsingContext> getParsingContext() const
+	std::shared_ptr<ParsingContext> getParsingContext() const
 	{
 		return _parsingContext;
 	}
@@ -64,13 +64,13 @@ public:
     virtual void toString(std::ostream &out, int indent = 0) const;
 
 private:
-	boost::shared_ptr<ParsingContext> _parsingContext;
+	std::shared_ptr<ParsingContext> _parsingContext;
 };
 
 class AttributeReference: public LogicalExpression
 {
 public:
-    AttributeReference(const boost::shared_ptr<ParsingContext>& parsingContext,
+    AttributeReference(const std::shared_ptr<ParsingContext>& parsingContext,
     	const std::string& arrayName, const std::string& attributeName):
     	LogicalExpression(parsingContext), _arrayName(arrayName), _attributeName(attributeName)
     {
@@ -89,8 +89,8 @@ public:
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Terminate with newline.
-    * @param[out] stream to write to
-     * @param[in] indent number of spacer characters to start every line with.
+     * @param[out] stream to write to
+     * @param[in]  indent number of spacer characters to start every line with.
      */
     virtual void toString(std::ostream &out, int indent = 0) const;
 
@@ -102,7 +102,7 @@ private:
 class Constant : public LogicalExpression
 {
 public:
-	Constant(const boost::shared_ptr<ParsingContext>& parsingContext, const  Value& value,
+	Constant(const std::shared_ptr<ParsingContext>& parsingContext, const  Value& value,
 		const  TypeId& type): LogicalExpression(parsingContext), _value(value), _type(type)
 	{
 	}
@@ -115,14 +115,13 @@ public:
         return _type;
     }
 
-
     /**
      * Retrieve a human-readable description.
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Terminate with newline.
-    * @param[out] stream to write to
-     * @param[in] indent number of spacer characters to start every line with.
+     * @param[out] stream to write to
+     * @param[in]  indent number of spacer characters to start every line with.
      */
     virtual void toString(std::ostream &str, int indent = 0) const;
 
@@ -131,12 +130,11 @@ private:
 	 TypeId _type;
 };
 
-
 class Function : public LogicalExpression
 {
 public:
-	Function(const boost::shared_ptr<ParsingContext>& parsingContext, const std::string& function,
-		const std::vector<boost::shared_ptr<LogicalExpression> >& args):
+	Function(const std::shared_ptr<ParsingContext>& parsingContext, const std::string& function,
+		const std::vector<std::shared_ptr<LogicalExpression> >& args):
 		LogicalExpression(parsingContext), _function(function), _args(args)
 	{
 	}
@@ -145,7 +143,7 @@ public:
 		return _function;
 	}
 
-	const std::vector<boost::shared_ptr<LogicalExpression> >& getArgs() const {
+	const std::vector<std::shared_ptr<LogicalExpression> >& getArgs() const {
 		return _args;
 	}
 
@@ -153,9 +151,8 @@ public:
 
 private:
 	std::string _function;
-	std::vector<boost::shared_ptr<LogicalExpression> > _args;
+	std::vector<std::shared_ptr<LogicalExpression> > _args;
 };
-
 
 } // namespace scidb
 

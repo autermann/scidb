@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@ function ubuntu ()
 {
     function dependencies ()
     {
-	(for package in $(ls *.deb); do
+	(for package in $(ls *.deb | xargs); do
 	    dpkg --info $package | grep Depends | sed -e "s/Depends://g" | sed -e "s/,/\n/g" | awk '{print $1}' | grep -v scidb;
 	    dpkg --info $package | grep Depends | sed -e "s/Depends://g" | sed -e "s/,/\n/g" | awk '{print $1}' | grep scidb | grep libcsv;
 	    dpkg --info $package | grep Depends | sed -e "s/Depends://g" | sed -e "s/,/\n/g" | awk '{print $1}' | grep scidb | grep mpich2;

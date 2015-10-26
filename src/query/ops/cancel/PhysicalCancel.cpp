@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -45,13 +45,13 @@ public:
 	{
 	}
 
-    shared_ptr<Array> execute(vector<shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector<std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         const scidb::SciDB& scidb = getSciDBExecutor();
         const QueryID queryID = dynamic_pointer_cast<OperatorParamPhysicalExpression>(_parameters[0])->getExpression()->evaluate().getInt64();
         scidb.cancelQuery(queryID);
 
-        return boost::shared_ptr<Array>();
+        return std::shared_ptr<Array>();
     }
 };
 

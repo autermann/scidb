@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -52,12 +52,12 @@ namespace scidb {
     class Scanner
     {
         FILE* filePtr;          // not owned, do not close
-        string filePath;
+        std::string filePath;
         int missingReason;
         int lineNo;
         int columnNo;
         int64_t pos;
-        boost::shared_ptr<BufferedFileInput> doubleBuffer;
+        std::shared_ptr<BufferedFileInput> doubleBuffer;
 
         // A temporary string which is used to hold the current token.
         // Normally, bytes are copied to stringBuf.  When stringBuf is
@@ -66,7 +66,7 @@ namespace scidb {
         // optimization is used to avoid expensive calls to
         // string::operation+=() for individual bytes.
         //
-        string tmpValue;
+        std::string tmpValue;
 
         // Max size of the temporary stringBuf.
         static const size_t MAX_TEMP_BUF_SIZE = 100;
@@ -91,7 +91,7 @@ namespace scidb {
             return missingReason;
         }
 
-        string const& getValue()
+        std::string const& getValue()
         {
             tmpValue.append(stringBuf, nStringBuf);
             nStringBuf = 0;
@@ -103,7 +103,7 @@ namespace scidb {
             return pos;
         }
 
-        void setPosition(int64_t p) 
+        void setPosition(int64_t p)
         {
             pos = p;
         }
@@ -123,7 +123,7 @@ namespace scidb {
             return useDoubleBuffering;
         }
 
-        void open(FILE* fp, boost::shared_ptr<Query> query)
+        void open(FILE* fp, std::shared_ptr<Query> query)
         {
             assert(doubleBuffer.get() == 0);
             if (useDoubleBuffering) {
@@ -131,7 +131,7 @@ namespace scidb {
                 // to start worker threads that will begin reading the
                 // file immediately!
                 doubleBuffer =
-                    shared_ptr<BufferedFileInput>(new BufferedFileInput(fp, query));
+                        std::shared_ptr<BufferedFileInput>(new BufferedFileInput(fp, query));
             } else {
                 filePtr = fp;
             }
@@ -146,7 +146,7 @@ namespace scidb {
             doubleBuffer.reset();
         }
 
-        const string& getFilePath() const { return filePath; }
+        const std::string& getFilePath() const { return filePath; }
 
         int getChar() {
             int ch = useDoubleBuffering ? doubleBuffer->myGetc() : fgetc(filePtr);

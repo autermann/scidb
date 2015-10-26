@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,7 +21,7 @@
 */
 
 // defacto std
-#include <boost/make_shared.hpp>
+#include <memory>
 
 // SciDB
 #include <array/Metadata.h>
@@ -68,13 +68,13 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_line
 
 void mpirankMaster(//general args
                 Query* query,
-                boost::shared_ptr<MpiOperatorContext>& ctx,
-                boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
+                std::shared_ptr<MpiOperatorContext>& ctx,
+                std::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                 const string& ipcName, // can this be in the ctx too?
                 void * argsBuf,
                 const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
                 const slpp::int_t& MYPROW, const slpp::int_t& MYPCOL, const slpp::int_t& MYPNUM,
-                // mpirank operator args
+                // _mpirank operator args
                 double *IN,  const slpp::desc_t& DESC_IN,
                 double *OUT, const slpp::desc_t& DESC_OUT,
                 slpp::int_t &INFO)
@@ -109,7 +109,7 @@ void mpirankMaster(//general args
     cmd.setCmd(string("DLAOP")); // dummy command
     cmd.addArg(ipcName);
     cmd.addArg("3"); // 3 buffers: ARGS + IN, OUT arrays
-    cmd.addArg("mpirank");
+    cmd.addArg("_mpirank");
     slave->sendCommand(cmd, ctx);       // at this point the command and ipcName are sent
                                         // our slave finds and maps the buffers by name
                                         // based on ipcName

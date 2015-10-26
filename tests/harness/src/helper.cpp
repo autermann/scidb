@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -205,7 +205,7 @@ int manual_diff (const string &file1, const string &file2, const string &diff_fi
 
 	try
 	{
-		//bfs::remove (diff_file);	
+		//bfs::remove (diff_file);
 		if ((file1_ptr = fopen (file1.c_str(), "rb")) == NULL)
 		{
 			throw SystemError (FILE_LINE_FUNCTION, string("error opening file " + file1).c_str());
@@ -284,7 +284,7 @@ int diff (const string &file1, const string &file2, const string &diff_file)
 		{
 			case 0 :
 				LOGGER_POP_NDCTAG;
-				bfs::remove (diff_file);	
+				bfs::remove (diff_file);
 				return DIFF_FILES_MATCH;
 
 			/* if exit code is 1 and there is something written in .diff file then files differ */
@@ -346,7 +346,7 @@ int remove_duplicates (vector <string> &strcollection)
 	sort (strcollection.begin (), strcollection.end ());
 
 	/* remove duplicates */
-	vector <string> :: iterator it = unique (strcollection.begin (), strcollection.end ());  
+	vector <string> :: iterator it = unique (strcollection.begin (), strcollection.end ());
 	strcollection.resize (it - strcollection.begin());
 
 	return strcollection.size ();
@@ -506,7 +506,7 @@ int collectSkippedTestCases (string root_dir, string under_directory, string ski
 		    }
 		}
 	}
-         
+
 	/* read file containing disabled tests */
 	ifstream f(skiptestfname.c_str());
 	string line;
@@ -521,7 +521,7 @@ int collectSkippedTestCases (string root_dir, string under_directory, string ski
 	}
 
 	LOG4CXX_INFO (logger, "Reading skiplist from file " << skiptestfname);
-	
+
 	while (!f.eof ())
 	{
 		getline (f, line);
@@ -565,7 +565,7 @@ int collectSkippedTestCases (string root_dir, string under_directory, string ski
 
 		/* remove duplicates */
 		sort (skip_tclist.begin (), skip_tclist.end ());
-		it = unique (skip_tclist.begin (), skip_tclist.end ());  
+		it = unique (skip_tclist.begin (), skip_tclist.end ());
 		skip_tclist.resize (it - skip_tclist.begin());
 	}
 
@@ -573,7 +573,7 @@ int collectSkippedTestCases (string root_dir, string under_directory, string ski
     return skip_tclist.size ();
 }
 
-/* if "dirORfile" is a directory then collects all .test files from under this directory 
+/* if "dirORfile" is a directory then collects all .test files from under this directory
  * if it is a .suite file name then collects all test ids mentioned in it
  * and fills up the 'tclist' with the fully qualified file paths
  */
@@ -585,7 +585,7 @@ int collectTestCases (string root_dir, string dirORfile, const string regex_expr
 
 	if (root_dir.empty ())
 		root_dir = bid::current_directory ();
-	
+
 	/* if it is a relative path then prepend it with 'root_dir' */
 	if (dirORfile.find ('/') != 0 && dirORfile.find ('~') != 0)
 		dirORfile = root_dir + "/" + dirORfile;
@@ -771,7 +771,7 @@ int collectTestCases (string root_dir, const vector <string> &testcase_idsORname
 
 	if (root_dir.empty ())
 		root_dir = bid::current_directory ();
-	
+
 	/* if it is a relative path then prepend it with 'root_dir' */
 	if (under_directory.find ('/') != 0 && under_directory.find ('~') != 0)
 		under_directory = root_dir + "/" + under_directory;
@@ -914,7 +914,7 @@ int tokenize_commandline (const string str, vector<string> &token_list)
 				token_list.push_back (token);
 				delete token;
 
-				tmp.replace (0, nl_index+1, "");	
+				tmp.replace (0, nl_index+1, "");
 				stored_buf = tmp;
 			}
 			else
@@ -934,7 +934,7 @@ int tokenize_commandline (const string str, vector<string> &token_list)
 		ss << "tokenize_commandline: arg_separator failed when processing '" << str << "' Please check quoting." ;
 		throw SystemError (FILE_LINE_FUNCTION, ss.str());
 	}
-	
+
 	LOGGER_POP_NDCTAG;
 	return token_list.size ();
 }
@@ -1087,11 +1087,11 @@ void prepare_filepaths (InfoForExecutor &ie, int internally_called)
 	ie.timerfile.replace (ie.timerfile.find (file_extension), file_extensionLength, ".timer");
 	ie.diff_file.replace (ie.diff_file.find (file_extension), file_extensionLength, ".diff");
 	ie.log_file.replace (ie.log_file.find (file_extension), file_extensionLength, ".log");
-	
+
 	//------------------------------------------------------------------------
 	// Change: during the desktop/development workflow the harness will be run
 	// directly against the tests located in the checked out SVN tree (rootDir
-	// switch value will point there).  The logs, outs, diffs, etc. will be 
+	// switch value will point there).  The logs, outs, diffs, etc. will be
 	// dumped into scratchDir in order not to pollute the SVN tree diffs.
 	ie.actual_rfile = ie.actual_rfile.replace (0,ie.rootDir.length(),ie.scratchDir,0,ie.scratchDir.length());
 	ie.timerfile = ie.timerfile.replace(0,ie.rootDir.length(),ie.scratchDir,0,ie.scratchDir.length());

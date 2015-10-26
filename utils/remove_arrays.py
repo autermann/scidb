@@ -1,9 +1,10 @@
 #!/usr/bin/python
 #
+#
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2014 SciDB, Inc.
+# Copyright (C) 2014-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +41,7 @@ import traceback
 import scidblib
 from scidblib import scidb_afl
 from scidblib import scidb_psf
-        
+
 def main():
     """The main function gets command-line argument as a pattern, and removes all arrays with that pattern.
 
@@ -62,6 +63,10 @@ def main():
                         help='Port number to be passed to iquery.')
     parser.add_argument('-t', '--temp-only', action='store_true',
                         help='Limiting the candidates to temp arrays.')
+    parser.add_argument('-U', '--user-name',
+                        help='User name to be passed to iquery.')
+    parser.add_argument('-P', '--user-password',
+                        help='User password to be passed to iquery.')
     parser.add_argument('regex', metavar='REGEX', type=str, nargs='?', default='.*',
                         help='''Regular expression to match against array names.
                         The utility will remove arrays whose names match the regular expression.
@@ -70,31 +75,58 @@ def main():
                         For instance, '.*s' will match array 'dogs' because it ends with 's',
                         but will not match array 'moose' because it does not end with 's'.'''
                         )
+
     args = parser.parse_args()
+    if not args.user_name:      args.user_name = 'root'
+    if not args.user_password:  args.user_password = 'Paradigm4'
+
 
     try:
-        names = scidb_afl.get_array_names(temp_only=args.temp_only)
-        iquery_cmd = scidb_afl.get_iquery_cmd(args)
-        names_to_remove = []
+        namespaces = scidb_afl.get_namespace_names()
+        for namespace in namespaces:
+            print "\nSearching namespace: ", namespace
 
-        for name in names:
-            match_name = re.match('^'+args.regex+'$', name)
-            if match_name:
-                names_to_remove.append(name)
+            names = scidb_afl.get_array_names(
+                iquery_cmd = scidb_afl.get_iquery_cmd(),
+                temp_only=args.temp_only,
+                namespace=namespace)
 
-        if not names_to_remove:
-            print 'There is no array to remove.'
-            sys.exit(0)
+            iquery_cmd = scidb_afl.get_iquery_cmd(args)
+            names_to_remove = []
 
-        if not args.force:
-            print 'The following arrays are about to be removed:'
-            print names_to_remove
-            proceed = scidb_psf.confirm(prompt='Are you sure you want to remove?', resp=False)
-            if not proceed:
-                sys.exit(0)
+            for name in names:
+                match_name = re.match('^'+args.regex+'$', name)
+                if match_name:
+                    names_to_remove.append(name)
 
-        for name in names_to_remove:
-            scidb_afl.afl(iquery_cmd, 'remove('+name+')')
+            if not names_to_remove:
+                print "There are no arrays to remove in namespace", namespace
+                continue
+
+            if not args.force:
+                print 'The following arrays are about to be removed from namespace ' + namespace + ':'
+                print names_to_remove
+                proceed = scidb_psf.confirm(prompt='Are you sure you want to remove?', resp=False)
+                if not proceed:
+                    return
+
+            for name in names_to_remove:
+                scidb_afl.remove_array(name, namespace, iquery_cmd)
+
+            if namespace != 'public':
+                names = scidb_afl.get_array_names(
+                    iquery_cmd = scidb_afl.get_iquery_cmd(),
+                    temp_only=args.temp_only,
+                    namespace=namespace)
+                if not names:
+                    scidb_afl.afl(
+                        iquery_cmd
+                            + ' -U ' + args.user_name
+                            + ' -P ' + args.user_password,
+                        'drop_namespace(\'' + namespace + '\');')
+
+                    print "namespace " + namespace + " removed"
+
 
         print 'Number of arrays removed =', len(names_to_remove)
     except Exception, e:

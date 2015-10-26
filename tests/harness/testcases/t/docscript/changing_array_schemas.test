@@ -47,7 +47,6 @@ show(m1)
 show(m3x3)
 --set-format dense
 --aql SELECT * FROM m3x3  
---aql SELECT * FROM reverse(m3x3)  
 --set-format dcsv
 show(m4x4)
 --set-format dense
@@ -68,7 +67,6 @@ slice(m3x3x3,k,1)
 show(m4x4)
 --set-format dense
 scan(m4x4)  
-thin(m4x4, 0, 2, 0, 2)  
 --set-format dcsv
 --start-igdata
 create array square_array <val:int64>[i=0:15,16,0,j=0:15,16,0]  
@@ -78,10 +76,7 @@ store(build(square_array,i*16+j),square_array)
 subarray(square_array,5,5,8,8)  
 slice(square_array,j,5)  
 slice(square_array,i,9)  
-thin(square_array,0,4,0,8)  
-thin(square_array,0,8,0,2)  
-thin(square_array,2,8,1,2)  
---aql SELECT * INTO m3x3_new FROM attribute_rename(m3x3,val,val2)  
+--aql SELECT * INTO m3x3_new FROM project(apply(m3x3,val2,val),val2)
 --set-format dcsv
 show(m3x3_new)
 --set-format dense
@@ -113,10 +108,6 @@ show(Dsp)
 --aql SELECT * INTO Dsp_slice_1 FROM slice(Dsp, device_id, 1)  
 --aql SELECT * INTO Dsp_slice_2 FROM slice(Dsp, device_id, 2)  
 show(Dsp_slice_2)
---aql SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2)  
-show(Dsp_1d)
-store( concat( redimension( apply(Dsp_slice_0, d, 0), <val:double> [d=0:0,1,0,probe_id=0:4,5,0]), redimension( apply(Dsp_slice_2, d, 0), <val:double> [d=0:0,1,0,probe_id=0:4,5,0]) ), Dsp_new)
-show(Dsp_new)
 
 --stop-query-logging
 
@@ -147,5 +138,3 @@ remove(Dsp)
 remove(Dsp_slice_0)
 remove(Dsp_slice_1)
 remove(Dsp_slice_2)
-remove(Dsp_1d)
-remove(Dsp_new)

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@ InjectedErrorLibrary::~InjectedErrorLibrary()
 {
 }
 
-bool InjectedErrorLibrary::registerError(long int id, const boost::shared_ptr<const InjectedError>& err)
+bool InjectedErrorLibrary::registerError(long int id, const std::shared_ptr<const InjectedError>& err)
 {
 #ifndef NDEBUG
     ScopedMutexLock lock(_mutex);
@@ -44,39 +44,39 @@ bool InjectedErrorLibrary::registerError(long int id, const boost::shared_ptr<co
     return false;
 }
 
-boost::shared_ptr<const InjectedError> InjectedErrorLibrary::getError(long int id)
+std::shared_ptr<const InjectedError> InjectedErrorLibrary::getError(long int id)
 {
 #ifndef NDEBUG
     ScopedMutexLock lock(_mutex);
     IdToErrorMap::const_iterator iter = _registeredErrors.find(id);
     if (iter == _registeredErrors.end()) {
-        return boost::shared_ptr<InjectedError>();
+        return std::shared_ptr<InjectedError>();
     }
     return iter->second;
 #endif
-    return boost::shared_ptr<const InjectedError>();
+    return std::shared_ptr<const InjectedError>();
 }
 
 InjectedErrorLibrary::InjectedErrorLibrary()
 {
 #ifndef NDEBUG
     bool rc = registerError(WriteChunkInjectedError::ID,
-                            boost::shared_ptr<InjectedError>(new WriteChunkInjectedError()));
+                            std::shared_ptr<InjectedError>(new WriteChunkInjectedError()));
     assert(rc);
     rc = registerError(ReplicaSendInjectedError::ID,
-                       boost::shared_ptr<InjectedError>(new ReplicaSendInjectedError()));
+                       std::shared_ptr<InjectedError>(new ReplicaSendInjectedError()));
     assert(rc);
     rc = registerError(ReplicaWaitInjectedError::ID,
-                       boost::shared_ptr<InjectedError>(new ReplicaWaitInjectedError()));
+                       std::shared_ptr<InjectedError>(new ReplicaWaitInjectedError()));
     assert(rc);
     rc = registerError(OperatorInjectedError::ID,
-                       boost::shared_ptr<InjectedError>(new OperatorInjectedError()));
+                       std::shared_ptr<InjectedError>(new OperatorInjectedError()));
     assert(rc);
     rc = registerError(ThreadStartInjectedError::ID,
-                       boost::shared_ptr<InjectedError>(new ThreadStartInjectedError()));
+                       std::shared_ptr<InjectedError>(new ThreadStartInjectedError()));
     assert(rc);
     rc = registerError(DataStoreInjectedError::ID,
-                       boost::shared_ptr<InjectedError>(new DataStoreInjectedError()));
+                       std::shared_ptr<InjectedError>(new DataStoreInjectedError()));
     assert(rc);
 #endif
 }
@@ -85,7 +85,7 @@ InjectedErrorLibrary InjectedErrorLibrary::_injectedErrorLib;
 
 void WriteChunkInjectedError::inject() const
 {
-    boost::shared_ptr<const WriteChunkInjectedError> err(shared_from_this());
+    std::shared_ptr<const WriteChunkInjectedError> err(shared_from_this());
     Notification<WriteChunkInjectedError> event(err);
     event.publish();
 }
@@ -97,7 +97,7 @@ void WriteChunkInjectedError::activate() const
 
 void ReplicaSendInjectedError::inject() const
 {
-    boost::shared_ptr<const ReplicaSendInjectedError> err(shared_from_this());
+    std::shared_ptr<const ReplicaSendInjectedError> err(shared_from_this());
     Notification<ReplicaSendInjectedError> event(err);
     event.publish();
 }
@@ -109,7 +109,7 @@ void ReplicaSendInjectedError::activate() const
 
 void ReplicaWaitInjectedError::inject() const
 {
-    boost::shared_ptr<const ReplicaWaitInjectedError> err(shared_from_this());
+    std::shared_ptr<const ReplicaWaitInjectedError> err(shared_from_this());
     Notification<ReplicaWaitInjectedError> event(err);
     event.publish();
 }
@@ -121,7 +121,7 @@ void ReplicaWaitInjectedError::activate() const
 
 void OperatorInjectedError::inject() const
 {
-    boost::shared_ptr<const OperatorInjectedError> err(shared_from_this());
+    std::shared_ptr<const OperatorInjectedError> err(shared_from_this());
     Notification<OperatorInjectedError> event(err);
     event.publish();
 }
@@ -133,7 +133,7 @@ void OperatorInjectedError::activate() const
 
 void ThreadStartInjectedError::inject() const
 {
-    boost::shared_ptr<const ThreadStartInjectedError> err(shared_from_this());
+    std::shared_ptr<const ThreadStartInjectedError> err(shared_from_this());
     Notification< ThreadStartInjectedError> event(err);
     event.publish();
 }
@@ -145,7 +145,7 @@ void  ThreadStartInjectedError::activate() const
 
 void DataStoreInjectedError::inject() const
 {
-    boost::shared_ptr<const DataStoreInjectedError> err(shared_from_this());
+    std::shared_ptr<const DataStoreInjectedError> err(shared_from_this());
     Notification<DataStoreInjectedError> event(err);
     event.publish();
 }

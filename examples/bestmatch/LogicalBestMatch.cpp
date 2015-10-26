@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,7 +48,7 @@ class LogicalBestMatch: public LogicalOperator
         ADD_PARAM_CONSTANT("int64");
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 2);
 
@@ -74,9 +74,10 @@ class LogicalBestMatch: public LogicalOperator
                   && catalogDimensions[i].getChunkInterval() == patternDimensions[i].getChunkInterval()
                   && catalogDimensions[i].getChunkOverlap() == patternDimensions[i].getChunkOverlap()))
             {
-                // XXX To do: implement requiresRepart() method, remove interval/overlap checks
-                // above, use SCIDB_LE_START_INDEX_MISMATCH here.
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+                // XXX To do: implement requiresRedimensionOrRepartition() method, remove
+                // interval/overlap checks above, use SCIDB_LE_START_INDEX_MISMATCH here.
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+                << "Dimensions do not match";
             }
         }
 
@@ -98,7 +99,7 @@ class LogicalBestMatch: public LogicalOperator
         }
         matchAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
 
-        return ArrayDesc("bestmatch", matchAttributes, patternDimensions);
+        return ArrayDesc("bestmatch", matchAttributes, patternDimensions, defaultPartitioning());
     }
 };
 

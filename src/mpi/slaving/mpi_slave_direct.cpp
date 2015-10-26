@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -163,7 +163,7 @@ int initMpi(int argc, char* argv[])
     if(rank==0) cout << "SLAVE: rank: "<< rank  << " is ready (stdout)" << endl;
     if(rank==0) cerr << "SLAVE: rank: "<< rank  << " is ready (stderr)" << endl;
 
-    MPI::Errhandler eh = 
+    MPI::Errhandler eh =
        MPI::Comm::Create_errhandler((MPI::Comm::Errhandler_fn*)  &mpiErrorHandler);
 
     MPI::COMM_WORLD.Set_errhandler(eh);
@@ -240,9 +240,9 @@ int runScidbCommands(uint32_t port,
         INFO = scidb::pdgesvdSlave(bufs, sizes, nBufs, debugOverwriteArgs);
     } else if (dlaOp == "pdgemm_") {
         INFO = scidb::pdgemmSlave(bufs, sizes, nBufs);
-    } else if (dlaOp == "mpirank") {
+    } else if (dlaOp == "_mpirank") {
         INFO = scidb::mpirankSlave(bufs, sizes, nBufs);
-    } else if (dlaOp == "mpicopy") {
+    } else if (dlaOp == "_mpicopy") {
         cerr << "runScidbCommands: calling mpiCopySlave()" << std::endl;
         INFO = scidb::mpiCopySlave(bufs, sizes, nBufs);
     } else {

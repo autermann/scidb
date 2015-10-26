@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,21 +42,21 @@
 #include <limits.h>
 #include <string>
 
-#include <boost/enable_shared_from_this.hpp>
+#include <log4cxx/logger.h>
+#include <log4cxx/basicconfigurator.h>
+#include <log4cxx/helpers/exception.h>
+
+#include <memory>
 #include <query/Operator.h>
 #include <array/Metadata.h>
 #include <array/MemArray.h>
 #include <array/StreamArray.h>
 
-#include <log4cxx/logger.h>
-#include <log4cxx/basicconfigurator.h>
-#include <log4cxx/helpers/exception.h>
-
 namespace scidb
 {
     class ChunkLoader;
 
-    class InputArray : public SinglePassArray, public boost::enable_shared_from_this<InputArray>
+    class InputArray : public SinglePassArray, public std::enable_shared_from_this<InputArray>
     {
         friend class ChunkLoader;
 
@@ -67,12 +67,12 @@ namespace scidb
         /// Constructor
         InputArray(ArrayDesc const& desc,
                    std::string const& format,
-                   boost::shared_ptr<Query>& query,
+                   std::shared_ptr<Query>& query,
                    bool emptyMode,
                    bool enforceUniqueness,
-                   int64_t maxCnvErrors = 0,
-                   std::string const& shadowArrayName = string(),
-                   bool parallelLoad = false);
+                   int64_t maxCnvErrors,
+                   ArrayDesc const& shadowArraySchema,
+                   bool parallelLoad);
         /// Destructor
         virtual ~InputArray();
 
@@ -84,7 +84,7 @@ namespace scidb
         /// Upcalls from the _chunkLoader
         /// @{
         void handleError(Exception const& x,
-                         boost::shared_ptr<ChunkIterator> cIter,
+                         std::shared_ptr<ChunkIterator> cIter,
                          AttributeID i);
         void completeShadowArrayRow();
         void countCell() { ++nLoadedCells; lastBadAttr = -1; }
@@ -110,9 +110,17 @@ namespace scidb
         // which cannot overlap with the scatter/gather of the
         // InputArray itself.
         void sg();
-        void redistributeShadowArray(boost::shared_ptr<Query> const& query);
-        void scheduleSG(boost::shared_ptr<Query> const& query);
+        void redistributeShadowArray(std::shared_ptr<Query>& query);
+        void scheduleSG(std::shared_ptr<Query> const& query);
         void resetShadowChunkIterators();
+        void adjustArrayDistributionForParallelMode(PartitioningSchema ps)
+        {
+            SCIDB_ASSERT(ps!=psUndefined);
+            SCIDB_ASSERT(ps!=psUninitialized);
+            SCIDB_ASSERT(parallelLoad);
+            SCIDB_ASSERT(getArrayDesc().getPartitioningSchema()==psUndefined);
+            desc.setPartitioningSchema(ps);
+        }
 
         ChunkLoader*    _chunkLoader;
         size_t          _currChunkIndex;
@@ -123,7 +131,7 @@ namespace scidb
         uint64_t nLoadedChunks;
         size_t nErrors;
         size_t maxErrors;
-        boost::shared_ptr<Array> shadowArray;
+        std::shared_ptr<Array> _shadowArray;
         enum State
         {
             S_Normal,           // We expect to load more chunks
@@ -132,8 +140,8 @@ namespace scidb
         };
         State state;
         MemChunk tmpChunk;
-        vector< shared_ptr<ArrayIterator> > shadowArrayIterators;
-        vector< shared_ptr<ChunkIterator> > shadowChunkIterators;
+        std::vector< std::shared_ptr<ArrayIterator> > shadowArrayIterators;
+        std::vector< std::shared_ptr<ChunkIterator> > shadowChunkIterators;
         size_t nAttrs;
         int lastBadAttr;
         InstanceID myInstanceID;

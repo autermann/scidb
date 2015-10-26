@@ -6,8 +6,8 @@ create array z2 <trial:string,ppb:int64,device:string> [height=60:62,3,0]
 create array z3 <device:string,height:int64,trial:string>[ppb=1:10000,10000,0]
 create array z4 <trial:string>[device(string)=2,2,0, height=60:62,3,0, ppb=1:10000,10000,0]
 
---shell --command "csv2scidb -s 1 -p SNSN < testcases/data/doc/bug1709.csv > testcases/data/doc/bug1709.scidb"
---aql load zFlat from '${TEST_DATA_DIR}/doc/bug1709.scidb'
+--shell --command "sed 1d testcases/data/doc/bug1709.csv > /tmp/bug1709.csv"
+--aql load zFlat from '/tmp/bug1709.csv' as 'csv'
 
 --test
 
@@ -24,6 +24,7 @@ store(redimension(z1,z4),z4)
 
 
 --cleanup
+--shell --command "rm -f /tmp/bug1709.csv"
 --aql drop array z1
 --aql drop array zFlat
 --aql drop array z2

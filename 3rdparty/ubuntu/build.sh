@@ -28,3 +28,7 @@ popd
 pushd mpich2
 ./build.sh $1
 popd
+
+pushd cityhash
+./build.sh $1
+popd

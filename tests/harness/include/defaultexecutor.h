@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -198,7 +198,7 @@ class DefaultExecutor : public Executor
 		std::vector<Command> _setupCommands;
 		std::vector<Command> _testCommands;
 		std::vector<Command> _cleanupCommands;
-		
+
 		std::map<std::string,std::string> _testEnvVars;
 
 		/**
@@ -275,18 +275,18 @@ class DefaultExecutor : public Executor
  		 *
  		 * @return SUCCESS
  		 */
-		int startTimer (const std::string &args); 
+		int startTimer (const std::string &args);
 		int setOutputFormat (const std::string &args);
 		int endOutputFormat (void);
 		int setPrecision (const std::string &args);
 
 		int Shell (ShellCommandOptions *sco);
 		void initializeCommand (std::string &command);
-                /** 
+                /**
                  * Disconnects any established connection to SciDB.
                  */
                 void disconnectFromSciDB(void);
-                
+
 		/**
  		 * writes the string passed as an argument into the actual output file .out as is
  		 * @param args represents the string to be written to the .out file
@@ -377,18 +377,27 @@ class DefaultExecutor : public Executor
 		 * @return SUCCESS, FAILURE
 		 */
 		int execute (InfoForExecutor &ie);
-		
+
 		/**
 		 * Sets up test-specific environment variables for use in shell command (e.g. TESTDIR
 		 * variable will point to the path where the .test file is located).
 		 */
 		void addTestSpecificVariables(void);
-		
+
 		/**
 		 * Inserts the test-specific environment variables into the current process which makes
 		 * them available in the child processes also.
 		 */
 		void setTestSpecificVariables(void);
+
+		/**
+		 * If necessary, handle new client startup handshaking protocol with server.
+		 */
+		void newClientStart(
+			void* connection,
+			const std::string &name,
+			const std::string &password);
+
 };
 
 } //END namespace executors

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -77,13 +77,13 @@ public:
         ADD_PARAM_CONSTANT("int32");
     }
 
-    ArrayDesc inferSchema(vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         return schemas[0];
     }
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalReduceDistro, "reduce_distro")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalReduceDistro, "_reduce_distro")
 
 } //namespace

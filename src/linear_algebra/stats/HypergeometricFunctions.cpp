@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -53,7 +53,7 @@ namespace scidb
  *           which contains both black and white marbles.
  * @param m (double) The number of white marbles in the bag.
  * @param n (double) The number of black marbles in the bag.
- * @param k (double) The number of marbles drawn from the bag. 
+ * @param k (double) The number of marbles drawn from the bag.
  * @param lower_tail (boolean) TRUE for lower tail, FALSE for upper.
  * @return The hypergeometric cumulative distribution up to x
  */
@@ -98,7 +98,7 @@ stats_hygecdf(double x, double m, double n, double k, bool lower_tail, Value* re
  *           which contains both black and white marbles.
  * @param m (double) The number of white marbles in the bag.
  * @param n (double) The number of black marbles in the bag.
- * @param k (double) The number of marbles drawn from the bag. 
+ * @param k (double) The number of marbles drawn from the bag.
  * @param lower_tail (boolean) TRUE for lower tail, FALSE for upper.
  * @return The hypergeometric cumulative distribution up to x
  */
@@ -119,7 +119,7 @@ stats_hygecdf_default(const Value** args, Value* res, void*)
  *           which contains both black and white marbles.
  * @param m (double) The number of white marbles in the bag.
  * @param n (double) The number of black marbles in the bag.
- * @param k (double) The number of marbles drawn from the bag. 
+ * @param k (double) The number of marbles drawn from the bag.
  * @param lower_tail (boolean) TRUE for lower tail, FALSE for upper.
  * @return The hypergeometric cumulative distribution up to x
  */
@@ -140,7 +140,7 @@ stats_hygecdf_override(const Value** args, Value* res, void*)
  *           which contains both black and white marbles.
  * @param m (double) The number of white marbles in the bag.
  * @param n (double) The number of black marbles in the bag.
- * @param k (double) The number of marbles drawn from the bag. 
+ * @param k (double) The number of marbles drawn from the bag.
  * @return The hypergeometric mass at x.
  */
 static void
@@ -160,7 +160,7 @@ stats_hygepmf(const Value** args, Value *res, void*)
  * @param p (double) The probability (0 <= p <= 1)
  * @param m (double) The number of white marbles in the bag.
  * @param n (double) The number of black marbles in the bag.
- * @param k (double) The number of marbles drawn from the bag. 
+ * @param k (double) The number of marbles drawn from the bag.
  * @param lower_tail (boolean) TRUE for lowe tail quantile, FALSE for upper.
  * @return The number of white marbles drawn from a bag, without replacement,
  *          which contains both black and white marbles.

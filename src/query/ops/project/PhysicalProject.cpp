@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -55,7 +55,7 @@ public:
 	 * Project is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
 
@@ -63,16 +63,16 @@ public:
         const size_t n = _parameters.size();
         for (size_t i = 0; i < n; i++)
         {
-            projection[i] = ((shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
+            projection[i] = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
         }
         if (projection.size() > n) {
             projection[n] = inputArrays[0]->getArrayDesc().getEmptyBitmapAttribute()->getId();
         }
 
-		return boost::shared_ptr<Array>(new ProjectArray(_schema, inputArrays[0], projection));
+		return std::shared_ptr<Array>(new ProjectArray(_schema, inputArrays[0], projection));
 	 }
 };
-    
+
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalProject, "project", "physicalProject")
 
 }  // namespace scidb

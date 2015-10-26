@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,8 +32,7 @@
 
 // de-facto standards
 #include <boost/foreach.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 
 // SciDB
@@ -67,16 +66,18 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.scalapack.phy
 //                    so we can pass fewer arguments
 
 
-void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
-                    slpp::int_t NPROW, slpp::int_t NPCOL, slpp::int_t MYPROW, slpp::int_t MYPCOL,
+void checkBlacsInfo(std::shared_ptr<Query>& query, const blacs::context_t& blacsContext,
                     const std::string& callerLabel)
 {
     const size_t nInstances = query->getInstancesCount();
     slpp::int_t instanceID = query->getInstanceID();
 
+    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+    scidb_blacs_gridinfo_(blacsContext, NPROW, NPCOL, MYPROW, MYPCOL);
+
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::checkBlacsInfo()"
                            << " (via " << callerLabel << "):"
-                           << " checkBlacsInfo(ctx " << ICTXT << ") start"
+                           << " checkBlacsInfo() start"
                            << " NPROW " << NPROW  << ", NPCOL " << NPCOL << ")"
                            << " ; MYPROW " << MYPROW << ", MYPCOL" << MYPCOL << ")");
 
@@ -135,7 +136,7 @@ void checkBlacsInfo(shared_ptr<Query>& query, slpp::int_t ICTXT,
                            << " MYPE/instanceID " << MYPE);
 }
 
-void ScaLAPACKPhysical::checkInputArray(boost::shared_ptr<Array>& Ain) const
+void ScaLAPACKPhysical::checkInputArray(std::shared_ptr<Array>& Ain) const
 {
     //
     // ScaLAPACK computation routines are only efficient for a certain
@@ -174,9 +175,9 @@ void ScaLAPACKPhysical::checkInputArray(boost::shared_ptr<Array>& Ain) const
 }
 
 
-void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
+void extractArrayToScaLAPACK(std::shared_ptr<Array>& array, double* dst, slpp::desc_t& desc,
                              slpp::int_t nPRow, slpp::int_t nPCol,
-                             slpp::int_t myPRow, slpp::int_t myPCol, const shared_ptr<Query>& query)
+                             slpp::int_t myPRow, slpp::int_t myPCol, const std::shared_ptr<Query>& query)
 {
     // use extractDataToOp() and the reformatToScalapack() operator
     // to reformat the data according to ScaLAPACK requirements.
@@ -189,7 +190,7 @@ void extractArrayToScaLAPACK(boost::shared_ptr<Array>& array, double* dst, slpp:
     LOG4CXX_DEBUG(logger, "extractArrayToScaLAPACK took " << reformatTimer.stop());
 }
 
-bool ScaLAPACKPhysical::requiresRepart(ArrayDesc const& inputSchema) const
+bool ScaLAPACKPhysical::requiresRedimensionOrRepartition(ArrayDesc const& inputSchema) const
 {
     return false ; // see #2032 ... have to disable as it will core dump otherwise
 
@@ -210,13 +211,14 @@ bool ScaLAPACKPhysical::requiresRepart(ArrayDesc const& inputSchema) const
     //     will be the common one we change all the others to.
     //         Since we can't analyze them, we have to insist they are a specific size, when
     //     the user may know well what they are doing and using one in the acceptable range.
-    //         Proposal ... requiresRepart() passes in the inputSchemas for all inputs
+    //         Proposal ... requiresRedimensionOrRepartition() passes in the inputSchemas for all inputs
     //     and returns a vector of bool, or specifies which it is asking about, and we answer with that
     //     single bool.
     return false;
 }
 
-ArrayDesc ScaLAPACKPhysical::getRepartSchema(ArrayDesc const& inputSchema) const
+ArrayDesc ScaLAPACKPhysical::getRedimensionOrRepartitionSchema(
+    ArrayDesc const& inputSchema) const
 {
     Dimensions const& inDims = inputSchema.getDimensions();
 
@@ -235,24 +237,24 @@ ArrayDesc ScaLAPACKPhysical::getRepartSchema(ArrayDesc const& inputSchema) const
     }
 
     Attributes inAttrs = inputSchema.getAttributes();
-    return ArrayDesc(inputSchema.getName(), inAttrs, resultDims);
+    return ArrayDesc(inputSchema.getName(), inAttrs, resultDims, defaultPartitioning());
 }
 
-shared_ptr<Array> ScaLAPACKPhysical::redistributeOutputArrayForTiming(shared_ptr<Array>& outputArray, shared_ptr<Query>& query, const std::string& callerLabel)
+std::shared_ptr<Array> ScaLAPACKPhysical::redistributeOutputArrayForTiming(std::shared_ptr<Array>& outputArray, std::shared_ptr<Query>& query, const std::string& callerLabel)
 {
     // NOTE: for timing only.  Normally, the query planner inserts the redistribute
     // between ScaLAPACK-based operators which have output type psScaLAPACK,
-    // and other operators, such as store, that require, e.g. type psHashPartitioned
+    // and other operators, such as store, that require, e.g. defaultPartitioning()
     // but until the "consume()" operator is completed, and can request redistribution to RR,
     // I need a way to force in the redistribution to measure its cost, when the terminal operator
     // is filter(val > 1e200), which is my workaround for not having "consume"
 
-    // redistribute back to psHashPartitioned
-    shared_ptr<Array>redistOutput = redistributeToRandomAccess(outputArray, query, psHashPartitioned,
+    // redistribute back to defaultPartitioning()
+    std::shared_ptr<Array>redistOutput = redistributeToRandomAccess(outputArray, query, defaultPartitioning(),
                                                                ALL_INSTANCE_MASK,
-                                                               shared_ptr<DistributionMapper>(),
+                                                               std::shared_ptr<CoordinateTranslator>(),
                                                                0,
-                                                               shared_ptr<PartitioningSchemaData>());
+                                                               std::shared_ptr<PartitioningSchemaData>());
     return redistOutput;
 }
 
@@ -260,17 +262,17 @@ shared_ptr<Array> ScaLAPACKPhysical::redistributeOutputArrayForTiming(shared_ptr
 /// convert a set of inputArrays to psScaLAPACK distribution.  Doing them as a set allows certain extra sanity checks,
 /// but is not efficient use of memory, so this version is being phased out, or changed to only do the checks.
 ///
-std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query, const std::string& callerLabel)
+std::vector<std::shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query>& query, const std::string& callerLabel)
 {
     //
     // + converts a set of inputArrays to psScaLAPACK distribution
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArrays(): via " << callerLabel << " begin.");
 
-    std::vector<shared_ptr<Array> > result;
+    std::vector<std::shared_ptr<Array> > result;
 
     // redistribute to psScaLAPACK
     procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-    shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, callerLabel), firstChunkSize);
 
     for(size_t ii=0; ii < inputArrays.size(); ii++) {
@@ -293,9 +295,9 @@ std::vector<shared_ptr<Array> > ScaLAPACKPhysical::redistributeInputArrays(std::
 /// Alternating redistribute and extractToScaLAPACK allows the input array and redistributed array to be released before
 /// any more inputs are processed.  This reduces the memory overhead in gemm(), which uses up to 3 inputs(), considerably.
 /// and allows mem-array-threshold to be set higher for the same amount of total system memory.
-shared_ptr<Array> ScaLAPACKPhysical::redistributeInputArray(shared_ptr<Array>& inputArray,
-                                                            const shared_ptr<PartitioningSchemaDataForScaLAPACK>& schemeData,
-                                                            shared_ptr<Query>& query, const std::string& callerLabel)
+std::shared_ptr<Array> ScaLAPACKPhysical::redistributeInputArray(std::shared_ptr<Array>& inputArray,
+                                                            const std::shared_ptr<PartitioningSchemaDataForScaLAPACK>& schemeData,
+                                                            std::shared_ptr<Query>& query, const std::string& callerLabel)
 {
     assert(schemeData);
     //
@@ -312,7 +314,7 @@ shared_ptr<Array> ScaLAPACKPhysical::redistributeInputArray(shared_ptr<Array>& i
     // at a 5-15% extra cost to the m^3 portion.
     //
 
-    shared_ptr<Array> result = inputArray ; // in case no processing needed, the output is the input
+    std::shared_ptr<Array> result = inputArray ; // in case no processing needed, the output is the input
 
     const size_t nInstances = query->getInstancesCount();
     bool requiresRedistribute = true ;  // TODO: when bringup is done, can set this false, but
@@ -336,7 +338,7 @@ shared_ptr<Array> ScaLAPACKPhysical::redistributeInputArray(shared_ptr<Array>& i
 
                 // do the redistribute
                 result=pullRedistribute(inputArray, query, psScaLAPACK, ALL_INSTANCE_MASK,
-                                               boost::shared_ptr<DistributionMapper>(), /*shift*/0, schemeData);
+                                               std::shared_ptr<CoordinateTranslator>(), /*shift*/0, schemeData);
                 LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray: redistribute() took " << redistTime.stop() << " via " << callerLabel);
                 LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::redistributeInputArray:"
                                        << " via " << callerLabel
@@ -363,7 +365,7 @@ shared_ptr<Array> ScaLAPACKPhysical::redistributeInputArray(shared_ptr<Array>& i
     return result;
 }
 
-bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query, const std::string& callerLabel)
+blacs::context_t ScaLAPACKPhysical::doBlacsInit(std::vector< std::shared_ptr<Array> >& redistInputs, std::shared_ptr<Query>& query, const std::string& callerLabel)
 {
     //
     //.... Initialize the (imitation)BLACS used by the instances to calculate sizes
@@ -378,7 +380,8 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
     // + get our position in the grid
     // + sets up the ScaLAPACK grid accordingly and if not participating, return early
     //
-    bool result(true);
+    blacs::context_t resultContext;    // initialized to invalid "not participating" values
+
     // get size of the grid we are going to use
     procRowCol_t blacsGridSize = getBlacsGridSize(redistInputs, query, callerLabel);
 
@@ -410,43 +413,40 @@ bool ScaLAPACKPhysical::doBlacsInit(std::vector< shared_ptr<Array> >& redistInpu
         // assert(!query->isCoordinator());
         LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
                                    << " via " << callerLabel
-                                   << " instID " << instanceID << "not in grid, returning false, fake BLACS not initialized.");
-        result = false ;
+                                   << " instID " << instanceID << "not in grid, fake BLACS not initialized.");
     } else {
         LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
                                    << " via " << callerLabel
                                    << " instID " << instanceID << "is in grid.");
+
+        LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
+                                  << " via " << callerLabel
+                                  << " calling scidb_set_blacs_gridinfo_("
+                                  << " nProw " << blacsGridSize.row << ", nPcol "<< blacsGridSize.col
+                                  << ", myPRow " << myGridPos.row << ", myPCol " << myGridPos.col << ")");
+        scidb_set_blacs_gridinfo_(resultContext, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
     }
-
-    slpp::int_t ICTXT=-1;
-
-    LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
-                              << " via " << callerLabel
-                              << " calling scidb_set_blacs_gridinfo_(ctx " << ICTXT
-                              << ", nProw " << blacsGridSize.row << ", nPcol "<< blacsGridSize.col
-                              << ", myPRow " << myGridPos.row << ", myPCol " << myGridPos.col << ")");
-    scidb_set_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(resultContext, NPROW, NPCOL, MYPROW, MYPCOL);
     LOG4CXX_DEBUG(logger, "ScaLAPACKPhysical::doBlacsInit():"
                               << " via " << callerLabel
-                              << " scidb_blacs_gridinfo(" << ICTXT << ") returns "
+                              << " scidb_blacs_gridinfo() returns "
                               << " gridsiz (" << NPROW  << ", " << NPCOL << ")"
                               << " gridPos (" << MYPROW << ", " << MYPCOL << ")");
 
-    return result;
+    return resultContext;
 }
 
 
-procRowCol_t ScaLAPACKPhysical::getBlacsGridSize(std::vector< shared_ptr<Array> >& redistInputs, shared_ptr<Query>& query, const std::string& callerLabel)
+procRowCol_t ScaLAPACKPhysical::getBlacsGridSize(std::vector< std::shared_ptr<Array> >& redistInputs, std::shared_ptr<Query>& query, const std::string& callerLabel)
 {
     // find max (union) size of all array/matrices.  this works for most ScaLAPACK operators
     size_t maxSize[2];
     maxSize[0] = 0;
     maxSize[1] = 0;
-    BOOST_FOREACH( shared_ptr<Array> input, redistInputs ) {
+    BOOST_FOREACH( std::shared_ptr<Array> input, redistInputs ) {
         matSize_t inputSize = getMatSize(input);
         maxSize[0] = std::max(maxSize[0], inputSize[0]);  // add max() operator to matSize_t?
         maxSize[1] = std::max(maxSize[1], inputSize[1]);
@@ -471,12 +471,17 @@ procRowCol_t ScaLAPACKPhysical::getBlacsGridSize(std::vector< shared_ptr<Array> 
     }
 
     const ProcGrid* procGrid = query->getProcGrid();
-    procRowCol_t MN = { maxSize[0], maxSize[1]};
+    const size_t MaxUnsigned = std::numeric_limits<unsigned>::max();
+    ASSERT_EXCEPTION(
+            maxSize[0] <= MaxUnsigned &&
+            maxSize[1] <= MaxUnsigned,
+            "Narrowing conversion from size_t to unsigned in ScaLAPACKPhysical::getBlacsGridSize lost information.");
+    procRowCol_t MN = { static_cast<unsigned>(maxSize[0]), static_cast<unsigned>(maxSize[1])};
     procRowCol_t MNB = { chunkRow(redistInputs[0]), chunkCol(redistInputs[0]) };
     // TODO: when automatic repartitioning is introduced, have to decide which of the
     //       chunksizes will be the target chunksize, MNB
     //       Right now, we assert they were the same (presently checked in each Logical operator)
-    BOOST_FOREACH( shared_ptr<Array> input, redistInputs ) {
+    BOOST_FOREACH( std::shared_ptr<Array> input, redistInputs ) {
         assert(chunkRow(input) == MNB.row && chunkCol(input) == MNB.col);
     }
 

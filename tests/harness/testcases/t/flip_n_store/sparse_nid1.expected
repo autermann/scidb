@@ -38,9 +38,6 @@ SCIDB QUERY : <cross_join(join(slice(NID,a2,154.44),slice(NID,a1,81)),NID)>
 SCIDB QUERY : <cross_join(AAA,cast(AAA,<x:int64> [a11(double)=5,3,0,a22(double)=4,3,0,a33(double)=4,3,0]),a1,a22)>
 [An error expected at this place for the query "cross_join(AAA,cast(AAA,<x:int64> [a11(double)=5,3,0,a22(double)=4,3,0,a33(double)=4,3,0]),a1,a22)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT.]
 
-SCIDB QUERY : <thin(NID,16.2,3,92.664,3,46.332,3)>
-[An error expected at this place for the query "thin(NID,16.2,3,92.664,3,46.332,3)". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_IMPLICIT_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_IMPLICIT_CONVERTER.]
-
 SCIDB QUERY : <store(apply(apply(NID,y,x*100.5),z,y*12),NID_multi)>
 {0,0,0}[[[{0,0,0}(5,502.5,6030),{1,1,1}(4,402,4824),{2,2,2}(3,301.5,3618)]]];{3,3,3}[[[{3,3,3}(2,201,2412),{4,4,4}(1,100.5,1206),{5,5,5}(0,0,0)]]]
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -71,7 +71,7 @@ public:
         _properties.ddl = true;
 	}
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
 	{
         int64_t queryID = evaluate(dynamic_pointer_cast<OperatorParamLogicalExpression>(
             _parameters[0])->getExpression(), query, TID_INT64).getInt64();
@@ -90,7 +90,9 @@ public:
                 throw;
             }
         }
-        return ArrayDesc();
+        ArrayDesc arrDesc;
+        arrDesc.setPartitioningSchema(defaultPartitioning());
+        return arrDesc;
 	}
 };
 

@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -28,7 +28,9 @@ message(STATUS "*****BEGIN dense_linear_algebra/CMakeLists.txt *****************
 # here.  To protect us from constant re-writing of includes, we will
 # add to the default include paths
 #
-include_directories("${CMAKE_SOURCE_DIR}/src/mpi")
+if(${DISTRO_NAME_VER} MATCHES "Ubuntu")
+  include_directories("${CMAKE_SOURCE_DIR}/src/mpi")
+endif()
 include_directories("${CMAKE_SOURCE_DIR}/src/dense_linear_algebra")  # include our own root
 
 # the above is necessary to keep compatibility with the use of code in here within the

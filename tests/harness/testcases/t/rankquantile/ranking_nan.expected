@@ -1,7 +1,7 @@
 SCIDB QUERY : <create array load_dbl <a:double null, b:double> [x=1:5,5,0,y=1:5,5,0]>
 Query was executed successfully
 
-SCIDB QUERY : <load(load_dbl, '../tests/harness/testcases/data/agg_load_special.txt')>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -odense -aq "load ( load_dbl, '${TEST_DATA_DIR}/agg_load_special.txt' )">
 [[(2,4),(6,8),(10,12),(14,16),(18,20)],[(22,24),(null,28),(30,32),(null,36),(38,40)],[(42,44),(46,48),(50,52),(54,56),(58,60)],[(62,64),(66,68),(70,72),(null,76),(78,inf)],[(82,nan),(86,88),(90,92),(nan,96),(98,100)]]
 
 SCIDB QUERY : <create array expr4_dbl <a:double null, b:double> [x=1:5,2,0,y=1:5,2,0]>
@@ -13,7 +13,7 @@ SCIDB QUERY : <store(repart(load_dbl,expr4_dbl),expr4_dbl)>
 SCIDB QUERY : <create array load_flt <a:float null, b:float> [x=1:5,5,0,y=1:5,5,0]>
 Query was executed successfully
 
-SCIDB QUERY : <load(load_flt, '../tests/harness/testcases/data/agg_load_special.txt')>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -odense -aq "load ( load_flt, '${TEST_DATA_DIR}/agg_load_special.txt' )">
 [[(2,4),(6,8),(10,12),(14,16),(18,20)],[(22,24),(null,28),(30,32),(null,36),(38,40)],[(42,44),(46,48),(50,52),(54,56),(58,60)],[(62,64),(66,68),(70,72),(null,76),(78,inf)],[(82,nan),(86,88),(90,92),(nan,96),(98,100)]]
 
 SCIDB QUERY : <create array expr4_flt <a:float null, b:float> [x=1:5,2,0,y=1:5,2,0]>

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,12 +31,11 @@
 #ifndef XGRID_ARRAY_H
 #define XGRID_ARRAY_H
 
-#include "array/DelegateArray.h"
-#include "array/MemArray.h"
+#include <array/DelegateArray.h>
+#include <array/MemArray.h>
 
 namespace scidb {
 
-using namespace boost;
 using namespace std;
 
 class XgridArray;
@@ -45,25 +44,25 @@ class XgridChunk;
 class XgridChunkIterator;
 
 class XgridChunkIterator : public ConstChunkIterator
-{  
+{
     XgridArray const& array;
     XgridChunk const& chunk;
     Coordinates outPos;
     Coordinates inPos;
     Coordinates first;
     Coordinates last;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
+    std::shared_ptr<ConstChunkIterator> inputIterator;
     int mode;
     bool hasCurrent;
 
   public:
-    virtual int    getMode();
+    virtual int    getMode() const;
     virtual bool   setPosition(Coordinates const& pos);
     virtual Coordinates const& getPosition();
     virtual void   operator++();
     virtual void   reset();
-    virtual Value& getItem();
-    virtual bool   isEmpty();
+    virtual Value const& getItem();
+    virtual bool   isEmpty() const;
     virtual bool   end();
     virtual ConstChunk const& getChunk();
 
@@ -80,8 +79,8 @@ class XgridChunk : public DelegateChunk
     MemChunk chunk;
 
   public:
-    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
-    
+    virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+
     void initialize(Coordinates const& pos);
 
     XgridChunk(XgridArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID);
@@ -98,7 +97,7 @@ class XgridArrayIterator : public DelegateArrayIterator
     virtual Coordinates const& getPosition();
     virtual bool setPosition(Coordinates const& pos);
 
-	XgridArrayIterator(XgridArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
+	XgridArrayIterator(XgridArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator);
 };
 
 class XgridArray : public DelegateArray
@@ -109,15 +108,15 @@ class XgridArray : public DelegateArray
 
     Coordinates scale;
 
-    void out2in(Coordinates const& outPos, Coordinates& inPos) const; 
-    void in2out(Coordinates const& inPos, Coordinates& outPos) const; 
+    void out2in(Coordinates const& outPos, Coordinates& inPos) const;
+    void in2out(Coordinates const& inPos, Coordinates& outPos) const;
 
   public:
 
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    XgridArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array);
+    XgridArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array);
 };
 
 }

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -41,8 +41,8 @@ if [[ $? != 0 ]] ; then clenaup 0; fi
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "store(build(fooar,4),fooar)"
 if [[ $? != 0 ]] ; then clenaup 0; fi
 
-uaid=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('arrays'),name='fooar'),uaid)" | 
-         grep \{0\} | cut -d ' ' -f 2`
+uaid=`iquery -o csv -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('arrays'),name='fooar'),uaid)" |
+         sed 1d`
 
 # case 1 --- abort the remove of the first two versions of the array.
 # Verify that the first two versions are actually removed
@@ -54,11 +54,11 @@ iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "rename(fooar2, fooar)"
 lines=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('arrays', true), uaid=$uaid)" | wc -l`
 if [[ $lines != 4 ]]; then echo lines = $lines; cleanup 1; fi
 
-count=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(fooar@3, a = 3), count(a))" |
-         grep \{0\} | cut -d ' ' -f 2`
+count=`iquery -o csv -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(fooar@3, a = 3), count(a))" |
+         sed 1d`
 if [[ $count != 50001 ]]; then echo count = $count; cleanup 2; fi
-count=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(fooar@4, a = 4), count(a))" |
-         grep \{0\} | cut -d ' ' -f 2`
+count=`iquery -o csv -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(fooar@4, a = 4), count(a))" |
+         sed 1d`
 if [[ $count != 50001 ]]; then echo count = $count; cleanup 3; fi
 
 # case 2 --- abort the complete removal of the array.

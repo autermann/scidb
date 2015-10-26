@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -56,26 +56,26 @@ Node*& Visitor::visit(Node*& pn)
 
     switch (pn->getType())                               // What kind of node?
     {
-        default:          this->onNode       (pn);  break;// ...basic node
-        case abstraction: this->onAbstraction(pn);  break;// ...abstraction
-        case application: this->onApplication(pn);  break;// ...application
-        case fix:         this->onFix        (pn);  break;// ...fix expression
-        case let:         this->onLet        (pn);  break;// ...let expression
-        case reference:   this->onReference  (pn);  break;// ...reference
-        case schema:      this->onSchema     (pn);  break;// ...schema
-        case variable:    this->onVariable   (pn);  break;// ...variable
-        case cnull:       this->onNull       (pn);  break;// ...null
-        case creal:       this->onReal       (pn);  break;// ...real
-        case cstring:     this->onString     (pn);  break;// ...string
-        case cboolean:    this->onBoolean    (pn);  break;// ...boolean
-        case cinteger:    this->onInteger    (pn);  break;// ...integer
-        case module:      this->onModule     (pn);  break;// ...module
-        case insertArray: this->onInsertArray(pn);  break;// ...insert array
-        case selectArray: this->onSelectArray(pn);  break;// ...select array
-        case updateArray: this->onUpdateArray(pn);  break;// ...update array
-        case binding:     this->onBinding    (pn);  break;// ...binding
-        case attribute:   this->onAttribute  (pn);  break;// ...attribute
-        case dimension:   this->onDimension  (pn);  break;// ...dimension
+        default:          this->onNode       (pn); break;// ...basic node
+        case abstraction: this->onAbstraction(pn); break;// ...abstraction
+        case application: this->onApplication(pn); break;// ...application
+        case fix:         this->onFix        (pn); break;// ...fix expression
+        case let:         this->onLet        (pn); break;// ...let expression
+        case reference:   this->onReference  (pn); break;// ...reference
+        case schema:      this->onSchema     (pn); break;// ...schema
+        case variable:    this->onVariable   (pn); break;// ...variable
+        case cnull:       this->onNull       (pn); break;// ...null
+        case creal:       this->onReal       (pn); break;// ...real
+        case cstring:     this->onString     (pn); break;// ...string
+        case cboolean:    this->onBoolean    (pn); break;// ...boolean
+        case cinteger:    this->onInteger    (pn); break;// ...integer
+        case module:      this->onModule     (pn); break;// ...module
+        case insertArray: this->onInsertArray(pn); break;// ...insert array
+        case selectArray: this->onSelectArray(pn); break;// ...select array
+        case updateArray: this->onUpdateArray(pn); break;// ...update array
+        case binding:     this->onBinding    (pn); break;// ...binding
+        case attribute:   this->onAttribute  (pn); break;// ...attribute
+        case dimension:   this->onDimension  (pn); break;// ...dimension
     }
 
     return pn;                                           // The processed node

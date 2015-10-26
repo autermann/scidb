@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,10 +28,8 @@
  *  Created on: November 4, 2013
  */
 
-
-// boost
-#include <boost/shared_ptr.hpp>
-#include <boost/unordered_map.hpp>
+#include <memory>
+#include <unordered_map>
 // local
 #include "SpgemmBlock.h"
 #include "SpAccumulator.h"
@@ -128,7 +126,7 @@ private:
 
     typedef Row_t&               RowRef_t;
     typedef const Row_t&         ConstRowRef_t;
-    typedef boost::unordered_map<ssize_t, Row_t> RowMap_t;
+    typedef std::unordered_map<ssize_t, Row_t> RowMap_t;
 
 
     // DATA
@@ -170,7 +168,7 @@ inline void CSRBlock<Value_tt>::append(ssize_t rowNum, ssize_t colNum, const Val
     typename RowMap_t::iterator it = _rowMap.find(rowNum); // leftValue's column corresponds to this matrix's row
 
     if (it ==_rowMap.end()) { // doesn't exist
-        RowRef_t rowRef = _rowMap[rowNum]; // initialize at this key 
+        RowRef_t rowRef = _rowMap[rowNum]; // initialize at this key
         rowRef.push_back(ColVal(colNum, value));
     } else {
         RowRef_t rowRef = (*it).second;

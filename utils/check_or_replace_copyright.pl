@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -78,7 +78,9 @@ my @SKIP_DIRS = (
     "stage",
     ".svn",
     "3rdparty",
-    "lib_json"
+    "lib_json",
+    "graveyard",
+    "getopt"     # src/jdbc/scidb4j/gnu/getopt is third-party code that reads command-line parameters.
 );
 
 my @SKIP_FILES = (
@@ -86,13 +88,14 @@ my @SKIP_FILES = (
     $NEW_COPYRIGHT_FILE_SHARP,
     "bsdiff.c",
     "bspatch.c",
-    "FindProtobuf.cmake", # See ticket:3215
+    "FindProtobuf.cmake",  # See ticket:3215
     "MurmurHash3.h",
     "MurmurHash3.cpp",
-    "statistics.py",      # The statistics.py package was introduced in Python 3. But we have Python 2.
-    "counter.py",         # The Counter class was introduced in Python 2.7. But we have 2.6.6.
-    "PSF_license.txt",    # The file that contains the PSF license agreement
-    "scidb_psf.py"        # Code we borrowed, that have PSF license
+    "statistics.py",       # The statistics.py package was introduced in Python 3. But we have Python 2.
+    "counter.py",          # The Counter class was introduced in Python 2.7. But we have 2.6.6.
+    "PSF_license.txt",     # The file that contains the PSF license agreement
+    "scidb_psf.py",        # Code we borrowed, that have PSF license
+    "PROTOBUF_COPYING.txt" # This is a copyright notice for the google protobuf Java classes.
 );
 
 # As the name says.
@@ -256,7 +259,7 @@ sub replace
             }
 
             $differ = $TRUE;
-            unless ( $newCopyright[$i] =~ /Copyright.*\d\d\d\d.*\d\d\d\d/ ) {
+            unless ( $newCopyright[$i] =~ /Copyright.*\d\d\d\d/ ) {
                 # the line that differ is not the line containing copyright duration ==> regard totally different
                 $needToReplace = $TRUE;
                 $usingNewCopyright = $TRUE;
@@ -520,6 +523,12 @@ sub getNewCopyright
                     $newCopyrightYear = $1;
                 }
             }
+            elsif ( $line =~ /\s*Copyright\s*\(C\)\s*(\d\d\d\d)/ ) {
+                if ( (0 + $newCopyrightYear) < (0 + $1) ) {
+                    $newCopyrightYear = $1;
+                }
+            }
+
             if ( $line =~ /^\s*(.)\s+$END_COPYRIGHT/ ) {
                 $state = $STATE_AFTER;
             }

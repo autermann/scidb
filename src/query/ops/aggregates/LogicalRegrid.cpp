@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,7 +27,7 @@
  *      Author: poliocough@gmail.com
  */
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <query/Operator.h>
 #include <system/Exceptions.h>
@@ -91,9 +91,9 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         if (_parameters.size() < schemas[0].getDimensions().size())
         {
             // We must have numDims block sizes.
@@ -109,7 +109,7 @@ public:
             // The rest params are optional.
             res.push_back(END_OF_VARIES_PARAMS());
 
-            boost::shared_ptr<OperatorParam> lastParam = _parameters[_parameters.size() - 1];
+            std::shared_ptr<OperatorParam> lastParam = _parameters[_parameters.size() - 1];
             if (lastParam->getParamType() == PARAM_AGGREGATE_CALL) {
                 // If the last one was an aggregate call, this can can be either another aggregate call or a chunk size
                 res.push_back(PARAM_AGGREGATE_CALL());
@@ -123,7 +123,7 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         assert(schemas.size() == 1);
 
@@ -152,7 +152,7 @@ public:
         // Generate the output dims.
         for (size_t i = 0; i < nDims; i++)
         {
-            int64_t blockSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
+            int64_t blockSize = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
                                         query, TID_INT64).getInt64();
             if (blockSize <= 0) {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REGRID_ERROR1,
@@ -162,7 +162,7 @@ public:
             int64_t chunkSize = static_cast<int64_t>(srcDim.getChunkInterval());
             if (numChunkSizes) {
                 size_t index = i + nDims + numAggregateCalls;
-                chunkSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[index])->getExpression(),
+                chunkSize = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[index])->getExpression(),
                         query, TID_INT64).getInt64();
                 if (chunkSize<=0) {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE);
@@ -172,18 +172,18 @@ public:
                                         srcDim.getNamesAndAliases(),
                                         srcDim.getStartMin(),
                                         srcDim.getStartMin(),
-                                        srcDim.getEndMax() == MAX_COORDINATE ? MAX_COORDINATE : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
-                                        srcDim.getEndMax() == MAX_COORDINATE ? MAX_COORDINATE : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
+                                        srcDim.getEndMax() == CoordinateBounds::getMax() ? CoordinateBounds::getMax() : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
+                                        srcDim.getEndMax() == CoordinateBounds::getMax() ? CoordinateBounds::getMax() : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
                                         static_cast<size_t>(chunkSize),
                                         0  );
         }
 
-        ArrayDesc outSchema(inputDesc.getName(), Attributes(), outDims);
+        ArrayDesc outSchema(inputDesc.getName(), Attributes(), outDims, defaultPartitioning());
 
         for (size_t i = nDims, j=nDims+numAggregateCalls; i<j; i++)
         {
             bool isInOrderAggregation = false;
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], inputDesc, outSchema,
+            addAggregatedAttribute( (std::shared_ptr <OperatorParamAggregateCall> &) _parameters[i], inputDesc, outSchema,
                     isInOrderAggregation);
         }
 

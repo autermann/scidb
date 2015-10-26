@@ -120,15 +120,6 @@ SCIDB QUERY : <select * into B from filter(build(B,x+2),1)>
 {1} 3
 {2} 4
 
-SCIDB QUERY : <select * from allversions(B)>
-{VersionNo,x} a
-{1,0} 10
-{1,1} 11
-{1,2} 12
-{2,0} 2
-{2,1} 3
-{2,2} 4
-
 SCIDB QUERY : <select * from help()>
 {i} help
 {0} 'Use existing operator name as argument for help operator. You can see all operators by executing list(\'operators\').'

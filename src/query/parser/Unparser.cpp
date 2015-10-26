@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,6 +48,7 @@ class Unparser : public Visitor
                                : _out(o)                 {}
 
  private:                  // From class Visitor
+    virtual void              onNode       (Node*&);
     virtual void              onAbstraction(Node*&);
     virtual void              onApplication(Node*&);
     virtual void              onFix        (Node*&);
@@ -71,6 +72,19 @@ class Unparser : public Visitor
  private:                  // Representation
             ostream&          _out;                      // The output stream
 };
+
+/**
+ *  Insert a formatted representation of the node 'pn' onto our output stream.
+ */
+void Unparser::onNode(Node*& pn)
+{
+    assert(pn != 0);                                     // Validate arguments
+
+    if (pn->is(asterisk))                                // Is the asterisk?
+    {
+        _out << '*';                                     // ...emit asterisk
+    }
+}
 
 /**
  *  Insert a formatted representation of the node 'pn' onto our output stream.
@@ -328,7 +342,7 @@ void Unparser::onDimension(Node*& pn)
     }
     else                                                 // No, its missing
     {
-        _out << ",*";                                    // ...emot default
+        _out << ",?";                                    // ...emit default
     }
 
     if (Node* n = pn->get(dimensionArgChunkOverlap))     // Has an overlap?

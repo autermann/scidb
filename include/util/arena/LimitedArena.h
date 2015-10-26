@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,13 +41,19 @@ namespace scidb { namespace arena {
  *              The limit is specified at construction using the 'limit' field
  *              of the options structure. For example:
  *  @code
- *                  b = newArena(Options("B").limit(1*GB).parent(a));
+ *                  b = newArena(Options("B").parent(a).limit(1*GB));
  *  @endcode
  *              creates a new %arena 'b' that is permitted to allocate as much
  *              as a gibibyte of memory from the %arena 'a' before throwing an
  *              arena::Exhausted exception.  Clients can track the memory that
  *              is still available by calling available(),  and can also catch
  *              the exception if they attempt to allocate beyond this limit.
+ *
+ *              Alternatively, one can also write:
+ *  @code
+ *                  b = newArena(Options("B").limited(a,1*GB));
+ *  @endcode
+ *              which does exactly the same thing.
  *
  *              Bear in mind that other arenas may also be allocating from the
  *              the same parent too:  the limit affects only those allocations

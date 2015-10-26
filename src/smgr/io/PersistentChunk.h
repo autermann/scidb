@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -61,6 +61,12 @@ namespace scidb
      *
      * Revision history:
      *
+     * SCIDB_STORAGE_FORMAT_VERSION = 9:
+     *    Author: Steve F.
+     *    Date: 7/2/15
+     *    Ticket: 4534
+     *    Note: Allowing chunk header to track more than 2^32 - 1 elements in a chunk
+     *
      * SCIDB_STORAGE_FORMAT_VERSION = 8:
      *    Author: Dave Gosselin
      *    Date: 8/21/14
@@ -100,7 +106,7 @@ namespace scidb
      *    Ticket: ??
      *    Note: Initial implementation dating back some time
      */
-    const uint32_t SCIDB_STORAGE_FORMAT_VERSION = 8;
+    const uint32_t SCIDB_STORAGE_FORMAT_VERSION = 9;
 
     /**
      * The beginning section of the storage header file.
@@ -248,7 +254,7 @@ namespace scidb
         /**
          * Number of non-empty cells in the chunk.
          */
-        uint32_t nElems;
+        uint64_t nElems;
 
         /**
          * The instance ID this chunk must occupy;
@@ -258,6 +264,7 @@ namespace scidb
 
         enum Flags {
             DELTA_CHUNK = 2,
+            INVALID = 4,
             TOMBSTONE = 8
         };
 
@@ -318,7 +325,7 @@ namespace scidb
               instanceId(0) {}
     };
 
-    inline ostream& operator<<(ostream& stream, ChunkHeader const& hdr)
+    inline std::ostream& operator<<(std::ostream& stream, ChunkHeader const& hdr)
     {
         stream << hdr.toString();
         return stream;
@@ -356,7 +363,7 @@ namespace scidb
      * PersistentChunk is an internal interface and should not be usable/visible
      * via the Array/Chunk/Iterator APIs.
      */
-    class PersistentChunk : public boost::enable_shared_from_this<PersistentChunk>
+    class PersistentChunk : public std::enable_shared_from_this<PersistentChunk>
     {
         friend class CachedStorage;
         friend class ListChunkMapArrayBuilder;
@@ -498,7 +505,7 @@ namespace scidb
         }
 
         PersistentChunk();
-        ~PersistentChunk();
+        virtual ~PersistentChunk();
     };
 }
 

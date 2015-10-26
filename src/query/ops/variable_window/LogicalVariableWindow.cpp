@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -100,20 +100,20 @@ public:
         ADD_PARAM_VARIES();
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         res.push_back(PARAM_AGGREGATE_CALL());
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         assert(schemas.size() == 1);
 
-        int64_t wstart = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(), query, TID_INT64).getInt64();
-        int64_t wend = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(), query, TID_INT64).getInt64();
+        int64_t wstart = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(), query, TID_INT64).getInt64();
+        int64_t wend = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(), query, TID_INT64).getInt64();
 
         if (wstart<0)
         {
@@ -146,11 +146,11 @@ public:
                                        0);
         }
 
-        ArrayDesc output (schemas[0].getName(), Attributes(), outDims);
+        ArrayDesc output (schemas[0].getName(), Attributes(), outDims, defaultPartitioning());
         for(size_t i =3; i<_parameters.size(); i++)
         {
             bool isInOrderAggregation = true;
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], schemas[0], output,
+            addAggregatedAttribute( (std::shared_ptr <OperatorParamAggregateCall> &) _parameters[i], schemas[0], output,
                     isInOrderAggregation);
         }
 

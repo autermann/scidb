@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,7 @@ namespace scidb
     //
     // Xgrid chunk iterator methods
     //
-    int XgridChunkIterator::getMode()
+    int XgridChunkIterator::getMode() const
     {
         return mode;
     }
@@ -56,18 +56,18 @@ namespace scidb
     void XgridChunkIterator::operator++()
     {
         size_t nDims = outPos.size();
-        while (true) { 
+        while (true) {
             size_t i = nDims-1;
-            while (++outPos[i] > last[i]) { 
-                if (i == 0) { 
+            while (++outPos[i] > last[i]) {
+                if (i == 0) {
                     hasCurrent = false;
                     return;
                 }
                 outPos[i] = first[i];
                 i -= 1;
             }
-            array.out2in(outPos, inPos);            
-            if (inputIterator->setPosition(inPos)) { 
+            array.out2in(outPos, inPos);
+            if (inputIterator->setPosition(inPos)) {
                 hasCurrent = true;
                 return;
             }
@@ -78,7 +78,7 @@ namespace scidb
     {
         array.out2in(newPos, inPos);
         outPos = newPos;
-        if (inputIterator->setPosition(inPos)) { 
+        if (inputIterator->setPosition(inPos)) {
             return hasCurrent = true;
         }
         return hasCurrent = false;
@@ -91,19 +91,19 @@ namespace scidb
         return outPos;
     }
 
-    Value& XgridChunkIterator::getItem()
+    Value const& XgridChunkIterator::getItem()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         return inputIterator->getItem();
     }
-    
+
     bool XgridChunkIterator::end()
-    { 
+    {
         return !hasCurrent;
     }
 
-    bool XgridChunkIterator::isEmpty()
+    bool XgridChunkIterator::isEmpty() const
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -114,7 +114,7 @@ namespace scidb
     {
         return chunk;
     }
- 
+
     XgridChunkIterator::XgridChunkIterator(XgridArray const& arr, XgridChunk const& chk, int iterationMode)
     : array(arr),
       chunk(chk),
@@ -131,9 +131,9 @@ namespace scidb
     //
     // Xgrid chunk methods
     //
-    boost::shared_ptr<ConstChunkIterator> XgridChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> XgridChunk::getConstIterator(int iterationMode) const
     {
-        return boost::shared_ptr<ConstChunkIterator>(new XgridChunkIterator(array, *this, iterationMode));
+        return std::shared_ptr<ConstChunkIterator>(new XgridChunkIterator(array, *this, iterationMode));
     }
 
     void XgridChunk::initialize(Coordinates const& pos)
@@ -149,19 +149,19 @@ namespace scidb
       array(arr)
     {
     }
-      
+
     //
     // Xgrid array iterator
     //
     ConstChunk const& XgridArrayIterator::getChunk()
     {
-        if (!chunkInitialized) { 
+        if (!chunkInitialized) {
             ((XgridChunk&)*chunk).initialize(getPosition());
             chunkInitialized = true;
         }
         return *chunk;
     }
-    
+
     Coordinates const& XgridArrayIterator::getPosition()
     {
         array.in2out(inputIterator->getPosition(), outPos);
@@ -177,7 +177,7 @@ namespace scidb
         return inputIterator->setPosition(inPos);
     }
 
-    XgridArrayIterator::XgridArrayIterator(XgridArray const& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator)
+    XgridArrayIterator::XgridArrayIterator(XgridArray const& arr, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator)
     : DelegateArrayIterator(arr, attrID, inputIterator),
       array(arr),
       inPos(arr.getArrayDesc().getDimensions().size()),
@@ -190,17 +190,17 @@ namespace scidb
     //
 
     void XgridArray::out2in(Coordinates const& outPos, Coordinates& inPos)  const
-    { 
+    {
         Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0, n = outPos.size(); i < n; i++) { 
+        for (size_t i = 0, n = outPos.size(); i < n; i++) {
             inPos[i] = dims[i].getStartMin() + (outPos[i] - dims[i].getStartMin()) / scale[i];
         }
     }
 
     void XgridArray::in2out(Coordinates const& inPos, Coordinates& outPos)  const
-    { 
+    {
         Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0, n = inPos.size(); i < n; i++) { 
+        for (size_t i = 0, n = inPos.size(); i < n; i++) {
             outPos[i] = dims[i].getStartMin() + (inPos[i] - dims[i].getStartMin()) * scale[i];
         }
     }
@@ -213,17 +213,17 @@ namespace scidb
     DelegateArrayIterator* XgridArray::createArrayIterator(AttributeID id) const
     {
         return new XgridArrayIterator(*this, id, inputArray->getConstIterator(id));
-    }    
+    }
 
-    XgridArray::XgridArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array)
+    XgridArray::XgridArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array)
     : DelegateArray(desc, array),
       scale(desc.getDimensions().size())
     {
         Dimensions const& oldDims = array->getArrayDesc().getDimensions();
         Dimensions const& newDims = desc.getDimensions();
-        for (size_t i = 0, n = newDims.size(); i < n; i++) { 
+        for (size_t i = 0, n = newDims.size(); i < n; i++) {
             scale[i] = newDims[i].getLength() / oldDims[i].getLength();
         }
-    } 
+    }
 }
 

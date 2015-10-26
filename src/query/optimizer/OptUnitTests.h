@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,9 +34,8 @@
 #include <algorithm>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/filesystem.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include <query/Operator.h>
 #include <query/QueryPlan.h>
@@ -49,6 +48,7 @@
 
 #include "smgr/compression/BuiltinCompressors.h"
 #include "query/optimizer/HabilisOptimizer.h"
+#include <usr_namespace/NamespaceDesc.h>
 
 namespace scidb
 {
@@ -56,8 +56,8 @@ namespace scidb
 class OptimizerTests: public CppUnit::TestFixture
 {
 
-    typedef boost::shared_ptr<PhysicalOperator> PhysOpPtr;
-    typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
+    typedef std::shared_ptr<PhysicalOperator> PhysOpPtr;
+    typedef std::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
 
 CPPUNIT_TEST_SUITE(OptimizerTests);
         CPPUNIT_TEST(testBoundaries);
@@ -65,7 +65,6 @@ CPPUNIT_TEST_SUITE(OptimizerTests);
         CPPUNIT_TEST(testBasic);
         CPPUNIT_TEST(testSubArrayReshapeSgInsertions);
         CPPUNIT_TEST(testInputSgInsert);
-        CPPUNIT_TEST(testConcatSgInsert);
         CPPUNIT_TEST(testHabilisCollapse);
 //        CPPUNIT_TEST(testTwoPhase);
 //        CPPUNIT_TEST(testMultiply);
@@ -74,9 +73,9 @@ CPPUNIT_TEST_SUITE(OptimizerTests);
     CPPUNIT_TEST_SUITE_END();
 
 private:
-    boost::shared_ptr<QueryProcessor> _queryProcessor;
-    boost::shared_ptr<Optimizer> _habilisDisabled;
-    boost::shared_ptr<Optimizer> _habilis;
+    std::shared_ptr<QueryProcessor> _queryProcessor;
+    std::shared_ptr<Optimizer> _habilisDisabled;
+    std::shared_ptr<Optimizer> _habilis;
 
     ArrayDesc _dummyArray;
     Coordinates _dummyArrayStart;
@@ -115,7 +114,7 @@ public:
 
 #define ASSERT_OPERATOR(instance, opName) (CPPUNIT_ASSERT( instance ->getPhysicalOperator()->getPhysicalName() == opName ))
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, PartitioningSchema ps = psHashPartitioned)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, PartitioningSchema ps)
     {
         SystemCatalog* systemCat = SystemCatalog::getInstance();
         if (systemCat->containsArray(desc.getName()))
@@ -123,11 +122,15 @@ public:
             systemCat->deleteArray(desc.getName());
         }
         ArrayDesc d2 = desc;
-        systemCat->addArray(d2, ps);
+
+        ArrayID uAId = systemCat->getNextArrayId();
+        d2.setPartitioningSchema(ps);
+        d2.setIds(uAId, uAId, VersionID(0));
+        systemCat->addArray(NamespaceDesc("public"), d2);
         return d2.getId();
     }
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end, PartitioningSchema ps = psHashPartitioned)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end, PartitioningSchema ps)
     {
         ArrayID id = s_addArray(desc, ps);
         SystemCatalog::getInstance()->updateArrayBoundaries(desc, PhysicalBoundaries(start, end));
@@ -147,57 +150,57 @@ public:
         dummyArrayDimensions.push_back(DimensionDesc("x", 0, 0, 8, 9, 1, 0));
         dummyArrayDimensions.push_back(DimensionDesc("y", 0, 1, 9, 9, 1, 0));
 
-        _dummyArray = ArrayDesc("opttest_dummy_array", dummyArrayAttributes, dummyArrayDimensions);
+        _dummyArray = ArrayDesc("opttest_dummy_array", dummyArrayAttributes, dummyArrayDimensions, defaultPartitioning());
         _dummyArrayStart.push_back(0);
         _dummyArrayStart.push_back(1);
         _dummyArrayEnd.push_back(8);
         _dummyArrayEnd.push_back(9);
-        _dummyArrayId = s_addArray(_dummyArray, _dummyArrayStart, _dummyArrayEnd);
+        _dummyArrayId = s_addArray(_dummyArray, _dummyArrayStart, _dummyArrayEnd, defaultPartitioning());
 
         //DUMMY_SHIFTED
         Dimensions dummyShiftedArrayDimensions;
         dummyShiftedArrayDimensions.push_back(DimensionDesc("x", 5, 5, 12, 14, 1, 0));
         dummyShiftedArrayDimensions.push_back(DimensionDesc("y", 5, 6, 13, 14, 1, 0));
 
-        _dummyShiftedArray = ArrayDesc("opttest_dummy_shifted_array", dummyArrayAttributes, dummyShiftedArrayDimensions);
+        _dummyShiftedArray = ArrayDesc("opttest_dummy_shifted_array", dummyArrayAttributes, dummyShiftedArrayDimensions, defaultPartitioning());
         _dummyShiftedArrayStart.push_back(5);
         _dummyShiftedArrayStart.push_back(6);
         _dummyShiftedArrayEnd.push_back(12);
         _dummyShiftedArrayEnd.push_back(13);
-        _dummyShiftedArrayId = s_addArray(_dummyShiftedArray, _dummyShiftedArrayStart, _dummyShiftedArrayEnd);
+        _dummyShiftedArrayId = s_addArray(_dummyShiftedArray, _dummyShiftedArrayStart, _dummyShiftedArrayEnd, defaultPartitioning());
 
         //SMALL
         Dimensions smallArrayDimensions;
         smallArrayDimensions.push_back(DimensionDesc("x", 0, 0, 0, 2, 1, 0));
         smallArrayDimensions.push_back(DimensionDesc("y", 0, 1, 2, 2, 1, 0));
 
-        _smallArray = ArrayDesc("opttest_small_array", dummyArrayAttributes, smallArrayDimensions);
+        _smallArray = ArrayDesc("opttest_small_array", dummyArrayAttributes, smallArrayDimensions, defaultPartitioning());
         _smallArrayStart.push_back(0);
         _smallArrayStart.push_back(1);
         _smallArrayEnd.push_back(0);
         _smallArrayEnd.push_back(2);
-        _smallArrayId = s_addArray(_smallArray, _smallArrayStart, _smallArrayEnd);
+        _smallArrayId = s_addArray(_smallArray, _smallArrayStart, _smallArrayEnd, defaultPartitioning());
 
         //SINGLEDIM
         Dimensions singleDimDimensions;
         singleDimDimensions.push_back(DimensionDesc("x", 0, 0, 3, 3, 1, 0));
 
-        _singleDim = ArrayDesc("opttest_single_dim", dummyArrayAttributes, singleDimDimensions);
+        _singleDim = ArrayDesc("opttest_single_dim", dummyArrayAttributes, singleDimDimensions, defaultPartitioning());
         _singleDimStart.push_back(0);
         _singleDimEnd.push_back(3);
-        _singleDimId = s_addArray(_singleDim, _singleDimStart, _singleDimEnd);
+        _singleDimId = s_addArray(_singleDim, _singleDimStart, _singleDimEnd, defaultPartitioning());
 
         //PARTIALLYFILLED
         Dimensions partiallyFilledDimensions;
         partiallyFilledDimensions.push_back(DimensionDesc("x", 0, 0, 9, 9, 3, 0));
         partiallyFilledDimensions.push_back(DimensionDesc("y", 0, 0, 9, 9, 3, 0));
 
-        _partiallyFilledArray = ArrayDesc("opttest_partially_filled", dummyArrayAttributes, partiallyFilledDimensions);
+        _partiallyFilledArray = ArrayDesc("opttest_partially_filled", dummyArrayAttributes, partiallyFilledDimensions, defaultPartitioning());
         _partiallyFilledStart.push_back(0);
         _partiallyFilledStart.push_back(0);
         _partiallyFilledEnd.push_back(9);
         _partiallyFilledEnd.push_back(9);
-        _partiallyFilledId = s_addArray(_partiallyFilledArray, _partiallyFilledStart, _partiallyFilledEnd);
+        _partiallyFilledId = s_addArray(_partiallyFilledArray, _partiallyFilledStart, _partiallyFilledEnd, defaultPartitioning());
 
         //DUMMYFLIPPED
         Dimensions dummyFlippedDimensions;
@@ -209,19 +212,19 @@ public:
         dummyFlippedAttributes.push_back(AttributeDesc(1, "y", TID_INT64, 0, (uint16_t) CompressorFactory::NO_COMPRESSION));
         dummyFlippedAttributes.push_back(AttributeDesc(2, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
-        _dummyFlippedArray = ArrayDesc("opttest_dummy_flipped", dummyFlippedAttributes, dummyFlippedDimensions);
-        _dummyFlippedId = s_addArray(_dummyFlippedArray);
+        _dummyFlippedArray = ArrayDesc("opttest_dummy_flipped", dummyFlippedAttributes, dummyFlippedDimensions, defaultPartitioning());
+        _dummyFlippedId = s_addArray(_dummyFlippedArray, defaultPartitioning());
 
-        _dummyReplicatedArray = ArrayDesc("opttest_dummy_replicated_array", dummyArrayAttributes, dummyArrayDimensions);
+        _dummyReplicatedArray = ArrayDesc("opttest_dummy_replicated_array", dummyArrayAttributes, dummyArrayDimensions, defaultPartitioning());
         _dummyReplicatedArrayId = s_addArray(_dummyReplicatedArray,_dummyArrayStart, _dummyArrayEnd, psReplication);
 
         ////////////////
 
         HabilisOptimizer *hopt = new HabilisOptimizer();
         hopt->_featureMask=0;
-        _habilisDisabled = boost::shared_ptr<Optimizer>(hopt);
+        _habilisDisabled = std::shared_ptr<Optimizer>(hopt);
 
-        _habilis = boost::shared_ptr<Optimizer>(new HabilisOptimizer());
+        _habilis = std::shared_ptr<Optimizer>(new HabilisOptimizer());
     }
 
     void tearDown()
@@ -237,12 +240,12 @@ public:
         systemCat->deleteArray(_dummyReplicatedArrayId);
     }
 
-    boost::shared_ptr<Query> getQuery()
+    std::shared_ptr<Query> getQuery()
     {
-        boost::shared_ptr<Query> query;
-        boost::shared_ptr<const InstanceLiveness> liveness(Cluster::getInstance()->getInstanceLiveness());
+        std::shared_ptr<Query> query;
+        std::shared_ptr<const InstanceLiveness> liveness(Cluster::getInstance()->getInstanceLiveness());
         int32_t longErrorCode = SCIDB_E_NO_ERROR;
-        query = Query::createFakeQuery(0, 0, liveness, &longErrorCode);
+        query = Query::createFakeQuery(INVALID_INSTANCE, 0, liveness, &longErrorCode);
         if (longErrorCode != SCIDB_E_NO_ERROR &&
             longErrorCode != SCIDB_LE_INVALID_FUNCTION_ARGUMENT) {
                 // NetworkManger::createWorkQueue() may complain about null queue
@@ -252,9 +255,9 @@ public:
         return query;
     }
 
-    boost::shared_ptr<PhysicalPlan> habilis_d_generatePPlanFor(const char* queryString)
+    std::shared_ptr<PhysicalPlan> habilis_d_generatePPlanFor(const char* queryString)
     {
-        boost::shared_ptr<Query> query = getQuery();
+        std::shared_ptr<Query> query = getQuery();
 
         query->queryString = queryString;
         _queryProcessor->parseLogical(query, true);
@@ -264,9 +267,9 @@ public:
         return query->getCurrentPhysicalPlan();
     }
 
-    boost::shared_ptr<PhysicalPlan> habilis_generatePPlanFor(const char* queryString, bool ail = true)
+    std::shared_ptr<PhysicalPlan> habilis_generatePPlanFor(const char* queryString, bool ail = true)
     {
-        boost::shared_ptr<Query> query = getQuery();
+        std::shared_ptr<Query> query = getQuery();
 
         query->queryString = queryString;
         _queryProcessor->parseLogical(query, ail);
@@ -276,10 +279,10 @@ public:
         return query->getCurrentPhysicalPlan();
     }
 
-    int countDfNodes(boost::shared_ptr<PhysicalPlan> pp)
+    int countDfNodes(std::shared_ptr<PhysicalPlan> pp)
     {
         int result = 1;
-        boost::shared_ptr<PhysicalQueryPlanNode> node = pp->getRoot();
+        std::shared_ptr<PhysicalQueryPlanNode> node = pp->getRoot();
 
         while (node->getChildren().size() > 0)
         {
@@ -540,7 +543,7 @@ public:
 
     void testBasic()
     {
-        boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("scan(opttest_dummy_array)");
+        std::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("scan(opttest_dummy_array)");
         CPPUNIT_ASSERT(pp->isDdl()==false);
         CPPUNIT_ASSERT(countDfNodes(pp) == 1);
         ASSERT_OPERATOR(pp->getRoot(), "physicalScan");
@@ -559,7 +562,7 @@ public:
 
     void testThreeInstanceSgInsert(const char* query, const char* opName)
     {
-        boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor(query);
+        std::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor(query);
 
         CPPUNIT_ASSERT(countDfNodes(pp) == 2);
         PhysNodePtr expectedSubArrayNode = pp->getRoot();
@@ -610,7 +613,7 @@ public:
             close(fd);
         }
 
-        boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("input(opttest_dummy_array, '/tmp/tmpfile')");
+        std::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("input(opttest_dummy_array, '/tmp/tmpfile')");
 
         CPPUNIT_ASSERT(countDfNodes(pp) == 1);
         PhysNodePtr expectedInputNode = pp->getRoot();
@@ -634,75 +637,11 @@ public:
         CPPUNIT_ASSERT(expectedInputNode->getChildren().size() == 0);
     }
 
-    void testConcatSgInsert()
-    {
-        //this test case will need to change as optimizer gets smarter about concat
-        boost::shared_ptr<PhysicalPlan> pp = habilis_d_generatePPlanFor("concat(opttest_dummy_array, opttest_dummy_array)");
-
-        CPPUNIT_ASSERT(countDfNodes(pp) == 2);
-        CPPUNIT_ASSERT(countTotalNodes(pp->getRoot()) == 3);
-
-        PhysNodePtr expectedConcatNode = pp->getRoot();
-        ASSERT_OPERATOR(expectedConcatNode, "physicalConcat");
-
-        PhysOpPtr expectedConcatOp = expectedConcatNode->getPhysicalOperator();
-        CPPUNIT_ASSERT(expectedConcatNode->hasParent() == false);
-        CPPUNIT_ASSERT(expectedConcatNode->getChildren().size() == 2);
-
-        PhysNodePtr expectedScanLeftNode = expectedConcatNode->getChildren()[0];
-        PhysOpPtr expectedScanLeftOp = expectedScanLeftNode->getPhysicalOperator();
-
-        CPPUNIT_ASSERT(expectedScanLeftNode->getChildren().size() == 0);
-        CPPUNIT_ASSERT(expectedScanLeftNode->getParent() == expectedConcatNode);
-        CPPUNIT_ASSERT(equivalent(expectedScanLeftOp->getSchema(), _dummyArray) ||
-                equivalent(expectedScanLeftOp->getSchema(), _dummyShiftedArray));
-        CPPUNIT_ASSERT(!equivalent(expectedScanLeftOp->getSchema(), expectedConcatOp->getSchema()));
-
-        PhysNodePtr expectedScanRightNode = expectedConcatNode->getChildren()[0];
-        PhysOpPtr expectedScanRightOp = expectedScanRightNode->getPhysicalOperator();
-
-        CPPUNIT_ASSERT(expectedScanRightNode->getParent() == expectedConcatNode);
-        CPPUNIT_ASSERT(expectedScanRightNode->getChildren().size() == 0);
-        CPPUNIT_ASSERT(equivalent(expectedScanRightOp->getSchema(), _dummyArray) ||
-                equivalent(expectedScanRightOp->getSchema(), _dummyShiftedArray));
-        CPPUNIT_ASSERT(!equivalent(expectedScanRightOp->getSchema(), expectedConcatOp->getSchema()));
-
-        pp = habilis_generatePPlanFor("concat(opttest_dummy_array, opttest_dummy_array)");
-
-        CPPUNIT_ASSERT(countDfNodes(pp) == 2);
-        CPPUNIT_ASSERT(countTotalNodes(pp->getRoot()) == 3);
-
-        expectedConcatNode = pp->getRoot();
-        ASSERT_OPERATOR(expectedConcatNode, "physicalConcat");
-        expectedConcatOp = expectedConcatNode->getPhysicalOperator();
-
-        CPPUNIT_ASSERT(expectedConcatNode->hasParent() == false);
-        CPPUNIT_ASSERT(expectedConcatNode->getChildren().size() == 2);
-
-        expectedScanLeftNode = expectedConcatNode->getChildren()[0];
-        expectedScanLeftOp = expectedScanLeftNode->getPhysicalOperator();
-
-        CPPUNIT_ASSERT(expectedScanLeftNode->getChildren().size() == 0);
-        CPPUNIT_ASSERT(expectedScanLeftNode->getParent() == expectedConcatNode);
-        CPPUNIT_ASSERT(equivalent(expectedScanLeftOp->getSchema(), _dummyArray) ||
-                equivalent(expectedScanLeftOp->getSchema(), _dummyShiftedArray));
-        CPPUNIT_ASSERT(!equivalent(expectedScanLeftOp->getSchema(), expectedConcatOp->getSchema()));
-
-        expectedScanRightNode = expectedConcatNode->getChildren()[0];
-        expectedScanRightOp = expectedScanRightNode->getPhysicalOperator();
-
-        CPPUNIT_ASSERT(expectedScanRightNode->getParent() == expectedConcatNode);
-        CPPUNIT_ASSERT(expectedScanRightNode->getChildren().size() == 0);
-        CPPUNIT_ASSERT(equivalent(expectedScanRightOp->getSchema(), _dummyArray) ||
-                equivalent(expectedScanRightOp->getSchema(), _dummyShiftedArray));
-        CPPUNIT_ASSERT(!equivalent(expectedScanRightOp->getSchema(), expectedConcatOp->getSchema()));
-    }
-
     void testHabilisCollapse()
     {
         std::ostringstream out;
-        boost::shared_ptr<PhysicalPlan> pp;
-        ArrayDistribution dist;
+        std::shared_ptr<PhysicalPlan> pp;
+        RedistributeContext dist;
 
         PhysNodePtr root, leftChild, rightChild;
 
@@ -880,52 +819,6 @@ public:
         rightChild = rightChild->getChildren()[0];
         ASSERT_OPERATOR(rightChild,"physicalScan");
 
-        pp = habilis_generatePPlanFor("concat(subarray(opttest_dummy_array,0,0,1,1),subarray(opttest_dummy_array,1,1,2,2))");
-        root = pp->getRoot();
-
-//        pp->toString(out);
-//        std::cout<<out.str();
-//        out.str("");
-
-        ASSERT_OPERATOR(root,"physicalConcat");
-        CPPUNIT_ASSERT(root->getDistribution().isViolated() == true);
-        CPPUNIT_ASSERT(root->getDataWidth() == root->getChildren()[0]->getDataWidth() + root->getChildren()[1]->getDataWidth());
-
-        leftChild = root->getChildren()[0];
-        ASSERT_OPERATOR(leftChild,"physicalSubArray");
-        leftChild = leftChild->getChildren()[0];
-        ASSERT_OPERATOR(leftChild,"physicalScan");
-
-        rightChild = root->getChildren()[1];
-        ASSERT_OPERATOR(rightChild,"physicalSubArray");
-        rightChild = rightChild->getChildren()[0];
-        ASSERT_OPERATOR(rightChild,"physicalScan");
-
-        pp
-                = habilis_generatePPlanFor(
-                                           "join ( subarray ( concat(subarray(opttest_dummy_array,0,0,0,2),subarray(opttest_dummy_array,1,0,2,2)),1,1,2,2), project(apply(join(subarray(opttest_dummy_array,0,0,1,1) as foo, subarray(opttest_dummy_array,0,0,1,1) as bar), sum, foo.att0+bar.att0),sum))");
-//        pp->toString(out);
-//        std::cout<<out.str();
-//        out.str("");
-
-        root = pp->getRoot();
-        ASSERT_OPERATOR(root,"physicalJoin");
-
-        leftChild = root->getChildren()[0];
-        ASSERT_OPERATOR(leftChild,"impl_sg");
-        leftChild = leftChild->getChildren()[0];
-        ASSERT_OPERATOR(leftChild,"physicalSubArray");
-        leftChild = leftChild->getChildren()[0];
-        ASSERT_OPERATOR(leftChild,"physicalConcat");
-
-        rightChild = root->getChildren()[1];
-        ASSERT_OPERATOR(rightChild,"physicalProject");
-        rightChild = rightChild->getChildren()[0];
-        ASSERT_OPERATOR(rightChild,"physicalApply");
-        rightChild = rightChild->getChildren()[0];
-        ASSERT_OPERATOR(rightChild,"physicalJoin");
-
-
         pp
                 = habilis_generatePPlanFor(
                                            "join ( apply(subarray(project(opttest_dummy_array,att1),0,0,1,1), att0, att1+att1), subarray(opttest_dummy_array,1,1,2,2))");
@@ -942,8 +835,8 @@ public:
         leftChild = leftChild->getChildren()[0];
         ASSERT_OPERATOR(leftChild, "physicalSubArray");
         leftChild = leftChild->getChildren()[0];
-	ASSERT_OPERATOR(leftChild, "impl_materialize");
-	leftChild = leftChild->getChildren()[0];
+        ASSERT_OPERATOR(leftChild, "impl_materialize");
+        leftChild = leftChild->getChildren()[0];
         ASSERT_OPERATOR(leftChild, "physicalProject");
         CPPUNIT_ASSERT(leftChild->getDataWidth() == leftChild->getChildren()[0]->getDataWidth() / 2.0 );
         leftChild = leftChild->getChildren()[0];
@@ -952,43 +845,12 @@ public:
         ASSERT_OPERATOR(rightChild, "physicalSubArray");
         rightChild = rightChild->getChildren()[0];
         ASSERT_OPERATOR(rightChild, "physicalScan");
-
-        //just don't crash... will add more checks when optimizer is smarter
-        pp
-                = habilis_generatePPlanFor(
-                                           "store(join ( subarray ( concat(subarray(opttest_dummy_array,0,0,0,2),subarray(opttest_dummy_array,1,0,2,2)),1,1,2,2), project(apply(join(subarray(opttest_dummy_array,0,0,1,1) as foo, subarray(opttest_dummy_array,0,0,1,1) as bar), sum, foo.att0+bar.att0),sum)), foobar)");
-        pp = habilis_generatePPlanFor("join(subarray(opttest_dummy_array,0,0,9,9), sg(subarray(opttest_dummy_array,0,0,9,9),1,-1))");
-        //        pp->toString(out);
-        //        std::cout<<out.str();
-        //        out.str("");
-        pp
-                = habilis_generatePPlanFor(
-                                           "concat(subarray(join (subarray(subarray(opttest_dummy_array,0,0,9,9),0,0,9,9), reshape(opttest_dummy_shifted_array,opttest_dummy_array)), 1,1,3,3), join(opttest_small_array, reshape(opttest_small_array,opttest_small_array)))");
-        //        pp->toString(out);
-        //        std::cout<<out.str();
-        //        out.str("");
-
-        pp = habilis_generatePPlanFor(
-                                      " concat( subarray(apply(join(subarray(opttest_dummy_array,2,2,4,4) as foo,subarray(opttest_dummy_array,0,0,2,2) as bar),sum,foo.att0+bar.att0),1,1,2,2), "
-                                          "         subarray(apply(join(subarray(opttest_dummy_array,0,0,2,2) as foo,subarray(opttest_dummy_array,2,2,4,4) as bar),sum,foo.att0+bar.att0),0,0,1,1)"
-                                          " )");
-
-        pp = habilis_generatePPlanFor(" join ( "
-            "       subarray ("
-            "             concat ( subarray(opttest_dummy_array,0,0,0,0), subarray(opttest_dummy_array,1,1,1,1)),"
-            "             0,0,0,0),"
-            "       subarray ("
-            "             join ( subarray(opttest_dummy_array,1,1,1,1), subarray(opttest_dummy_array,0,0,0,0)),"
-            "                  0,0,0,0))");
-        //        pp->toString(out);
-        //        std::cout<<out.str();
-        //        out.str("");
     }
 
     void testTwoPhase()
     {
         std::ostringstream out;
-        boost::shared_ptr<PhysicalPlan> pp;
+        std::shared_ptr<PhysicalPlan> pp;
         PhysNodePtr root, child;
 
         pp = habilis_generatePPlanFor("sum(opttest_single_dim)");
@@ -1106,7 +968,7 @@ public:
     void testMultiply()
     {
         std::ostringstream out;
-        boost::shared_ptr<PhysicalPlan> pp;
+        std::shared_ptr<PhysicalPlan> pp;
         PhysNodePtr root, child;
 
         //SG results of subarray to match results of multply
@@ -1152,7 +1014,7 @@ public:
 
     void testFlipStoreRewrite()
     {
-        boost::shared_ptr<PhysicalPlan> pp;
+        std::shared_ptr<PhysicalPlan> pp;
         PhysNodePtr root;
 
         pp = habilis_generatePPlanFor( "select * into some_weird_array_we_hope_does_not_exist from opttest_dummy_array", false);
@@ -1165,7 +1027,13 @@ public:
 
         pp = habilis_generatePPlanFor (" select * into opttest_dummy_flipped from opttest_dummy_array", false);
         root = pp->getRoot();
-        ASSERT_OPERATOR(root, "physicalStore");
+        if (Cluster::getInstance()->getInstanceMembership()->getInstances().size() == 1) {
+            ASSERT_OPERATOR(root, "physicalStore");
+        } else {
+            ASSERT_OPERATOR(root, "impl_sg"); //storing
+            CPPUNIT_ASSERT(root->getPhysicalOperator()->getParameters().size() >= 3);
+            CPPUNIT_ASSERT(!static_cast<OperatorParamReference*>(root->getPhysicalOperator()->getParameters()[2].get())->getObjectName().empty());
+        }
 
         bool thrown = false;
         try
@@ -1182,7 +1050,7 @@ public:
 
     void testReplication()
     {
-        boost::shared_ptr<PhysicalPlan> pp;
+        std::shared_ptr<PhysicalPlan> pp;
         PhysNodePtr root;
         std::ostringstream out;
 

@@ -78,7 +78,7 @@ mkdir -p "${chroot_tmp_dir}" || die "Can not mkdir ${chroot_tmp_dir}"
 echo "Downloading sources to: ${build_dir}"
 pushd "${build_dir}" > /dev/null
    for filename in $sources; do
-      wget "${baseurl}/${filename}" || die "Unable to wget ${baseurl}/${filename}"
+       wget "${baseurl}/${filename}" || die "Unable to wget ${baseurl}/${filename}"
    done
 popd > /dev/null
 #----------------------------------------------------------------------#
@@ -98,7 +98,15 @@ echo "Building source package"
 pushd ${build_dir} > /dev/null
     # Extract source
     dpkg-source -x ${dsc_source}  || die "Can not dpkg-source"
-    # Add patches to it
+    # Copy in our own rules file
+    #   eliminates mpi and python libraries
+    #   sets toolset to 4.9
+    cp "${script_dir}"/patches/rules ${dir_source}/debian/rules
+    # Copy in our own control file
+    #   eliminates mpi and python libraries
+    #   depends on g*-4.9
+    cp "${script_dir}"/patches/control ${dir_source}/debian/control
+    # Add patches
     for patch_file in *.patch; do
 	echo ${patch_file} >> ${dir_source}/debian/patches/series
 	cp ${patch_file} ${dir_source}/debian/patches || die "Can not copy patch file ${patch_file} into patches directory"

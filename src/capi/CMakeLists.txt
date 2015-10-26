@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -25,6 +25,7 @@ set(scidbclient_src
     ../network/BaseConnection.cpp
     ../system/Exceptions.cpp
     ../array/Metadata.cpp
+    ../array/ArrayDistribution.cpp
     ${CMAKE_BINARY_DIR}/src/system/Constants.cpp
     ../smgr/io/ArrayWriter.cpp
     ../smgr/io/TemplateParser.cpp
@@ -53,14 +54,43 @@ set(scidbclient_src
 
 file(GLOB scidbclient_include "include/*.h")
 
+include_directories(${CityHash_INCLUDE_DIR})
 add_library(scidbclient SHARED ${scidbclient_src} ${scidbclient_include})
+add_dependencies(scidbclient scidb_msg_lib)
+
+
+
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "libscidbclient${CMAKE_SHARED_LIBRARY_SUFFIX}" scidbclient)
 set_target_properties(scidbclient PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
-set_target_properties(scidbclient PROPERTIES COMPILE_FLAGS "-DSCIDB_CLIENT")
+set_target_properties(scidbclient PROPERTIES COMPILE_FLAGS "-DSCIDB_CLIENT -std=c++14")
+set_target_properties(scidbclient PROPERTIES LINK_FLAGS "-Wl,--no-undefined")
 
-    set_target_properties(scidbclient PROPERTIES LINK_FLAGS "-Wl,--no-undefined")
-target_link_libraries(scidbclient scidb_msg_lib json_lib compression_lib util_lib
-    ${LIBRT_LIBRARIES} ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+
+# include relevant utilities
+
+# Make sure the compiler can find include files for our libopenssl
+# library when other libraries or executables link to libopenssl
+#target_include_directories (openssl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+find_package(OpenSSL)
+#  OPENSSL_FOUND - system has the OpenSSL library
+#  OPENSSL_INCLUDE_DIR - the OpenSSL include directory
+#  OPENSSL_LIBRARIES - The libraries needed to use OpenSSL
+#  OPENSSL_VERSION - This is set to $major.$minor.$revision$path (eg. 0.9.8s)
+
+
+if(OPENSSL_FOUND)
+  if(OPENSSL_VERSION VERSION_LESS 0.9.8)
+    message(FATAL_ERROR " ERROR OpenSSL: version is less than 0.9.8")
+  endif()
+else()
+  message(FATAL_ERROR "No crypto library found")
+endif()
+
+
+target_link_libraries(scidbclient scidb_msg_lib json_lib compression_lib util_lib crypto
+    ${LIBRT_LIBRARIES} ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES}
+    ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS} ${CityHash_LIBRARY})
 
 # RS: I hope double free will not happen again because of I removed linking protobuf to iquery
 #add_dependencies(scidbclient ${CURRENT_SOURCE_DIR}/export.map)
@@ -68,7 +98,9 @@ target_link_libraries(scidbclient scidb_msg_lib json_lib compression_lib util_li
 #    set_target_properties(scidbclient PROPERTIES LINK_FLAGS "-Wl,--version-script=export.map")
 #endif()
 
-if(NOT WITHOUT_PYTHON_BINDING)
+#SWIG-based python connector is temporarily disabled because it does not work with C++14. See #4745.
+#if(NOT WITHOUT_PYTHON_BINDING)
+if(false)
 	message (STATUS "SWIG 2 and Python found. Python module will built")
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -84,7 +116,7 @@ if(NOT WITHOUT_PYTHON_BINDING)
 		COMMENT "Building SWIG source in ${SWSIZE} mode: See swigpython.out for errors and warning"
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	)
-        
+
     set(scidbpython_src ${CMAKE_CURRENT_BINARY_DIR}/scidbpython.cxx)
 	include_directories(${PYTHON_INCLUDE_PATH})
 
@@ -96,7 +128,7 @@ if(NOT WITHOUT_PYTHON_BINDING)
 	endif(NOT (${DISTRO_NAME_VER} MATCHES "RedHat-[0-9][.][0-9]" OR ${DISTRO_NAME_VER} MATCHES "SUSE"))
 
 	target_link_libraries(scidbpython scidbclient)
-        
+
 	set_target_properties(scidbpython PROPERTIES
 		LIBRARY_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY}
 		PREFIX "_lib" OUTPUT_NAME "scidbpython"

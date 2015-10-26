@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,25 +25,25 @@
  *
  * @author paul@scidb.org
  *
- * @brief Shared library that loads into SciDB a Rational data type. 
+ * @brief Shared library that loads into SciDB a Rational data type.
  */
 
 #include <vector>
 #include <boost/assign.hpp>
 
-#include "query/Operator.h"
-#include "query/FunctionLibrary.h"
-#include "query/FunctionDescription.h"
-#include "query/TypeSystem.h"
-#include "system/ErrorsLibrary.h"
-#include "query/TileFunctions.h"
-#include "query/Aggregate.h"
+#include <query/Operator.h>
+#include <query/FunctionLibrary.h>
+#include <query/FunctionDescription.h>
+#include <query/TypeSystem.h>
+#include <system/ErrorsLibrary.h>
+#include <query/TileFunctions.h>
+#include <query/Aggregate.h>
+
+#include "rational_functions.h"
 
 using namespace std;
 using namespace scidb;
 using namespace boost::assign;
-
-#include "rational_functions.h"
 
 /**
  * EXPORT FUNCTIONS
@@ -89,37 +89,37 @@ public:
     RationalLibrary()
     {
 		//
-		// The Type constructor takes: 
+		// The Type constructor takes:
 		//   a) A Name for the type - a string.
-		//   b) An Integer identifier that is scoped to withiin this 
-		//      shared library. That is, two different types, in two 
+		//   b) An Integer identifier that is scoped to withiin this
+		//      shared library. That is, two different types, in two
 		//      shared libraries, can share an identifier. SciDB assigns
-		// 		each module an identifier as it loads the module and the 
-		//      SciDB internal identifiers for things like types and 
-		//      functions combine the ID of the Module, with the IDs of 
+		// 		each module an identifier as it loads the module and the
+		//      SciDB internal identifiers for things like types and
+		//      functions combine the ID of the Module, with the IDs of
 		//      objects defined within the module: here, for example.
-		//   c) The third argument is the size, in bits, of the data 
-		//      in the type. 
+		//   c) The third argument is the size, in bits, of the data
+		//      in the type.
         Type rationalType("rational", sizeof(SciDB_Rational) * 8);
         _types.push_back(rationalType);
 
 		//
-		// The FunctionDescription constructor takes: 
-		//  a) A name for the function - a string. 
-		//  b) A vector of input types. These can be constructed using the 
-		//     argTypes() function, which takes a variable list of 
-		//     parameters. The first paramater to the argTypes() function is 
-		//     an integer corresponding to the number of parameters passed 
-		//     into the function. The rest of the arguments to argTypes() is 
-		//     a list of type identifiers. For the built in types (String, 
-		//     various numerical types) you can use the enum{} provided. 
+		// The FunctionDescription constructor takes:
+		//  a) A name for the function - a string.
+		//  b) A vector of input types. These can be constructed using the
+		//     argTypes() function, which takes a variable list of
+		//     parameters. The first paramater to the argTypes() function is
+		//     an integer corresponding to the number of parameters passed
+		//     into the function. The rest of the arguments to argTypes() is
+		//     a list of type identifiers. For the built in types (String,
+		//     various numerical types) you can use the enum{} provided.
 		//     For functions that take extended types, use the type identifiers
-		//     supplied above. 
+		//     supplied above.
 		//
-		//  c) The third argument to FunctionDescription() is an identifier  
-		//     for the function's return type. 
-		//  d) The fourth and final argument is a function pointer to the 
-		//     code that implements the function. 
+		//  c) The third argument to FunctionDescription() is an identifier
+		//     for the function's return type.
+		//  d) The fourth and final argument is a function pointer to the
+		//     code that implements the function.
         _functionDescs.push_back(FunctionDescription("rational", ArgTypes(), TypeId("rational"), &construct_rational));
         _functionDescs.push_back(FunctionDescription("rational", list_of(TID_STRING), TypeId("rational"), &str2Rational));
         _functionDescs.push_back(FunctionDescription("rational", list_of(TID_INT64), TypeId("rational"), &int2Rational));

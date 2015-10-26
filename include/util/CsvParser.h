@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014-2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -47,11 +47,21 @@ namespace scidb {
  *              is analogous to converting a SAX-like API into a
  *              DOM-like API.)
  *
+ *              This parser attempts to guess the kind of quotes to
+ *              use based on the contents of the first input buffer.
+ *              To disable this behavior, call #setQuote with the
+ *              desired quote character.  (It is possible but
+ *              extremely unlikely that two instances will guess
+ *              differently during a parallel load().  We don't bother
+ *              to handle this case; the user should just specify the
+ *              quote character using 'csv:d' or 'csv:s' format
+ *              options.)
+ *
  *  @note       Unfortunately, all the input data must be copied in
  *              order to avoid pointer invalidations due to
  *              libcsv-internal realloc(3) calls.  Oh well.
  *
- *  @author     mjl@paradigm4.com
+ *  @author     Mike Leibensperger <mjl@paradigm4.com>
  *
  *  @see        http://libcsv.sourceforge.net/
  */
@@ -82,11 +92,7 @@ public:
     /// Set logging object.
     CsvParser& setLogger(log4cxx::LoggerPtr);
 
-    /**
-     * Return values for #getField .  Positive values indicate a libcsv
-     * parsing error as returned by the csv_error() function---use
-     * csv_strerror() to obtain a static string describing the error.
-     */
+    /// Return values for #getField
     enum {
         OK = 0,                 ///< Returning a valid field
         END_OF_RECORD = -1,     ///< Reached end-of-record
@@ -103,24 +109,34 @@ public:
      * one or the other.  After the final END_OF_RECORD, END_OF_FILE
      * is returned for all subsequent calls.
      *
-     * @c getField() can also return positive error values, which are
-     * those returned by @c csv_error().  This typically only happens in
-     * strict mode (and therefore #setStrict() is not recommended).
-     * If a csv_error() value is returned, the parser is left in an
-     * undefined state and further calls continue to return the error.
+     * @note If an exception is thrown, the internal parser state
+     * *may* require a full reset.  A reset entails searching forward
+     * in the input to a position beyond the next newline and posting
+     * END_OF_RECORD.  (Newlines are not necessarily record boundaries
+     * in CSV, but this is the best we can do.)  Exception handlers
+     * can check whether the exception involves a full reset by
+     * calling #willReset() .
      *
      * @note The returned @c field pointer will never be NULL, so it
      * can safely be passed to the @c std::string constructor.
      *
-     * @param field [OUT] non-NULL pointer to const parsed field or to empty string
-     * @returns OK, END_OF_RECORD, END_OF_FILE, or csv_error() value
+     * @param[out] field non-NULL pointer to const parsed field or to empty string
+     * @returns OK, END_OF_RECORD, or END_OF_FILE
+     * @throws SCIDB_LE_CSV_PARSE_ERROR error while parsing in strict mode
+     * @throws SCIDB_LE_CSV_UNBALANCED_QUOTE field too big, suspected quote problem
+     * @throws SCIDB_LE_FILE_READ_ERROR fread(2) error on input
      */
     int getField(char const*& field);
 
-    /**
-     * Return true iff no fields are currently buffered up.
-     */
-    bool empty() const { return _fields.empty(); }
+    /** Return true iff no fields are currently buffered up. */
+    bool empty() const
+    {
+        return _fields.empty()
+            || _fields.front().offset == END_OF_FILE;
+    }
+
+    /** Return true iff recently thrown error has scheduled a parser reset. */
+    bool willReset() const { return _wantReset; }
 
     /**
      * These accessors are for logging should an error occur.
@@ -136,6 +152,8 @@ private:
     int  more();                    // Parse another buffer's worth
     void putField(void*, size_t);   // Per-field logic
     void putRecord(int);            // Per-record logic
+    void reset();                   // Brute force recovery from parse errors
+    void readNextBuffer();          // ...and set _nread and _bufOffset
 
     // Callback routines needed by libcsv.
     static void fieldCbk(void* s, size_t n, void* state);
@@ -149,7 +167,7 @@ private:
     };
 
     struct Field {
-        int     offset;         // Offset of field data, or END_OF_* value
+        int     offset;         // Offset of field in _data[], or END_OF_* value
         size_t  record;         // Belongs to this record number
         size_t  column;         // Column within record
         off_t   filepos;        // Offset of field within file
@@ -167,13 +185,16 @@ private:
     Field               _lastField; // Last real field (not END_OF_* value)
     std::deque<Field>   _fields;    // Queue of info about parsed fields
     std::vector<char>   _inbuf;     // File input buffer
+    off_t               _bufOffset; // File offset of first byte of _inbuf[]
     std::vector<char>   _data;      // Buffer holding parsed field data
     size_t              _datalen;   // Length of valid _data[]
     size_t              _numRecords;// Count records seen
     size_t              _numFields; // Track # of fields per record
     size_t              _prevFields;// Previous per-record field count
     size_t              _warnings;  // Field count warnings so far
-    off_t               _fileOffset;// Input file offset prior to csv_parse call
+    size_t              _nread;     // Size of last file read
+    bool                _wantReset; // Got an error that requires parser reset
+    char*               _reparse;   // Residual data to re-parse after reset
     log4cxx::LoggerPtr  _logger;    // Logging support
 };
 

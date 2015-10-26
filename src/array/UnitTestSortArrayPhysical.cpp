@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <array/Metadata.h>
 #include <system/Cluster.h>
 #include <query/Query.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
@@ -52,7 +52,7 @@ public:
     {
     }
 
-    void preSingleExecute(shared_ptr<Query> query)
+    void preSingleExecute(std::shared_ptr<Query> query)
     {
     }
 
@@ -127,12 +127,12 @@ public:
      * @param[inout] array  the array to receive data
      * @param[in]    m      the map of Coordinate --> Value
      */
-    void insertMapDataIntoArray(shared_ptr<Query>& query, MemArray& array, CoordValueMap const& m)
+    void insertMapDataIntoArray(std::shared_ptr<Query>& query, MemArray& array, CoordValueMap const& m)
     {
         Coordinates coord(1);
         coord[0] = 0;
-        vector< shared_ptr<ArrayIterator> > arrayIters(array.getArrayDesc().getAttributes(true).size());
-        vector< shared_ptr<ChunkIterator> > chunkIters(arrayIters.size());
+        vector< std::shared_ptr<ArrayIterator> > arrayIters(array.getArrayDesc().getAttributes(true).size());
+        vector< std::shared_ptr<ChunkIterator> > chunkIters(arrayIters.size());
 
         for (size_t i = 0; i < arrayIters.size(); i++)
         {
@@ -182,7 +182,7 @@ public:
      *
      * @throw SCIDB_SE_INTERNAL::SCIDB_LE_UNITTEST_FAILED
      */
-    void testOnce_SortArray(boost::shared_ptr<Query>& query,
+    void testOnce_SortArray(std::shared_ptr<Query>& query,
                             TypeId const& type,
                             Coordinate start,
                             Coordinate end,
@@ -207,7 +207,7 @@ public:
         }
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), start, end, chunkInterval, 0);
-        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions);
+        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
 
         // Sort Keys
         SortingAttributeInfos sortingAttributeInfos;
@@ -217,8 +217,8 @@ public:
         sortingAttributeInfos.push_back(k);
 
         // Define the array to sort
-        shared_ptr<MemArray> arrayInst(new MemArray(schema,query));
-        shared_ptr<Array> baseArrayInst = static_pointer_cast<MemArray, Array>(arrayInst);
+        std::shared_ptr<MemArray> arrayInst(new MemArray(schema,query));
+        std::shared_ptr<Array> baseArrayInst = static_pointer_cast<MemArray, Array>(arrayInst);
 
         // Generate source data
         CoordValueMap mapInst;
@@ -235,8 +235,8 @@ public:
         // Sort
         const bool preservePositions = false;
         SortArray sorter(schema, _arena, preservePositions);
-        shared_ptr<TupleComparator> tcomp(new TupleComparator(sortingAttributeInfos, schema));
-        shared_ptr<MemArray> sortedArray = sorter.getSortedArray(baseArrayInst, query, tcomp);
+        std::shared_ptr<TupleComparator> tcomp(new TupleComparator(sortingAttributeInfos, schema));
+        std::shared_ptr<MemArray> sortedArray = sorter.getSortedArray(baseArrayInst, query, tcomp);
 
         // Check correctness.
         // - Retrieve all data from the array. Ensure results are sorted.
@@ -245,21 +245,21 @@ public:
             Value t1[1];
             Value t2[1];
             size_t itemCount = 0;
-            shared_ptr<ConstArrayIterator> constArrayIter = sortedArray->getConstIterator(j);
+            std::shared_ptr<ConstArrayIterator> constArrayIter = sortedArray->getConstIterator(j);
             constArrayIter->reset();
             while (!constArrayIter->end())
             {
-                shared_ptr<ConstChunkIterator> constChunkIter =
+                std::shared_ptr<ConstChunkIterator> constChunkIter =
                     constArrayIter->getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
                 while (!constChunkIter->end())
                 {
                     itemCount++;
-                    Value& v = constChunkIter->getItem();
+                    Value const& v = constChunkIter->getItem();
                     t1[0] = v;
                     ++(*constChunkIter);
                     if (!constChunkIter->end())
                     {
-                        Value& next = constChunkIter->getItem();
+                        Value const& next = constChunkIter->getItem();
                         t2[0] = next;
                         if (tcomp->compare(t1, t2) > 0)
                         {
@@ -288,7 +288,7 @@ public:
                       "][nattrs=" << nattrs << "][ascent=" << ascent << "]");
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         srand(time(NULL));
 
@@ -300,7 +300,7 @@ public:
         testOnce_SortArray(query, TID_STRING, 0, 1000, 3, true, 100);
         testOnce_SortArray(query, TID_INT64, 0, 5000000, 3, true, 10000);
 
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 
 };

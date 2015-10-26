@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,10 +28,8 @@
  *  Created on: November 4, 2013
  */
 
-
-// boost
-#include <boost/shared_ptr.hpp>
-#include <boost/unordered_map.hpp>
+#include <memory>
+#include <unordered_map>
 // scidb
 #include <system/ErrorCodes.h>
 #include <system/Exceptions.h>
@@ -62,7 +60,7 @@ namespace scidb
  * @return
  */
 template<class SemiringTraits_tt>
-shared_ptr<SpgemmBlock<typename SemiringTraits_tt::Value_t> >
+std::shared_ptr<SpgemmBlock<typename SemiringTraits_tt::Value_t> >
 SpgemmBlockFactory(ssize_t rowBegin, ssize_t colBegin, size_t numRow, size_t numCol, size_t nnzEstimate)
 {
     typedef typename SemiringTraits_tt::Value_t Value_t;
@@ -86,7 +84,7 @@ SpgemmBlockFactory(ssize_t rowBegin, ssize_t colBegin, size_t numRow, size_t num
     } else {
         tmp = new CSRBlock<Value_t>(rowBegin, colBegin, numRow, numCol, nnzEstimate);
     }
-    return shared_ptr<SpgemmBlock<Value_t> >(tmp);
+    return std::shared_ptr<SpgemmBlock<Value_t> >(tmp);
 }
 
 /**

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -377,7 +377,7 @@ class Mu_Daemon(Daemon):
             tok = 'pausing'
 	  elif tcmd == 'resume':
 	    tok = 'resuming'
-  
+
 	  for k,v in dict_harness.items():
 	    if tname == k:
 	      try:
@@ -536,7 +536,7 @@ class Mu_Daemon(Daemon):
 		    print "killing TEST from list as server is down.."
 		    v[8]='killing'
 		  if v[8] == 'killing':
-		    if self.get_pstate(v[0]) != '-': 
+		    if self.get_pstate(v[0]) != '-':
 		      self.log_it('sending kill signal to TEST '+k,3)
 		      os.kill(v[0],signal.SIGKILL)
 		    dict_harness.pop(k)
@@ -554,7 +554,7 @@ class Mu_Daemon(Daemon):
 		    continue
 		  elif v[8] == 'resuming':
 		    if self.get_pstate(v[0]) == 'T':
-		      self.log_it('sending resume signal to TEST '+k,3) 
+		      self.log_it('sending resume signal to TEST '+k,3)
 		      os.kill(v[0],signal.SIGCONT)
 		      dict_harness[k][8] = 'resumed'
 		      self.write_to_stat_file()

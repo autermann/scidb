@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -74,15 +74,15 @@ namespace scidb
         return desc;
     }
 
-    boost::shared_ptr<ArrayIterator> StreamArray::getIterator(AttributeID attId)
+    std::shared_ptr<ArrayIterator> StreamArray::getIterator(AttributeID attId)
     {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "StreamArray::getIterator()";
     }
 
-    boost::shared_ptr<ConstArrayIterator> StreamArray::getConstIterator(AttributeID attId) const
+    std::shared_ptr<ConstArrayIterator> StreamArray::getConstIterator(AttributeID attId) const
     {
         if (!_iterators[attId]) {
-            ((StreamArray*)this)->_iterators[attId] = boost::shared_ptr<ConstArrayIterator>(new StreamArrayIterator(*(StreamArray*)this, attId));
+            ((StreamArray*)this)->_iterators[attId] = std::shared_ptr<ConstArrayIterator>(new StreamArrayIterator(*(StreamArray*)this, attId));
         }
         return _iterators[attId];
     }
@@ -174,8 +174,8 @@ namespace scidb
     //
     // AccumulatorArray
     //
-    AccumulatorArray::AccumulatorArray(boost::shared_ptr<Array> array,
-                                       boost::shared_ptr<Query>const& query)
+    AccumulatorArray::AccumulatorArray(std::shared_ptr<Array> array,
+                                       std::shared_ptr<Query>const& query)
     : StreamArray(array->getArrayDesc(), false),
       pipe(array),
       iterators(array->getArrayDesc().getAttributes().size())
@@ -201,10 +201,10 @@ namespace scidb
         Address addr(attId, inputChunk.getFirstPosition(false));
         chunk.initialize(this, &desc, addr, inputChunk.getCompressionMethod());
         chunk.setBitmapChunk((Chunk*)&inputChunk);
-        boost::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|
+        std::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE|
                                                                                 ChunkIterator::IGNORE_EMPTY_CELLS);
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-        boost::shared_ptr<ChunkIterator> dst =
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        std::shared_ptr<ChunkIterator> dst =
             chunk.getIterator(query,
                               (src->getMode() & ChunkIterator::TILE_MODE)|
                               ChunkIterator::NO_EMPTY_CHECK|
@@ -237,8 +237,8 @@ MultiStreamArray::DefaultChunkMerger::DefaultChunkMerger (bool isEnforceDataInte
 bool
 MultiStreamArray::DefaultChunkMerger::mergePartialChunk(size_t stream,
                                                         AttributeID attId,
-                                                        shared_ptr<MemChunk>& partialChunk,
-                                                        const shared_ptr<Query>& query)
+                                                        std::shared_ptr<MemChunk>& partialChunk,
+                                                        const std::shared_ptr<Query>& query)
 {
     assert(partialChunk);
 
@@ -269,15 +269,15 @@ MultiStreamArray::DefaultChunkMerger::mergePartialChunk(size_t stream,
     return true;
 }
 
-bool MultiStreamArray::DefaultChunkMerger::isEmptyBitMap(const shared_ptr<MemChunk>& chunk)
+bool MultiStreamArray::DefaultChunkMerger::isEmptyBitMap(const std::shared_ptr<MemChunk>& chunk)
 {
     AttributeDesc const* ebmAttr = chunk->getArrayDesc().getEmptyBitmapAttribute();
     return (ebmAttr != NULL && chunk->getAttributeDesc().getId() == ebmAttr->getId());
 }
 
-shared_ptr<MemChunk>
+std::shared_ptr<MemChunk>
 MultiStreamArray::DefaultChunkMerger::getMergedChunk(AttributeID attId,
-                                                     const shared_ptr<Query>& query)
+                                                     const std::shared_ptr<Query>& query)
 {
     static const char* funcName = "DefaultChunkMerger::getMergedChunk: ";
     assert(_mergedChunk);
@@ -328,7 +328,7 @@ MultiStreamArray::DefaultChunkMerger::getMergedChunk(AttributeID attId,
         << mergedFootprint << _chunkSizeLimit;
     }
 
-    shared_ptr<MemChunk> result;
+    std::shared_ptr<MemChunk> result;
     _mergedChunk.swap(result);
     _numElems = 0;
     assert(result);
@@ -347,7 +347,7 @@ MultiStreamArray::MultiStreamArray(size_t n,
                                    size_t localStream,
                                    ArrayDesc const& arr,
                                    bool enforceDataIntegrity,
-                                   boost::shared_ptr<Query>const& query)
+                                   std::shared_ptr<Query>const& query)
 : StreamArray(arr, false),
   _nStreams(n),
   _localStream(localStream),
@@ -369,7 +369,7 @@ MultiStreamArray::MultiStreamArray(size_t n,
     for (AttributeID attId=0; attId < _notReadyPositions.size(); ++attId) {
         list<size_t>& current = _notReadyPositions[attId];
         current.insert(current.end(), notReadyPos.begin(), notReadyPos.end());
-        _chunkMergers[attId] = boost::make_shared<DefaultChunkMerger>(_enforceDataIntegrity);
+        _chunkMergers[attId] = std::make_shared<DefaultChunkMerger>(_enforceDataIntegrity);
     }
 }
 
@@ -496,7 +496,7 @@ MultiStreamArray::getAllStreamPositions(PositionMap& readyPos,
 {
     static const char *funcName = "MultiStreamArray::getAllStreamPositions: ";
     Coordinates pos;
-    shared_ptr<RetryException> err;
+    std::shared_ptr<RetryException> err;
 
     for (list<size_t>::iterator iter = notReadyPos.begin();
          iter != notReadyPos.end();) {
@@ -519,7 +519,7 @@ MultiStreamArray::getAllStreamPositions(PositionMap& readyPos,
             LOG4CXX_TRACE(logger, funcName << "next position is NOT ready attId= " << attId
                           <<", stream="<< stream);
 
-            if (!err) { err = boost::dynamic_pointer_cast<RetryException>(e.copy()); }
+            if (!err) { err = std::dynamic_pointer_cast<RetryException>(e.copy()); }
         }
         ++iter;
     }
@@ -537,9 +537,9 @@ MultiStreamArray::mergePartialStreams(PositionMap& readyPos,
 {
     static const char *funcName = "MultiStreamArray::mergePartialStreams: ";
     Coordinates pos;
-    shared_ptr<RetryException> err;
-    shared_ptr<MemChunk> mergeChunk = boost::make_shared<MemChunk>();
-    boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+    std::shared_ptr<RetryException> err;
+    std::shared_ptr<MemChunk> mergeChunk = std::make_shared<MemChunk>();
+    std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
     assert(_chunkMergers[attId]);
 
     // get all partial chunks
@@ -583,7 +583,7 @@ MultiStreamArray::mergePartialStreams(PositionMap& readyPos,
 
             assert(next==NULL);
             if (!err) {
-                err = boost::dynamic_pointer_cast<RetryException>(e.copy());
+                err = std::dynamic_pointer_cast<RetryException>(e.copy());
             }
             ++it;
             continue;
@@ -601,7 +601,7 @@ MultiStreamArray::mergePartialStreams(PositionMap& readyPos,
         assert(_currMinPos[attId] == next->getFirstPosition(false));
         if (!_chunkMergers[attId]->mergePartialChunk(stream, attId,mergeChunk,query)) {
             assert(!mergeChunk);
-            mergeChunk = boost::make_shared<MemChunk>();
+            mergeChunk = std::make_shared<MemChunk>();
         }
         assert(mergeChunk);
     }
@@ -618,7 +618,7 @@ MultiStreamArray::getNextStreamPositions(PositionMap& readyPos,
 {
     static const char *funcName = "MultiStreamArray::getNextStreamPositions: ";
     Coordinates pos;
-    shared_ptr<RetryException> err;
+    std::shared_ptr<RetryException> err;
     // re-request next stream positions
     for (list<size_t>::iterator it=currPartialStreams.begin();
          it != currPartialStreams.end(); ++it) {
@@ -645,7 +645,7 @@ MultiStreamArray::getNextStreamPositions(PositionMap& readyPos,
                           <<", stream="<< stream);
             notReadyPos.push_back(stream);
             if (!err) {
-                err = boost::dynamic_pointer_cast<RetryException>(e.copy());
+                err = std::dynamic_pointer_cast<RetryException>(e.copy());
             }
             continue;
         }
@@ -688,9 +688,11 @@ SinglePassArray::SinglePassArray(ArrayDesc const& arr)
   _rowIndexPerAttribute(arr.getAttributes().size(), 0)
 {}
 
-shared_ptr<ConstArrayIterator>
+std::shared_ptr<ConstArrayIterator>
 SinglePassArray::getConstIterator(AttributeID attId) const
 {
+    ScopedMutexLock cs(_mutex);
+
     if (_iterators[attId]) { return _iterators[attId]; }
 
     // Initialize all attribute iterators at once
@@ -701,8 +703,8 @@ SinglePassArray::getConstIterator(AttributeID attId) const
         try {
             if (!_iterators[a]) {
                 StreamArray* self = const_cast<StreamArray*>(static_cast<const StreamArray*>(this));
-                boost::shared_ptr<ConstArrayIterator> cai(new StreamArrayIterator(*self, a));
-                const_cast< boost::shared_ptr<ConstArrayIterator>& >(_iterators[a]) = cai;
+                std::shared_ptr<ConstArrayIterator> cai(new StreamArrayIterator(*self, a));
+                const_cast< std::shared_ptr<ConstArrayIterator>& >(_iterators[a]) = cai;
             }
         } catch (const StreamArray::RetryException& e) {
             if (a == attId) {
@@ -718,6 +720,8 @@ SinglePassArray::getConstIterator(AttributeID attId) const
 ConstChunk const*
 SinglePassArray::nextChunk(AttributeID attId, MemChunk& chunk)
 {
+    ScopedMutexLock cs(_mutex);
+
     static const char* funcName="SinglePassArray:nextChunk: ";
     // Ensure that attributes are consumed horizontally
     while(true) {

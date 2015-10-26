@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -48,40 +48,41 @@ if [[ $? != 0 ]] ; then cleanup 1 0; fi
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "store(build(foo,4),foo)"
 if [[ $? != 0 ]] ; then cleanup 1 0; fi
 
-uaid=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('arrays'),name='foo'),uaid)" | 
+uaid=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('arrays'),name='foo'),uaid)" |
          sed 1d`
 
 # calculate the free and used bytes for instance 0
-free=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
-         sed 1d | cut -d ',' -f 5`
-used=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
+free=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
          sed 1d | cut -d ',' -f 4`
+used=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
+         sed 1d | cut -d ',' -f 2`
+((net = used - free))
 
 # run remove_versions and verify that the correct versions are removed
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "remove_versions(foo, 3)"
 if [[ $? != 0 ]]; then cleanup 1 2; fi
 
-count1=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(foo, a = 4), count(a))" |
+count1=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(foo, a = 4), count(a))" |
            sed 1d`
-count2=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(foo@3, a = 3), count(a))" |
+count2=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(foo@3, a = 3), count(a))" |
            sed 1d`
 if [[ $count1 != 50001 || $count2 != 50001 ]]; then cleanup 1 3; fi
 
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(foo@2, a = 2), count(a))" 2>&1 |
-    grep ARRAY_DOESNT_EXIST
+    grep ARRAY_VERSION_DOESNT_EXIST
 if [[ $? != 0 ]]; then cleanup 1 4; fi
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "aggregate(filter(foo@1, a = 1), count(a))" 2>&1 |
-    grep ARRAY_DOESNT_EXIST
+    grep ARRAY_VERSION_DOESNT_EXIST
 if [[ $? != 0 ]]; then cleanup 1 4; fi
 
 # verify that the free space increased and the used bytes decreased
-free1=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
-         sed 1d | cut -d ',' -f 3`
-used1=`iquery -ocsv -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
+free1=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
+         sed 1d | cut -d ',' -f 4`
+used1=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "filter(list('datastores'), uaid=$uaid and inst=0)" |
          sed 1d | cut -d ',' -f 2`
+((net1 = used1 - free1))
 
-if [[ $free -ge $free1 ]]; then echo free $free free1 $free1 cleanup 1 5; fi
-if [[ $used -le $used1 ]]; then cleanup 1 6; fi
+if [[ $net -le $net1 ]]; then echo net $net net1 $net1; cleanup 1 5; fi
 
 # success
 cleanup 0

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@ namespace scidb
 {
   //static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.smgr.compression.Compressor"));
     CompressorFactory CompressorFactory::instance;
-    
+
     void CompressorFactory::registerCompressor(Compressor* compressor)
     {
         compressors.push_back(compressor);
@@ -72,23 +72,23 @@ namespace scidb
     {
         return size;
     }
-    
-    size_t NoCompression::decompress(void const* src, size_t size, Chunk& chunk) 
+
+    size_t NoCompression::decompress(void const* src, size_t size, Chunk& chunk)
     {
         memcpy(chunk.getDataForLoad(), src, size);
         return size;
     }
-    
+
     int ZlibCompressor::compressionLevel = Z_DEFAULT_COMPRESSION;
-    
-    size_t ZlibCompressor::compress(void* dst, const ConstChunk& chunk, size_t size) 
+
+    size_t ZlibCompressor::compress(void* dst, const ConstChunk& chunk, size_t size)
     {
         uLongf dstLen = size;
         int rc = compress2((Bytef*)dst, &dstLen, (Bytef*)chunk.getData(), size, compressionLevel);
         return rc == Z_OK ? dstLen : size;
     }
-    
-    size_t ZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk) 
+
+    size_t ZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk)
     {
         uLongf dstLen = chunk.getSize();
         int rc = uncompress((Bytef*)chunk.getDataForLoad(), &dstLen, (Bytef*)src, size);
@@ -96,34 +96,34 @@ namespace scidb
     }
 
     int BZlibCompressor::blockSize100k = 4;
-    int BZlibCompressor::workFactor = 9; 
- 
-    size_t BZlibCompressor::compress(void* dst, const ConstChunk& chunk, size_t size) 
+    int BZlibCompressor::workFactor = 9;
+
+    size_t BZlibCompressor::compress(void* dst, const ConstChunk& chunk, size_t size)
     {
         unsigned int dstLen = size;
         int rc = BZ2_bzBuffToBuffCompress((char*)dst, &dstLen, (char*)chunk.getData(), size, blockSize100k, 0, workFactor);
         return rc == BZ_OK ? dstLen : size;
     }
-    
-    size_t BZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk) 
+
+    size_t BZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk)
     {
         unsigned int dstLen = chunk.getSize();
         int rc = BZ2_bzBuffToBuffDecompress((char*)chunk.getDataForLoad(), &dstLen, (char*)src, size, 0, 0);
         return rc == BZ_OK ? dstLen : 0;
     }
 
-    size_t NullFilter::compress(void* dst, const ConstChunk& chunk, size_t size) 
+    size_t NullFilter::compress(void* dst, const ConstChunk& chunk, size_t size)
     {
         return size;
     }
 
-    size_t NullFilter::decompress(void const* src, size_t size, Chunk& chunk) 
+    size_t NullFilter::decompress(void const* src, size_t size, Chunk& chunk)
     {
-      
+
       return 0;
     }
 }
-    
+
 
 
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -63,11 +63,11 @@ class PhysicalBestMatch: public PhysicalOperator
      * BestMatch is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
-        int64_t error = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt64();
-        return boost::shared_ptr<Array>(new BestMatchArray(_schema, inputArrays[0], inputArrays[1], error));
+        int64_t error = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt64();
+        return std::shared_ptr<Array>(new BestMatchArray(_schema, inputArrays[0], inputArrays[1], error));
     }
 };
 
@@ -163,11 +163,11 @@ static void radec_sindist(const Value** args, Value* res, void*)
     x *= x;
     y = sin (DEGREE_TO_RADIAN((dec1 - dec2) / 2));
     y *= y;
-    
+
     /* Seem to be more precise :) */
     z = cos (DEGREE_TO_RADIAN((dec1 + dec2)/2));
     z*=z;
-    
+
     res->setDouble(x * (z - y) + y);
 }
 

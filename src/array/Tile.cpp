@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,6 +38,9 @@ namespace scidb
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.tile"));
 
 namespace rle {
+
+const uint32_t Segment::MAX_DATA_INDEX;
+
 std::ostream& operator << ( std::ostream& out,
                             const scidb::rle::Segment& segment )
 {
@@ -70,7 +73,7 @@ void TileFactory::registerConstructor(const scidb::TypeId tID,
     }
 }
 
-boost::shared_ptr<BaseTile>
+std::shared_ptr<BaseTile>
 TileFactory::construct(const scidb::TypeId tID,
                        const BaseEncoding::EncodingID eID,
                        const BaseTile::Context* ctx)
@@ -87,7 +90,7 @@ TileFactory::construct(const scidb::TypeId tID,
     if (iter == _factories.end()) {
         assert(false);
         throw std::runtime_error("unknown type for tile");
-        return boost::shared_ptr<BaseTile>();
+        return std::shared_ptr<BaseTile>();
     }
     return (iter->second)(tID, eID, ctx);
 }
@@ -124,21 +127,15 @@ void TileFactory::registerBuiltinTypes()
 }
 
 template<>
-void RLEEncoding<scidb::Value>::initializeInternalData(const char* startData,
-                                                       const char* endData,
-                                                       size_t elemSize)
+void RLEEncoding<scidb::Value>::initializeInternalDatum(const char* buf,
+                                                        size_t dataIndx,
+                                                        size_t elemSize)
 {
-    const char * func = "RLEEncoding<scidb::Value>::initializeInternalData";
-    for (std::vector<scidb::Value>::iterator iter = _data.begin();
-         startData != endData;
-         ++iter, startData +=elemSize) {
-        assert(iter != _data.end());
-        scidb::Value& el = *iter;
-        assert(startData <= (endData-elemSize));
-        el.setData(startData, elemSize);
-
-        LOG4CXX_TRACE(logger, func << " this = "<< this <<" next value = "<<el);
-    }
+   const char * func = "RLEEncoding<scidb::Value>::initializeInternalDatum";
+   assert(dataIndx < _data.size());
+   scidb::Value& el = _data[dataIndx];
+   el.setData(buf, elemSize);
+   LOG4CXX_TRACE(logger, func << " this = "<< this <<" next value = "<<el);
 }
 
 } //namespace scidb

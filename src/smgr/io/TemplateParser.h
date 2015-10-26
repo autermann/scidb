@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,8 +40,8 @@ namespace scidb
 
     class TemplateScanner
     {
-        string format;
-        string ident;
+        std::string format;
+        std::string ident;
         size_t pos;
         int    num;
 
@@ -55,7 +55,7 @@ namespace scidb
             TKN_NUMBER
         };
 
-        string const& getIdent() const
+        std::string const& getIdent() const
         {
             return ident;
         }
@@ -124,14 +124,14 @@ namespace scidb
             size_t fixedSize;
             FunctionPointer converter;
         };
-        vector<Column> columns;
+        std::vector<Column> columns;
         bool opaque;
     };
 
     class TemplateParser
     {
       public:
-        static ExchangeTemplate parse(ArrayDesc const& desc, string const& format, bool isImport);
+        static ExchangeTemplate parse(ArrayDesc const& desc, std::string const& format, bool isImport);
     };
 
     /**

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,33 +21,32 @@
 */
 package org.scidb.jdbc;
 
+import java.sql.SQLException;
+
 import org.scidb.client.Schema;
 import org.scidb.client.Schema.Attribute;
 import org.scidb.client.Schema.Dimension;
-
-import java.sql.SQLException;
+import org.scidb.client.Type;
 
 public class ResultSetMetaData implements java.sql.ResultSetMetaData
 {
     private Schema schema;
     private String[] columnsNames;
-    private String[] columnsTypes;
+    private Type.Enum[] columnsTypeEnums;
     private int columnsCount;
-    /// dimension type: int64
-    private static final String TID_INT64 = new String("int64");
 
     public ResultSetMetaData(Schema schema)
     {
         this.schema = schema;
         columnsCount = schema.getDimensions().length + schema.getAttributes().length - (schema.getEmptyIndicator() != null ? 1 : 0);
         columnsNames = new String[columnsCount];
-        columnsTypes = new String[columnsCount];
+        columnsTypeEnums = new Type.Enum[columnsCount];
 
         int i = 0;
         for (Dimension dim: schema.getDimensions())
         {
             columnsNames[i] = dim.getName();
-            columnsTypes[i] = TID_INT64;
+            columnsTypeEnums[i] = Type.Enum.TE_INT64;
             i++;
         }
 
@@ -56,7 +55,7 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData
             if (schema.getEmptyIndicator() != null && att.getId() == schema.getEmptyIndicator().getId())
                 continue;
             columnsNames[i] = att.getName();
-            columnsTypes[i] = att.getType();
+            columnsTypeEnums[i] = att.getTypeEnum();
             i++;
         }
     }
@@ -182,10 +181,15 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData
         return 0;
     }
 
+    public Type.Enum getColumnTypeEnum(int column) throws SQLException
+    {
+        return columnsTypeEnums[column - 1];
+    }
+
     @Override
     public String getColumnTypeName(int column) throws SQLException
     {
-        return columnsTypes[column - 1];
+        return Type.enum2Type(columnsTypeEnums[column - 1]);
     }
 
     @Override

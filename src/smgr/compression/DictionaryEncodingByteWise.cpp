@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,7 +51,7 @@ namespace scidb
   size_t DictionaryEncoding::dictionarySize(uint32_t uniqueElements, size_t elementSize, uint8_t bytesPerCode)
   {
     size_t bitsPerEntry = ceil(log2(uniqueElements)); // size of an individual dictionary encoding
-    bitsPerEntry = (bitsPerEntry==0) ? 1 : bitsPerEntry; 
+    bitsPerEntry = (bitsPerEntry==0) ? 1 : bitsPerEntry;
     size_t bitsPerCode = 8 * bytesPerCode;
     uint32_t valuesPerCode = floor(bitsPerCode / bitsPerEntry);
     uint32_t dictionaryEntries = pow(uniqueElements,valuesPerCode);
@@ -91,7 +91,7 @@ namespace scidb
     // cache size in bytes, take no greater than 3/4 of it to prevent thrashing
     size_t maxCache = Sysinfo::getCPUCacheSize(Sysinfo::CPU_CACHE_L2 | Sysinfo::CPU_CACHE_L3) * 3 / 4;
     uint32_t entryLengthBits = ceil(log2(_values.size()));
-    entryLengthBits = (entryLengthBits==0) ? 1 : entryLengthBits;  
+    entryLengthBits = (entryLengthBits==0) ? 1 : entryLengthBits;
 
     uint32_t entriesPerCode = floor(8 / entryLengthBits);
     uint32_t minWasted = 8 - entriesPerCode * entryLengthBits;
@@ -102,7 +102,7 @@ namespace scidb
 
     if(dictionarySize(_values.size(), elementSize, 1) > maxCache)
       {
-	
+
 	// it won't fit in L2 cache
 	return -1;
       }
@@ -132,13 +132,13 @@ namespace scidb
       }
 
 
-    // now build all possible combos for _codeLength codes - recurse 
+    // now build all possible combos for _codeLength codes - recurse
     _entriesPerCode = floor(_codeLength * 8 / entryLengthBits);
     // recursively generate byte-aligned dictionary codes
     std::string blank = ""; // prime the value
 
     generateAllCodes(_entriesPerCode, 0, blank, entryLengthBits, elementSize);
-      
+
     return 1;
   }
 
@@ -157,7 +157,7 @@ namespace scidb
     std::string data;
     data.reserve(elementSize);
 
-    
+
     // entry = indiv dict key for one element
     // code = a block of entries for lookup
     _values.clear();
@@ -165,7 +165,7 @@ namespace scidb
     for(i = 0; i < nElems; ++i)
       {
 	data.assign((char *) readPtr, elementSize);
-	
+
 	readPtr += elementSize;
 	if(find(_values.begin(), _values.end(), data) == _values.end())
 	  {
@@ -187,7 +187,7 @@ namespace scidb
 
 
     _values.clear();
-    if(in.getArray((uint8_t *) &uniqueValues, 4) == -1) { return 0; } 
+    if(in.getArray((uint8_t *) &uniqueValues, 4) == -1) { return 0; }
     toDecode.reserve(elementSize);
 
     boost::scoped_array<char> valueArr(new char[elementSize]);
@@ -195,7 +195,7 @@ namespace scidb
     _values.reserve(uniqueValues);
     for(uint32_t i = 0; i < uniqueValues; ++i)
       {
-	if(in.getArray((uint8_t *) value, elementSize) == -1) { return 0; } 
+	if(in.getArray((uint8_t *) value, elementSize) == -1) { return 0; }
 	toDecode.assign(value, elementSize);
 	_values.push_back(toDecode);
       }
@@ -204,12 +204,12 @@ namespace scidb
 
     return uniqueValues;
   }
-  
-    size_t DictionaryEncoding::compress(void* dst, const ConstChunk& chunk, size_t chunkSize) 
+
+    size_t DictionaryEncoding::compress(void* dst, const ConstChunk& chunk, size_t chunkSize)
     {
 #ifdef FORMAT_SENSITIVE_COMPRESSORS
 	uint8_t *src = (uint8_t *)chunk.getData();
-	TypeId type = chunk.getAttributeDesc().getType();        
+	TypeId type = chunk.getAttributeDesc().getType();
 	size_t elementSize = TypeLibrary::getType(type).byteSize();
 	size_t nElems = chunkSize / elementSize;
 
@@ -229,10 +229,10 @@ namespace scidb
 
 	ByteOutputItr out((uint8_t *) dst, chunkSize-1);
 
-	
+
 	uniqueValues  = createDictionary(src, elementSize, nElems);
-	if(uniqueValues == nElems) { 
-	  return chunkSize; 
+	if(uniqueValues == nElems) {
+	  return chunkSize;
 	}
 
 	toEncode.reserve(elementSize);
@@ -253,7 +253,7 @@ namespace scidb
 	for(i = 0; i < uniqueValues; ++i)
 	  {
 	    // put value
-	    if(out.putArray((uint8_t *) _values[i].data(), elementSize) == -1) {    return chunkSize; } 
+	    if(out.putArray((uint8_t *) _values[i].data(), elementSize) == -1) {    return chunkSize; }
 	  }// end dictionary output
 
 
@@ -266,12 +266,12 @@ namespace scidb
 	    readPtr += blockEntriesSize;
 	    code = _encodeDictionary[toEncode];
 
-	    if(out.putArray((uint8_t *) &code, _codeLength) == -1) {  return chunkSize; } 
+	    if(out.putArray((uint8_t *) &code, _codeLength) == -1) {  return chunkSize; }
 	  }
-	
+
 	if(remainder)
 	  {
-	    // output the last few entries -- 
+	    // output the last few entries --
 	    toEncode.assign((char *) readPtr, elementSize * remainder);
 	    // pad it with _value[0]
 	    for(i = 0; i < _entriesPerCode - remainder; ++i)
@@ -279,11 +279,11 @@ namespace scidb
 		toEncode.append(_values[0]);
 	      }
 	    code = _encodeDictionary[toEncode];
-	    if(out.putArray((uint8_t *) &code, _codeLength) == -1) {   return chunkSize; } 
+	    if(out.putArray((uint8_t *) &code, _codeLength) == -1) {   return chunkSize; }
 	  }
 
 	size_t compressed_size = out.close();
-	
+
 	return compressed_size;
 #else
     return chunkSize;
@@ -298,7 +298,7 @@ namespace scidb
     uint32_t i;
     uint32_t code = 0;
     std::string value;
-    TypeId type = chunk.getAttributeDesc().getType();        
+    TypeId type = chunk.getAttributeDesc().getType();
     size_t elementSize = TypeLibrary::getType(type).byteSize();
     size_t nElems = chunkSize / elementSize;
 
@@ -316,29 +316,29 @@ namespace scidb
     uint32_t blocks = floor(nElems / _entriesPerCode);
     uint32_t remainderSize = (nElems % _entriesPerCode) * elementSize; // in bytes
     size_t blockValueSize = _entriesPerCode * elementSize;
-    
+
 
     for(i = 0; i < blocks; ++i)
       {
-	if(in.getArray((uint8_t *) &code, _codeLength) == -1) {  return 0; } 
+	if(in.getArray((uint8_t *) &code, _codeLength) == -1) {  return 0; }
 	value = _decodeDictionary[code];
 	memcpy(dst, value.data(), blockValueSize);
 	dst += blockValueSize;
-	
+
       }
 
     // edge case - last few vals
     if(remainderSize) {
-      if(in.getArray((uint8_t *) &code, _codeLength) == -1) {  return 0; } 
+      if(in.getArray((uint8_t *) &code, _codeLength) == -1) {  return 0; }
       value = _decodeDictionary[code];
       memcpy(dst, value.data(), remainderSize);
       dst += remainderSize;
     }
-    
+
 
 
     return dst - (uint8_t *) chunk.getDataForLoad();
-	    
+
   } // end decompress
 
 

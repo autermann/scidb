@@ -24,6 +24,9 @@ SCIDB QUERY : <store(apply(A,b,str(rational(a,3))),C)>
 
 SCIDB QUERY : <save C into current instance 'spook.txt' as 'text'>
 {x} a,b
+
+SCIDB QUERY : <scan(C)>
+{x} a,b
 {0} 1,'(1/3)'
 {1} 2,'(2/3)'
 {2} 3,'(1/1)'
@@ -34,13 +37,19 @@ SCIDB QUERY : <load AB from current instance 'spook.txt' as 'text'>
 {1} 2,'(2/3)'
 {2} 3,'(1/1)'
 
-SCIDB QUERY : <save C into current instance 'spook1.bin' as '(int32,dummy)'>
+SCIDB QUERY : <save(project(C, a), 'spook1.bin', -2, '(int32)')>
+{x} a
+
+SCIDB QUERY : <scan(C)>
 {x} a,b
 {0} 1,'(1/3)'
 {1} 2,'(2/3)'
 {2} 3,'(1/1)'
 
 SCIDB QUERY : <save C into current instance 'spook2.bin' as '(int32,rational)'>
+{x} a,b
+
+SCIDB QUERY : <scan(C)>
 {x} a,b
 {0} 1,'(1/3)'
 {1} 2,'(2/3)'
@@ -52,13 +61,13 @@ SCIDB QUERY : <save A into current instance 'space.fin' as 'rational'>
 SCIDB QUERY : <save A into current instance 'space.fin' as '(rational)'>
 [An error expected at this place for the query "save A into current instance 'space.fin' as '(rational)'". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER.]
 
-SCIDB QUERY : <load B from current instance 'spook1.bin' as '(rational,dummy)' errors 100>
-[An error expected at this place for the query "load B from current instance 'spook1.bin' as '(rational,dummy)' errors 100". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+SCIDB QUERY : <load B from current instance 'spook1.bin' as '(rational,skip)' errors 100>
+[An error expected at this place for the query "load B from current instance 'spook1.bin' as '(rational,skip)' errors 100". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-SCIDB QUERY : <load B from current instance 'spook1.bin' as '(int32,dummy)' errors 100>
-[An error expected at this place for the query "load B from current instance 'spook1.bin' as '(int32,dummy)' errors 100". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER.]
+SCIDB QUERY : <load B from current instance 'spook1.bin' as '(int32,skip)' errors 100>
+[An error expected at this place for the query "load B from current instance 'spook1.bin' as '(int32,skip)' errors 100". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER.]
 
-SCIDB QUERY : <load B from current instance 'spook2.bin' as '(dummy(4),rational)'>
+SCIDB QUERY : <load B from current instance 'spook2.bin' as '(skip(4),rational)'>
 {x} b
 {0} '(1/3)'
 {1} '(2/3)'

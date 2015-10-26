@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,7 +41,7 @@ SyntheticDimChunkMerger::SyntheticDimAdjuster::updateMapCoordToCount(MemChunk co
                                                                      ConstChunkIterator* chunkIter)
 {
     // Note that default values can't be ignored. Otherwise the coordinate in the synthetic dimension would mess up.
-    shared_ptr<ConstChunkIterator> localIter;
+    std::shared_ptr<ConstChunkIterator> localIter;
     if (!chunkIter) {
         localIter = chunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|
                                             ChunkIterator::APPEND_CHUNK);
@@ -90,7 +90,7 @@ void
 SyntheticDimChunkMerger::clear()
 {
     _syntheticDimHelper.clear();
-    for(std::vector<shared_ptr<MemChunk> >::iterator i = _partialChunks.begin();
+    for(std::vector<std::shared_ptr<MemChunk> >::iterator i = _partialChunks.begin();
         i !=_partialChunks.end(); ++i) {
         (*i).reset();
     }
@@ -100,8 +100,8 @@ SyntheticDimChunkMerger::clear()
 bool
 SyntheticDimChunkMerger::mergePartialChunk(InstanceID instanceId,
                                            AttributeID attId,
-                                           shared_ptr<MemChunk>& chunk,
-                                           const shared_ptr<Query>& query)
+                                           std::shared_ptr<MemChunk>& chunk,
+                                           const std::shared_ptr<Query>& query)
 {
     assert(chunk);
     static const bool withoutOverlap = false;
@@ -118,16 +118,16 @@ SyntheticDimChunkMerger::mergePartialChunk(InstanceID instanceId,
     return false;
 }
 
-shared_ptr<MemChunk>
+std::shared_ptr<MemChunk>
 SyntheticDimChunkMerger::getMergedChunk(AttributeID attId,
-                                        const shared_ptr<Query>& query)
+                                        const std::shared_ptr<Query>& query)
 {
-    shared_ptr<MemChunk> result;
-    shared_ptr<ChunkIterator> dstIterator;
+    std::shared_ptr<MemChunk> result;
+    std::shared_ptr<ChunkIterator> dstIterator;
 
-    for (std::vector<shared_ptr<MemChunk> >::iterator chunkIt =  _partialChunks.begin();
+    for (std::vector<std::shared_ptr<MemChunk> >::iterator chunkIt =  _partialChunks.begin();
          chunkIt !=  _partialChunks.end(); ++chunkIt) {
-        shared_ptr<MemChunk>& chunk = *chunkIt;
+        std::shared_ptr<MemChunk>& chunk = *chunkIt;
         if (!chunk) {
             continue;
         }
@@ -159,10 +159,10 @@ SyntheticDimChunkMerger::getMergedChunk(AttributeID attId,
 }
 
 void
-SyntheticDimChunkMerger::mergeChunks(shared_ptr<ChunkIterator>& dstIterator,
-                                     shared_ptr<MemChunk>& src)
+SyntheticDimChunkMerger::mergeChunks(std::shared_ptr<ChunkIterator>& dstIterator,
+                                     std::shared_ptr<MemChunk>& src)
 {
-    shared_ptr<ConstChunkIterator> srcIterator = src->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+    std::shared_ptr<ConstChunkIterator> srcIterator = src->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
 
     while (!srcIterator->end()) {
         _coord = srcIterator->getPosition();

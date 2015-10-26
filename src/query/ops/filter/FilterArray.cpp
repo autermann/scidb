@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,7 +27,7 @@
  *      Author: Knizhnik
  */
 
-#include <boost/make_shared.hpp>
+#include <memory>
 
 #include "query/Operator.h"
 #include "array/Metadata.h"
@@ -58,7 +58,14 @@ namespace scidb {
 
                 case BindInfo::BI_COORDINATE:
                     if (_mode & TILE_MODE) {
-                        _iterators[i]->getItem().getTile()->getCoordinates(_array.getInputArray()->getArrayDesc(), _array.bindings[i].resolvedId, _iterators[i]->getChunk().getFirstPosition(false), _iterators[i]->getPosition(), _query, _params[i], !(_mode & IGNORE_OVERLAPS));
+                        _iterators[i]->getItem().getTile()->getCoordinates(
+                            _array.getInputArray()->getArrayDesc(),
+                            _array.bindings[i].resolvedId,
+                            _iterators[i]->getChunk().getFirstPosition(false),
+                            _iterators[i]->getPosition(),
+                            _query,
+                            _params[i],
+                            !(_mode & IGNORE_OVERLAPS));
                     } else {
                         _params[i].setInt64(inputIterator->getPosition()[_array.bindings[i].resolvedId]);
                     }
@@ -68,7 +75,7 @@ namespace scidb {
                     break;
             }
         }
-        return (Value&)_array.expression->evaluate(_params);
+        return const_cast<Value&>(_array.expression->evaluate(_params));
     }
 
     inline bool FilterChunkIterator::filter()
@@ -119,24 +126,26 @@ namespace scidb {
         return !_hasCurrent;
     }
 
-    Value& FilterChunkIterator::getItem()
+    Value const& FilterChunkIterator::getItem()
     {
         if (_mode & TILE_MODE) {
             RLEPayload* newEmptyBitmap = evaluate().getTile();
             RLEPayload::iterator ei(newEmptyBitmap);
-            Value& value = inputIterator->getItem();
+            Value const& value = inputIterator->getItem();
             RLEPayload* inputPayload = value.getTile();
             RLEPayload::iterator vi(inputPayload);
 
-            if (newEmptyBitmap->count() == INFINITE_LENGTH) {
+			// This needs to compare against getMaxLength() or multiple tests
+			// will fail with scidb::SCIDB_SE_NETWORK::SCIDB_LE_CANT_SEND_RECEIVE.
+            if (newEmptyBitmap->count() == CoordinateBounds::getMaxLength()) {
                 assert(newEmptyBitmap->nSegments() == 1);
                 if (ei.isNull() == false && ei.checkBit()) {
                     // empty bitmap containing all ones: just return original value
                     return value;
                 }
-                tileValue.getTile()->clear();
+                _tileValue.getTile()->clear();
             } else {
-                RLEPayload::append_iterator appender(tileValue.getTile());
+                RLEPayload::append_iterator appender(_tileValue.getTile());
                 Value v;
                 while (!ei.end()) {
                     uint64_t count = ei.getRepeatCount();
@@ -149,7 +158,7 @@ namespace scidb {
                 }
                 appender.flush();
             }
-            return tileValue;
+            return _tileValue;
         }
         return inputIterator->getItem();
     }
@@ -210,14 +219,14 @@ namespace scidb {
             }
         }
         if (iterationMode & TILE_MODE) {
-            tileValue = Value(TypeLibrary::getType(chunk->getAttributeDesc().getType()),Value::asTile);
+            _tileValue = Value(TypeLibrary::getType(chunk->getAttributeDesc().getType()),Value::asTile);
             if (arrayIterator.emptyBitmapIterator) {
-                emptyBitmapIterator = arrayIterator.emptyBitmapIterator->getChunk().getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
+                _emptyBitmapIterator = arrayIterator.emptyBitmapIterator->getChunk().getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
             } else {
                 ArrayDesc const& arrayDesc = chunk->getArrayDesc();
                 Address addr(arrayDesc.getEmptyBitmapAttribute()->getId(), chunk->getFirstPosition(false));
-                shapeChunk.initialize(&_array, &arrayDesc, addr, 0);
-                emptyBitmapIterator = shapeChunk.getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
+                _shapeChunk.initialize(&_array, &arrayDesc, addr, 0);
+                _emptyBitmapIterator = _shapeChunk.getConstIterator(TILE_MODE|IGNORE_EMPTY_CELLS);
             }
         }
         nextVisible();
@@ -227,11 +236,11 @@ namespace scidb {
     {
         Value& value = evaluate();
         RLEPayload* inputPayload = value.getTile();
-        RLEPayload::append_iterator appender(tileValue.getTile());
+        RLEPayload::append_iterator appender(_tileValue.getTile());
         RLEPayload::iterator vi(inputPayload);
-        if (!emptyBitmapIterator->setPosition(inputIterator->getPosition()))
+        if (!_emptyBitmapIterator->setPosition(inputIterator->getPosition()))
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-        RLEPayload* emptyBitmap = emptyBitmapIterator->getItem().getTile();
+        RLEPayload* emptyBitmap = _emptyBitmapIterator->getItem().getTile();
         RLEPayload::iterator ei(emptyBitmap);
 
 #ifndef NDEBUG
@@ -262,7 +271,7 @@ namespace scidb {
 #endif
         }
         appender.flush();
-        return tileValue;
+        return _tileValue;
     }
 
     //
@@ -452,9 +461,9 @@ namespace scidb {
 #endif
     }
 
-    boost::shared_ptr<DelegateChunk> FilterArray::getEmptyBitmapChunk(FilterArrayEmptyBitmapIterator* iterator)
+    std::shared_ptr<DelegateChunk> FilterArray::getEmptyBitmapChunk(FilterArrayEmptyBitmapIterator* iterator)
     {
-        boost::shared_ptr<DelegateChunk> chunk;
+        std::shared_ptr<DelegateChunk> chunk;
         Coordinates const& pos = iterator->getPosition();
         {
             ScopedMutexLock cs(mutex);
@@ -463,7 +472,7 @@ namespace scidb {
                 return chunk;
             }
         }
-        chunk = boost::shared_ptr<DelegateChunk>(createChunk(iterator, emptyAttrID));
+        chunk = std::shared_ptr<DelegateChunk>(createChunk(iterator, emptyAttrID));
         chunk->setInputChunk(iterator->getInputIterator()->getChunk());
         chunk->materialize();
         {
@@ -476,8 +485,8 @@ namespace scidb {
         return chunk;
     }
 
-    FilterArray::FilterArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array,
-                             boost::shared_ptr< Expression> expr, boost::shared_ptr<Query>& query,
+    FilterArray::FilterArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array,
+                             std::shared_ptr< Expression> expr, std::shared_ptr<Query>& query,
                              bool tileMode)
     : DelegateArray(desc, array), expression(expr), bindings(expr->getBindings()), _tileMode(tileMode),
       cacheSize(Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE)),

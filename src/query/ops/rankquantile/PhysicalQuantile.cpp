@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -59,7 +59,7 @@ struct QuantileBucket
     vector<Value> values;
 };
 
-typedef unordered_map <Coordinates, QuantileBucket> QuantileBucketsMap;
+typedef unordered_map <Coordinates, QuantileBucket, CoordinatesHash> QuantileBucketsMap;
 
 class QuantileChunkIterator : public ConstChunkIterator
 {
@@ -68,8 +68,8 @@ public:
                           ConstChunk const* chunk,
                           AttributeID attr,
                           int mode,
-                          shared_ptr <QuantileBucketsMap> buckets,
-                          shared_ptr <DimensionGrouping> grouping):
+                          std::shared_ptr <QuantileBucketsMap> buckets,
+                          std::shared_ptr <DimensionGrouping> grouping):
         _iterationMode(mode),
         _desc(desc),
         _firstPos(chunk->getFirstPosition(false)),
@@ -84,17 +84,17 @@ public:
         reset();
     }
 
-    virtual int getMode()
+    virtual int getMode() const
     {
         return _iterationMode;
     }
 
-    virtual bool isEmpty()
+    virtual bool isEmpty() const
     {
         return false;
     }
 
-    virtual Value& getItem()
+    virtual Value const& getItem()
     {
         if (!_hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_UDO, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -115,17 +115,15 @@ public:
         {
             double pctValue = getPercentage(quantileNo, _desc.getDimensions()[_desc.getDimensions().size() - 1]);
             _value.setDouble(pctValue);
+            return _value;
         }
-        else if ( _buckets->count(reducedCoords) == 0 || (*_buckets)[reducedCoords].values.size() == 0)
+        if ( _buckets->count(reducedCoords) == 0 || (*_buckets)[reducedCoords].values.size() == 0)
         {
             _value.setNull();
-        }
-        else
-        {
-            _value = (*_buckets)[reducedCoords].values[quantileNo];
+            return _value;
         }
 
-        return _value;
+        return (*_buckets)[reducedCoords].values[quantileNo];
     }
 
     virtual void operator ++()
@@ -190,15 +188,15 @@ public:
     bool _hasCurrent;
     AttributeID _attrID;
     ConstChunk const* _chunk;
-    shared_ptr <QuantileBucketsMap > _buckets;
-    shared_ptr <DimensionGrouping> _grouping;
+    std::shared_ptr <QuantileBucketsMap > _buckets;
+    std::shared_ptr <DimensionGrouping> _grouping;
     Value _value;
 };
 
 class QuantileChunk : public ConstChunk
 {
   public:
-    QuantileChunk(Array const& array, ArrayDesc const& desc, AttributeID attrID, shared_ptr <QuantileBucketsMap> buckets, shared_ptr<DimensionGrouping> grouping):
+    QuantileChunk(Array const& array, ArrayDesc const& desc, AttributeID attrID, std::shared_ptr <QuantileBucketsMap> buckets, std::shared_ptr<DimensionGrouping> grouping):
     _array(array),
     _desc(desc),
     _firstPos(_desc.getDimensions().size()),
@@ -233,9 +231,9 @@ class QuantileChunk : public ConstChunk
         return _lastPos;
     }
 
-    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const
+    virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const
     {
-        return boost::shared_ptr<ConstChunkIterator>(new QuantileChunkIterator(_desc, this, _attrID, iterationMode, _buckets, _grouping));
+        return std::shared_ptr<ConstChunkIterator>(new QuantileChunkIterator(_desc, this, _attrID, iterationMode, _buckets, _grouping));
     }
 
     virtual int getCompressionMethod() const
@@ -265,8 +263,8 @@ class QuantileChunk : public ConstChunk
     Coordinates _firstPos;
     Coordinates _lastPos;
     AttributeID _attrID;
-    shared_ptr <QuantileBucketsMap> _buckets;
-    shared_ptr <DimensionGrouping> _grouping;
+    std::shared_ptr <QuantileBucketsMap> _buckets;
+    std::shared_ptr <DimensionGrouping> _grouping;
 };
 
 class QuantileArrayIterator : public ConstArrayIterator
@@ -274,10 +272,10 @@ class QuantileArrayIterator : public ConstArrayIterator
 public:
     QuantileArrayIterator(Array const& array,
                           ArrayDesc const& desc,
-                          shared_ptr <QuantileBucketsMap> buckets,
+                          std::shared_ptr <QuantileBucketsMap> buckets,
                           AttributeID attrID,
-                          shared_ptr <DimensionGrouping> grouping,
-                          shared_ptr <set<size_t> > liveChunks)
+                          std::shared_ptr <DimensionGrouping> grouping,
+                          std::shared_ptr <set<size_t> > liveChunks)
         : _desc(desc),
           _currPos(_desc.getDimensions().size()),
           _chunk(array, _desc, attrID, buckets, grouping),
@@ -380,25 +378,25 @@ private:
     bool _hasCurrent;
     QuantileChunk _chunk;
     size_t _currChunkNo;
-    shared_ptr <set<size_t> > _liveChunks;
+    std::shared_ptr <set<size_t> > _liveChunks;
 };
 
 class QuantileArray : public Array
 {
 public:
     QuantileArray(ArrayDesc const& desc,
-                  shared_ptr <QuantileBucketsMap> buckets,
-                  shared_ptr <DimensionGrouping> grouping,
-                  shared_ptr <set<size_t> > liveChunks):
+                  std::shared_ptr <QuantileBucketsMap> buckets,
+                  std::shared_ptr <DimensionGrouping> grouping,
+                  std::shared_ptr <set<size_t> > liveChunks):
           _desc(desc),
           _buckets(buckets),
           _grouping(grouping),
           _liveChunks(liveChunks)
     {}
 
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
     {
-        return boost::shared_ptr<ConstArrayIterator>(new QuantileArrayIterator(*this, _desc, _buckets, attr, _grouping, _liveChunks));
+        return std::shared_ptr<ConstArrayIterator>(new QuantileArrayIterator(*this, _desc, _buckets, attr, _grouping, _liveChunks));
     }
 
     virtual ArrayDesc const& getArrayDesc() const
@@ -408,13 +406,13 @@ public:
 
 private:
     ArrayDesc _desc;
-    shared_ptr <QuantileBucketsMap> _buckets;
-    shared_ptr <DimensionGrouping> _grouping;
-    shared_ptr <set<size_t> > _liveChunks;
+    std::shared_ptr <QuantileBucketsMap> _buckets;
+    std::shared_ptr <DimensionGrouping> _grouping;
+    std::shared_ptr <set<size_t> > _liveChunks;
 };
 
 typedef RowCollection<Coordinates> RowCollectionGroup;      // every chunk is a row
-typedef unordered_map <Coordinates, vector<Value> > MapGroupToQuantile;    // one entry per group with non-Null values.
+typedef unordered_map <Coordinates, vector<Value>, CoordinatesHash > MapGroupToQuantile;    // one entry per group with non-Null values.
 
 class GroupbyQuantileChunk;
 
@@ -472,17 +470,17 @@ public:
                           int mode,
                           size_t numQuantilesPlusOne);
 
-    virtual int getMode()
+    virtual int getMode() const
     {
         return _iterationMode;
     }
 
-    virtual bool isEmpty()
+    virtual bool isEmpty() const
     {
         return false;
     }
 
-    virtual Value& getItem()
+    virtual Value const& getItem()
     {
         if (!_hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_UDO, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -496,8 +494,7 @@ public:
             _value.setDouble(pctValue);
             return _value;
         } else if (_quantilesInCurrentGroup){ // quantiles exist
-            _value = (*_quantilesInCurrentGroup)[_indexInCurrentGroup];
-            return _value;
+            return (*_quantilesInCurrentGroup)[_indexInCurrentGroup];
         }
 
         // else: quantiles do not exist
@@ -555,7 +552,7 @@ private:
     size_t _numQuantilesPlusOne;
 
     // Pointer to RowCollectionGroup. Only valid for the quantile chunks.
-    shared_ptr<RowCollectionGroup> _pRowCollectionGroup;
+    std::shared_ptr<RowCollectionGroup> _pRowCollectionGroup;
 
 public:
     /**
@@ -565,7 +562,7 @@ public:
      * @param pRowCollectionGroup a shared_ptr to a RowCollection object holding records from the input array.
      */
     GroupbyQuantileChunk(Array const& array, AttributeID attrID, size_t numQuantilesPlusOne,
-            shared_ptr<RowCollectionGroup> pRowCollectionGroup) :
+            std::shared_ptr<RowCollectionGroup> pRowCollectionGroup) :
     _array(array),
     _firstPos(array.getArrayDesc().getDimensions().size()),
     _lastPos(array.getArrayDesc().getDimensions().size()),
@@ -612,9 +609,9 @@ public:
         return _lastGroup;
     }
 
-    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const
+    virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const
     {
-        return boost::shared_ptr<ConstChunkIterator>(new GroupbyQuantileChunkIterator(this, _attrID, iterationMode, _numQuantilesPlusOne));
+        return std::shared_ptr<ConstChunkIterator>(new GroupbyQuantileChunkIterator(this, _attrID, iterationMode, _numQuantilesPlusOne));
     }
 
     virtual int getCompressionMethod() const
@@ -749,7 +746,7 @@ private:
     Coordinates _tmpPos;
 
     // An iterator that iterates over all the groups, regardless to what instance the group should belong to.
-    scoped_ptr<RegionCoordinatesIterator> _regionCoordinatesIterator;
+    unique_ptr<RegionCoordinatesIterator> _regionCoordinatesIterator;
 
 private:
     // Get the instanceID for a chunk.
@@ -786,7 +783,7 @@ public:
     GroupbyQuantileArrayIterator(Array const& array,
                           AttributeID attrID,
                           size_t numQuantilesPlusOne,
-                          const shared_ptr<RowCollectionGroup>& pRowCollectionGroup,
+                          const std::shared_ptr<RowCollectionGroup>& pRowCollectionGroup,
                           size_t instanceID,
                           size_t numInstances
                           )
@@ -909,7 +906,7 @@ class GroupbyQuantileArray : public Array
 private:
     ArrayDesc _desc;
     size_t _numQuantilesPlusOne;
-    shared_ptr<RowCollectionGroup> _pRowCollectionGroup;
+    std::shared_ptr<RowCollectionGroup> _pRowCollectionGroup;
     QueryID _queryID;
 
 public:
@@ -917,18 +914,18 @@ public:
     scidb::Mutex _mutexChunkSetPosition;
 
 public:
-    GroupbyQuantileArray(ArrayDesc const& desc, shared_ptr<Query>& query, size_t numQuantilesPlusOne, shared_ptr<RowCollectionGroup>& pRowCollectionGroup):
+    GroupbyQuantileArray(ArrayDesc const& desc, std::shared_ptr<Query>& query, size_t numQuantilesPlusOne, std::shared_ptr<RowCollectionGroup>& pRowCollectionGroup):
           _desc(desc), _numQuantilesPlusOne(numQuantilesPlusOne), _pRowCollectionGroup(pRowCollectionGroup), _queryID(query->getQueryID())
     {
         assert(numQuantilesPlusOne>1);
         _query=query;
     }
 
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
     {
-        shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
 
-        return boost::shared_ptr<ConstArrayIterator>(
+        return std::shared_ptr<ConstArrayIterator>(
                 new GroupbyQuantileArrayIterator(*this, attr, _numQuantilesPlusOne, _pRowCollectionGroup,
                         query->getInstanceID(), query->getInstancesCount()));
     }
@@ -1031,10 +1028,10 @@ class PhysicalQuantile: public PhysicalOperator
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     /**
@@ -1042,23 +1039,23 @@ class PhysicalQuantile: public PhysicalOperator
      */
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
-        vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
+        vector<RedistributeContext> requiredDistribution;
+        requiredDistribution.push_back(RedistributeContext(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
-    void fillQuantiles (shared_ptr<Array> rankings, shared_ptr < QuantileBucketsMap > buckets, DimensionGrouping const& grouping)
+    void fillQuantiles (std::shared_ptr<Array> rankings, std::shared_ptr < QuantileBucketsMap > buckets, DimensionGrouping const& grouping)
     {
         size_t qDim = _schema.getDimensions().size() -1;
         DimensionDesc quantileDimension = _schema.getDimensions()[qDim];
 
-        shared_ptr<ConstArrayIterator> rankArrayIterator = rankings->getConstIterator(1);
-        shared_ptr<ConstItemIterator> valueItemIterator = rankings->getItemIterator(0);
+        std::shared_ptr<ConstArrayIterator> rankArrayIterator = rankings->getConstIterator(1);
+        std::shared_ptr<ConstItemIterator> valueItemIterator = rankings->getItemIterator(0);
         size_t numQuantilesPlusOne = quantileDimension.getEndMax() - quantileDimension.getStartMin() + 1;
 
         while(! rankArrayIterator->end() )
         {
-            boost::shared_ptr<ConstChunkIterator> rankChunkIterator = rankArrayIterator->getChunk().getConstIterator();
+            std::shared_ptr<ConstChunkIterator> rankChunkIterator = rankArrayIterator->getChunk().getConstIterator();
             while (! rankChunkIterator->end())
             {
                 Coordinates const& pos = rankChunkIterator->getPosition();
@@ -1108,9 +1105,9 @@ class PhysicalQuantile: public PhysicalOperator
     /**
      * execute().
      */
-    boost::shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        shared_ptr<Array> inputArray = inputArrays[0];
+        std::shared_ptr<Array> inputArray = inputArrays[0];
         if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
         {   //if input supports MULTI_PASS, don't bother converting it
             inputArray = ensureRandomAccess(inputArray, query);
@@ -1127,7 +1124,7 @@ class PhysicalQuantile: public PhysicalOperator
         // _parameters[0] is numQuantilesPlusOne.
         // _parameters[1], if exists, is the value to compute quantile on.
         // _parameters[2...], if exists, are the groupby dimensions
-        string attName = _parameters.size() > 1 ? ((boost::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName() :
+        string attName = _parameters.size() > 1 ? ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName() :
                                                     inputAttributes[0].getName();
 
         AttributeID rankedAttributeID = 0;
@@ -1150,8 +1147,8 @@ class PhysicalQuantile: public PhysicalOperator
         {
             size_t i, j;
             for (i = 0; i < _parameters.size()-2; i++) {
-               const string& dimName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getObjectName();
-               const string& dimAlias = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getArrayName();
+               const string& dimName = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getObjectName();
+               const string& dimAlias = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getArrayName();
                for (j = 0; j < inputDims.size(); j++) {
                    if (inputDims[j].hasNameAndAlias(dimName, dimAlias)) {
                        groupBy.push_back(inputDims[j]);
@@ -1164,7 +1161,7 @@ class PhysicalQuantile: public PhysicalOperator
         }
 
         // For every dimension, determine whether it is a groupby dimension
-        shared_ptr<PartitioningSchemaDataGroupby> psdGroupby = make_shared<PartitioningSchemaDataGroupby>();
+        std::shared_ptr<PartitioningSchemaDataGroupby> psdGroupby = make_shared<PartitioningSchemaDataGroupby>();
         psdGroupby->_arrIsGroupbyDim.reserve(inputDims.size());
         for (size_t i=0; i<inputDims.size(); ++i)
         {
@@ -1184,9 +1181,9 @@ class PhysicalQuantile: public PhysicalOperator
             // timing
             LOG4CXX_DEBUG(logger, "[Quantile] Using the original algorithm, because this is not a group-by quantile.");
 
-            shared_ptr<DimensionGrouping> grouping ( new DimensionGrouping(inputArray->getArrayDesc().getDimensions(), groupBy));
-            shared_ptr<RankingStats> rStats (new RankingStats());
-            shared_ptr<Array> rankArray(buildRankArray(inputArray, rankedAttributeID, groupBy, query, rStats));
+            std::shared_ptr<DimensionGrouping> grouping ( new DimensionGrouping(inputArray->getArrayDesc().getDimensions(), groupBy));
+            std::shared_ptr<RankingStats> rStats (new RankingStats());
+            std::shared_ptr<Array> rankArray(buildRankArray(inputArray, rankedAttributeID, groupBy, query, rStats));
 
             const size_t nInstances = query->getInstancesCount();
             InstanceID myInstance = query->getInstanceID();
@@ -1195,18 +1192,18 @@ class PhysicalQuantile: public PhysicalOperator
             {
                 rankArray = redistributeToRandomAccess(rankArray,query,psHashPartitioned,
                                                        ALL_INSTANCE_MASK,
-                                                       shared_ptr<DistributionMapper>(),
+                                                       std::shared_ptr<CoordinateTranslator>(),
                                                        0,
-                                                       shared_ptr<PartitioningSchemaData>());
+                                                       std::shared_ptr<PartitioningSchemaData>());
 
             }
             else
             {
                 //we don't need to redistribute the rank array but we still need to pass over it to collect max rankings
-                shared_ptr<ConstArrayIterator> aiter = rankArray->getConstIterator(1);
+                std::shared_ptr<ConstArrayIterator> aiter = rankArray->getConstIterator(1);
                 while (!aiter->end())
                 {
-                    shared_ptr<ConstChunkIterator> citer = aiter->getChunk().getConstIterator();
+                    std::shared_ptr<ConstChunkIterator> citer = aiter->getChunk().getConstIterator();
                     while(!citer->end())
                     {
                         citer->getItem();
@@ -1217,8 +1214,8 @@ class PhysicalQuantile: public PhysicalOperator
             }
             LOG4CXX_DEBUG(logger, "Created prerank array");
 
-            shared_ptr <QuantileBucketsMap> buckets(new QuantileBucketsMap);
-            shared_ptr <set<size_t> > liveChunks(new set<size_t>);
+            std::shared_ptr <QuantileBucketsMap> buckets(new QuantileBucketsMap);
+            std::shared_ptr <set<size_t> > liveChunks(new set<size_t>);
 
             BOOST_FOREACH (CountsMap::value_type bucket, rStats->counts)
             {
@@ -1239,7 +1236,7 @@ class PhysicalQuantile: public PhysicalOperator
                 {
                     chunkCoords.push_back(0);
                 }
-                boost::shared_ptr<DistributionMapper> distMapper;
+                std::shared_ptr<CoordinateTranslator> distMapper;
                 InstanceID instanceForChunk = getInstanceForChunk(query, chunkCoords, _schema, psHashPartitioned, distMapper, 0, 0);
                 if(instanceForChunk == myInstance)
                 {
@@ -1248,7 +1245,8 @@ class PhysicalQuantile: public PhysicalOperator
                     (*buckets)[chunkCoords].maxIndeces = vector<double> ();
                     (*buckets)[chunkCoords].values = vector<Value> ();
 
-                    size_t chunkNo = _schema.getHashedChunkNumber(chunkCoords);
+                    SCIDB_ASSERT(_schema.getPartitioningSchema() == psHashPartitioned);
+                    size_t chunkNo = _schema.getPrimaryInstanceId(chunkCoords, nInstances);
                     liveChunks->insert(chunkNo);
                 }
             }
@@ -1259,14 +1257,14 @@ class PhysicalQuantile: public PhysicalOperator
             {
                 rankArray = redistributeToRandomAccess(rankArray,query,psHashPartitioned,
                                                        ALL_INSTANCE_MASK,
-                                                       shared_ptr<DistributionMapper>(),
+                                                       std::shared_ptr<CoordinateTranslator>(),
                                                        i,
-                                                       shared_ptr<PartitioningSchemaData>());
+                                                       std::shared_ptr<PartitioningSchemaData>());
                 fillQuantiles(rankArray, buckets, *grouping);
             }
             rankArray.reset();
 
-            shared_ptr<Array> result = shared_ptr<Array>(new QuantileArray( _schema, buckets, grouping, liveChunks));
+            std::shared_ptr<Array> result = std::shared_ptr<Array>(new QuantileArray( _schema, buckets, grouping, liveChunks));
 
             // timing
             timing.logTiming(logger, "[Quantile] original algorithm", false); // false = no restart
@@ -1306,16 +1304,16 @@ class PhysicalQuantile: public PhysicalOperator
                                        0);
         }
 
-        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims);
+        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims, defaultPartitioning());
 
         vector<AttributeID> projection(1);
         projection[0] = rankedAttributeID;
 
-        shared_ptr<Array> projected(make_shared<SimpleProjectArray>(projectSchema, inputArray, projection));
+        std::shared_ptr<Array> projected(make_shared<SimpleProjectArray>(projectSchema, inputArray, projection));
 
         // Redistribute, s.t. all records in the same group go to the same instance.
-        boost::shared_ptr<DistributionMapper> distMapper;
-        shared_ptr<Array> redistributed = redistributeToRandomAccess(projected, query, psGroupby,
+        std::shared_ptr<CoordinateTranslator> distMapper;
+        std::shared_ptr<Array> redistributed = redistributeToRandomAccess(projected, query, psGroupby,
                                                                      ALL_INSTANCE_MASK,
                                                                      distMapper,
                                                                      0,
@@ -1329,9 +1327,9 @@ class PhysicalQuantile: public PhysicalOperator
         // There is a single attribute: the ranked attribute.
         Attributes rcGroupAttrs;
         rcGroupAttrs.push_back(AttributeDesc(0, rankedAttribute.getName(), rankedAttribute.getType(), rankedAttribute.getFlags(), rankedAttribute.getDefaultCompressionMethod()));
-        shared_ptr<RowCollectionGroup> rcGroup = make_shared<RowCollectionGroup>(query, "", rcGroupAttrs);
+        std::shared_ptr<RowCollectionGroup> rcGroup = make_shared<RowCollectionGroup>(query, "", rcGroupAttrs);
 
-        boost::shared_ptr<ConstArrayIterator> srcArrayIterValue = redistributed->getConstIterator(0);
+        std::shared_ptr<ConstArrayIterator> srcArrayIterValue = redistributed->getConstIterator(0);
         vector<Value> itemInRowCollectionGroup(1);
         Coordinates group(groupBy.size());
         size_t totalItems = 0;
@@ -1341,7 +1339,7 @@ class PhysicalQuantile: public PhysicalOperator
         size_t reportATimingAfterHowManyChunks = 10; // report a timing after how many chunks? Report progress, without too many lines.
         while (!srcArrayIterValue->end()) {
             const ConstChunk& chunk = srcArrayIterValue->getChunk();
-            boost::shared_ptr<ConstChunkIterator> srcChunkIter = chunk.getConstIterator();
+            std::shared_ptr<ConstChunkIterator> srcChunkIter = chunk.getConstIterator();
             while (!srcChunkIter->end()) {
                 const Coordinates& full = srcChunkIter->getPosition();
                 for (size_t i=0; i<groupBy.size(); ++i) {
@@ -1388,7 +1386,7 @@ class PhysicalQuantile: public PhysicalOperator
         size_t qDim = _schema.getDimensions().size() -1;
         DimensionDesc quantileDimension = _schema.getDimensions()[qDim];
         size_t numQuantilesPlusOne = quantileDimension.getChunkInterval();
-        shared_ptr<Array> result = shared_ptr<Array>(
+        std::shared_ptr<Array> result = std::shared_ptr<Array>(
                 new GroupbyQuantileArray(_schema, query, numQuantilesPlusOne, rcGroup) );
         return result;
     }

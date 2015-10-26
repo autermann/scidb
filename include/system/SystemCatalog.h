@@ -1,10 +1,9 @@
-
 /*
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,12 +36,16 @@
 #include <map>
 #include <list>
 #include <assert.h>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <pqxx/transaction>
+
 #include <query/TypeSystem.h>
 #include <array/Metadata.h>
 #include <util/Singleton.h>
 #include <system/Cluster.h>
+
+#include <usr_namespace/NamespaceDesc.h>
+
 
 namespace pqxx
 {
@@ -55,7 +58,10 @@ namespace pqxx
 namespace scidb
 {
 class Mutex;
+class NamespaceDesc;
+class NamespaceObject;
 class PhysicalBoundaries;
+class UserDesc;
 
 /**
  * @brief Global object for accessing and manipulating cluster's metadata.
@@ -66,6 +72,13 @@ class PhysicalBoundaries;
  * and it ready to work (though we must wait other instances online, this can be
  * implemented as PostgreSQL event which will be transparently transported to
  * NetworkManager through callback for example).
+ *
+ * @note for developers:
+ *   If you want to change array_dimension or array_attribute tables,
+ *   such as to add the capability to rename attributes or dimensions,
+ *   you should make sure an array's dimension names and attribute names do not collide.
+ *   @see Donghui Zhang's comment inside SystemCatalog::_addArray().
+ *
  */
 class SystemCatalog : public Singleton<SystemCatalog>
 {
@@ -75,8 +88,7 @@ public:
     {
     public:
         typedef enum {INVALID_ROLE=0, COORD, WORKER} InstanceRole;
-        typedef enum {INVALID_MODE=0, RD, WR, CRT, RM, RNT, RNF} LockMode;
-
+        typedef enum {INVALID_MODE=0, RD, WR, CRT, RM, XCL, RNF} LockMode;
 
         LockDesc(const std::string& arrayName,
                 QueryID  queryId,
@@ -91,11 +103,13 @@ public:
         InstanceID    getInstanceId() const { return _instanceId; }
         VersionID getArrayVersion() const { return _arrayVersion; }
         ArrayID   getArrayVersionId() const { return _arrayVersionId; }
+        ArrayID   getArrayCatalogId() const { assert(isLocked()); return _arrayCatalogId; }
         InstanceRole  getInstanceRole() const { return _instanceRole; }
         LockMode  getLockMode() const { return _lockMode; }
         bool  isLocked() const { return _isLocked; }
         void setArrayId(ArrayID arrayId) { _arrayId = arrayId; }
         void setArrayVersionId(ArrayID versionId) { _arrayVersionId = versionId; }
+        void setArrayCatalogId(ArrayID catalogId) { _arrayCatalogId = catalogId; }
         void setArrayVersion(VersionID version) { _arrayVersion = version; }
         void setLockMode(LockMode mode) { _lockMode = mode; }
         void setLocked(bool isLocked) { _isLocked = isLocked; }
@@ -112,6 +126,9 @@ public:
         QueryID  _queryId;
         InstanceID   _instanceId;
         ArrayID  _arrayVersionId;
+        ArrayID  _arrayCatalogId; // highest (version) array ID for _arrayId;
+                                  // right after all the query locks are acquired, the state of the catalog should be such that
+                                  // _arrayId <= _arrayCatalogId < _arrayVersionId (where 0 means non-existent)
         VersionID _arrayVersion;
         InstanceRole _instanceRole; // 1-coordinator, 2-worker
         LockMode  _lockMode; // {1=read, write, remove, renameto, renamefrom}
@@ -134,12 +151,22 @@ public:
         void raise() const { throw *this; }
         virtual Exception::Pointer copy() const
         {
-            Exception::Pointer ep(boost::make_shared<LockBusyException>(_file.c_str(),
-                                                                        _function.c_str(),
-                                                                        _line));
+            std::shared_ptr<LockBusyException> ep =
+               std::make_shared<LockBusyException>(_file.c_str(),
+                                                     _function.c_str(),
+                                                     _line);
+            ep->_what_str = _what_str;
+            ep->_formatter = _formatter;
             return ep;
         }
     };
+
+    /**
+     * Log errors produced by sql
+     */
+    void _logSqlError(
+        const std::string &t,
+        const std::string &w);
 
     /**
      * Add the 'INVALID' flag to all array entries in the catalog currently
@@ -168,14 +195,14 @@ public:
      * @param[in] errorChecker that is allowed to interrupt the lock acquisition
      * @return true if the lock was acquired, false otherwise
      */
-    bool lockArray(const boost::shared_ptr<LockDesc>&  lockDesc, ErrorChecker& errorChecker);
+    bool lockArray(const std::shared_ptr<LockDesc>&  lockDesc, ErrorChecker& errorChecker);
 
     /**
      * Release a lock in the catalog.
      * @param[in] lockDesc the lock descriptor
      * @return true if the lock was released, false if it did not exist
      */
-    bool unlockArray(const boost::shared_ptr<LockDesc>& lockDesc);
+    bool unlockArray(const std::shared_ptr<LockDesc>& lockDesc);
 
     /**
      * Update the lock with new fields. Array name, query ID, instance ID, instance role
@@ -183,7 +210,7 @@ public:
      * @param[in] lockDesc the lock descriptor
      * @return true if the lock was released, false if it did not exist
      */
-    bool updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc);
+    bool updateArrayLock(const std::shared_ptr<LockDesc>& lockDesc);
 
     /**
      * Get all arrays locks from the catalog for a given instance.
@@ -192,8 +219,8 @@ public:
      * @param[in] workerLocks locks acquired as in the worker role
      */
     void readArrayLocks(const InstanceID instanceId,
-            std::list< boost::shared_ptr<LockDesc> >& coordLocks,
-            std::list< boost::shared_ptr<LockDesc> >& workerLocks);
+            std::list< std::shared_ptr<LockDesc> >& coordLocks,
+            std::list< std::shared_ptr<LockDesc> >& workerLocks);
 
     /**
      * Delete all arrays locks created as coordinator from the catalog on a given instance.
@@ -226,7 +253,7 @@ public:
      * @param[in] queryId
      * @return the lock found in the catalog possibly empty
      */
-    boost::shared_ptr<LockDesc> checkForCoordinatorLock(const std::string& arrayName,
+    std::shared_ptr<LockDesc> checkForCoordinatorLock(const std::string& arrayName,
                                                         QueryID queryId);
 
     /**
@@ -249,20 +276,30 @@ public:
     const std::string& getClusterUuid() const;
 
     /**
-     * Add new array to catalog by descriptor. Populates the supplied descriptor with the resulting id values.
-     * @param[in|out] array_desc Descriptor populated with array metadata; must have all identifiers set to 0
-     * @param[in] ps Partitioning scheme for mapping array data to instances
+     * @note IMPORTANT: Array updates must not use this interface, @see SystemCatalog::addArrayVersion().
+     * Add new array to the catalog by descriptor.
+     * @param[in] namespace_desc describes the namespace to add the array into
+     * @param[in] array_desc fully populated descriptor
      */
-    void addArray(ArrayDesc &array_desc, PartitioningSchema ps);
+    void addArray(
+        const NamespaceDesc &namespaceDesc,
+        const ArrayDesc &array_desc);
 
     /**
-     * Update array descriptor. The value of the array_desc.getId()
-     * identifies the array record to be updated to the new description,
-     * which allows you to change an array's name.
-     *
-     * @param[in] array_desc Descriptor populated with array metadata
+     * Transactionally add a new array version.
+     * Basically, this is how all array updates become visible to other queries.
+     * @param[in] namespace_desc describes the namespace to add the array into
+     * @param unversionedDesc schema for the unversioned array if not already in the catalog, NULL if it is
+     *        Must have the array ID already filled in.
+     * @param versionedDesc schema for the new versioned array to be added
+     *        Must have the array ID already filled in.
+     * @see scidb::SystemCatalog::getNextArrayId()
+     * @throws scidb::SystemException if the catalog state is not consistent with this operation
      */
-    void updateArray(const ArrayDesc &array_desc);
+    void addArrayVersion(
+        const NamespaceDesc &namespaceDesc,
+        const ArrayDesc* unversionedDesc,
+        const ArrayDesc& versionedDesc);
 
     /**
      * Fills vector with array names from the persistent catalog manager.
@@ -280,15 +317,6 @@ public:
     void getArrays(std::vector<ArrayDesc>& arrayDescs,
                    bool ignoreOrphanAttributes,
                    bool ignoreVersions);
-    /**
-     * Checks if there is an array with the specified ID in the catalog. First
-     * check the local instance's list of arrays. If the array is not present
-     * in the local catalog management, check the persistent catalog manager.
-     *
-     * @param[in] array_id Array id
-     * @return true if there is array with such ID, false otherwise
-     */
-    bool containsArray(const ArrayID array_id);
 
     /**
      * Checks if there is array with specified name in the storage. First
@@ -300,41 +328,155 @@ public:
      */
     bool containsArray(const std::string &array_name);
 
-    /**
-     * Get array ID by array name
-     * @param[in] array_name Array name
-     * @return array id or 0 if there is no array with such name
-     */
-    ArrayID findArrayByName(const std::string &array_name);
 
     /**
-     * Returns array metadata using the array name.
+     * Retrieves information about a user in users table
+     *
+     * @param user - Information about the user
+     */
+    void findUser(UserDesc &user);
+
+
+    /**
+     * Adds a new entry to the users table if the user does not already exist.
+     *
+     * @param user - Information about the user
+     */
+    void createUser(UserDesc &user);
+
+    /**
+     * Changes the setting for the specified user in users.
+     *
+     * @param user - Information about the user
+     * @param whatToChange - what to change about the user
+     */
+    void changeUser(
+        UserDesc &user,
+        const std::string &whatToChange);
+
+    /**
+     * Removes an entry representing a user in the users table.
+     *
+     * @param name - the name of the user to remove
+     */
+    void dropUser(const UserDesc &user);
+
+    /**
+     * Fills vector with user names from the persistent catalog manager.
+     * @param users Vector of desriptors describing user
+     */
+    void getUsers(std::vector<UserDesc> &users);
+
+
+    // -------------------------------------------------------------- //
+
+
+    /**
+     * Retrieves information about a namespace in scidb_namespaces table
+     *
+     * @param namespaceDesc - the descriptor of the namespace to find
+     * @param namespaceId - the return id of the namespace
+     * @param throwOnErr - throws if the namespace library is not loaded
+     */
+    void findNamespace(
+        const NamespaceDesc &   namespaceDesc,
+        NamespaceDesc::ID &     namespaceId,
+        bool                    throwOnErr = true);
+
+    /**
+     * Adds a new entry to the scidb_namespaces table if the namespace
+     * does not already exist.
+     *
+     * @param namespaceDesc - the descriptor of the namespace to add
+     */
+    void createNamespace(
+        const NamespaceDesc & namespaceDesc);
+
+    /**
+     * Removes an entry representing a namespace in the
+     * scidb_namespaces table.
+     *
+     * @param namespaceDesc - the descriptor of the namespace to remove
+     */
+    void dropNamespace(
+        const NamespaceDesc & namespaceDesc);
+
+    /**
+     * Fills vector with Namespace names from the persistent catalog
+     * manager.
+     *
+     * @param namespaceDescs - Vector of namespace descriptors
+     */
+    void getNamespaces(
+        std::vector<NamespaceDesc> &namespaceDescs);
+
+    /**
+     * Retrieve the namespace id for a given array id
+     *
+     * @param[in] arrayId - the id of the array to determine the namespace for
+     * @param[out] namespaceId - the id of the namespace associated with the arrayId
+     */
+    void getNamespaceIdFromArrayId(
+        const ArrayID           arrayId,
+        NamespaceDesc::ID &     namespaceId);
+
+
+    /// Unrestricted catalog version
+    static const ArrayID ANY_VERSION;
+    static const ArrayID MAX_ARRAYID;
+    static const VersionID MAX_VERSIONID;
+
+
+    /**
+     * Get array metadata for the array name as of a given catalog version.
+     * The metadata provided by this method corresponds to an array with id <= catalogVersion
      * @param[in] array_name Array name
+     * @param[in] catalogVersion as previously returned by getCurrentVersion().
+     *            If catalogVersion == SystemCatalog::ANY_VERSION,
+     *            the result metadata array ID is not bounded by catalogVersion
      * @param[out] array_desc Array descriptor
      * @exception scidb::SystemException
+     * @see SystemCatalog::getCurrentVersion()
      */
-    void getArrayDesc(const std::string &array_name, ArrayDesc &array_desc);
+    void getArrayDesc(const std::string& array_name,
+                      const ArrayID catalogVersion,
+                      ArrayDesc& array_desc);
 
     /**
-     * Returns array metadata using the array name.
+     * Get array metadata for the array name as of a given catalog version.
+     * The metadata provided by this method corresponds to an array with id <= catalogVersion
      * @param[in] array_name Array name
+     * @param[in] catalogVersion as previously returned by getCurrentVersion().
+     *            If catalogVersion == SystemCatalog::ANY_VERSION,
+     *            the result metadata array ID is not bounded by catalogVersion
      * @param[out] array_desc Array descriptor
      * @param[in] throwException throw exception if array with specified name is not found
      * @return true if array is found, false if array is not found and throwException is false
      * @exception scidb::SystemException
      */
-    bool getArrayDesc(const std::string &array_name, ArrayDesc &array_desc, const bool throwException);
+    bool getArrayDesc(const std::string &array_name,
+                      const ArrayID catalogVersion,
+                      ArrayDesc &array_desc,
+                      const bool throwException);
 
     /**
-     * Returns array metadata using the array name.
+     * Get array metadata for the array name as of a given catalog version.
+     * The metadata provided by this method corresponds to an array with id <= catalogVersion
      * @param[in] array_name Array name
+     * @param[in] catalogVersion as previously returned by getCurrentVersion().
+     *            If catalogVersion == SystemCatalog::ANY_VERSION,
+     *            the result metadata array ID is not bounded by catalogVersion
      * @param[in] array_version version identifier or LAST_VERSION
      * @param[out] array_desc Array descriptor
      * @param[in] throwException throw exception if array with specified name is not found
      * @return true if array is found, false if array is not found and throwException is false
      * @exception scidb::SystemException
      */
-    bool getArrayDesc(const std::string &array_name, VersionID version, ArrayDesc &array_desc, const bool throwException = true);
+    bool getArrayDesc(const std::string &array_name,
+                      const ArrayID catalogVersion,
+                      VersionID version,
+                      ArrayDesc &array_desc,
+                      const bool throwException = true);
 
     /**
      * Returns array metadata by its ID
@@ -348,14 +490,7 @@ public:
      * @param[in] id array identifier
      * @return Array descriptor
      */
-    boost::shared_ptr<ArrayDesc> getArrayDesc(const ArrayID id);
-
-    /**
-     * Returns array partitioning scheme by its ID
-     * @param[in] id array identifier
-     * @return Array partitionins scheme
-     */
-    PartitioningSchema getPartitioningSchema(const ArrayID arrayId);
+    std::shared_ptr<ArrayDesc> getArrayDesc(const ArrayID id);
 
     /**
      * Delete array from catalog by its name and all of its versions if this is the base array.
@@ -379,12 +514,10 @@ public:
     void deleteArray(const ArrayID id);
 
     /**
-     * Create new version of the array
-     * @param[in] id array ID
-     * @param[in] version_array_id version array ID
-     * @return identifier of newly create version
+     * Get an array ID suitable for using in a schema(ArrayDesc) for a persistent array,
+     * the one stored in the catalog (including the temp arrays).
      */
-    VersionID createNewVersion(const ArrayID id, const ArrayID version_array_id);
+    ArrayID getNextArrayId();
 
     /**
      * Delete version of the array
@@ -394,11 +527,16 @@ public:
     void deleteVersion(const ArrayID arrayID, const VersionID versionID);
 
     /**
-     * Get last version of the array
-     * @param[in] id array ID
+     * Get last version of an array.
+     * The version provided by this method corresponds to an array with id <= catalogVersion
+     * @param[in] unvAId unversioned array ID
+     * @param[in] catalogVersion as previously returned by getCurrentVersion().
+     *            If catalogVersion == SystemCatalog::ANY_VERSION,
+     *            the array ID corresponding to the result is not bounded by catalogVersion
      * @return identifier of last array version or 0 if this array has no versions
      */
-    VersionID getLastVersion(const ArrayID id);
+    VersionID getLastVersion(const ArrayID unvAId,
+                             const ArrayID catlogVersion=ANY_VERSION);
 
     /**
      * Get array id of oldest version of array
@@ -487,9 +625,9 @@ public:
      * Temporary method for connecting to PostgreSQL database used as metadata
      * catalog
      *
-     * @param[in] connectionString something like 'host=host_with_ph port=5432 dbname=catalog_db_name user=user_name password=users_password'
+     * @param[in] doUpgrade run upgrade scripts depending on metadata version
      */
-    void connect(const std::string& connectionString, bool doUpgrade);
+    void connect(bool doUpgrade);
 
     /**
      * Temporary method for checking connection to catalog's database.
@@ -510,7 +648,7 @@ public:
      * Get info about loaded libraries from the persistent system catalog
      * manager.
      *
-     * @param[out] vector of library names
+     * @param[out] libraries vector of library names
      */
     void getLibraries(std::vector< std::string >& libraries);
 
@@ -528,11 +666,50 @@ public:
      */
     int getMetadataVersion() const;
 
-private:
+    struct LockPtrLess : std::binary_function <const std::shared_ptr<scidb::SystemCatalog::LockDesc>,
+                                               const std::shared_ptr<scidb::SystemCatalog::LockDesc>, bool>
+    {
+        bool operator() (const std::shared_ptr<scidb::SystemCatalog::LockDesc>& l,
+                         const std::shared_ptr<scidb::SystemCatalog::LockDesc>& r) const
+        {
+            if (!l || !r) {
+                ASSERT_EXCEPTION_FALSE("LockPtrLess: NULL argument");
+                return false;
+            }
+            return (l->getArrayName() < r->getArrayName());
+        }
+    };
+
+    typedef std::set<std::shared_ptr<LockDesc>, LockPtrLess > QueryLocks;
+
+    /**
+     * Updates the query array locks with the highest array ID committed to the catalog for each array
+     * in the list of ACQUIRED locks.
+     * @param locks [in/out] all already ACQUIRED array locks for the current query
+     */
+    void getCurrentVersion(QueryLocks& locks);
+
+
+private:  // Definitions
+
+    struct StringPtrLess : std::binary_function <const std::string*, const std::string*, bool>
+    {
+        bool operator() (const std::string* const& l, const std::string* const& r) const
+        {
+            if (!l || !r) {
+                assert(false);
+                return false;
+            }
+            return ((*l) < (*r));
+        }
+    };
+
+private:  // Methods
+
     /**
      * Helper method to get an appropriate SQL string for a given lock
      */
-    static std::string getLockInsertSql(const boost::shared_ptr<LockDesc>& lockDesc);
+    static std::string getLockInsertSql(const std::shared_ptr<LockDesc>& lockDesc);
 
     /// SQL to garbage-collect unused mapping arrays
     static const std::string cleanupMappingArraysSql;
@@ -543,20 +720,67 @@ private:
     SystemCatalog();
     virtual ~SystemCatalog();
 
-    void _invalidateTempArrays();
+    void _invalidateTempArray(const std::string& arrayName);
     void _renameArray(const std::string &old_array_name, const std::string &new_array_name);
-    bool _lockArray(const boost::shared_ptr<LockDesc>&  lockDesc, ErrorChecker& errorChecker);
-    bool _unlockArray(const boost::shared_ptr<LockDesc>& lockDesc);
-    bool _updateArrayLock(const boost::shared_ptr<LockDesc>& lockDesc);
+    bool _lockArray(const std::shared_ptr<LockDesc>&  lockDesc, ErrorChecker& errorChecker);
+    bool _unlockArray(const std::shared_ptr<LockDesc>& lockDesc);
+    bool _updateArrayLock(const std::shared_ptr<LockDesc>& lockDesc);
     void _readArrayLocks(const InstanceID instanceId,
-            std::list< boost::shared_ptr<LockDesc> >& coordLocks,
-            std::list< boost::shared_ptr<LockDesc> >& workerLocks);
+            std::list< std::shared_ptr<LockDesc> >& coordLocks,
+            std::list< std::shared_ptr<LockDesc> >& workerLocks);
     uint32_t _deleteArrayLocks(InstanceID instanceId, QueryID queryId, LockDesc::InstanceRole role);
-    boost::shared_ptr<LockDesc> _checkForCoordinatorLock(const std::string& arrayName,
+    std::shared_ptr<LockDesc> _checkForCoordinatorLock(const std::string& arrayName,
             QueryID queryId);
+    std::string _findCredParam(const std::string& creds, const std::string& what);
+    std::string _makeCredentials();
     void _initializeCluster();
-    void _addArray(ArrayDesc &array_desc, PartitioningSchema ps);
-    void _updateArray(const ArrayDesc &array_desc);
+
+
+    void _findUser(UserDesc &user);
+
+    void _createUser(UserDesc &user);
+
+    void _changeUser(
+        UserDesc &user,
+        const std::string &whatToChange);
+
+    void _dropUser(const UserDesc &user);
+
+    void _getUsers(std::vector<UserDesc> &users);
+
+    void _findNamespace(
+        const NamespaceDesc &       name,
+        NamespaceDesc::ID &         namespaceId,
+        bool                        throwOnErr = true);
+
+    void _createNamespace(
+        const NamespaceDesc &       namespaceDesc);
+
+    void _dropNamespace(
+        const NamespaceDesc &       namespaceDesc);
+
+    void _getNamespaces(std::vector<NamespaceDesc> &namespaces);
+
+    void _getNamespaceIdFromArrayId(
+        const ArrayID               arrayId,
+        NamespaceDesc::ID &         namespaceId);
+    void _getNamespaceIdFromArrayId(
+        const scidb::ArrayID            arrayId,
+        NamespaceDesc::ID &             namespaceId,
+        pqxx::basic_transaction*        tr);
+
+
+    void _addArray(
+        const NamespaceDesc &namespaceDesc,
+        const ArrayDesc &array_desc);
+    void _addArray(
+        const NamespaceDesc &namespaceDesc,
+        const ArrayDesc &array_desc,
+        pqxx::basic_transaction* tr);
+    void _addArrayVersion(
+        const NamespaceDesc &namespaceDesc,
+        const ArrayDesc* unversionedDesc,
+        const ArrayDesc& versionedDesc);
     void _getArrays(std::vector<std::string> &arrays);
     void _getArrays(std::vector<ArrayDesc>& arrayDescs,
                     bool ignoreOrphanAttributes,
@@ -564,20 +788,31 @@ private:
     bool _containsArray(const ArrayID array_id);
     ArrayID _findArrayByName(const std::string &array_name);
     void _getArrayDesc(const std::string &array_name,
-                       ArrayDesc &array_desc,
-                       bool ignoreOrphanAttributes);
+                       const ArrayID catalogVersion,
+                       const bool ignoreOrphanAttributes,
+                       ArrayDesc &array_desc);
     void _getArrayDesc(const std::string &array_name,
+                       const ArrayID catalogVersion,
+                       const bool ignoreOrphanAttributes,
                        ArrayDesc &array_desc,
-                       bool ignoreOrphanAttributes,
                        pqxx::basic_transaction* tr);
-    boost::shared_ptr<ArrayDesc> _getArrayDesc(const ArrayID id);
-    PartitioningSchema _getPartitioningSchema(const ArrayID arrayId);
+    void getArrayInfo(const std::string &array_name,
+                      const ArrayID catalogVersion,
+                      ArrayID& arrId,
+                      std::string& arrName,
+                      int& arrPs,
+                      int& arrFlags,
+                      pqxx::basic_transaction* tr);
+    std::shared_ptr<ArrayDesc> _getArrayDesc(const ArrayID id);
     bool _deleteArrayByName(const std::string &array_name);
     bool _deleteArrayVersions(const std::string &array_name, const VersionID array_version);
     void _deleteArrayById(const ArrayID id);
-    VersionID _createNewVersion(const ArrayID id, const ArrayID version_array_id);
+    ArrayID _getNextArrayId();
+    ArrayID _getNextArrayId(pqxx::basic_transaction* tr);
+    VersionID _createNewVersion(const ArrayID id, const ArrayID version_array_id,
+                                pqxx::basic_transaction* tr);
     void _deleteVersion(const ArrayID arrayID, const VersionID versionID);
-    VersionID _getLastVersion(const ArrayID id);
+    VersionID _getLastVersion(const ArrayID id, const ArrayID catlogVersion);
     ArrayID _getOldestArrayVersion(const ArrayID id);
     VersionID _lookupVersionByTimestamp(const ArrayID id, const uint64_t timestamp);
     std::vector<VersionDesc> _getArrayVersions(const ArrayID array_id);
@@ -593,11 +828,15 @@ private:
     void _addLibrary(const std::string& libraryName);
     void _getLibraries(std::vector< std::string >& libraries);
     void _removeLibrary(const std::string& libraryName);
+    void _getCurrentVersion(QueryLocks& locks);
+
+private:  // Variables
 
     bool _initialized;
     pqxx::connection *_connection;
     std::string _uuid;
     int _metadataVersion;
+    const NamespaceDesc::ID PUBLIC_NS_ID = 1;
 
     //FIXME: libpq don't have ability of simultaneous access to one connection from
     // multiple threads even on read-only operatinos, so every operation must
@@ -605,10 +844,22 @@ private:
     static Mutex _pgLock;
 
     friend class Singleton<SystemCatalog>;
-
+    /// number of attempts to reconnect to PG
     int _reconnectTries;
+    /// number of attempts to re-execute a conflicting/concurrent serialized txn
+    int _serializedTxnTries;
+    static const int DEFAULT_SERIALIZED_TXN_TRIES =10;
+
+    class TxnIsolationConflict : public pqxx::sql_error
+    {
+    public:
+        explicit TxnIsolationConflict(const std::string& what,
+				      const std::string& query)
+        : sql_error(what, query) {}
+    };
+    void throwOnSerializationConflict(const pqxx::sql_error& e);
 };
 
-} // namespace catalog
+} // namespace scidb
 
 #endif /* SYSTEMCATALOG_H_ */

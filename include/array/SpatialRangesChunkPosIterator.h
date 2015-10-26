@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,7 +33,7 @@
 #include <util/SpatialType.h>
 #include <util/MultiConstIterators.h>
 #include <util/RegionCoordinatesIterator.h>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 namespace scidb
 {
@@ -50,7 +50,7 @@ public:
      * @param spatialRanges  a SpatialRanges object.
      * @param schema  the array schema.
      */
-    SpatialRangesChunkPosIterator(boost::shared_ptr<SpatialRanges> const& spatialRanges, ArrayDesc const& schema);
+    SpatialRangesChunkPosIterator(std::shared_ptr<SpatialRanges> const& spatialRanges, ArrayDesc const& schema);
 
     /**
      * @return true if done with enumeration.
@@ -95,7 +95,7 @@ private:
     /**
      * A spatialRanges object.
      */
-    boost::shared_ptr<SpatialRanges> _spatialRanges;
+    std::shared_ptr<SpatialRanges> _spatialRanges;
 
     /**
      * Array schema.
@@ -105,12 +105,12 @@ private:
     /**
      * A vector of RegionCoordinatesIterator objects.
      */
-    std::vector<boost::shared_ptr<ConstIterator> > _rawIterators;
+    std::vector<std::shared_ptr<ConstIterator> > _rawIterators;
 
     /**
      * A MultiConstIterators object wrapping _rawIterators, for synchronized advancement.
      */
-    boost::shared_ptr<MultiConstIterators> _wrapperIterator;
+    std::shared_ptr<MultiConstIterators> _wrapperIterator;
 
     /**
      * Each Coordinates in the vector will be used to initialize the 'low' for one of _rawIterators.
@@ -130,6 +130,5 @@ private:
     std::vector<size_t> _intervals;
 };
 
-}
-
+} // namespace
 #endif /* SPATIALRANGESCHUNKPOSITERATOR_H_ */

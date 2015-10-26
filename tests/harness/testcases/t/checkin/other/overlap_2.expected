@@ -12,12 +12,6 @@ SCIDB QUERY : <store(build(A,x+1),A)>
 
 SCIDB QUERY : <save(A,'a_test.txt',-1,'store')>
 {x} a
-{-2} -1
-{-1} 0
-{0} 1
-{1} 2
-{2} 3
-{3} 4
 
 SCIDB QUERY : <load(A,'a_test.txt',-1)>
 {x} a

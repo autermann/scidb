@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,8 +29,7 @@
 
 #include <cmath>
 #include <boost/format.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <cstdarg>
 
 #include "query/QueryPlanUtilites.h"
@@ -104,8 +103,8 @@ Value& ExpressionContext::operator[](int i)
 }
 
 // Expression implementation
-void Expression::compile(boost::shared_ptr<LogicalExpression> expr,
-                         const boost::shared_ptr<Query>& query,
+void Expression::compile(std::shared_ptr<LogicalExpression> expr,
+                         const std::shared_ptr<Query>& query,
                          bool tile,
                          TypeId expectedType,
                          const vector< ArrayDesc>& inputSchemas,
@@ -264,12 +263,12 @@ void Expression::compile(const string& expression, const vector<string>& names, 
 {
     assert(names.size() == types.size());
 
-    shared_ptr<LogicalExpression> logicalExpression(parseExpression(expression));
+    std::shared_ptr<LogicalExpression> logicalExpression(parseExpression(expression));
 
     for (size_t i = 0; i < names.size(); i++) {
         addVariableInfo(names[i], types[i]);
     }
-    shared_ptr<Query> emptyQuery; //XXX tigor TODO: expressions should not read/write data and need a query context (right?)
+    std::shared_ptr<Query> emptyQuery; //XXX tigor TODO: expressions should not read/write data and need a query context (right?)
     compile(logicalExpression, emptyQuery, false, expectedType);
 }
 
@@ -292,7 +291,7 @@ void Expression::addVariableInfo(const std::string& name, const TypeId& type)
 
 BindInfo
 Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
-                           const string& referenceName, const boost::shared_ptr<Query>& query)
+                           const string& referenceName, const std::shared_ptr<Query>& query)
 {
     BindInfo bind;
     const Attributes& attrs = arrayDesc.getAttributes();
@@ -325,8 +324,8 @@ Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
 }
 
 
-BindInfo Expression::resolveContext(const boost::shared_ptr<AttributeReference>& ref,
-                                    const boost::shared_ptr<Query>& query)
+BindInfo Expression::resolveContext(const std::shared_ptr<AttributeReference>& ref,
+                                    const std::shared_ptr<Query>& query)
 {
     BindInfo bind;
 
@@ -439,14 +438,14 @@ void Expression::swapArguments(size_t firstIndex)
 }
 
 const Expression::ArgProp&
-Expression::internalCompile(boost::shared_ptr<LogicalExpression> expr,
-                            const boost::shared_ptr<Query>& query,
+Expression::internalCompile(std::shared_ptr<LogicalExpression> expr,
+                            const std::shared_ptr<Query>& query,
                             bool tile,
                             size_t resultIndex, size_t skipIndex, bool skipValue)
 {
     if (typeid(*expr) == typeid(AttributeReference))
     {
-        boost::shared_ptr<AttributeReference> e = dynamic_pointer_cast<AttributeReference>(expr);
+        std::shared_ptr<AttributeReference> e = dynamic_pointer_cast<AttributeReference>(expr);
         const BindInfo bind = resolveContext(e, query);
         size_t i;
         for (i = 0; i < _bindings.size(); i++) {
@@ -463,7 +462,7 @@ Expression::internalCompile(boost::shared_ptr<LogicalExpression> expr,
     }
     else if (typeid(*expr) == typeid(Constant))
     {
-        boost::shared_ptr<Constant> e = dynamic_pointer_cast<Constant>(expr);
+        std::shared_ptr<Constant> e = dynamic_pointer_cast<Constant>(expr);
         _props[resultIndex].type = e->getType();
         _eargs.resize(_props.size());
         _eargs[resultIndex] = tile ? makeTileConstant(e->getType(),e->getValue()) : e->getValue();
@@ -473,7 +472,7 @@ Expression::internalCompile(boost::shared_ptr<LogicalExpression> expr,
     }
     else if (typeid(*expr) == typeid(Function))
     {
-        boost::shared_ptr<Function> e = dynamic_pointer_cast<Function>(expr);
+        std::shared_ptr<Function> e = dynamic_pointer_cast<Function>(expr);
         CompiledFunction f;
         f.functionName = e->getFunction();
         f.resultIndex = resultIndex;
@@ -763,16 +762,16 @@ void Expression::clear()
 
 
 // Functions
-Value evaluate(boost::shared_ptr<LogicalExpression> expr,
-               const boost::shared_ptr<Query>& query, TypeId expectedType)
+Value evaluate(std::shared_ptr<LogicalExpression> expr,
+               const std::shared_ptr<Query>& query, TypeId expectedType)
 {
     Expression e;
     e.compile(expr, query, false, expectedType);
     return e.evaluate();
 }
 
-TypeId expressionType(boost::shared_ptr<LogicalExpression> expr,
-                      const boost::shared_ptr<Query>& query,
+TypeId expressionType(std::shared_ptr<LogicalExpression> expr,
+                      const std::shared_ptr<Query>& query,
                       const vector< ArrayDesc>& inputSchemas)
 {
     Expression e;

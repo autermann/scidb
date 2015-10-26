@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,78 +29,71 @@
 #define PARALLEL_ACCUMULATOR_ARRAY_H_
 
 #include <vector>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 
-#include "array/MemArray.h"
-#include "util/JobQueue.h"
-#include "util/Semaphore.h"
-#include "util/ThreadPool.h"
-#include "array/StreamArray.h"
-
+#include <array/MemArray.h>
+#include <util/JobQueue.h>
+#include <util/Semaphore.h>
+#include <util/ThreadPool.h>
+#include <array/StreamArray.h>
 
 namespace scidb
 {
-    using namespace std;
-    using namespace boost;
 
-    //
-    // Array implementation materializing current chunk
-    //
-    class ParallelAccumulatorArray : public StreamArray, public boost::enable_shared_from_this<ParallelAccumulatorArray>
+/**
+ * An array that helps an input array prefetch result chunk and deliver to the caller.
+ */
+class ParallelAccumulatorArray : public StreamArray, public std::enable_shared_from_this<ParallelAccumulatorArray>
+{
+public:
+    ParallelAccumulatorArray(const std::shared_ptr<Array>& pipe);
+    ~ParallelAccumulatorArray();
+    void start(const std::shared_ptr<Query>& query);
+
+protected:
+    virtual ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
+
+private:
+    class ChunkPrefetchJob : public Job, public SelfStatistics
     {
-      public:
-        ParallelAccumulatorArray(const boost::shared_ptr<Array>& pipe);
-        ~ParallelAccumulatorArray();
-        void start(const boost::shared_ptr<Query>& query);
+    private:
+        std::weak_ptr<Query> _queryLink;
+        std::weak_ptr<ParallelAccumulatorArray> _arrayLink;
+        std::shared_ptr<ConstArrayIterator> _iterator;
+        Coordinates _pos;
+        AttributeID _attrId;
+        MemChunk    _accChunk;
+        ConstChunk const* _resultChunk;
+        bool _isCoordinator;
 
-      protected:
-        virtual ConstChunk const* nextChunk(AttributeID attId, MemChunk& chunk);
+    public:
+        ChunkPrefetchJob(const std::shared_ptr<ParallelAccumulatorArray>& array,
+                         AttributeID attr, const std::shared_ptr<Query>& query);
+        virtual ~ChunkPrefetchJob();
 
-      private:
-        class ChunkPrefetchJob : public Job,
-#ifndef NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_PROTECTED_BASE_CLASSES
-        public SelfStatistics
-#else
-        protected SelfStatistics
-#endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_ACCEPT_PROTECTED_BASE_CLASSES
-        {
-          private:
-            boost::weak_ptr<Query> _queryLink;
-            boost::weak_ptr<ParallelAccumulatorArray> _arrayLink;
-            boost::shared_ptr<ConstArrayIterator> _iterator;
-            Coordinates _pos;
-            AttributeID _attrId;
-            MemChunk    _accChunk;
-            ConstChunk const* _resultChunk;
+        void setPosition(Coordinates const& coord) {
+            _resultChunk = NULL;
+            _pos = coord;
+        }
 
-          public:
-            ChunkPrefetchJob(const boost::shared_ptr<ParallelAccumulatorArray>& array,
-                             AttributeID attr, const boost::shared_ptr<Query>& query);
-            virtual ~ChunkPrefetchJob();
+        AttributeID getAttributeID() const {
+            return _attrId;
+        }
 
-            void setPosition(Coordinates const& coord) {
-                _resultChunk = NULL;
-                _pos = coord;
-            }
+        ConstChunk const* getResult();
 
-            AttributeID getAttributeID() const {
-                return _attrId;
-            }
+        virtual void run();
 
-            ConstChunk const* getResult();
+        void cleanup();
+    };
 
-            virtual void run();
+    void doNewJob(std::shared_ptr<ChunkPrefetchJob>& job);
 
-            void cleanup();
-        };
+    std::vector< std::shared_ptr<ConstArrayIterator> > iterators;
+    std::shared_ptr<Array> pipe;
+    std::vector< std::list< std::shared_ptr<ChunkPrefetchJob> > > activeJobs;
+    std::vector< std::shared_ptr<ChunkPrefetchJob> > completedJobs;
+};
 
-        void doNewJob(boost::shared_ptr<ChunkPrefetchJob>& job);
-
-        std::vector< boost::shared_ptr<ConstArrayIterator> > iterators;
-        boost::shared_ptr<Array> pipe;
-        std::vector< std::list< boost::shared_ptr<ChunkPrefetchJob> > > activeJobs;
-        std::vector< boost::shared_ptr<ChunkPrefetchJob> > completedJobs;
-   };
-}
-
+} // namespace
 #endif

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -83,14 +83,14 @@ public:
      * @param query the query context
      * @return the 0th element of schemas with the dimensions in reverse order
      */
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         assert(_parameters.size() == 0);
 
         ArrayDesc const& schema = schemas[0];
 
-        Dimensions const& dims(schema.getDimensions());   
+        Dimensions const& dims(schema.getDimensions());
         Dimensions transDims(dims.size());
 
         for (size_t i = 0, n = dims.size(); i < n; i++)
@@ -98,7 +98,7 @@ public:
             transDims[n-i-1] = dims[i];
         }
 
-        return ArrayDesc(schema.getName(), schema.getAttributes(), transDims);
+        return ArrayDesc(schema.getName(), schema.getAttributes(), transDims, defaultPartitioning());
 	}
 
 };

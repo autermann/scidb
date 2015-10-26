@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -63,6 +63,9 @@ void initConfig(int argc, char* argv[])
     // rather than Config::INTEGER.  Otherwise at runtime you'll get a
     // boost::bad_any_cast exception when reading the option value
     // (cannot extract 64-bit unsigned size_t into 32-bit signed int).
+    // If you dont use the EIC multipliers but do use Config::SIZE,
+    // make sure to use the UL suffix after your constants
+    // (or indicate somehow else to the compiler that the constants are not of type int).
 
     // ANOTHER WARNING: Until my advice in ticket #3533 comment:10 is
     // heeded, you'll have to also add your new option to the
@@ -74,7 +77,7 @@ void initConfig(int argc, char* argv[])
         (CONFIG_PRECISION, 'w', "precision", "PRECISION", "", scidb::Config::INTEGER,
                "Precision for printing floating point numbers. Default is 6", 6, false)
         (CONFIG_CATALOG, 'c', "catalog", "CATALOG", "", Config::STRING,
-            "Catalog connection string. In order to create use utils/prepare-db.sh")
+            "Catalog connection string, but without any password.  See utils/scidb-prepare-db.sh for guidance.")
         (CONFIG_LOGCONF, 'l', "logconf", "LOG_PROPERTIES", "",
             Config::STRING, "Log4cxx properties file.", string(""), false)
         (CONFIG_COORDINATOR, 'k', "coordinator", "COORDINATOR", "", Config::BOOLEAN,
@@ -90,8 +93,8 @@ void initConfig(int argc, char* argv[])
             "Asynchronous replication.", true, false)
         (CONFIG_RECOVER, 0, "recover", "", "", Config::INTEGER,
             "Recover instance.", -1, false)
-        (CONFIG_REDUNDANCY, 0, "redundancy", "", "", Config::INTEGER,
-            "Level of redundancy.", 0, false)
+        (CONFIG_REDUNDANCY, 0, "redundancy", "", "", Config::SIZE,
+            "Level of redundancy.", 0UL, false)
         (CONFIG_INITIALIZE, 0, "initialize", "", "", Config::BOOLEAN,
             "Initialize cluster.", false, false)
         (CONFIG_STORAGE, 's', "storage", "STORAGE", "", Config::STRING, "Storage URL.",
@@ -201,6 +204,10 @@ void initConfig(int argc, char* argv[])
         (CONFIG_INSTALL_ROOT, 0, "install_root", "INSTALL_ROOT", "", Config::STRING, "The installation directory from which SciDB runs", string(SCIDB_INSTALL_PREFIX()), false)
         (CONFIG_INPUT_DOUBLE_BUFFERING, 0, "input-double-buffering", "INPUT_DOUBLE_BUFFERING", "", Config::BOOLEAN,
          "Use double buffering where possible in input and load operators", true, false)
+        (CONFIG_SECURITY, 'S', "security", "", "", Config::STRING,
+                "Security mode.", string("trust"), false)
+        (CONFIG_ENABLE_CHUNKMAP_RECOVERY, 0, "enable-chunkmap-recovery", "ENABLE_CHUNKMAP_RECOVERY", "", Config::BOOLEAN, "Set to true to enable recovery of corrupt chunk-map entires on startup.", false, false)
+        (CONFIG_SKIP_CHUNKMAP_INTEGRITY_CHECK, 0, "skip-chunkmap-integrity-check", "SKIP_CHUNKMAP_INTEGRITY_CHECK", "", Config::BOOLEAN, "Set to true to skip all chunkmap integrity checks on startup.", false, false)
         ;
 
     cfg->addHook(configHook);

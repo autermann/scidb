@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -88,8 +88,8 @@ namespace scidb
  *     <br> 2012,  3,      8,     26.64,  30
  *
  * @par Errors:
- *   - SCIDB_SE_OPERATOR::SCIDB_LE_OP_CROSSJOIN-ERROR2: if the number of input dimensions is not even.
- *   - SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_FONFORMANT: if any join dimension is not an integer dimension, or if a pair of join dimensions
+ *   - SCIDB_SE_OPERATOR::SCIDB_LE_OP_CROSSJOIN_ERROR2: if the number of input dimensions is not even.
+ *   - SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT: if any join dimension is not an integer dimension, or if a pair of join dimensions
  *     do not have the same start, chunk interval, or overlap.
  *
  * @par Notes:
@@ -104,19 +104,19 @@ class LogicalCrossJoin: public LogicalOperator
     {
     	ADD_PARAM_INPUT()
         ADD_PARAM_INPUT()
-        ADD_PARAM_VARIES()           
+        ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
     nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         res.push_back(PARAM_IN_DIMENSION_NAME());
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         if ((_parameters.size() & 1) != 0) {
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_CROSSJOIN_ERROR2);
@@ -132,7 +132,7 @@ class LogicalCrossJoin: public LogicalOperator
         size_t totalAttributes = leftAttributes.size() + rightAttributes.size();
         AttributeDesc const* leftBitmap = leftArrayDesc.getEmptyBitmapAttribute();
         AttributeDesc const* rightBitmap = rightArrayDesc.getEmptyBitmapAttribute();
-        if (leftBitmap && rightBitmap) { 
+        if (leftBitmap && rightBitmap) {
             totalAttributes -= 1;
         }
 
@@ -155,7 +155,7 @@ class LogicalCrossJoin: public LogicalOperator
                 attr.getDefaultValueExpr());
             CrossJoinAttributes[j].addAlias(rightArrayDesc.getName());
         }
-        if (leftBitmap && !rightBitmap) { 
+        if (leftBitmap && !rightBitmap) {
             AttributeDesc const& attr = *leftBitmap;
             CrossJoinAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
                 attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
@@ -165,14 +165,13 @@ class LogicalCrossJoin: public LogicalOperator
 
         size_t nRightDims = rightDimensions.size();
         size_t nLeftDims = leftDimensions.size();
-        Dimensions CrossJoinDimensions(nLeftDims + nRightDims - _parameters.size()/2);
         vector<int> CrossJoinOnDimensions(nRightDims, -1);
         uint64_t leftCrossJoinOnMask = 0;
         uint64_t rightCrossJoinOnMask = 0;
         for (size_t p = 0, np = _parameters.size(); p < np; p += 2) {
-            shared_ptr<OperatorParamDimensionReference> leftDim = (shared_ptr<OperatorParamDimensionReference>&)_parameters[p];
-            shared_ptr<OperatorParamDimensionReference> rightDim = (shared_ptr<OperatorParamDimensionReference>&)_parameters[p+1];
-            
+            std::shared_ptr<OperatorParamDimensionReference> leftDim = (std::shared_ptr<OperatorParamDimensionReference>&)_parameters[p];
+            std::shared_ptr<OperatorParamDimensionReference> rightDim = (std::shared_ptr<OperatorParamDimensionReference>&)_parameters[p+1];
+
             const string &leftDimName = leftDim->getObjectName();
             const string &rightDimName = rightDim->getObjectName();
             const string &leftDimArray = leftDim->getArrayName();
@@ -190,7 +189,7 @@ class LogicalCrossJoin: public LogicalOperator
                                            leftDim->getParsingContext());
             }
             leftCrossJoinOnMask |=  (uint64_t)1 << l;
-            
+
             ssize_t r = rightArrayDesc.findDimension(rightDimName, rightDimArray);
             if (r < 0) {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_NOT_EXIST,
@@ -203,27 +202,29 @@ class LogicalCrossJoin: public LogicalOperator
                                            rightDim->getParsingContext());
             }
             rightCrossJoinOnMask |=  (uint64_t)1 << r;
-            
-            // Differences in chunk size and overlap are now handled via PhysicalCrossJoin::requiresRepart().
+
+            // Differences in chunk size and overlap are now handled
+            // via PhysicalCrossJoin::requiresRedimensionOrRepartition().
             if (leftDimensions[l].getStartMin() != rightDimensions[r].getStartMin()) {
                 ostringstream ss;
                 ss << leftDimensions[l] << " != " << rightDimensions[r];
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_START_INDEX_MISMATCH) << ss.str();
             }
-            
+
             if (CrossJoinOnDimensions[r] >= 0) {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CROSSJOIN_ERROR1);
             }
             CrossJoinOnDimensions[r] = (int)l;
-        }                                           
+        }
 
         j = 0;
-        for (size_t i = 0; i < nLeftDims; i++) { 
+        Dimensions CrossJoinDimensions(nLeftDims + nRightDims - _parameters.size()/2);
+        for (size_t i = 0; i < nLeftDims; i++) {
             CrossJoinDimensions[j] = leftDimensions[i];
             CrossJoinDimensions[j].addAlias(leftArrayDesc.getName());
             ++j;
         }
-        for (size_t i = 0; i < nRightDims; i++) { 
+        for (size_t i = 0; i < nRightDims; i++) {
             if (CrossJoinOnDimensions[i] < 0)
             {
                 CrossJoinDimensions[j] = rightDimensions[i];
@@ -232,6 +233,7 @@ class LogicalCrossJoin: public LogicalOperator
             }
             else
             {
+                // Tweak corresponding left dimension 'd'.
                 DimensionDesc& d = CrossJoinDimensions[CrossJoinOnDimensions[i]];
                 DimensionDesc const& right = rightDimensions[i];
                 Coordinate newCurrStart = max(d.getCurrStart(), right.getCurrStart());
@@ -240,9 +242,13 @@ class LogicalCrossJoin: public LogicalOperator
                 d.setCurrStart(newCurrStart);
                 d.setCurrEnd(newCurrEnd);
                 d.setEndMax(newEndMax);
+                d.setChunkOverlap(min(d.getChunkOverlap(), right.getChunkOverlap()));
             }
         }
-        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(), CrossJoinAttributes, CrossJoinDimensions);
+        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(),
+                         CrossJoinAttributes,
+                         CrossJoinDimensions,
+                         defaultPartitioning());
     }
 };
 

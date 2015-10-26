@@ -1,11 +1,11 @@
 #!/usr/bin/python
 
 # Initialize, start and stop scidb in a cluster.
-#
+
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -20,7 +20,6 @@
 # along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 #
 # END_COPYRIGHT
-#
 
 import collections
 import copy
@@ -28,6 +27,7 @@ import datetime
 import errno
 import exceptions
 import os
+import platform
 import signal
 import subprocess
 import sys
@@ -37,8 +37,14 @@ import traceback
 import copy
 import argparse
 import re
+import ConfigParser
 
-_DBG = os.environ.get("SCIDB_DBG",False)
+_PGM = None
+_DBG = None
+
+class AppError(Exception):
+    """Base class for all exceptions that halt script execution."""
+    pass
 
 # not order preserving
 # should be O(n log n) or O(n) depending on
@@ -49,25 +55,27 @@ def noDupes(seq):
     # dictionary code is involved.
     return list(set(seq))
 
-# bad style to use from, removes the namespace colission-avoidance mechanism
-import ConfigParser
+def _log_to_file(file_, *args):
+    print >>file_, _PGM, ' '.join(map(str, args))
+    # stderr is line buffered, no flush needed
+    if file_ is not sys.stderr:
+        file_.flush()
 
-def printDebug(string, force=False):
-   if _DBG or force:
-      print >> sys.stderr, "%s: DBG: %s" % (sys.argv[0], string)
-      sys.stderr.flush()
+def printDebug(*args):
+    if _DBG:
+        _log_to_file(sys.stderr, "DEBUG:", *args)
 
-def printDebugForce(string):
-    printDebug(string, force=True)
+def printDebugForce(*args):
+    _log_to_file(sys.stderr, "DEBUG:", *args)
 
-def printInfo(string):
-   sys.stdout.flush()
-   print >> sys.stdout, "%s" % (string)
-   sys.stdout.flush()
+def printInfo(*args):
+    _log_to_file(sys.stdout, *args)
 
-def printError(string):
-   print >> sys.stderr, "%s: ERROR: %s" % (sys.argv[0], string)
-   sys.stderr.flush()
+def printWarn(*args):
+    _log_to_file(sys.stderr, "WARNING:", *args)
+
+def printError(*args):
+    _log_to_file(sys.stderr, "ERROR:", *args)
 
 # borrowed from http://code.activestate.com/recipes/541096/
 def confirm(prompt=None, resp=False):
@@ -103,7 +111,7 @@ def parse_test_timing_file(timing_file):
         into a list.  Timing file is obtained from the harness test
         log.  Resulting list returned from the function contains
         tuples - [test_name,time].
-        
+
         @param timing_file path to the file with test time
         @return list of tuples each containing a test name and its
                 running time
@@ -114,35 +122,35 @@ def parse_test_timing_file(timing_file):
 
     # Split the file content into individual lines.
     test_lines = [line.strip() for line in contents.split('\n')]
-    
+
     # Remove blank lines
     while ('' in test_lines):
         test_lines.remove('')
-        
+
     # Pick out the timing information and record it in a list.
     tests = []
     for test_line in test_lines:
         m = re.compile('(\[end\]\s+t\.)(.+)').search(test_line)
         if (m is None):
             continue
-        
+
         test_info = m.group(2).split(' ')
         test_info = [test_info[0],float(test_info[2])]
         tests.append(test_info)
-        
+
     # Sort the list by test time in acending order.
     tests = sorted(tests,key=lambda x: x[1])
-    
+
     # Return the result.
     return tests
-    
+
 def find_long_tests(test_timing_list, cutoff):
     """ Find tests whose running time is greater than
         some cutoff value.
-        @param test_timing_list list with test names and their 
+        @param test_timing_list list with test names and their
                running times
         @param cutoff floating point number for running time cutoff
-        
+
         @return list of test names whose running time is greater
                 than the specified cutoff.
     """
@@ -152,13 +160,13 @@ def find_long_tests(test_timing_list, cutoff):
         break
     long_test_info = test_timing_list[i:]
     long_tests = [test_info[0] for test_info in long_test_info]
-    
+
     return long_tests
-    
+
 def make_new_skip_file(old_skip_file, new_skip_file, skip_tests):
     """ Append the specified list of test names to the existing disable
         test file and save it with a new file name.
-        
+
         @param old_skip_file path to the disabled tests file
         @param new_skip_file path to the new disabled tests file
         @param skip_tests list of tests to skip
@@ -171,20 +179,23 @@ def make_new_skip_file(old_skip_file, new_skip_file, skip_tests):
     # Append the tests to skip and write the whole new contents into
     # the new file.
     with open(new_skip_file,'w') as fd:
-        contents = fd.write(contents + '\n' + '\n'.join(skip_tests))        
+        contents = fd.write(contents + '\n' + '\n'.join(skip_tests))
 
-# Parse a config file
-def parseOptions(filename, section_name):
-   config = ConfigParser.RawConfigParser()
-   config.read(filename)
-   options={}
-   try:
-       for (key, value) in config.items(section_name):
-           options[str(key)] = value
-   except Exception, e:
-      printError("config file parser error in file: %s, reason: %s" % (filename, e))
-      sys.exit(1)
-   return options
+def parseConfig(filename, section_name, _cache={}):
+    """Parse a config file section, caching the result."""
+    if (filename, section_name) in _cache:
+        return _cache[(filename, section_name)]
+    config = ConfigParser.RawConfigParser()
+    config.read(filename)
+    options={}
+    try:
+        for (key, value) in config.items(section_name):
+            options[str(key)] = value
+    except Exception as e:
+        raise AppError("config file parser error in file: %s, reason: %s" % (
+                filename, str(e)))
+    _cache[(filename, section_name)] = options
+    return options
 
 # from http://www.chiark.greenend.org.uk/ucgi/~cjwatson/blosxom/2009-07-02
 def subprocess_setup():
@@ -217,6 +228,21 @@ def executeIt(cmdList,
 
     my_env = copy.copy(os.environ)
 
+    if platform.linux_distribution()[0] == "Ubuntu":
+        my_env["CC"]="/usr/bin/gcc-4.9"
+        my_env["MPICH_CC"]="/usr/bin/gcc-4.9"
+        my_env["CXX"]="/usr/bin/g++-4.9"
+        my_env["MPICH_CXX"]="/usr/bin/g++-4.9"
+        my_env["FC"]="/usr/bin/gfortran-4.9"
+        my_env["MPICH_F77"]="/usr/bin/gfortran-4.9"
+    if platform.linux_distribution()[0] == "CentOS":
+        my_env["CC"]="/opt/rh/devtoolset-3/root/usr/bin/gcc"
+        my_env["MPICH_CC"]="/opt/rh/devtoolset-3/root/usr/bin/gcc"
+        my_env["CXX"]="/opt/rh/devtoolset-3/root/usr/bin/g++"
+        my_env["MPICH_CXX"]="/opt/rh/devtoolset-3/root/usr/bin/g++"
+        my_env["FC"]="/opt/rh/devtoolset-3/root/usr/bin/gfortran"
+        my_env["MPICH_FC"]="/opt/rh/devtoolset-3/root/usr/bin/gfortran"
+
     if env:
         for (key,value) in env.items():
             my_env[key] = value
@@ -245,7 +271,8 @@ def executeIt(cmdList,
 
        if collectOutput:
            if not waitFlag:
-               raise Exception("Inconsistent arguments: waitFlag=%s and collectOutput=%s" % (str(waitFlag), str(collectOutput)))
+               raise RuntimeError("Inconsistent arguments: waitFlag=%s and collectOutput=%s" % (
+                       str(waitFlag), str(collectOutput)))
            if not stdErr:
                stdErr = subprocess.PIPE
            if not stdOut:
@@ -265,13 +292,13 @@ def executeIt(cmdList,
           p.wait()
           ret = p.returncode
           if ret != 0 and raiseOnBadExitCode:
-             raise Exception("Abnormal return code: %s on command %s" % (ret, cmdList))
+             raise RuntimeError("Abnormal return code: %s on command %s" % (ret, cmdList))
     finally:
        if stdIn:
           stdIn.close()
-       if stdOut and not isinstance(stdOut,int):
+       if isinstance(stdOut, file):
           stdOut.close()
-       if stdErr and not isinstance(stdErr,int):
+       if isinstance(stdErr, file):
           stdErr.close()
 
     return (ret,out,err)
@@ -292,7 +319,7 @@ def getOS (scidbEnv):
 def rm_rf(path,force=False,throw=True):
     if not force and not confirm("WARNING: about to delete *all* contents of "+path, True):
         if throw:
-            raise Exception("Cannot continue without removing the contents of "+path)
+            raise RuntimeError("Cannot continue without removing the contents of "+path)
         else:
             return
 
@@ -313,12 +340,12 @@ def mkdir_p(path):
 def runSetup(force, sourcePath,buildPath,installPath,defs={},name='scidb'):
     oldCmakeCache = os.path.join(sourcePath,"CMakeCache.txt")
     if os.access(oldCmakeCache, os.R_OK):
-        printInfo("WARNING: Deleting old CMakeCache file:"+oldCmakeCache)
+        printWarn("Deleting old CMakeCache file:"+oldCmakeCache)
         os.remove(oldCmakeCache)
 
     oldCmakeCache = os.path.join(buildPath,"CMakeCache.txt")
     if os.access(oldCmakeCache, os.R_OK):
-        printInfo("WARNING: Deleting old CMakeCache file:"+oldCmakeCache)
+        printWarn("Deleting old CMakeCache file:"+oldCmakeCache)
         os.remove(oldCmakeCache)
 
     build_type=os.environ.get("SCIDB_BUILD_TYPE","Debug")
@@ -417,7 +444,7 @@ def pluginMakePackages(scidbEnv):
     binPath=os.path.join(pluginPath,"deployment/deploy.sh")
     curr_dir=os.getcwd()
 
-    # Usage: plugin-trunk/deployment/deploy.sh build <Debug|RelWithDebInfo> <packages_path> <scidb_packages_path> <scidb_bin_path>
+    # Usage: plugin-trunk/deployment/deploy.sh build <build_type> <packages_path> <scidb_packages_path> <scidb_bin_path>
 
     cmdList=[binPath,
              "build", buildType,
@@ -429,8 +456,8 @@ def pluginMakePackages(scidbEnv):
 def confirmRecordedInstallPath (scidbEnv):
     installPath = getRecordedVar (scidbEnv.build_path,"CMAKE_INSTALL_PREFIX")
     if installPath != scidbEnv.install_path:
-        raise Exception("Inconsistent install path: recorded by setup=%s vs default/environment=%s" %
-                        (installPath, scidbEnv.install_path))
+        raise RuntimeError("Inconsistent install path: recorded by setup=%s vs default/environment=%s" %
+                           (installPath, scidbEnv.install_path))
 
 def getRecordedVar (buildPath, varName):
     cmakeConfFile=os.path.join(buildPath,"CMakeCache.txt")
@@ -505,7 +532,6 @@ def generateConfigFile(scidbEnv, db_name, host, port, data_path, instance_num, n
     print >>fd, "[%s]"            %(db_name)
     print >>fd, "server-0=%s,%d"  %(host,instance_num-1)
     print >>fd, "db_user=%s"      %(db_name)
-    print >>fd, "db_passwd=%s"    %(db_name)
     print >>fd, "install_root=%s" %(scidbEnv.install_path)
     print >>fd, "pluginsdir=%s"   %(os.path.join(scidbEnv.install_path,"lib/scidb/plugins"))
     print >>fd, "logconf=%s"      %(os.path.join(scidbEnv.install_path,"share/scidb/log1.properties"))
@@ -516,30 +542,94 @@ def generateConfigFile(scidbEnv, db_name, host, port, data_path, instance_num, n
         print >>fd, "no-watchdog=true"
     if instance_num > 1:
         print >>fd, "redundancy=1"
+
+    # Note:  you must execute "./run.py stop" and then "./run.py start" after changing
+    # this setting if you want it to take effect.
+    print >>fd, "# \"trust\" - anyone can connect without a password "
+    print >>fd, "#\"password\" - user supplies a password that goes to coordinator as free text - username & password are stored in SciDB."
+    print >>fd, "security=trust"
     fd.close()
 
 def getConfigFile(scidbEnv):
     return os.path.join(scidbEnv.install_path,"etc","config.ini")
 
 def getDataPath(configFile, dbName):
-    configOpts=parseOptions(configFile, dbName)
+    configOpts=parseConfig(configFile, dbName)
     return str(configOpts["base-path"])
 
 def getCoordHost(configFile, dbName):
-    configOpts=parseOptions(configFile, dbName)
+    configOpts=parseConfig(configFile, dbName)
     return str(configOpts["server-0"]).split(",")[0]
 
 def getCoordPort(configFile, dbName):
-    configOpts=parseOptions(configFile, dbName)
+    configOpts=parseConfig(configFile, dbName)
     return str(configOpts["base-port"])
 
 def getDBUser(configFile, dbName):
-    configOpts=parseOptions(configFile, dbName)
+    configOpts=parseConfig(configFile, dbName)
     return str(configOpts["db_user"])
 
-def getDBPasswd(configFile, dbName):
-    configOpts=parseOptions(configFile, dbName)
-    return str(configOpts["db_passwd"])
+def getDBPort(configFile, dbName):
+    configOpts=parseConfig(configFile, dbName)
+    try:
+        return str(configOpts["db-port"])
+    except KeyError:
+        return None
+
+def getDBPassword(scidbEnv, dbname, dbuser):
+    # At last we know the source path etc. and can import the PgpassUpdater.
+    # Since run.py itself is not installed, we have to jump through this hoop.
+    imported = False
+    for place in (None,                 # First, try without hacking sys.path
+                  os.sep.join((scidbEnv.build_path, "bin")),
+                  os.sep.join((scidbEnv.source_path, "utils")),
+                  os.sep.join((scidbEnv.install_path, "bin"))):
+        if place is not None:
+            if place in sys.path:
+                continue
+            printDebug("Appending", place, "to sys.path")
+            sys.path.append(place)
+        try:
+            from scidblib.pgpass_updater import (
+                PgpassUpdater, PgpassError, I_PASS)
+            from scidblib.util import getVerifiedPassword
+        except ImportError as e:
+            printDebug("Delayed import failed:", e)
+        else:
+            printDebug("Delayed import succeeded")
+            imported = True
+            break
+    pup = None
+    config = getConfigFile(scidbEnv)
+    dbhost = getCoordHost(config, dbname)
+    dbport = getDBPort(config, dbname)
+    if not imported:
+        printWarn("Cannot import PgpassUpdater, ignoring ~/.pgpass file")
+    else:
+        # OK, now to use it...
+        try:
+            pup = PgpassUpdater()
+        except PgpassError as e:
+            printWarn("PgpassUpdater:", e)
+        else:
+            printDebug("Checking", pup.filename(), "for",
+                       '/'.join(map(str, [dbuser, dbname, dbhost, dbport])))
+            found = pup.find(dbuser, dbname, dbhost, dbport)
+            if found:
+                return found[I_PASS]
+    # Still here?  We'll have to prompt for it.
+    if imported:
+        dbpass = getVerifiedPassword(
+            "Enter password for db_user '{0}' [{0}]: ".format(dbuser))
+    else:
+        dbpass = getpass.getpass(
+            "Enter password for db_user '{0}' [{0}]: ".format(dbuser))
+    if not dbpass:
+        dbpass = dbuser
+    if pup and confirm("Update %s?" % pup.filename(), resp=True):
+        pup.update(dbuser, dbpass, dbname, dbhost, dbport)
+        pup.write_file()
+    return dbpass
 
 def removeAlternatives(scidbEnv):
     # remove the local alternatives information
@@ -548,6 +638,7 @@ def removeAlternatives(scidbEnv):
     rm_rf(altdir, scidbEnv.args.force, throw=False)
 
 def install(scidbEnv):
+    scidbEnv.set_install(True)
     configFile = getConfigFile(scidbEnv)
 
     if os.access(configFile, os.R_OK):
@@ -623,14 +714,17 @@ def install(scidbEnv):
 
     # Create PG user/role
 
-    cmdList=[ "sudo","-u", pg_user, os.path.join(scidbEnv.install_path,"bin/scidb.py"),
-              "init_syscat", db_name,
+    cmdList=[ "sudo","-u", pg_user, scidbEnv.scidb_py_path(),
+              "init-syscat",
+              '--db-password', getDBPassword(scidbEnv, db_name,
+                                             getDBUser(configFile, db_name)),
+              db_name,
               os.path.join(scidbEnv.install_path,"etc/config.ini")]
     ret = executeIt(cmdList)
 
     # Initialize SciDB
 
-    cmdList=[ os.path.join(scidbEnv.install_path,"bin/scidb.py"),
+    cmdList=[ scidbEnv.scidb_py_path(),
               "initall-force", db_name, os.path.join(scidbEnv.install_path,"etc/config.ini")]
     ret = executeIt(cmdList)
 
@@ -639,14 +733,15 @@ def install(scidbEnv):
     os.chdir(curr_dir)
 
 def pluginInstall(scidbEnv):
+    scidbEnv.set_install(True)
     pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
 
     if not os.access(pluginBuildPath, os.R_OK):
-        raise Exception("Invalid plugin %s build directory %s" % (scidbEnv.args.name, pluginBuildPath))
+        raise RuntimeError("Invalid plugin %s build directory %s" % (scidbEnv.args.name, pluginBuildPath))
 
     pluginInstallPath = os.path.join(scidbEnv.install_path,"lib","scidb","plugins")
     if not os.access(pluginInstallPath, os.R_OK):
-        raise Exception("Invalid plugin install directory %s" % (pluginInstallPath))
+        raise RuntimeError("Invalid plugin install directory %s" % (pluginInstallPath))
 
     curr_dir=os.getcwd()
 
@@ -657,19 +752,19 @@ def pluginInstall(scidbEnv):
 
 def start(scidbEnv):
     db_name=os.environ.get("SCIDB_NAME","mydb")
-    cmdList=[ os.path.join(scidbEnv.install_path,"bin/scidb.py"),
+    cmdList=[ scidbEnv.scidb_py_path(),
               "startall", db_name, os.path.join(scidbEnv.install_path,"etc/config.ini")]
     ret = executeIt(cmdList)
 
 def stop(scidbEnv):
     db_name=os.environ.get("SCIDB_NAME","mydb")
-    cmdList=[ os.path.join(scidbEnv.install_path,"bin/scidb.py"),
+    cmdList=[ scidbEnv.scidb_py_path(),
               "stopall", db_name, os.path.join(scidbEnv.install_path,"etc/config.ini")]
     ret = executeIt(cmdList)
 
 def initall(scidbEnv):
     db_name=os.environ.get("SCIDB_NAME","mydb")
-    cmdList=[ os.path.join(scidbEnv.install_path,"bin/scidb.py"),
+    cmdList=[ scidbEnv.scidb_py_path(),
               "initall", db_name, os.path.join(scidbEnv.install_path,"etc/config.ini")]
     print "initializing cluster '" + db_name + "' from " + os.path.join(scidbEnv.install_path,"etc/config.ini")
     ret = executeIt(cmdList)
@@ -701,7 +796,7 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
     coordHost = getCoordHost(configFile, db_name)
     coordPort = getCoordPort(configFile, db_name)
     dbUser    = getDBUser(configFile, db_name)
-    dbPasswd  = getDBPasswd(configFile, db_name)
+    dbPasswd  = getDBPassword(scidbEnv, db_name, dbUser)
 
     version = getScidbVersion(scidbEnv)
 
@@ -727,6 +822,7 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
              "export", "SCIDB_BUILD_PATH=%s"%scidbEnv.build_path,";",
              "export", "SCIDB_INSTALL_PATH=%s"%scidbEnv.install_path,";",
              "export", "SCIDB_SOURCE_PATH=%s"%scidbEnv.source_path,";",
+             "export", "SCIDB_CONFIG_USER=%s"%scidbEnv.cfg_user,";",
              "export", "SCIDB_DATA_PATH=%s"%dataPath, ";",
              "export", "SCIDB_DB_USER=%s"%dbUser, ";",
              "export", "SCIDB_DB_PASSWD=%s"%dbPasswd, ";",
@@ -769,14 +865,44 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
 
         skipTests = new_skip_tests
 
-    cmdList.extend(["PATH=%s:${PATH}"%(binPath),
-                    testBin,
-                    "--port=${IQUERY_PORT}",
-                    "--connect=${IQUERY_HOST}",
-                    "--scratch-dir=" + scratchDir,
-                    "--log-dir=$SCIDB_BUILD_PATH/tests/harness/testcases/log",
-                    "--skip-tests=" + skipTests,
-                    "--root-dir=" + testRootDir])
+    if (scidbEnv.args.add_disabled): # User specified list of files to add to disable.tests.
+        if (os.path.isfile(scidbEnv.args.add_disabled)):
+            with open(skipTests,'r') as fd:
+                skip_contents = fd.read()
+            with open(scidbEnv.args.add_disabled,'r') as fd:
+                add_skip = fd.read()
+            new_skip_file = skipTests + '.add'
+            with open(new_skip_file,'w') as fd:
+                fd.write(''.join([
+                    skip_contents,
+                    '\n',
+                    add_skip
+                    ]
+                    ))
+            skipTests = os.path.abspath(new_skip_file)
+        else:
+            raise RuntimeError('Bad path specified for --add-disabled option: ' + scidbEnv.args.add_disabled + '!')
+
+    if (scidbEnv.args.disabled_tests): # User specified custom disable.tests file.
+        if (os.path.isfile(scidbEnv.args.disabled_tests)):
+            skipTests = os.path.abspath(scidbEnv.args.disabled_tests)
+        else:
+            raise RuntimeError('Bad path specified for --disabled option: ' + scidbEnv.args.disabled_tests + '!')
+
+    cmdList.extend([
+        "PATH=%s:${PATH}"%(binPath),
+        testBin,
+        "--port=${IQUERY_PORT}",
+        "--connect=${IQUERY_HOST}",
+        "--scratch-dir=" + scratchDir,
+        "--log-dir=$SCIDB_BUILD_PATH/tests/harness/testcases/log",
+        "--skip-tests=" + skipTests,
+        "--root-dir=" + testRootDir])
+
+    if scidbEnv.args.user_name and scidbEnv.args.user_password:
+        cmdList.extend([
+            "--user-name="     + scidbEnv.args.user_name,
+            "--user-password=" + scidbEnv.args.user_password])
 
     if scidbEnv.args.all:
         pass  # nothing to add
@@ -785,7 +911,7 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
     elif  scidbEnv.args.suite_id:
         cmdList.append("--suite-id="+ scidbEnv.args.suite_id)
     else:
-        raise Exception("Cannot figure out which tests to run")
+        raise RuntimeError("Cannot figure out which tests to run")
 
     if scidbEnv.args.record:
         cmdList.append("--record")
@@ -807,11 +933,11 @@ def pluginTests(scidbEnv):
     pluginBuildPath=getPluginBuildPath(scidbEnv.build_path, scidbEnv.args.name)
 
     if not os.access(pluginBuildPath, os.R_OK):
-        raise Exception("Invalid plugin %s build directory %s" % (scidbEnv.args.name, pluginBuildPath))
+        raise RuntimeError("Invalid plugin %s build directory %s" % (scidbEnv.args.name, pluginBuildPath))
 
     pluginInstallPath = os.path.join(scidbEnv.install_path,"lib","scidb","plugins")
     if not os.access(pluginInstallPath, os.R_OK):
-        raise Exception("Invalid plugin install directory %s" % (pluginInstallPath))
+        raise RuntimeError("Invalid plugin install directory %s" % (pluginInstallPath))
 
     plugin_tests=os.environ.get("SCIDB_PLUGIN_TESTS","test")
 
@@ -838,46 +964,62 @@ def pluginTests(scidbEnv):
             commands
             )
 
-# Environment setup (variables with '_' are affected by environment)
-
 #XXX TODO: support optional CMAKE -D
 
 class SciDBEnv:
-    def __init__(self, bin_path, source_path, stage_path, build_path, install_path, args):
-        self.bin_path = bin_path
-        self.source_path = source_path
-        self.stage_path = stage_path
-        self.build_path = build_path
-        self.install_path = install_path
-        self.args = args
+    """A bunch of paths, and a place to stash parsed arguments."""
+    def __init__(self, argv, parsed_args=None):
+        self.bin_path = os.path.abspath(os.path.dirname(argv[0]))
+        self.source_path = self.bin_path
+        self.stage_path = os.path.join(self.source_path, "stage")
+        self.build_path = os.environ.get("SCIDB_BUILD_PATH",
+                                         os.path.join(self.stage_path, "build"))
+        self.install_path = os.environ.get("SCIDB_INSTALL_PATH",
+                                           os.path.join(self.stage_path, "install"))
+        self.cfg_user = cfg_user=os.environ.get("SCIDB_CONFIG_USER", '')
+        self.args = parsed_args
+        self.installing = False
+        printDebug("Source path:", self.source_path)
+        printDebug("Build path:", self.build_path)
+        printDebug("Install path:", self.install_path)
+        printDebug("Cfg User: ", self.cfg_user)
 
-def getScidbEnv(args):
-    bin_path=os.path.abspath(os.path.dirname(sys.argv[0]))
-    source_path=bin_path
-    stage_path=os.path.join(source_path, "stage")
-    build_path=os.path.join(stage_path, "build")
-    install_path=os.path.join(stage_path, "install")
+    def set_install(self, x):
+        self.installing = x
 
-    printDebug("Source path: "+source_path)
-
-    build_path=os.environ.get("SCIDB_BUILD_PATH", build_path)
-    printDebug("Build path: "+build_path)
-
-    install_path=os.environ.get("SCIDB_INSTALL_PATH",install_path)
-    printDebug("Install path: "+install_path)
-
-    return SciDBEnv(bin_path, source_path, stage_path, build_path, install_path, args)
+    def scidb_py_path(self):
+        """Return the appropriate path to the scidb.py executable."""
+        if 1:
+            return os.sep.join((self.install_path, "bin", "scidb.py"))
+        else:
+            # This was a nice idea, BUT... insanely, scidb.py insists
+            # on being invoked by its absolute pathname, and relies on
+            # that for certain verbs (service_add, service_remove,
+            # version).  That's really bad programming practice IMO
+            # but no time to fix it at the moment.
+            if self.installing:
+                # Don't use installed script when installing, it may be stale!
+                return os.sep.join((self.build_path, "bin", "scidb.py"))
+            else:
+                return os.sep.join((self.install_path, "bin", "scidb.py"))
 
 # The main entry routine that does command line parsing
-def main():
-    scidbEnv=getScidbEnv(None)
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
+    global _PGM
+    _PGM = "%s:" % os.path.basename(argv[0]) # colon for easy use by print
+
+    scidbEnv = SciDBEnv(argv)
     parser = argparse.ArgumentParser()
     parser.add_argument('-v','--verbose', action='store_true', help="display verbose output")
-    subparsers = parser.add_subparsers(dest='subparser_name',
-                                       title="Environment variables affecting all subcommands:"+
-                                       "\nSCIDB_BUILD_PATH - build products location, default = %s"%(os.path.join(scidbEnv.bin_path,"stage","build"))+
-                                       "\nSCIDB_INSTALL_PATH - SciDB installation directory, default = %s\n\nSubcommands"%(os.path.join(scidbEnv.bin_path,"stage","install")),
-                                       description="Use -h/--help with a particular subcommand from the list below to learn its usage")
+    subparsers = parser.add_subparsers(
+        dest='subparser_name',
+        title="Environment variables affecting all subcommands:"+
+        "\nSCIDB_BUILD_PATH - build products location, default = %s"%(os.path.join(scidbEnv.bin_path,"stage","build"))+
+        "\nSCIDB_INSTALL_PATH - SciDB installation directory, default = %s\n\nSubcommands"%(os.path.join(scidbEnv.bin_path,"stage","install")),
+        description="Use -h/--help with a particular subcommand from the list below to learn its usage")
 
 
     pluginBuildPathStr = "$SCIDB_BUILD_PATH/external_plugins/<name>"
@@ -886,7 +1028,7 @@ def main():
     """%(prog)s [-h | options]\n
 Creates a new build directory for an out-of-tree build and runs cmake there.
 Environment variables:
-SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
+SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release | Valgrind], default = Debug""")
     subParser.add_argument('-f','--force', action='store_true', help=
                            "automatically confirm any old state/directory cleanup")
     subParser.set_defaults(func=setup)
@@ -903,7 +1045,7 @@ SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
 "\n5. Running \'./deployment/deploy.sh build $SCIDB_BUILD_TYPE <package_path> <scidb_bin_path> %s\' in the directory specified by --path must generate installable plugin packages. See \'plugin_make_packages --help\'"%(scidbEnv.bin_path)+
 "\n6. \'scidbtestharness --rootdir=PATH/test/tescases --scratchDir=$SCIDB_BUILD_DIR/tests/harness/testcases ...\' must be runnable in %s."%(pluginBuildPathStr+"/$SCIDB_PLUGIN_TESTS")+
 """\nEnvironment variables:
-SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release], default = Debug""")
+SCIDB_BUILD_TYPE - [RelWithDebInfo | Debug | Release | Valgrind], default = Debug""")
     subParser.add_argument('-n', '--name',  required=True,
                            help= "plugin name")
     subParser.add_argument('-p','--path', required=True,
@@ -1057,6 +1199,10 @@ SCIDB_NAME - the name of the SciDB database to be tested, default = mydb"""+
     subParser.add_argument('--record', action='store_true', help="record the expected output")
     subParser.add_argument('-c', '--cutoff', default=-1.0, type=float, help="threshold for the running time of the test: tests whose running time is greater will be skipped.")
     subParser.add_argument('--timing-file', default='', help="path to the file containing test names and their running times (obtained from the harness tests log).")
+    subParser.add_argument('--add-disabled', default='', help="path to the file containing test names to add to the end of disable.tests.")
+    subParser.add_argument('--disabled-tests', default='', help="path to the custom disable.tests file (will be used in place of the default one).")
+    subParser.add_argument('--user-name', default='', help="specify the user-name (should also specify passowrd)")
+    subParser.add_argument('--user-password', default='', help="specify the user password")
     subParser.set_defaults(func=tests)
 
 
@@ -1080,8 +1226,11 @@ SCIDB_PLUGIN_TESTS - the subdirectory wrt the plugin build path where the the sc
     subParser.add_argument('--record', action='store_true', help="record the expected output")
     subParser.add_argument('-c', '--cutoff', default=-1.0, type=float, help="threshold for the running time of the test: tests whose running time is greater will be skipped.")
     subParser.add_argument('--timing-file', default='', help="path to the file containing test names and their running times (obtained from the harness tests log).")
+    subParser.add_argument('--add-disabled', default='', help="path to the file containing test names to add to the end of disable.tests.")
+    subParser.add_argument('--disabled-tests', default='', help="path to the custom disable.tests file (will be used in place of the default one).")
+    subParser.add_argument('--user-name', default='', help="specify the user-name (should also specify passowrd)")
+    subParser.add_argument('--user-password', default='', help="specify the user password")
     subParser.set_defaults(func=pluginTests)
-
 
     subParser = subparsers.add_parser('cleanup', usage=
     """%(prog)s [-h | options]\n
@@ -1096,33 +1245,32 @@ It will execute stop() if config.ini is present in the install directory.""")
  Print SciDB version (in short form)""")
     subParser.set_defaults(func=version)
 
-    args = parser.parse_args()
-    scidbEnv.args=args
+    args = parser.parse_args(argv[1:])
+    scidbEnv.args = args
 
     global _DBG
+    _DBG = os.environ.get("SCIDB_DBG", False)
     if args.verbose:
        _DBG=args.verbose
 
     printDebug("cmd="+args.subparser_name)
 
-    curr_dir=os.getcwd()
     try:
-        if args.subparser_name != "setup" and args.subparser_name != "cleanup" and args.subparser_name != "forceStop" :
+        if args.subparser_name not in ("setup", "cleanup", "forceStop"):
             confirmRecordedInstallPath(scidbEnv)
         args.func(scidbEnv)
-    except Exception, e:
-        printError("Command %s failed: %s\n"% (args.subparser_name,e) +
-                   "Make sure commands setup,make,install,start "+
-                   "are performed (in that order) before stop,stopForce,tests" )
+    except AppError as e:
+        printError(e)
+        return 1
+    except Exception as e:
+        printError("Command", args.subparser_name, "failed:", e)
+        printError(' '.join(("Make sure commands setup,make,install,start are",
+                             "performed (in that order) before stop,stopForce,tests")))
         if _DBG:
             traceback.print_exc()
-        sys.stderr.flush()
-        os.chdir(curr_dir)
-        sys.exit(1)
-    os.chdir(curr_dir)
-    sys.exit(0)
+        return 1
+    else:
+        return 0
 
-### MAIN
 if __name__ == "__main__":
-   main()
-### end MAIN
+    sys.exit(main())

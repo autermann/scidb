@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,26 +36,26 @@
 namespace scidb
 {
     using namespace boost;
-    
+
     //
     // Between chunk methods
     //
-    boost::shared_ptr<ConstChunkIterator> BetweenChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> BetweenChunk::getConstIterator(int iterationMode) const
     {
         AttributeDesc const& attr = getAttributeDesc();
         iterationMode &= ~ChunkIterator::INTENDED_TILE_MODE;
-        return boost::shared_ptr<ConstChunkIterator>(
+        return std::shared_ptr<ConstChunkIterator>(
             attr.isEmptyIndicator()
             ? (attrID >= array.getInputArray()->getArrayDesc().getAttributes().size())
                ? fullyInside
-                  ? (ConstChunkIterator*)new EmptyBitmapBetweenChunkIterator(*this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)          
+                  ? (ConstChunkIterator*)new EmptyBitmapBetweenChunkIterator(*this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)
                   : (ConstChunkIterator*)new NewBitmapBetweenChunkIterator(*this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)
                : fullyInside
-                  ? (ConstChunkIterator*)new DelegateChunkIterator(this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)                                
-                  : (ConstChunkIterator*)new ExistedBitmapBetweenChunkIterator(*this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)        
-            : fullyInside 
-                ? (ConstChunkIterator*)new DelegateChunkIterator(this, iterationMode)          
-                : (ConstChunkIterator*)new BetweenChunkIterator(*this, iterationMode));            
+                  ? (ConstChunkIterator*)new DelegateChunkIterator(this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)
+                  : (ConstChunkIterator*)new ExistedBitmapBetweenChunkIterator(*this, iterationMode & ~ConstChunkIterator::IGNORE_DEFAULT_VALUES)
+            : fullyInside
+                ? (ConstChunkIterator*)new DelegateChunkIterator(this, iterationMode)
+                : (ConstChunkIterator*)new BetweenChunkIterator(*this, iterationMode));
     }
 
     BetweenChunk::BetweenChunk(BetweenArray const& arr, DelegateArrayIterator const& iterator, AttributeID attrID)
@@ -67,7 +67,7 @@ namespace scidb
     {
         tileMode = false;
     }
-     
+
     void BetweenChunk::setInputChunk(ConstChunk const& inputChunk)
     {
         DelegateChunk::setInputChunk(inputChunk);
@@ -82,25 +82,27 @@ namespace scidb
         fullyOutside = !array._spatialRangesPtr->findOneThatIntersects(myRange, dummy);
 
         isClone = fullyInside && attrID < array.getInputArray()->getArrayDesc().getAttributes().size();
-        if (emptyBitmapIterator) { 
+        if (emptyBitmapIterator) {
             if (!emptyBitmapIterator->setPosition(inputChunk.getFirstPosition(false)))
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
         }
     }
 
-    Value& BetweenChunkIterator::getItem()
+    Value const& BetweenChunkIterator::getItem()
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        Value& value = inputIterator->getItem();
-        return value;
+        }
+        return inputIterator->getItem();
     }
 
-    bool BetweenChunkIterator::isEmpty()
+    bool BetweenChunkIterator::isEmpty() const
     {
-        if (!hasCurrent)
+        if (!hasCurrent) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        return inputIterator->isEmpty() || !array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges);
+        }
+        return inputIterator->isEmpty() ||
+            !array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges);
     }
 
     bool BetweenChunkIterator::end()
@@ -126,13 +128,13 @@ namespace scidb
                 }
             }
             hasCurrent = false;
-        } else { 
+        } else {
             ++(*inputIterator);
             hasCurrent = !inputIterator->end();
         }
     }
 
-    Coordinates const& BetweenChunkIterator::getPosition() 
+    Coordinates const& BetweenChunkIterator::getPosition()
     {
         return _ignoreEmptyCells ? currPos : inputIterator->getPosition();
     }
@@ -141,14 +143,18 @@ namespace scidb
     {
         if (_ignoreEmptyCells) {
             if (array._spatialRangesPtr->findOneThatContains(pos, _hintForSpatialRanges)) {
-                currPos = pos;
-                hasCurrent = true;
-                return true;
+                hasCurrent = inputIterator->setPosition(pos);
+                if (hasCurrent) {
+                    currPos = pos;
+                }
+                return hasCurrent;
             }
             hasCurrent = false;
             return false;
         }
-        return hasCurrent = inputIterator->setPosition(pos);
+
+        hasCurrent = inputIterator->setPosition(pos);
+        return hasCurrent;
     }
 
     void BetweenChunkIterator::reset()
@@ -169,7 +175,7 @@ namespace scidb
             else {
                 hasCurrent = false;
             }
-        } else { 
+        } else {
             inputIterator->reset();
             hasCurrent = !inputIterator->end();
         }
@@ -197,8 +203,8 @@ namespace scidb
     //
     // Exited bitmap chunk iterator methods
     //
-     Value& ExistedBitmapBetweenChunkIterator::getItem()
-    { 
+    Value const& ExistedBitmapBetweenChunkIterator::getItem()
+    {
         _value.setBool(
                 inputIterator->getItem().getBool() &&
                 array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges));
@@ -210,17 +216,17 @@ namespace scidb
       _value(TypeLibrary::getType(TID_BOOL))
     {
     }
-    
+
     //
     // New bitmap chunk iterator methods
     //
-    Value& NewBitmapBetweenChunkIterator::getItem()
-    { 
+    Value const& NewBitmapBetweenChunkIterator::getItem()
+    {
         _value.setBool(array._spatialRangesPtr->findOneThatContains(currPos, _hintForSpatialRanges));
         return _value;
     }
 
-    NewBitmapBetweenChunkIterator::NewBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode) 
+    NewBitmapBetweenChunkIterator::NewBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode)
     : BetweenChunkIterator(chunk, iterationMode),
       _value(TypeLibrary::getType(TID_BOOL))
     {
@@ -229,17 +235,17 @@ namespace scidb
     //
     // Empty bitmap chunk iterator methods
     //
-    Value& EmptyBitmapBetweenChunkIterator::getItem()
-    { 
+    Value const& EmptyBitmapBetweenChunkIterator::getItem()
+    {
         return _value;
     }
 
-    bool EmptyBitmapBetweenChunkIterator::isEmpty()
+    bool EmptyBitmapBetweenChunkIterator::isEmpty() const
     {
         return false;
     }
 
-    EmptyBitmapBetweenChunkIterator::EmptyBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode) 
+    EmptyBitmapBetweenChunkIterator::EmptyBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode)
     : NewBitmapBetweenChunkIterator(chunk, iterationMode)
     {
         _value.setBool(true);
@@ -250,11 +256,11 @@ namespace scidb
     //
     BetweenArrayIterator::BetweenArrayIterator(BetweenArray const& arr, AttributeID attrID, AttributeID inputAttrID)
     : DelegateArrayIterator(arr, attrID, arr.inputArray->getConstIterator(inputAttrID)),
-      array(arr), 
+      array(arr),
       pos(arr.getArrayDesc().getDimensions().size()),
       _hintForSpatialRanges(0)
     {
-        _spatialRangesChunkPosIteratorPtr = shared_ptr<SpatialRangesChunkPosIterator>(
+        _spatialRangesChunkPosIteratorPtr = std::shared_ptr<SpatialRangesChunkPosIterator>(
                 new SpatialRangesChunkPosIterator(array._spatialRangesPtr, array.getArrayDesc()));
         reset();
     }
@@ -377,7 +383,7 @@ namespace scidb
 
         advanceToNextChunkInRange();
     }
-    
+
     void BetweenArrayIterator::reset()
     {
         chunkInitialized = false;
@@ -421,12 +427,12 @@ namespace scidb
 
         advanceToNextChunkInRange();
     }
-    
+
     //
     // Between array methods
     //
-    BetweenArray::BetweenArray(ArrayDesc const& array, SpatialRangesPtr const& spatialRangesPtr, boost::shared_ptr<Array> const& input)
-    : DelegateArray(array, input), 
+    BetweenArray::BetweenArray(ArrayDesc const& array, SpatialRangesPtr const& spatialRangesPtr, std::shared_ptr<Array> const& input)
+    : DelegateArray(array, input),
       _spatialRangesPtr(spatialRangesPtr)
     {
         // Copy _spatialRangesPtr to extendedSpatialRangesPtr, but reducing low by (interval-1) to cover chunkPos.
@@ -438,7 +444,7 @@ namespace scidb
             _extendedSpatialRangesPtr->_ranges.push_back(SpatialRange(newLow, _spatialRangesPtr->_ranges[i]._high));
         }
     }
-    
+
     DelegateArrayIterator* BetweenArray::createArrayIterator(AttributeID attrID) const
     {
         AttributeID inputAttrID = attrID;
@@ -450,6 +456,6 @@ namespace scidb
 
     DelegateChunk* BetweenArray::createChunk(DelegateArrayIterator const* iterator, AttributeID attrID) const
     {
-        return new BetweenChunk(*this, *iterator, attrID);       
+        return new BetweenChunk(*this, *iterator, attrID);
     }
 }

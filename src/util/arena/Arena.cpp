@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -483,22 +483,14 @@ void Arena::free(void* payload,size_t size)
  *  within a header block -  the subsequent call to 'malloc()' would certainly
  *  have failed in this event were we to have proceeded. This almost certainly
  *  indicates some kind of error in the caller's arithmetic.
- *
- *  The exception we throw can be caught either as a std::bad_alloc or else as
- *  a SystemException.
  */
 void Arena::overflowed() const
 {
-    struct overflowed : std::bad_alloc, SystemException
+    struct overflowed : SystemException
     {
         overflowed(const Arena& a)
          : SystemException(SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY,SCIDB_LE_ARENA_OVERFLOWED) << a)
         {}
-
-        const char* what() const throw()
-        {
-            return SystemException::what();              // Use scidb message
-        }
     };
 
     throw overflowed(*this);                             // Throw an exception
@@ -509,8 +501,8 @@ void Arena::overflowed() const
  *  allocate 'size' bytes of memory and that this exceeds the arena's internal
  *  limit.
  *
- *  The exception we throw can be caught either as an arena::Exhausted or else
- *  as a SystemException.
+ *  The exception we throw can be caught either as an arena::Exhausted or as a
+ *  SystemException. Or even, for that matter, as a std::exception.
  */
 void Arena::exhausted(size_t size) const
 {
@@ -519,11 +511,6 @@ void Arena::exhausted(size_t size) const
         exhausted(const Arena& a,size_t n)
          : SystemException(SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY,SCIDB_LE_ARENA_EXHAUSTED) << a << bytes_t(n))
         {}
-
-        const char* what() const throw()
-        {
-            return SystemException::what();              // Use scidb message
-        }
     };
 
     throw exhausted(*this,size);                         // Throw an exception

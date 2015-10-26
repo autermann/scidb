@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
 #include <array/Metadata.h>
 #include <system/Cluster.h>
 #include <query/Query.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
 #include <log4cxx/logger.h>
@@ -55,21 +55,21 @@ public:
     /* Allocate power-of-two sized blocks in the datastore from size 2^baselow
        up to 2^basehigh, and record the offsets in the blockmap
      */
-    void allocatePowerOfTwos(uint32_t baselow, 
-                             uint32_t basehigh, 
-                             shared_ptr<DataStore> ds, 
+    void allocatePowerOfTwos(uint32_t baselow,
+                             uint32_t basehigh,
+                             std::shared_ptr<DataStore> ds,
                              map<size_t, off_t>& blockmap)
     {
         /* Verify params
          */
         if (basehigh < baselow)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "invalid argument to allocate";
         }
         if (!ds)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "invalid datastore";
         }
 
@@ -83,15 +83,15 @@ public:
             blockmap[size] = ds->allocateSpace(size, alloc);
             if (alloc != size*2)
             {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                     << "UnitTestDataStorePhysical" << "unexpected allocation";
             }
         }
     }
- 
+
     /* Test the basic functionality of the DataStore class
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         /* Test:
 
@@ -112,13 +112,13 @@ public:
 
         /* 1)
          */
-        shared_ptr<DataStore> ds = 
+        std::shared_ptr<DataStore> ds =
             StorageManager::getInstance().getDataStores().getDataStore(
                 static_cast<DataStore::Guid>(-1));
 
         if (!ds)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "failed to open data store";
         }
 
@@ -127,11 +127,10 @@ public:
         map<size_t, off_t> blockmap;
         off_t    size = 0;
         blkcnt_t blocks = 0;
-        off_t    reservedbytes = 0;
         off_t    freebytes = 0;
-        
+
         allocatePowerOfTwos(8, 16, ds, blockmap);
-        ds->getSizes(size, blocks, reservedbytes, freebytes);
+        ds->getSizes(size, blocks, freebytes);
 
         /* 3)
          */
@@ -146,16 +145,16 @@ public:
          */
         off_t    size1 = 0;
         blkcnt_t blocks1 = 0;
-        off_t    reservedbytes1 = 0;
         off_t    freebytes1 = 0;
-        
-        ds->getSizes(size1, blocks1, reservedbytes1, freebytes1);
-        if (size1 != size || blocks1 != blocks || 
-            reservedbytes1 + freebytes1 != reservedbytes + freebytes)
+
+        ds->getSizes(size1, blocks1, freebytes1);
+        if (size1 != size || blocks1 != blocks ||
+            freebytes1 != size1)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
-                << "UnitTestDataStorePhysical" << "incorrect number of bytes reported"
-                << " reserve " << reservedbytes1 << " free " << freebytes1;
+            stringstream failstring;
+            failstring << "incorrect number of free bytes reported: " << freebytes1;
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
+                << "UnitTestDataStorePhysical" << failstring.str();
         }
 
 
@@ -170,7 +169,7 @@ public:
 
         if (!ds)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "failed to open data store 2";
         }
 
@@ -178,14 +177,13 @@ public:
          */
         off_t    size2 = 0;
         blkcnt_t blocks2 = 0;
-        off_t    reservedbytes2 = 0;
         off_t    freebytes2 = 0;
-        
+
         allocatePowerOfTwos(8, 16, ds, blockmap);
-        ds->getSizes(size2, blocks2, reservedbytes2, freebytes2);
-        if (size2 != size || blocks2 != blocks)
+        ds->getSizes(size2, blocks2, freebytes2);
+        if (size2 != size || blocks2 != blocks || freebytes2 != freebytes)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "unexpected change in store size";
         }
 
@@ -194,7 +192,7 @@ public:
         for (it = blockmap.begin(); it != blockmap.end(); ++it)
         {
             char* buf = new char[it->first];
-            
+
             for (uint32_t* p = reinterpret_cast<uint32_t*>(buf);
                  p < reinterpret_cast<uint32_t*>(buf + it->first);
                  ++p)
@@ -210,7 +208,7 @@ public:
         for (it = blockmap.begin(); it != blockmap.end(); ++it)
         {
             char* buf = new char[it->first];
-            
+
             ds->readData(it->second, buf, it->first);
             for (uint32_t* p = reinterpret_cast<uint32_t*>(buf);
                  p < reinterpret_cast<uint32_t*>(buf + it->first);
@@ -218,7 +216,7 @@ public:
             {
                 if (*p != it->first)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                         << "UnitTestDataStorePhysical" << "mismatch in data read from store";
                 }
             }
@@ -236,7 +234,7 @@ public:
                 static_cast<DataStore::Guid>(-1));
         if (!ds)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "failed to open data store2";
         }
 
@@ -251,21 +249,21 @@ public:
         my_off = ds->allocateSpace(8 * KiB, my_alloc);
         if (my_alloc != 16 * KiB)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                 << "UnitTestDataStorePhysical" << "unexpected allocation";
         }
         ds->freeChunk(my_off, 16 * KiB);
         ds->freeChunk(my_off, 8 * KiB);
         ds->freeChunk(my_off + 8 * KiB, 4 * KiB);
         ds->verifyFreelist();
- 
+
         /* 13)
          */
         StorageManager::getInstance().getDataStores().closeDataStore(
             static_cast<DataStore::Guid>(-1), true);
         ds.reset();
 
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 
 };

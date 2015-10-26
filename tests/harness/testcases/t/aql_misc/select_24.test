@@ -28,7 +28,6 @@
 --aql select name, type_id, nullable from attributes(B)
 --aql select * from aggregate(versions(B),count(*))
 --aql select version_id from versions(B)
---aql select * from allversions(B)
 --aql select * from help()
 --aql rename array B to A
 --aql select * from dimensions(A)

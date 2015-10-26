@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,36 +35,33 @@
 #define LOCK_MANAGER_H_
 
 #include <pthread.h>
-#include "system/Exceptions.h"
 #include <map>
 #include <string>
-#include "RWLock.h"
-#include "Singleton.h"
 
+#include <system/Exceptions.h>
+#include <util/RWLock.h>
+#include <util/Singleton.h>
 
 namespace scidb
 {
 
-    using namespace std;
-    
-    class LockManager : public Singleton<LockManager>
-    {
-      private:
-        Mutex mutex;
-        map< string, shared_ptr<RWLock> > locks;
+class LockManager : public Singleton<LockManager>
+{
+private:
+    Mutex mutex;
+    std::map<std::string, std::shared_ptr<RWLock> > locks;
 
-      public:
-        shared_ptr<RWLock> getLock(string const& arrayName) 
-        {
-            ScopedMutexLock cs(mutex);
-            shared_ptr<RWLock> lock = locks[arrayName];
-            if (!lock) { 
-                locks[arrayName] = lock = shared_ptr<RWLock>(new RWLock());
-            }
-            return lock;
+public:
+    std::shared_ptr<RWLock> getLock(std::string const& arrayName)
+    {
+        ScopedMutexLock cs(mutex);
+        std::shared_ptr<RWLock> lock = locks[arrayName];
+        if (!lock) {
+            locks[arrayName] = lock = std::shared_ptr<RWLock>(new RWLock());
         }
-    };
+        return lock;
+    }
+};
 
 } // namespace
-
 #endif

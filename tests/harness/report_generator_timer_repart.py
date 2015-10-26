@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -37,17 +37,17 @@ def parse_file(f):
         line = l.replace(' ', '').replace('ms', '').replace('\n', '').replace('\r', '')
         key_and_value = line.split(':')
         if len(key_and_value) != 2:
-            raise ValueError("Can not parse string '%s' in %s line in file %s'" % 
+            raise ValueError("Can not parse string '%s' in %s line in file %s'" %
                              (l, n, f.name))
         key, value = tuple(key_and_value)
         if key in TIMER_NAMES:
             if key in d:
-                raise ValueError("Duplicate key %s in %s line in file '%s'" % 
+                raise ValueError("Duplicate key %s in %s line in file '%s'" %
                                  (key, n, f.name))
             d[key] = float(int(value))/1000
         return d
     return reduce(parse_line, enumerate(f.readlines()), {})
-            
+
 def process_file(d, n):
     if n in d:
         raise ValueError("File '%s' already processed" % n)
@@ -77,14 +77,14 @@ def process_dir(d, n):
         os.chdir(cwd)
 
 def print_result(d):
-    result_names = list(chain(*[[name, 'deviance(%s)' % name] 
+    result_names = list(chain(*[[name, 'deviance(%s)' % name]
                                 for name in TEST_NAMES]))
-    compare_names = list('compare(%s)' % name 
-                         for name in TEST_NAMES 
+    compare_names = list('compare(%s)' % name
+                         for name in TEST_NAMES
                          if name != COMPARE_TEST_NAME)
     column_names = ['case'] + result_names + compare_names
     print '\t'.join(column_names)
-    case_names = list(set(chain(*[result.iterkeys() 
+    case_names = list(set(chain(*[result.iterkeys()
                                   for result in d.itervalues()])))
     case_names.sort()
     for case_name in case_names:
@@ -104,13 +104,13 @@ def print_result(d):
             if test_name == COMPARE_TEST_NAME:
                 continue
             if case_name in d[test_name]:
-                compare = align(average[COMPARE_TEST_NAME] / 
+                compare = align(average[COMPARE_TEST_NAME] /
                                 average[test_name])
                 result.append('%sx' % compare)
             else:
                 result.append('N/A')
         print '\t'.join(result)
-        
+
 
 if __name__ == "__main__":
     print_result(reduce(process_dir, TEST_NAMES, {}))

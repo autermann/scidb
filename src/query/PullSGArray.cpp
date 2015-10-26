@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,11 +26,8 @@
  *
  * @brief mplementation of an array that returns redistributed chunks by the means of pull-based scater/gather
  */
-#include <boost/unordered_set.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <unordered_set>
+#include <memory>
 
 #include <system/Config.h>
 #include <system/SciDBConfigOptions.h>
@@ -40,6 +37,7 @@
 
 #include <query/Operator.h>
 #include <query/PullSGArray.h>
+#include <query/PullSGArrayUtil.h>
 #include <query/PullSGContext.h>
 #include <query/QueryProcessor.h>
 #include <system/Exceptions.h>
@@ -72,7 +70,7 @@ void logMatrix(std::vector<std::vector<T> >& matrix, const std::string& prefix)
 }
 
 PullSGArray::PullSGArray(const ArrayDesc& arrayDesc,
-                         const boost::shared_ptr<Query>& query,
+                         const std::shared_ptr<Query>& query,
                          bool enforceDataIntegrity,
                          uint32_t chunkPrefetchPerAttribute)
   : MultiStreamArray(query->getInstancesCount(), query->getInstanceID(), arrayDesc, enforceDataIntegrity, query),
@@ -183,7 +181,7 @@ PullSGArray::requestNextChunk(size_t stream, AttributeID attId, bool positionOnl
         }
 
         if (!streamState.isEmpty()) {
-            shared_ptr<scidb_msg::Chunk> chunkRecord =
+            std::shared_ptr<scidb_msg::Chunk> chunkRecord =
                streamState.head()->getRecord<scidb_msg::Chunk>();
             if (chunkRecord->eof()) {
                 // nothing to request
@@ -266,8 +264,8 @@ PullSGArray::requestNextChunk(size_t stream, AttributeID attId, bool positionOnl
                   << ", stream=" << stream
                   << ", prefetch=" << prefetchSize);
 
-    boost::shared_ptr<MessageDesc> fetchDesc = boost::make_shared<MessageDesc>(mtFetch);
-    boost::shared_ptr<scidb_msg::Fetch> fetchRecord = fetchDesc->getRecord<scidb_msg::Fetch>();
+    std::shared_ptr<MessageDesc> fetchDesc = std::make_shared<MessageDesc>(mtFetch);
+    std::shared_ptr<scidb_msg::Fetch> fetchRecord = fetchDesc->getRecord<scidb_msg::Fetch>();
     fetchDesc->setQueryID(_queryId);
     assert(fetchId != uint64_t(~0));
     fetchRecord->set_fetch_id(fetchId);
@@ -279,7 +277,7 @@ PullSGArray::requestNextChunk(size_t stream, AttributeID attId, bool positionOnl
     const InstanceID logicalId = stream;
     if (getLocalStream() == logicalId) {
         // local
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         NetworkManager::getInstance()->sendLocal(query, fetchDesc);
     } else {
         // remote
@@ -288,14 +286,14 @@ PullSGArray::requestNextChunk(size_t stream, AttributeID attId, bool positionOnl
 }
 
 void
-PullSGArray::handleChunkMsg(const boost::shared_ptr<MessageDesc>& chunkDesc,
+PullSGArray::handleChunkMsg(const std::shared_ptr<MessageDesc>& chunkDesc,
                             const InstanceID logicalSourceId)
 {
     static const char* funcName = "PullSGArray::handleChunkMsg: ";
     assert(chunkDesc->getMessageType() == mtRemoteChunk);
     ASSERT_EXCEPTION((chunkDesc->getQueryID()==_queryId), funcName);
 
-    boost::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
+    std::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
     ASSERT_EXCEPTION((chunkMsg->has_attribute_id()), funcName);
     AttributeID attId = chunkMsg->attribute_id();
     ASSERT_EXCEPTION((chunkMsg->has_fetch_id()), funcName);
@@ -357,11 +355,11 @@ PullSGArray::pruneRedundantPositions(size_t stream, AttributeID attId,
     PullSGArray::StreamState& streamState = _messages[attId][stream];
 
     while (!streamState.isEmpty()) {
-        const boost::shared_ptr<MessageDesc>& msg = streamState.head();
+        const std::shared_ptr<MessageDesc>& msg = streamState.head();
         if (msg->getBinary()) {
             break;
         }
-        boost::shared_ptr<scidb_msg::Chunk> record = msg->getRecord<scidb_msg::Chunk>();
+        std::shared_ptr<scidb_msg::Chunk> record = msg->getRecord<scidb_msg::Chunk>();
         if (record->eof()) {
             break;
         }
@@ -383,8 +381,8 @@ PullSGArray::getChunk(size_t stream, AttributeID attId, const Coordinates& posit
     static const char* funcName = "PullSGArray::getChunk: ";
     assert(chunk);
 
-    boost::shared_ptr<MessageDesc> chunkDesc;
-    boost::shared_ptr<CompressedBuffer> compressedBuffer;
+    std::shared_ptr<MessageDesc> chunkDesc;
+    std::shared_ptr<CompressedBuffer> compressedBuffer;
     {
         ScopedMutexLock lock(_sMutexes[stream % _sMutexes.size()]);
 
@@ -413,7 +411,7 @@ PullSGArray::getChunk(size_t stream, AttributeID attId, const Coordinates& posit
                                   << ", stream=" << stream);
                 }
             }
-            boost::shared_ptr<MessageDesc> nextPosMsgDesc;
+            std::shared_ptr<MessageDesc> nextPosMsgDesc;
             if (streamState.isEmpty()) {
                 nextPosMsgDesc = toPositionMesg(chunkDesc);
             }
@@ -436,13 +434,13 @@ PullSGArray::getChunk(size_t stream, AttributeID attId, const Coordinates& posit
         throw RetryException(REL_FILE, __FUNCTION__, __LINE__);
     }
 
-    boost::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
+    std::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
 
     if (!chunkMsg->eof())
     {
         LOG4CXX_TRACE(_logger, funcName << "found next chunk message stream="<<stream<<", attId="<<attId);
         assert(chunk != NULL);
-        ASSERT_EXCEPTION(compressedBuffer, funcName);
+        ASSERT_EXCEPTION(compressedBuffer.get()!=nullptr, funcName);
 
         const int compMethod = chunkMsg->compression_method();
         const size_t decompressedSize = chunkMsg->decompressed_size();
@@ -460,7 +458,13 @@ PullSGArray::getChunk(size_t stream, AttributeID attId, const Coordinates& posit
         compressedBuffer->setDecompressedSize(decompressedSize);
         chunk->decompress(*compressedBuffer); //XXX TODO: avoid data copy
         assert(chunkMsg->dest_instance() == getLocalStream());
-        checkChunkMagic(*chunk);
+        if (!isSerialized()) {
+            // When the input array is "serialized",
+            // the last attribute, which is usually the empty bitmap,
+            // 'looks' like the zero'th atrribute at a different coordinate.
+            // Thus, such a chunk would have the EBM magic number not the expected payload magic number.
+            checkChunkMagic(*chunk);
+        }
         return true;
     }
     else
@@ -470,29 +474,29 @@ PullSGArray::getChunk(size_t stream, AttributeID attId, const Coordinates& posit
     }
 }
 
-boost::shared_ptr<MessageDesc>
-PullSGArray::toPositionMesg(const shared_ptr<MessageDesc>& oldChunkMsg)
+std::shared_ptr<MessageDesc>
+PullSGArray::toPositionMesg(const std::shared_ptr<MessageDesc>& oldChunkMsg)
 {
     if (!oldChunkMsg) {
-        return shared_ptr<MessageDesc>();
+        return std::shared_ptr<MessageDesc>();
     }
 
-    shared_ptr<scidb_msg::Chunk> oldChunkRecord = oldChunkMsg->getRecord<scidb_msg::Chunk>();
+    std::shared_ptr<scidb_msg::Chunk> oldChunkRecord = oldChunkMsg->getRecord<scidb_msg::Chunk>();
     if (!oldChunkMsg->getBinary()) {
         // positon mesg should not have the next position
         assert(!oldChunkRecord->has_next());
         // we should not be calling this method
         assert(false);
-        return shared_ptr<MessageDesc>();
+        return std::shared_ptr<MessageDesc>();
     }
 
     if (!oldChunkRecord->has_next()) {
-        return shared_ptr<MessageDesc>();
+        return std::shared_ptr<MessageDesc>();
     }
     assert(oldChunkRecord->next_coordinates_size()>0);
 
-    shared_ptr<MessageDesc> chunkMsg = boost::make_shared<MessageDesc>(oldChunkMsg->getMessageType());
-    shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
+    std::shared_ptr<MessageDesc> chunkMsg = std::make_shared<MessageDesc>(oldChunkMsg->getMessageType());
+    std::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
 
     // set chunk coordinates
     for (size_t i = 0, n = oldChunkRecord->next_coordinates_size(); i < n; ++i) {
@@ -518,7 +522,7 @@ bool
 PullSGArray::getPosition(size_t stream, AttributeID attId, Coordinates& pos, size_t& destStream)
 {
     static const char* funcName = "PullSGArray::getPosition: ";
-    boost::shared_ptr<MessageDesc> chunkDesc;
+    std::shared_ptr<MessageDesc> chunkDesc;
     {
         ScopedMutexLock lock(_sMutexes[stream % _sMutexes.size()]);
 
@@ -549,7 +553,7 @@ PullSGArray::getPosition(size_t stream, AttributeID attId, Coordinates& pos, siz
         throw RetryException(REL_FILE, __FUNCTION__, __LINE__);
     }
 
-    boost::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
+    std::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
 
     if (!chunkMsg->eof())
     {
@@ -628,10 +632,10 @@ PullSGArray::resetCallback(AttributeID attId,
     return oldCb;
 }
 
-boost::shared_ptr<MessageDesc>
+std::shared_ptr<MessageDesc>
 PullSGArray::StreamState::pop()
 {
-    boost::shared_ptr<MessageDesc> msg;
+    std::shared_ptr<MessageDesc> msg;
     if (_msgs.empty()) {
         return msg;
     }
@@ -644,16 +648,16 @@ PullSGArray::StreamState::pop()
     return msg;
 }
 
-boost::shared_ptr<ConstArrayIterator>
+std::shared_ptr<ConstArrayIterator>
 PullSGArray::getConstIterator(AttributeID attId) const
 {
     assert(attId < _messages.size());
 
     StreamArray* self = const_cast<StreamArray*>(static_cast<const StreamArray*>(this));
     if (!_iterators[attId]) {
-        boost::shared_ptr<ConstArrayIterator> cai(new StreamArrayIterator(*self, attId));
-        boost::shared_ptr<ConstArrayIterator>& iter =
-           const_cast<boost::shared_ptr<ConstArrayIterator>&>(_iterators[attId]);
+        std::shared_ptr<ConstArrayIterator> cai(new StreamArrayIterator(*self, attId));
+        std::shared_ptr<ConstArrayIterator>& iter =
+           const_cast<std::shared_ptr<ConstArrayIterator>&>(_iterators[attId]);
         iter = cai;
         LOG4CXX_TRACE(_logger, "PullSGArray::getConstIterator(): new iterator attId="<<attId);
     } else {
@@ -665,248 +669,18 @@ PullSGArray::getConstIterator(AttributeID attId) const
     return _iterators[attId];
 }
 
-namespace {
-
-/// Functor class that copies a given chunk into a given array
-class WriteChunkToArrayFunc
+std::shared_ptr<Array> pullRedistributeInAttributeOrder(std::shared_ptr<Array>& inputArray,
+                                                   std::set<AttributeID>& attributeOrdering,
+                                                   const std::shared_ptr<Query>& query,
+                                                   PartitioningSchema ps,
+                                                   InstanceID destInstanceId,
+                                                   const std::shared_ptr<CoordinateTranslator>& distMapper,
+                                                   size_t shift,
+                                                   const std::shared_ptr<PartitioningSchemaData>& psData,
+                                                   bool enforceDataIntegrity)
 {
-    public:
-    /**
-     * Constructor
-     * @param outputArray to absorb the chunks
-     * @param newChunkCoords a set of chunk coordinates to populate during the operation of this functor,
-     * each chunk position will be recorded in it
-     */
-    WriteChunkToArrayFunc(const boost::shared_ptr<Array>& outputArray,
-                          std::set<Coordinates, CoordinatesLess>* newChunkCoords,
-                          bool enforceDataIntegrity)
-    : _outputArray(outputArray),
-      _newChunkCoords(newChunkCoords),
-      _outputIters(outputArray->getArrayDesc().getAttributes().size()),
-      _enforceDataIntegrity(enforceDataIntegrity),
-      _hasDataIntegrityIssue(false)
-    { }
-
-    /**
-     * Write a chunk into the internally stored array.
-     * All chunks must have unique positions.
-     * @param attId chunk attribute ID
-     * @param chunk
-     * @param query
-     */
-    void operator() (const AttributeID attId,
-                     const ConstChunk& chunk,
-                     shared_ptr<Query>& query)
-    {
-        static const char* funcName = "WriteChunkToArrayFunc: ";
-
-        LOG4CXX_TRACE(PullSGArray::_logger,  funcName << "trying to consume chunk for attId="<<attId);
-
-        ASSERT_EXCEPTION((attId == chunk.getAttributeDesc().getId()), funcName);
-
-        if (!_outputIters[attId]) {
-
-            assert(_outputIters.size() == chunk.getArrayDesc().getAttributes().size());
-            assert(attId < chunk.getArrayDesc().getAttributes().size());
-
-            _outputIters[attId] = _outputArray->getIterator(attId);
-        }
-
-        static const bool withoutOverlap = false;
-        const Coordinates& chunkPosition = chunk.getFirstPosition(withoutOverlap);
-
-        if(_newChunkCoords && attId == 0) {
-            _newChunkCoords->insert(chunkPosition);
-        }
-
-        LOG4CXX_TRACE(PullSGArray::_logger,  funcName << "writing chunk of attId="<<attId
-                      << " at pos="<<chunkPosition);
-
-        // chunk position must be unique, so setPosition() must fail
-        // except for MemArray, which creates an empty emptyBitmap chunk
-        // when any attribute chunk is constructed
-        // sigh ...
-        if (_outputIters[attId]->setPosition(chunkPosition)) {
-
-            if (attId != (chunk.getArrayDesc().getAttributes().size()-1)) {
-                // not an emptyBitmapChunk
-                if (_enforceDataIntegrity) {
-                    throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_DUPLICATE_CHUNK_ADDR)
-                    << CoordsToStr(chunkPosition);
-                }
-                if (!_hasDataIntegrityIssue) {
-                    LOG4CXX_WARN(PullSGArray::_logger, funcName
-                                 << "Received data chunk at position "
-                                 << CoordsToStr(chunkPosition)
-                                 << " for attribute ID = " << attId
-                                 << " is duplicate or out of (row-major) order"
-                                 << ". Add log4j.logger.scidb.qproc.pullsgarray=TRACE to the log4cxx config file for more");
-                    _hasDataIntegrityIssue=true;
-                } else {
-                    LOG4CXX_TRACE(PullSGArray::_logger, funcName
-                                  << "Received data chunk at position "
-                                  << CoordsToStr(chunkPosition)
-                                  << " for attribute ID = " << attId
-                                  << " is duplicate or out of (row-major) order");
-                }
-            }
-
-            if (!_enforceDataIntegrity) {
-                Chunk& dstChunk = _outputIters[attId]->updateChunk();
-
-                assert((chunk.getArrayDesc().getEmptyBitmapAttribute() == NULL)  ||
-                       (chunk.getArrayDesc().getEmptyBitmapAttribute()->getId() == attId) ||
-                       chunk.getBitmapSize()>0);
-
-                assert((dstChunk.getArrayDesc().getEmptyBitmapAttribute() == NULL)  ||
-                       (dstChunk.getArrayDesc().getEmptyBitmapAttribute()->getId() == attId) ||
-                       dstChunk.getBitmapSize()>0);
-
-                dstChunk.merge(chunk, query);
-                LOG4CXX_TRACE(PullSGArray::_logger,  funcName
-                              << "merged chunk of attId="<<attId
-                              << " at pos="<<chunkPosition);
-                return;
-            }
-        }
-
-        if ( isDebug() &&
-            (chunk.getArrayDesc().getEmptyBitmapAttribute() != NULL)  &&
-            (chunk.getArrayDesc().getEmptyBitmapAttribute()->getId() == attId) ) {
-
-            if (_outputIters[0] &&
-                _outputIters[0]->setPosition(chunkPosition) &&
-                _outputIters[0]->getChunk().getSize()>0 ) {
-                verifyBitmap(_outputIters[0]->getChunk(), chunk);
-            }
-        }
-
-        shared_ptr<ConstRLEEmptyBitmap> nullEmptyBitmap;
-        size_t ebmSize(0);
-        if (!_enforceDataIntegrity &&
-            (ebmSize = chunk.getBitmapSize())>0 ) {
-            // XXX tigor TODO:
-            // This whole hacky business with the empty bitmap is to support the old behavior of redistribute()
-            // which would just "merge" any colliding data.
-            // The dstChunk.merge() call above would not work without sticking the emptybitmap into copyChunk() below.
-            // This will also augment each (Mem)chunk by the size of the empty bitmap.
-            // Once we make _enforceDataIntegrity==true by default, we should just stop supporing the old behavior,
-            // and let the users shoot themselves in the foot if they so choose (by setting _enforceDataIntegrity=false).
-            size_t off = chunk.getSize()-ebmSize;
-            nullEmptyBitmap = boost::make_shared<ConstRLEEmptyBitmap>(static_cast<char*>(chunk.getData()) + off);
-        }
-        _outputIters[attId]->copyChunk(chunk, nullEmptyBitmap);
-
-        LOG4CXX_TRACE(PullSGArray::_logger,  funcName << "wrote chunk of attId="<<attId
-                      << " of size="<<chunk.getSize()
-                      << " at pos="<<chunkPosition
-                      << " with desc="<<chunk.getArrayDesc());
-    }
-
-    void verifyBitmap(ConstChunk const& dataChunk, ConstChunk const& ebmChunk)
-    {
-        assert(ebmChunk.getAttributeDesc().isEmptyIndicator());
-        assert(ebmChunk.getAttributeDesc().getId() ==
-               ebmChunk.getArrayDesc().getAttributes().size()-1);
-
-        dataChunk.pin();
-        UnPinner dataUP(static_cast<Chunk*>(const_cast<ConstChunk*>(&dataChunk)));
-
-        boost::scoped_ptr<ConstRLEPayload> payload(new ConstRLEPayload(static_cast<char*>(dataChunk.getData())));
-        boost::scoped_ptr<ConstRLEEmptyBitmap> emptyBitmap(new ConstRLEEmptyBitmap(static_cast<char*>(ebmChunk.getData())));
-        assert(emptyBitmap->count()>0);
-        assert(emptyBitmap->count() == payload->count());
-    }
-
-    private:
-    boost::shared_ptr<Array> _outputArray;
-    std::set<Coordinates, CoordinatesLess>* _newChunkCoords;
-    vector<shared_ptr<ArrayIterator> > _outputIters;
-    bool _enforceDataIntegrity;
-    /// true if a data integrity issue has been found
-    bool _hasDataIntegrityIssue;
-};
-
-template <class ChunkHandler_tt>
-shared_ptr<Array> redistributeWithCallback(shared_ptr<Array>& inputArray,
-                                           ChunkHandler_tt& chunkHandler,
-                                           PartialChunkMergerList* mergers,
-                                           const shared_ptr<Query>& query,
-                                           PartitioningSchema ps,
-                                           InstanceID destInstanceId,
-                                           const shared_ptr<DistributionMapper>& distMapper,
-                                           size_t shift,
-                                           const shared_ptr<PartitioningSchemaData>& psData,
-                                           bool enforceDataIntegrity)
-{
-    SinglePassArray* spa(NULL);
-    if (inputArray->getSupportedAccess() == Array::SINGLE_PASS) {
-        spa = dynamic_cast<SinglePassArray*>(inputArray.get());
-        assert(spa);
-        if (spa!=NULL) {
-            spa->setEnforceHorizontalIteration(true);
-        }
-    }
-    shared_ptr<Array> tmp = pullRedistribute(inputArray, query, ps,
-                                             destInstanceId, distMapper, shift, psData, enforceDataIntegrity);
-    if (tmp == inputArray ) {
-        assert(!query->getOperatorContext());
-        return inputArray;
-    }
-
-    PullSGArrayBlocking *arrayToPull = safe_dynamic_cast<PullSGArrayBlocking*>(tmp.get());
-    assert(arrayToPull->getSupportedAccess()==Array::SINGLE_PASS);
-
-    const ArrayDesc& desc = arrayToPull->getArrayDesc();
-
-    boost::unordered_set<AttributeID> attributesToPull;
-    for (AttributeID a=0, n=desc.getAttributes().size(); a < n; ++a) {
-        if (spa) {
-            attributesToPull.insert(a);
-        }
-        if (mergers) {
-            assert(a < mergers->size());
-            shared_ptr<MultiStreamArray::PartialChunkMerger>& merger = (*mergers)[a];
-            if (merger) {
-                arrayToPull->setPartialChunkMerger(a, merger);
-                assert(!merger);
-            }
-        }
-    }
-    if (spa) {
-        arrayToPull->pullAttributes(attributesToPull, chunkHandler);
-    } else {
-        for (AttributeID a=0, n=desc.getAttributes().size(); a < n; ++a) {
-            attributesToPull.clear();
-            attributesToPull.insert(a);
-            arrayToPull->pullAttributes(attributesToPull, chunkHandler);
-        }
-    }
-    arrayToPull->sync();
-
-    return tmp;
-}
-
-} //namespace
-
-shared_ptr<Array> redistributeToRandomAccess(shared_ptr<Array>& inputArray,
-                                             const shared_ptr<Query>& query,
-                                             PartitioningSchema ps,
-                                             InstanceID destInstanceId,
-                                             const shared_ptr<DistributionMapper>& distMapper,
-                                             size_t shift,
-                                             const shared_ptr<PartitioningSchemaData>& psData,
-                                             bool enforceDataIntegrity)
-{
-    static const char * funcName = "redistributeToRandomAccess: ";
-    shared_ptr<Array> outputArray = make_shared<MemArray>(inputArray->getArrayDesc(), query);
-
-    LOG4CXX_DEBUG(PullSGArray::_logger, funcName << "Temporary array was opened");
-    WriteChunkToArrayFunc chunkHandler(outputArray, NULL, enforceDataIntegrity);
-
-    shared_ptr<Array> redistributed = redistributeWithCallback(inputArray,
-                                                               chunkHandler,
-                                                               NULL,
+    std::shared_ptr<Array> serializedArray = sg::getSerializedArray(inputArray,
+                                                               attributeOrdering,
                                                                query,
                                                                ps,
                                                                destInstanceId,
@@ -914,21 +688,84 @@ shared_ptr<Array> redistributeToRandomAccess(shared_ptr<Array>& inputArray,
                                                                shift,
                                                                psData,
                                                                enforceDataIntegrity);
+    if (serializedArray == inputArray) {
+        return inputArray;
+    }
+
+    PullSGArrayBlocking *arrayToPull = safe_dynamic_cast<PullSGArrayBlocking*>(serializedArray.get());
+    SCIDB_ASSERT(arrayToPull->getSupportedAccess()==Array::SINGLE_PASS);
+
+    const ArrayDesc& multiAttrDesc = inputArray->getArrayDesc();
+    const ArrayDesc& singleAttrDesc = arrayToPull->getArrayDesc();
+    SCIDB_ASSERT(singleAttrDesc.getAttributes().size()<=2);
+    SCIDB_ASSERT(singleAttrDesc.getAttributes().size()>0);
+
+    // create a chunk merger that will convert chunk coordinates from the sereialized to the input dimensions
+
+    PullSGArrayBlocking::ChunkHandler chunkHandler(boost::bind<void>(sg::FailOnInvocation(), _1, _2, _3));
+
+    std::shared_ptr<sg::SerializedArray::SerializedChunkMerger>
+       handler(new sg::SerializedArray::SerializedChunkMerger(multiAttrDesc,
+                                                    singleAttrDesc,
+                                                    NULL,
+                                                    chunkHandler,
+                                                    enforceDataIntegrity));
+    std::shared_ptr<scidb::MultiStreamArray::PartialChunkMerger> merger(handler);
+    arrayToPull->setPartialChunkMerger(0, merger);
+    SCIDB_ASSERT(!merger);
+    SCIDB_ASSERT(handler);
+
+    std::shared_ptr<PullSGArrayBlocking> sgArray(dynamic_pointer_cast<PullSGArrayBlocking>(serializedArray));
+
+    std::shared_ptr<Array> resultArray = std::make_shared<sg::DeserializedArray>(sgArray,
+                                                                              multiAttrDesc,
+                                                                              attributeOrdering);
+    return resultArray;
+}
+
+std::shared_ptr<Array> redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                                             const std::shared_ptr<Query>& query,
+                                             PartitioningSchema ps,
+                                             InstanceID destInstanceId,
+                                             const std::shared_ptr<CoordinateTranslator>& distMapper,
+                                             size_t shift,
+                                             const std::shared_ptr<PartitioningSchemaData>& psData,
+                                             bool enforceDataIntegrity)
+{
+    static const char * funcName = "redistributeToRandomAccess: ";
+    std::shared_ptr<Array> outputArray = make_shared<MemArray>(inputArray->getArrayDesc(), query);
+
+    LOG4CXX_DEBUG(PullSGArray::_logger, funcName << "Temporary array was opened");
+
+    PullSGArrayBlocking::ChunkHandler chunkHandler(boost::bind<void>(sg::WriteChunkToArrayFunc(outputArray,
+                                                                                               NULL,
+                                                                                               enforceDataIntegrity),
+                                                                     _1, _2, _3));
+    std::shared_ptr<Array> redistributed = sg::redistributeWithCallback(inputArray,
+                                                                   chunkHandler,
+                                                                   NULL,
+                                                                   query,
+                                                                   ps,
+                                                                   destInstanceId,
+                                                                   distMapper,
+                                                                   shift,
+                                                                   psData,
+                                                                   enforceDataIntegrity);
     if (redistributed == inputArray) {
         return PhysicalOperator::ensureRandomAccess(redistributed, query);
     }
     return outputArray;
 }
 
-shared_ptr<Array>
-redistributeToRandomAccess(shared_ptr<Array>& inputArray,
-                           const shared_ptr<Query>& query,
+std::shared_ptr<Array>
+redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                           const std::shared_ptr<Query>& query,
                            const std::vector<AggregatePtr>& aggregates,
                            PartitioningSchema ps,
                            InstanceID destInstanceId,
-                           const shared_ptr<DistributionMapper>& distMapper,
+                           const std::shared_ptr<CoordinateTranslator>& distMapper,
                            size_t shift,
-                           const shared_ptr<PartitioningSchemaData>& psData,
+                           const std::shared_ptr<PartitioningSchemaData>& psData,
                            bool enforceDataIntegrity)
 {
     ArrayDesc const& inputDesc = inputArray->getArrayDesc();
@@ -942,8 +779,8 @@ redistributeToRandomAccess(shared_ptr<Array>& inputArray,
     for (AttributeID a=0; a < nAttrs; ++a) {
         assert(a<aggregates.size());
         if (aggregates[a]) {
-            shared_ptr<MultiStreamArray::PartialChunkMerger> merger =
-            boost::make_shared<AggregateChunkMerger>(aggregates[a],isEmptyable);
+            std::shared_ptr<MultiStreamArray::PartialChunkMerger> merger =
+            std::make_shared<AggregateChunkMerger>(aggregates[a],isEmptyable);
             mergers[a] = merger;
         }
     }
@@ -958,121 +795,152 @@ redistributeToRandomAccess(shared_ptr<Array>& inputArray,
                                       enforceDataIntegrity);
 }
 
-shared_ptr<Array>
-redistributeToRandomAccess(shared_ptr<Array>& inputArray,
-                           const shared_ptr<Query>& query,
+std::shared_ptr<Array>
+redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                           const std::shared_ptr<Query>& query,
                            PartialChunkMergerList& mergers,
                            PartitioningSchema ps,
                            InstanceID destInstanceId,
-                           const shared_ptr<DistributionMapper>& distMapper,
+                           const std::shared_ptr<CoordinateTranslator>& distMapper,
                            size_t shift,
-                           const shared_ptr<PartitioningSchemaData>& psData,
+                           const std::shared_ptr<PartitioningSchemaData>& psData,
                            bool enforceDataIntegrity)
 {
 
     static const char * funcName = "redistributeToRandomAccess: ";
-    shared_ptr<Array> outputArray = make_shared<MemArray>(inputArray->getArrayDesc(), query);
+    std::shared_ptr<Array> outputArray = make_shared<MemArray>(inputArray->getArrayDesc(), query);
 
     LOG4CXX_DEBUG(PullSGArray::_logger, funcName << "Temporary array was opened");
-    WriteChunkToArrayFunc chunkHandler(outputArray, NULL, enforceDataIntegrity);
+    PullSGArrayBlocking::ChunkHandler chunkHandler(boost::bind<void>(sg::WriteChunkToArrayFunc(outputArray,
+                                                                                               NULL,
+                                                                                               enforceDataIntegrity),
+                                                                     _1, _2, _3));
 
-    shared_ptr<Array> redistributed = redistributeWithCallback(inputArray,
-                                                               chunkHandler,
-                                                               &mergers,
-                                                               query,
-                                                               ps,
-                                                               destInstanceId,
-                                                               distMapper,
-                                                               shift,
-                                                               psData,
-                                                               enforceDataIntegrity);
+    ASSERT_EXCEPTION((mergers.size() == inputArray->getArrayDesc().getAttributes().size()),
+                     "Number of mergers != number of input array attributes");
+
+    std::shared_ptr<Array> redistributed = sg::redistributeWithCallback(inputArray,
+                                                                   chunkHandler,
+                                                                   &mergers,
+                                                                   query,
+                                                                   ps,
+                                                                   destInstanceId,
+                                                                   distMapper,
+                                                                   shift,
+                                                                   psData,
+                                                                   enforceDataIntegrity);
     if (redistributed == inputArray) {
         return PhysicalOperator::ensureRandomAccess(redistributed, query);
     }
     return outputArray;
 }
 
-void redistributeToArray(shared_ptr<Array>& inputArray,
-                         shared_ptr<Array>& outputArray,
+void redistributeToArray(std::shared_ptr<Array>& inputArray,
+                         std::shared_ptr<Array>& outputArray,
                          set<Coordinates, CoordinatesLess>* newChunkCoordinates,
-                         const shared_ptr<Query>& query,
+                         const std::shared_ptr<Query>& query,
                          PartitioningSchema ps,
                          InstanceID destInstanceId,
-                         const shared_ptr<DistributionMapper>& distMapper,
+                         const std::shared_ptr<CoordinateTranslator>& distMapper,
                          size_t shift,
-                         const shared_ptr<PartitioningSchemaData>& psData,
+                         const std::shared_ptr<PartitioningSchemaData>& psData,
                          bool enforceDataIntegrity)
 {
-    WriteChunkToArrayFunc chunkHandler(outputArray, newChunkCoordinates, enforceDataIntegrity);
-    shared_ptr<Array> redistributed = redistributeWithCallback(inputArray,
-                                                               chunkHandler,
-                                                               NULL,
-                                                               query,
-                                                               ps,
-                                                               destInstanceId,
-                                                               distMapper,
-                                                               shift,
-                                                               psData,
-                                                               enforceDataIntegrity);
+    PullSGArrayBlocking::ChunkHandler chunkHandler(boost::bind<void>(sg::WriteChunkToArrayFunc(outputArray,
+                                                                                               newChunkCoordinates,
+                                                                                               enforceDataIntegrity),
+                                                                     _1, _2, _3));
+
+    std::shared_ptr<Array> redistributed = sg::redistributeWithCallback(inputArray,
+                                                                   chunkHandler,
+                                                                   NULL,
+                                                                   query,
+                                                                   ps,
+                                                                   destInstanceId,
+                                                                   distMapper,
+                                                                   shift,
+                                                                   psData,
+                                                                   enforceDataIntegrity);
     if (redistributed == inputArray) {
         const bool oneAttributeAtATime = (inputArray->getSupportedAccess()>Array::SINGLE_PASS);
         outputArray->append(redistributed, oneAttributeAtATime, newChunkCoordinates);
     }
 }
 
-void redistributeToArray(shared_ptr<Array>& inputArray,
-                         shared_ptr<Array>& outputArray,
+void redistributeToArray(std::shared_ptr<Array>& inputArray,
+                         std::shared_ptr<Array>& outputArray,
                          PartialChunkMergerList& mergers,
                          set<Coordinates, CoordinatesLess>* newChunkCoordinates,
-                         const shared_ptr<Query>& query,
+                         const std::shared_ptr<Query>& query,
                          PartitioningSchema ps,
                          InstanceID destInstanceId,
-                         const shared_ptr<DistributionMapper>& distMapper,
+                         const std::shared_ptr<CoordinateTranslator>& distMapper,
                          size_t shift,
-                         const shared_ptr<PartitioningSchemaData>& psData,
+                         const std::shared_ptr<PartitioningSchemaData>& psData,
                          bool enforceDataIntegrity)
 {
-    WriteChunkToArrayFunc chunkHandler(outputArray, newChunkCoordinates, enforceDataIntegrity);
-    shared_ptr<Array> redistributed = redistributeWithCallback(inputArray,
-                                                               chunkHandler,
-                                                               &mergers,
-                                                               query,
-                                                               ps,
-                                                               destInstanceId,
-                                                               distMapper,
-                                                               shift,
-                                                               psData,
-                                                               enforceDataIntegrity);
+    PullSGArrayBlocking::ChunkHandler chunkHandler(boost::bind<void>(sg::WriteChunkToArrayFunc(outputArray,
+                                                                                               newChunkCoordinates,
+                                                                                               enforceDataIntegrity),
+                                                                     _1, _2, _3));
+
+    ASSERT_EXCEPTION((mergers.size() == inputArray->getArrayDesc().getAttributes().size()),
+                     "Number of mergers != number of input array attributes");
+
+    std::shared_ptr<Array> redistributed = sg::redistributeWithCallback(inputArray,
+                                                                   chunkHandler,
+                                                                   &mergers,
+                                                                   query,
+                                                                   ps,
+                                                                   destInstanceId,
+                                                                   distMapper,
+                                                                   shift,
+                                                                   psData,
+                                                                   enforceDataIntegrity);
     if (redistributed == inputArray) {
         const bool oneAttributeAtATime = (inputArray->getSupportedAccess()>Array::SINGLE_PASS);
         outputArray->append(redistributed, oneAttributeAtATime, newChunkCoordinates);
     }
 }
 
-shared_ptr<Array> pullRedistribute(shared_ptr<Array>& inputArray,
-                                   const shared_ptr<Query>& query,
+std::shared_ptr<Array> pullRedistribute(std::shared_ptr<Array>& inputArray,
+                                   const std::shared_ptr<Query>& query,
                                    PartitioningSchema ps,
                                    InstanceID destInstanceId,
-                                   const shared_ptr<DistributionMapper>& distMapper,
+                                   const std::shared_ptr<CoordinateTranslator>& distMapper,
                                    size_t shift,
-                                   const shared_ptr<PartitioningSchemaData>& psData,
+                                   const std::shared_ptr<PartitioningSchemaData>& psData,
                                    bool enforceDataIntegrity)
 {
     static const char * funcName = "pullRedistribute: ";
     LOG4CXX_DEBUG(PullSGArray::_logger, funcName
                   << "PullSG started with partitioning schema = " << ps
                   << ", destInstanceId = " << destInstanceId);
-    const uint64_t   instanceCount = query->getInstancesCount();
 
-    assert(destInstanceId == COORDINATOR_INSTANCE_MASK ||
-           destInstanceId == ALL_INSTANCE_MASK ||
-           destInstanceId < query->getInstancesCount());
+    destInstanceId = sg::resolveDestInstance(ps, destInstanceId, query);
 
-    assert(ps != psLocalInstance || destInstanceId != ALL_INSTANCE_MASK);
+    SGInstanceLocator instanceLocator(boost::bind(&PullSGContext::instanceForChunk,
+                                                  _1, _2, _3,
+                                                  ps,
+                                                  distMapper,
+                                                  shift,
+                                                  destInstanceId,
+                                                  psData));
 
-    if (destInstanceId == COORDINATOR_INSTANCE_MASK) {
-        destInstanceId = (query->isCoordinator() ? query->getInstanceID() : query->getCoordinatorID());
-    }
+    return pullRedistribute(inputArray,
+                            query,
+                            instanceLocator,
+                            enforceDataIntegrity);
+}
+
+std::shared_ptr<Array> pullRedistribute(std::shared_ptr<Array>& inputArray,
+                                   const std::shared_ptr<Query>& query,
+                                   SGInstanceLocator& instanceLocator,
+                                   bool enforceDataIntegrity)
+{
+    static const char * funcName = "pullRedistribute: ";
+
+    const uint64_t instanceCount = query->getInstancesCount();
 
     ArrayDesc const& desc = inputArray->getArrayDesc();
     size_t nAttrs = desc.getAttributes().size();
@@ -1087,29 +955,31 @@ shared_ptr<Array> pullRedistribute(shared_ptr<Array>& inputArray,
     syncBarrier(0, query);
 
     // Creating result array with the same descriptor as the input one
-    shared_ptr<PullSGArrayBlocking> pullArray = boost::make_shared<PullSGArrayBlocking>(desc, query,
+    std::shared_ptr<PullSGArrayBlocking> pullArray = std::make_shared<PullSGArrayBlocking>(desc, query,
                                                                                         inputArray,
                                                                                         enforceDataIntegrity);
 
     // Assigning result of this operation for current query and signal to concurrent handlers that they
     // can continue to work (after the barrier)
-    shared_ptr<PullSGContext> sgCtx = boost::make_shared<PullSGContext>(inputArray,
+    SCIDB_ASSERT(instanceLocator);
+    std::shared_ptr<PullSGContext> sgCtx = std::make_shared<PullSGContext>(inputArray,
                                                                         pullArray,
                                                                         instanceCount,
-                                                                        ps,
-                                                                        distMapper,
-                                                                        shift,
-                                                                        destInstanceId,
-                                                                        psData);
+                                                                        instanceLocator);
     query->setOperatorContext(sgCtx);
 
     return pullArray;
 }
 
+bool PullSGArray::isSerialized() const
+{
+    return (getArrayDesc().getAttributes()[0].getName() ==
+            sg::SerializedArray::SERIALIZED_ATTR_NAME);
+}
 
 PullSGArrayBlocking::PullSGArrayBlocking(const ArrayDesc& arrayDesc,
-                                         const shared_ptr<Query>& query,
-                                         const shared_ptr<Array>& inputSGArray,
+                                         const std::shared_ptr<Query>& query,
+                                         const std::shared_ptr<Array>& inputSGArray,
                                          bool enforceDataIntegrity,
                                          uint32_t chunkPrefetchPerAttribute)
   : PullSGArray(arrayDesc, query, enforceDataIntegrity, chunkPrefetchPerAttribute),
@@ -1121,16 +991,18 @@ PullSGArrayBlocking::PullSGArrayBlocking(const ArrayDesc& arrayDesc,
            _sgInputAccess<=Array::RANDOM);
 }
 
-boost::shared_ptr<ConstArrayIterator>
+std::shared_ptr<ConstArrayIterator>
 PullSGArrayBlocking::getConstIterator(AttributeID attId) const
 {
     const static char* funcName =  "PullSGArrayBlocking::getConstIterator: ";
 
     const size_t attrNum = _iterators.size(); // emptyBitmap included
     // Make sure that multiple attributes are NOT pulled simultaneously using this interface.
-    // If the input to pullRedistribute() is a SINGLE_PASS array, only a SINGLE attribute is allowed to be pulled by this interface.
-    // To pull multiple attributes simalteneosuly, pullAttributes() must be used.
-    // If the input to pullRedistribute() is a SINGLE_PASS array, pullAttributes() must be used to pull ALL attributes only.
+    // If the input to pullRedistribute() is a SINGLE_PASS array,
+    // only a SINGLE attribute is allowed to be pulled by this interface.
+    // To pull multiple attributes simultaneously, pullAttributes() must be used.
+    // If the input to pullRedistribute() is a SINGLE_PASS array,
+    // pullAttributes() must be used to pull ALL attributes only.
     for (size_t a=0; a < attrNum; ++a) {
         if (a!=attId && _iterators[a] &&
             (isInputSinglePass() || !_iterators[a]->end())) {
@@ -1150,9 +1022,9 @@ PullSGArrayBlocking::nextChunk(AttributeID attId, MemChunk& memChunk)
     }
 
     ConstChunk const* chunk(NULL);
-    boost::unordered_set<AttributeID> attributeSet;
+    std::unordered_set<AttributeID> attributeSet;
 
-    shared_ptr<SyncCtx> ctx = boost::make_shared<SyncCtx>(_query);
+    std::shared_ptr<SyncCtx> ctx = std::make_shared<SyncCtx>(_query);
     PullSGArray::RescheduleCallback cb = boost::bind(&SyncCtx::signal, ctx, attId, _1);
     resetCallback(attId, cb);
 
@@ -1178,8 +1050,9 @@ PullSGArrayBlocking::validateIncomingChunk(ConstChunk const* chunk,
                                            const AttributeID attId)
 {
     if (isDebug() && chunk) {
-        assert((getArrayDesc().getEmptyBitmapAttribute() == NULL) ||
-               (!chunk->isEmpty()));
+        assert( isSerialized() ||
+                (getArrayDesc().getEmptyBitmapAttribute() == NULL) ||
+                (!chunk->isEmpty()));
         assert(chunk->getSize() > 0);
 
         assert(chunk->getAttributeDesc().getId() == attId);
@@ -1190,8 +1063,8 @@ PullSGArrayBlocking::validateIncomingChunk(ConstChunk const* chunk,
 void PullSGArrayBlocking::sync()
 {
     static const char * funcName = "PullSGArrayBlocking::sync: ";
-    shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-    shared_ptr<PullSGContext> sgCtx = dynamic_pointer_cast<PullSGContext>(query->getOperatorContext());
+    std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+    std::shared_ptr<PullSGContext> sgCtx = dynamic_pointer_cast<PullSGContext>(query->getOperatorContext());
 
     ASSERT_EXCEPTION((sgCtx && sgCtx->getResultArray().get() == this), funcName);
     ASSERT_EXCEPTION((PullSGArray::getConstIterator(0)->end()), funcName);
@@ -1224,7 +1097,8 @@ PullSGArrayBlocking::SyncCtx::signal(AttributeID attrId,
 }
 
 void
-PullSGArrayBlocking::SyncCtx::waitForActiveAttributes(boost::unordered_set<AttributeID>& activeAttributes)
+PullSGArrayBlocking::SyncCtx::waitForActiveAttributes(unordered_set<AttributeID>&
+                                                      activeAttributes)
 {
     ScopedMutexLock cs(_mutex);
     while(!_cond) {
@@ -1237,6 +1111,106 @@ PullSGArrayBlocking::SyncCtx::waitForActiveAttributes(boost::unordered_set<Attri
     assert(!_activeAttributes.empty());
     activeAttributes.swap(_activeAttributes);
     assert(!activeAttributes.empty());
+}
+
+
+void PullSGArrayBlocking::pullAttributes(std::unordered_set<AttributeID>& attributesToPull,
+                                         ChunkHandler& func)
+{
+    _nonBlockingMode = true;
+    const static char* funcName =  "PullSGArrayBlocking::pullAttributes: ";
+    if (isInputSinglePass()) {
+        if (attributesToPull.size() != _iterators.size()) {
+            stringstream ss; ss << funcName << "all attributes are required for SINGLE_PASS array";
+            ASSERT_EXCEPTION(false, ss.str());
+        }
+        SinglePassArray* spa = dynamic_cast<SinglePassArray*>(_inputSGArray.get());
+        if (spa==NULL || !spa->isEnforceHorizontalIteration()) {
+            stringstream ss; ss << funcName << "SinglePassArray is required with horizontal iteration enforced";
+            ASSERT_EXCEPTION(false, ss.str());
+        }
+    }
+
+    std::shared_ptr<SyncCtx> ctx = std::make_shared<SyncCtx>(_query);
+    for (std::unordered_set<AttributeID>::const_iterator i = attributesToPull.begin();
+         i != attributesToPull.end(); ++i) {
+        const AttributeID attId = *i;
+        SCIDB_ASSERT(attId<_iterators.size());
+        if (_iterators[attId])  {
+            stringstream ss; ss << funcName << "attribute "<< attId << " already pulled";
+            ASSERT_EXCEPTION(false, ss.str());
+        }
+        PullSGArray::RescheduleCallback cb = boost::bind(&SyncCtx::signal, ctx, attId, _1);
+        resetCallback(attId, cb);
+    }
+
+    std::unordered_set<AttributeID> activeAttributes(attributesToPull);
+    while (!attributesToPull.empty()) {
+        LOG4CXX_TRACE(PullSGArray::_logger, funcName
+                      << " active attrs size="<<activeAttributes.size());
+        for (std::unordered_set<AttributeID>::iterator iter = activeAttributes.begin();
+             iter != activeAttributes.end(); ) {
+            const AttributeID attId = *iter;
+            bool eof = false;
+            try {
+                eof = pullChunk(func,attId);
+            } catch (const scidb::MultiStreamArray::RetryException& ) {
+                std::unordered_set<AttributeID>::iterator iterToErase = iter;
+                ++iter;
+                activeAttributes.erase(iterToErase);
+                continue;
+            }
+
+            if (eof) {
+                std::unordered_set<AttributeID>::iterator iterToErase = iter;
+                ++iter;
+                activeAttributes.erase(iterToErase);
+                resetCallback(attId);
+                attributesToPull.erase(attId);
+                LOG4CXX_DEBUG(PullSGArray::_logger, funcName
+                              << "EOF attId="<< attId
+                              <<", remain="<<attributesToPull.size());
+                continue;
+            }
+            ++iter;
+        }
+        if (!attributesToPull.empty() &&
+            activeAttributes.empty()) {
+            LOG4CXX_TRACE(PullSGArray::_logger,  funcName
+                          << "waiting, active attrs size="<<activeAttributes.size());
+            ctx->waitForActiveAttributes(activeAttributes);
+        }
+    }
+    _nonBlockingMode = false;
+}
+
+bool PullSGArrayBlocking::pullChunk(ChunkHandler& chunkHandler,
+                                    const AttributeID attId)
+{
+    const static char* funcName =  "PullSGArrayBlocking::pullChunk: ";
+    if (isDebug()) {
+        LOG4CXX_TRACE(PullSGArray::_logger, funcName << "trying to consume chunk for attId="<<attId);
+    }
+    std::shared_ptr<ConstArrayIterator> arrIter = PullSGArray::getConstIterator(attId);
+    if (arrIter->end()) {
+        LOG4CXX_DEBUG(PullSGArray::_logger,  funcName << "EOF attId="<<attId);
+        return true;
+    }
+    const ConstChunk& chunk = arrIter->getChunk();
+    validateIncomingChunk(&chunk, attId);
+
+    if (isDebug()) {
+        LOG4CXX_TRACE(PullSGArray::_logger, funcName << "trying to consume chunk for pos="
+                      << CoordsToStr(chunk.getFirstPosition(false)));
+    }
+
+    std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+    chunkHandler(attId, chunk, query);
+
+    if (isDebug()) {
+        LOG4CXX_TRACE(PullSGArray::_logger, funcName << "advanced attId="<<attId);
+    }
+    return false;
 }
 
 } // namespace

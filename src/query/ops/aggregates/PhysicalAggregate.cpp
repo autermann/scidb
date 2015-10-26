@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,6 +28,8 @@
  */
 
 #include "Aggregator.h"
+
+using namespace std;
 
 namespace scidb
 {
@@ -54,8 +56,8 @@ class PhysicalAggregate: public AggregatePartitioningOperator
         {
             if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)
             {
-                boost::shared_ptr<OperatorParamReference> const& reference =
-                                                (boost::shared_ptr<OperatorParamReference> const&) _parameters[i];
+                std::shared_ptr<OperatorParamReference> const& reference =
+                                                (std::shared_ptr<OperatorParamReference> const&) _parameters[i];
                 string const& dimName = reference->getObjectName();
                 string const& dimAlias = reference->getArrayName();
                 for (size_t j = 0; j < inputDims.size(); j++)

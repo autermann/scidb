@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -78,7 +78,7 @@ public:
 	{
 	}
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
 	{
         assert(schemas.size() == 0);
         assert(_parameters.size() == 0);
@@ -93,10 +93,10 @@ public:
         const size_t nInstances = query->getInstancesCount();
         size_t end        = nInstances>0 ? nInstances-1 : 0;
         dimensions[0]     = DimensionDesc("Instance", 0, 0, end, end, 1, 0);
-        return ArrayDesc("DiskInfo", attributes, dimensions);
+        return ArrayDesc("DiskInfo", attributes, dimensions, defaultPartitioning());
 	}
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalDiskInfo, "diskinfo")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalDiskInfo, "_diskinfo")
 
 }  // namespace scidb

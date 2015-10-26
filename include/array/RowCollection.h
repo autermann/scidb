@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -58,7 +58,7 @@
  *  // Scan the items in a group.
  *  if (!rc.existsGroup(group)) return;
  *  size_t rowId = rc.rowIdFromExistingGroup(group)
- *  scoped_ptr<RowIterator> ptr(rc.openRow(rowId))
+ *  unique_ptr<RowIterator> ptr(rc.openRow(rowId))
  *  while (!ptr->end()) {
  *      ptr->getItem()
  *      ++ (*ptr);
@@ -74,7 +74,7 @@
  *  elements.
  *
  *  The class is a template class, which takes as input a 'Group' class.
- *  The 'Group' class will be used as a key to boost::unordered_map.
+ *  The 'Group' class will be used as a key to std::unordered_map.
  *
  *  Note to Developers:
  *  Externally, RowIterator::getItem(), and RowCollection::appendItem() deal with vector<Value> of size = #attributes.
@@ -86,16 +86,17 @@
 #ifndef ROWCOLLECTION_H_
 #define ROWCOLLECTION_H_
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/unordered_map.hpp>
+#include <memory>
+#include <unordered_map>
 #include <algorithm>
 #include <exception>
-#include <array/Metadata.h>
-#include <system/Constants.h>
-#include <util/iqsort.h>
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
 #include <log4cxx/helpers/exception.h>
+
+#include <array/Metadata.h>
+#include <system/Constants.h>
+#include <util/iqsort.h>
 #include <util/ValueVector.h>
 #include <util/Mutex.h>
 
@@ -129,7 +130,7 @@ const size_t UNKNOWN_ROW_ID = static_cast<size_t>(-1);
 template<class Group, class Hash = boost::hash<Group> >
 class RowIterator : public ConstIterator
 {
-    typedef vector<boost::shared_ptr<ConstChunkIterator> > ChunkIterators;
+    typedef std::vector<std::shared_ptr<ConstChunkIterator> > ChunkIterators;
     typedef RowCollection<Group, Hash> MyRowCollection;
 
 private:
@@ -232,7 +233,7 @@ public:
         _locInRow = _totalInRow;
     }
 
-    virtual void getItem(vector<Value>& item)
+    virtual void getItem(std::vector<Value>& item)
     {
         assert(! end());
         assert( _chunkIterators[0]);
@@ -324,14 +325,14 @@ class RowCollection
 {
 public:
     typedef RowIterator<Group, Hash> MyRowIterator;
-    typedef typename boost::unordered_map<Group, size_t, Hash> GroupToRowId;
-    typedef typename boost::unordered_map<Group, size_t, Hash>::const_iterator GroupToRowIdIterator;
+    typedef typename std::unordered_map<Group, size_t, Hash> GroupToRowId;
+    typedef typename std::unordered_map<Group, size_t, Hash>::const_iterator GroupToRowIdIterator;
     typedef typename std::vector<std::vector<Value> > Items;
-    typedef typename boost::unordered_map<size_t, Items > MapRowIdToItems; // rowId --> Items; this map is used in the buffer of appended items.
+    typedef typename std::unordered_map<size_t, Items > MapRowIdToItems; // rowId --> Items; this map is used in the buffer of appended items.
 
 private:
     // query
-    boost::shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
 
     // the attributes to store
     Attributes _attributes;
@@ -340,16 +341,16 @@ private:
     size_t _chunkSize;
 
     // the backend MemArray
-    boost::shared_ptr<MemArray> _theArray;
+    std::shared_ptr<MemArray> _theArray;
 
     // the map that converts a group to a rowId
     GroupToRowId _groupToRowId;
 
     // #items in each row
-    vector<size_t> _counts;
+    std::vector<size_t> _counts;
 
     // non-const array iterator that is shared among the row-iterators
-    vector<boost::shared_ptr<ArrayIterator> > _arrayIterators;
+    std::vector<std::shared_ptr<ArrayIterator> > _arrayIterators;
 
     // mutex that protects the shared _arrayIterators
     Mutex _mutexArrayIterators;
@@ -400,7 +401,7 @@ private:
      * @note If the last chunk was full, newChunk() will be called; otherwise updateChunk() will be called.
      * @note The newChunk() path is more efficient, because SEQUENTIAL_WRITE can be used.
      */
-    void getChunkIterators(vector<boost::shared_ptr<ChunkIterator> >& chunkIterators, size_t rowId);
+    void getChunkIterators(std::vector<std::shared_ptr<ChunkIterator> >& chunkIterators, size_t rowId);
 
     /**
      * Flush one row.
@@ -413,7 +414,7 @@ public:
      * Given a chunk position, get the chunk iterators to read data from.
      * @note This is called from RowIterator.
      */
-    void getConstChunkIterators(vector<boost::shared_ptr<ConstChunkIterator> >& chunkIterators, Coordinates const& chunkPos);
+    void getConstChunkIterators(std::vector<std::shared_ptr<ConstChunkIterator> >& chunkIterators, Coordinates const& chunkPos);
 
     /**
      * Constructor.
@@ -422,7 +423,7 @@ public:
      * @param   attributes  Should not include empty tag.
      * @param   chunkSize   Number of columns a chunk has.
      */
-    RowCollection(boost::shared_ptr<Query> const& query, const string& name, const Attributes& attributes, size_t chunkSize = defaultChunkSize);
+    RowCollection(std::shared_ptr<Query> const& query, const std::string& name, const Attributes& attributes, size_t chunkSize = defaultChunkSize);
 
     /**
      * This allows the caller to iterate through the existing groups.
@@ -511,7 +512,7 @@ public:
      * @param   group   the group; only used if rowId == UNKNOWN_ROW_ID.
      * @param   item    the item to append
      */
-    void appendItem(size_t& rowId, const Group& group, const vector<Value>& item);
+    void appendItem(size_t& rowId, const Group& group, const std::vector<Value>& item);
 
     /**
      * Read a whole row out.
@@ -547,8 +548,7 @@ public:
     }
 };
 
-}
+#include "RowCollection.hpp"
 
-#include "RowCollection.cpp"
-
+} // namespace
 #endif /* ROWCOLLECTION_H_ */

@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -38,5 +38,5 @@ if (NOT WITHOUT_SERVER)
 
     add_library(network_lib STATIC ${network_src} ${network_include})
     target_link_libraries(network_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES})
-    target_link_libraries(network_lib catalog_lib scidb_msg_lib io_lib compression_lib qproc_lib)
+    target_link_libraries(network_lib usr_namespace_lib catalog_lib scidb_msg_lib io_lib compression_lib qproc_lib)
 endif()

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -111,11 +111,11 @@ bool TileApplyChunkIterator::setPosition(Coordinates const& coords)
     return false;
 }
 
-Value& TileApplyChunkIterator::getItem()
+Value const& TileApplyChunkIterator::getItem()
 {
     if (_applied)
     {
-        return *const_cast<Value*>(_value);
+        return *_value;
     }
     for (size_t i = 0, n = _bindings.size(); i < n; i++)
     {
@@ -139,14 +139,14 @@ Value& TileApplyChunkIterator::getItem()
     _value = static_cast<const Value*> (&_exp->evaluate(_params));
     _applied = true;
 
-    return *const_cast<Value*>(_value); //ugly, getItem() should return Value& const
+    return *_value;
 }
 
 const Coordinates&
 TileApplyChunkIterator::getData(scidb::Coordinates& offset,
                                 size_t maxValues,
-                                boost::shared_ptr<BaseTile>& tileData,
-                                boost::shared_ptr<BaseTile>& tileCoords)
+                                std::shared_ptr<BaseTile>& tileData,
+                                std::shared_ptr<BaseTile>& tileCoords)
 {
     return getDataInternal(offset, maxValues, tileData, tileCoords, true);
 }
@@ -154,8 +154,8 @@ TileApplyChunkIterator::getData(scidb::Coordinates& offset,
 position_t
 TileApplyChunkIterator::getData(position_t logicalOffset,
                                 size_t maxValues,
-                                boost::shared_ptr<BaseTile>& tileData,
-                                boost::shared_ptr<BaseTile>& tileCoords)
+                                std::shared_ptr<BaseTile>& tileData,
+                                std::shared_ptr<BaseTile>& tileCoords)
 {
     return getDataInternal(logicalOffset, maxValues, tileData, tileCoords, true);
 }
@@ -163,9 +163,9 @@ TileApplyChunkIterator::getData(position_t logicalOffset,
 const Coordinates&
 TileApplyChunkIterator::getData(scidb::Coordinates& offset,
                                 size_t maxValues,
-                                boost::shared_ptr<BaseTile>& tileData)
+                                std::shared_ptr<BaseTile>& tileData)
 {
-    boost::shared_ptr<BaseTile> emptyTileCoords;
+    std::shared_ptr<BaseTile> emptyTileCoords;
     const Coordinates& nextPos = getDataInternal(offset, maxValues, tileData, emptyTileCoords);
     assert(!emptyTileCoords);
     return nextPos;
@@ -174,9 +174,9 @@ TileApplyChunkIterator::getData(scidb::Coordinates& offset,
 position_t
 TileApplyChunkIterator::getData(position_t logicalOffset,
                                 size_t maxValues,
-                                boost::shared_ptr<BaseTile>& tileData)
+                                std::shared_ptr<BaseTile>& tileData)
 {
-    boost::shared_ptr<BaseTile> emptyTileCoords;
+    std::shared_ptr<BaseTile> emptyTileCoords;
     position_t nextPos = getDataInternal(logicalOffset, maxValues, tileData, emptyTileCoords);
     assert(!emptyTileCoords);
     return nextPos;
@@ -185,8 +185,8 @@ TileApplyChunkIterator::getData(position_t logicalOffset,
 position_t
 TileApplyChunkIterator::getDataInternal(position_t logicalOffset,
                                         size_t maxValues,
-                                        boost::shared_ptr<BaseTile>& tileData,
-                                        boost::shared_ptr<BaseTile>& tileCoords,
+                                        std::shared_ptr<BaseTile>& tileData,
+                                        std::shared_ptr<BaseTile>& tileCoords,
                                         bool withCoordinates)
 {
     assert(! (getMode() & TILE_MODE));
@@ -196,8 +196,8 @@ TileApplyChunkIterator::getDataInternal(position_t logicalOffset,
     }
 
     const TypeId& dataType = getChunk().getAttributeDesc().getType();
-    boost::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
-    boost::shared_ptr<BaseTile> coordTile;
+    std::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
+    std::shared_ptr<BaseTile> coordTile;
 
     if (withCoordinates) {
         const scidb::TypeId& coordTileType = "scidb::Coordinates";
@@ -224,8 +224,8 @@ TileApplyChunkIterator::getDataInternal(position_t logicalOffset,
 const Coordinates&
 TileApplyChunkIterator::getDataInternal(scidb::Coordinates& offset,
                                         size_t maxValues,
-                                        boost::shared_ptr<BaseTile>& tileData,
-                                        boost::shared_ptr<BaseTile>& tileCoords,
+                                        std::shared_ptr<BaseTile>& tileData,
+                                        std::shared_ptr<BaseTile>& tileCoords,
                                         bool withCoordinates)
 {
     assert(! (getMode() & TILE_MODE));
@@ -236,8 +236,8 @@ TileApplyChunkIterator::getDataInternal(scidb::Coordinates& offset,
     }
     const TypeId& dataType = getChunk().getAttributeDesc().getType();
 
-    boost::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
-    boost::shared_ptr<BaseTile> coordTile;
+    std::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
+    std::shared_ptr<BaseTile> coordTile;
 
     if (withCoordinates) {
         const scidb::TypeId& coordTileType = "scidb::Coordinates";
@@ -291,8 +291,8 @@ void reportTiming(log4cxx::LoggerPtr& logger, const char* info, double newTime, 
 
 void
 TileApplyChunkIterator::populateTiles(size_t maxValues,
-                                      boost::shared_ptr<BaseTile>& dataTile,
-                                      boost::shared_ptr<BaseTile>& coordTile)
+                                      std::shared_ptr<BaseTile>& dataTile,
+                                      std::shared_ptr<BaseTile>& coordTile)
 {
     double oldTime = getTimeInSecs();
     double newTime = oldTime;
@@ -311,10 +311,10 @@ TileApplyChunkIterator::populateTiles(size_t maxValues,
 
     reportTiming(_logger, "TileApplyChunkIterator::populateTiles [pre-getData] took (sec): ", newTime, oldTime);
 
-    boost::shared_ptr<BaseTile> inputDataTile;
-    boost::shared_ptr<BaseTile> inputCoordTile;
+    std::shared_ptr<BaseTile> inputDataTile;
+    std::shared_ptr<BaseTile> inputCoordTile;
 
-    bool needCoords = coordTile;
+    bool needCoords = (coordTile.get()!=nullptr);
     needCoords = needCoords || _needCoordinates;
 
     position_t nextPos(-1);
@@ -332,7 +332,7 @@ TileApplyChunkIterator::populateTiles(size_t maxValues,
 
     size_t maxTileSize = minTileSize;
 
-    std::vector< boost::shared_ptr<BaseTile> > inputDataTiles(_bindings.size());
+    std::vector< std::shared_ptr<BaseTile> > inputDataTiles(_bindings.size());
 
     // Get input tiles
     size_t bSize = _bindings.size();
@@ -409,9 +409,9 @@ TileApplyChunkIterator::populateTiles(size_t maxValues,
 
 /// Apply the expression on the input tiles
 void TileApplyChunkIterator::applyExpression(size_t minTileSize,
-                                             std::vector< boost::shared_ptr<BaseTile> >& inputDataTiles,
-                                             boost::shared_ptr<BaseTile>& inputCoordTile,
-                                             boost::shared_ptr<BaseTile>& dataTile)
+                                             std::vector< std::shared_ptr<BaseTile> >& inputDataTiles,
+                                             std::shared_ptr<BaseTile>& inputCoordTile,
+                                             std::shared_ptr<BaseTile>& dataTile)
 {
     assert(dataTile);
     const CoordinatesMapper* coordMapper = this;
@@ -507,8 +507,8 @@ TileApplyChunkIterator::TileApplyChunkIterator(TileApplyArrayIterator const& arr
     assert(! (_mode & TILE_MODE));
 
     // convert iters to tileiters
-    boost::shared_ptr<ConstChunkIterator> tmp =
-    boost::make_shared< TileConstChunkIterator< boost::shared_ptr<ConstChunkIterator> > > (inputIterator, _query);
+    std::shared_ptr<ConstChunkIterator> tmp =
+    std::make_shared< TileConstChunkIterator< std::shared_ptr<ConstChunkIterator> > > (inputIterator, _query);
     inputIterator.swap(tmp);
 
     for (size_t i = 0, n = _bindings.size(); i < n; ++i) {
@@ -526,8 +526,8 @@ TileApplyChunkIterator::TileApplyChunkIterator(TileApplyArrayIterator const& arr
             _iterators[i] = inputIterator;
         } else {
             const int iterMode = inputIterator->getMode();
-            _iterators[i] = boost::make_shared<
-               TileConstChunkIterator<boost::shared_ptr<ConstChunkIterator> >
+            _iterators[i] = std::make_shared<
+               TileConstChunkIterator<std::shared_ptr<ConstChunkIterator> >
                > (arrayIterator._iterators[i]->getChunk().getConstIterator(iterMode),
                _query);
         }
@@ -597,7 +597,7 @@ TileApplyArrayIterator::TileApplyArrayIterator(TileApplyArray const& array,
 {
     vector<BindInfo> const fakeBinding(0);
     vector<BindInfo> const& bindings = array._bindingSets[outAttrID] ? *array._bindingSets[outAttrID] : fakeBinding;
-    boost::shared_ptr<Array> inputArray = array.getInputArray();
+    std::shared_ptr<Array> inputArray = array.getInputArray();
     assert(inputArray!=NULL);
 
     assert(bindings.size() == _iterators.size());
@@ -682,9 +682,9 @@ DelegateChunk* TileApplyArray::createChunk(DelegateArrayIterator const* iterator
 }
 
 TileApplyArray::TileApplyArray(const ArrayDesc& desc,
-                               const boost::shared_ptr<Array>& array,
-                               const boost::shared_ptr<vector<shared_ptr<Expression> > >& exprs,
-                               const boost::shared_ptr<Query>& query)
+                               const std::shared_ptr<Array>& array,
+                               const std::shared_ptr<vector<std::shared_ptr<Expression> > >& exprs,
+                               const std::shared_ptr<Query>& query)
 : DelegateArray(desc, array),
   _expressions(exprs),
   _attributeNullable(desc.getAttributes().size(), false),
@@ -692,7 +692,7 @@ TileApplyArray::TileApplyArray(const ArrayDesc& desc,
 {
     assert(query);
     _query=query;
-    vector<shared_ptr<Expression> >& expressions = (*_expressions);
+    vector<std::shared_ptr<Expression> >& expressions = (*_expressions);
     for(size_t i =0; i<expressions.size(); ++i) {
         _attributeNullable[i] = desc.getAttributes()[i].isNullable();
         if (expressions[i]) {

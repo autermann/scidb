@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -49,7 +49,7 @@ inline int compareStringsIgnoreCase(const std::string& a, const std::string& b)
 {
     return strcasecmp(a.c_str(), b.c_str());
 }
-    
+
 /**
  * Structure for creating case insensitive maps
  */

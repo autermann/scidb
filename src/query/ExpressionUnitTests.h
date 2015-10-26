@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,9 +34,8 @@
 #include <algorithm>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/assign.hpp>
-#include <boost/make_shared.hpp>
 
 #include "query/LogicalExpression.h"
 #include "query/Expression.h"
@@ -100,14 +99,14 @@ public:
         CPPUNIT_ASSERT(FunctionLibrary::getInstance()->findFunction("is_null", boost::assign::list_of(TID_INT32), func, convs, true));
         Value inTile(TypeLibrary::getType(TID_INT32), Value::asTile);
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = true;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile.getTile()->addRawValues();
+        inSeg.setPPosition(0);
+        inSeg.setSame(true);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile.getTile()->addRawValues());
         inTile.getTile()->addSegment(inSeg);
-        inSeg._pPosition = 32;
-        inSeg._same = true;
-        inSeg._null = true;
+        inSeg.setPPosition(32);
+        inSeg.setSame(true);
+        inSeg.setNull(true);
         inTile.getTile()->addSegment(inSeg);
         inTile.getTile()->flush(64);
         int32_t* p = (int32_t*)inTile.getTile()->getRawValue(0);
@@ -122,20 +121,20 @@ public:
 
     void evlVectorAPlusB()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("a+b");
+        std::shared_ptr<LogicalExpression> le = parseExpression("a+b");
         Expression e;
         e.addVariableInfo("a", TID_INT64);
         e.addVariableInfo("b", TID_INT64);
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, true);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         ExpressionContext ec(e);
 
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = false;
-        inSeg._null = false;
-        inSeg._valueIndex = ec[0].getTile()->addRawValues(32);
+        inSeg.setPPosition(0);
+        inSeg.setSame(false);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(ec[0].getTile()->addRawValues(32));
         ec[1].getTile()->addRawValues(32);
 
         ec[0].getTile()->addSegment(inSeg);
@@ -167,10 +166,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("-", boost::assign::list_of(TID_INT32), func, convs, true);
         Value inTile(TypeLibrary::getType(TID_INT32), Value::asTile);
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = false;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile.getTile()->addRawValues(32);
+        inSeg.setPPosition(0);
+        inSeg.setSame(false);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile.getTile()->addRawValues(32));
         inTile.getTile()->addSegment(inSeg);
         inTile.getTile()->flush(32);
         int32_t* p = (int32_t*)inTile.getTile()->getRawValue(0);
@@ -194,10 +193,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("-", boost::assign::list_of(TID_INT32), func, convs, true);
         Value inTile(TypeLibrary::getType(TID_INT32), Value::asTile);
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = true;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile.getTile()->addRawValues();
+        inSeg.setPPosition(0);
+        inSeg.setSame(true);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile.getTile()->addRawValues());
         inTile.getTile()->addSegment(inSeg);
         inTile.getTile()->flush(32);
         int32_t* p = (int32_t*)inTile.getTile()->getRawValue(0);
@@ -218,10 +217,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("+", boost::assign::list_of(TID_INT32)(TID_INT32), func, convs, true);
         Value inTile[2] = {Value(TypeLibrary::getType(TID_INT32), Value::asTile), Value(TypeLibrary::getType(TID_INT32), Value::asTile)};
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = false;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[0].getTile()->addRawValues(32);
+        inSeg.setPPosition(0);
+        inSeg.setSame(false);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[0].getTile()->addRawValues(32));
         inTile[1].getTile()->addRawValues(32);
 
         inTile[0].getTile()->addSegment(inSeg);
@@ -257,10 +256,10 @@ public:
         CPPUNIT_ASSERT(func.getFuncPtr());
         Value inTile[2] = {Value(TypeLibrary::getType(TID_BOOL), Value::asTile), Value(TypeLibrary::getType(TID_BOOL), Value::asTile)};
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = false;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[0].getTile()->addRawValues(32);
+        inSeg.setPPosition(0);
+        inSeg.setSame(false);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[0].getTile()->addRawValues(32));
         inTile[1].getTile()->addRawValues(32);
 
         inTile[0].getTile()->addSegment(inSeg);
@@ -291,10 +290,10 @@ public:
         FunctionLibrary::getInstance()->findFunction("+", boost::assign::list_of(TID_INT32)(TID_INT32), func, convs, true);
         Value inTile[2] = {Value(TypeLibrary::getType(TID_INT32), Value::asTile), Value(TypeLibrary::getType(TID_INT32), Value::asTile)};
         RLEPayload::Segment inSeg;
-        inSeg._pPosition = 0;
-        inSeg._same = true;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[0].getTile()->addRawValues();
+        inSeg.setPPosition(0);
+        inSeg.setSame(true);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[0].getTile()->addRawValues());
         inTile[1].getTile()->addRawValues();
 
         inTile[0].getTile()->addSegment(inSeg);
@@ -314,7 +313,7 @@ public:
 
         // Checking
         CPPUNIT_ASSERT(resTile.getTile()->nSegments() == 1);
-        CPPUNIT_ASSERT(resTile.getTile()->getSegment(0).length() == 30);
+        CPPUNIT_ASSERT(resTile.getTile()->getSegLength(0) == 30);
         p0 = (int32_t*)resTile.getTile()->getRawValue(0);
         CPPUNIT_ASSERT(*p0 == 0);
     }
@@ -332,43 +331,43 @@ public:
         RLEPayload::Segment inSeg;
 
         // Adding 10 same values into tile 0
-        inSeg._pPosition = 0;
-        inSeg._same = true;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[0].getTile()->addRawValues();
+        inSeg.setPPosition(0);
+        inSeg.setSame(true);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[0].getTile()->addRawValues());
         inTile[0].getTile()->addSegment(inSeg);
-        int32_t* p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg._valueIndex);
+        int32_t* p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg.valueIndex());
         *p = 5;
 
         // Adding 20 different values into tile 0
-        inSeg._pPosition = 10;
-        inSeg._same = false;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[0].getTile()->addRawValues(20);
+        inSeg.setPPosition(10);
+        inSeg.setSame(false);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[0].getTile()->addRawValues(20));
         inTile[0].getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg._valueIndex);
+        p = (int32_t*)inTile[0].getTile()->getRawValue(inSeg.valueIndex());
         for (int i = 0; i < 20; i++)
             *p++ = i;
 
         inTile[0].getTile()->flush(30);
 
         // Adding 20 different values into tile 1
-        inSeg._pPosition = 0;
-        inSeg._same = false;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[1].getTile()->addRawValues(20);
+        inSeg.setPPosition(0);
+        inSeg.setSame(false);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[1].getTile()->addRawValues(20));
         inTile[1].getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg._valueIndex);
+        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg.valueIndex());
         for (int i = 0; i < 20; i++)
             *p++ = i;
 
         // Adding 20 same values into tile 1
-        inSeg._pPosition = 20;
-        inSeg._same = true;
-        inSeg._null = false;
-        inSeg._valueIndex = inTile[1].getTile()->addRawValues();
+        inSeg.setPPosition(20);
+        inSeg.setSame(true);
+        inSeg.setNull(false);
+        inSeg.setValueIndex(inTile[1].getTile()->addRawValues());
         inTile[1].getTile()->addSegment(inSeg);
-        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg._valueIndex);
+        p = (int32_t*)inTile[1].getTile()->getRawValue(inSeg.valueIndex());
         *p = 5;
 
         inTile[1].getTile()->flush(40);
@@ -379,9 +378,9 @@ public:
 
         // Checking
         CPPUNIT_ASSERT(resTile.getTile()->nSegments() == 3);
-        CPPUNIT_ASSERT(resTile.getTile()->getSegment(0).length() == 10);
-        CPPUNIT_ASSERT(resTile.getTile()->getSegment(1).length() == 10);
-        CPPUNIT_ASSERT(resTile.getTile()->getSegment(2).length() == 10);
+        CPPUNIT_ASSERT(resTile.getTile()->getSegLength(0) == 10);
+        CPPUNIT_ASSERT(resTile.getTile()->getSegLength(1) == 10);
+        CPPUNIT_ASSERT(resTile.getTile()->getSegLength(2) == 10);
         p = (int32_t*)resTile.getTile()->getRawValue(0);
         for (int i = 0; i < 10; i++) {
             CPPUNIT_ASSERT(*p++ == i + 5);
@@ -396,9 +395,9 @@ public:
 
     void evlPerfExp()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5");
+        std::shared_ptr<LogicalExpression> le = parseExpression("5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5000000000/1000 + 5 + 5");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         const clock_t startClock = clock();
@@ -439,9 +438,9 @@ public:
 
     void evlInt32PlusInt32()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("1+1");
+        std::shared_ptr< LogicalExpression> le = parseExpression("1+1");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().getInt64() == 2);
@@ -449,9 +448,9 @@ public:
 
     void evlInt64PlusInt64()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("5000000000+5000000000");
+        std::shared_ptr< LogicalExpression> le = parseExpression("5000000000+5000000000");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().getInt64() == 10000000000);
@@ -459,9 +458,9 @@ public:
 
     void evlInt32PlusInt64()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("5+5000000000");
+        std::shared_ptr< LogicalExpression> le = parseExpression("5+5000000000");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().getInt64() == 5000000005);
@@ -469,9 +468,9 @@ public:
 
     void evlInt32PlusInt32PlusInt64()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("5+5+5000000000");
+        std::shared_ptr< LogicalExpression> le = parseExpression("5+5+5000000000");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64); // TODO: It's not so correct. We need to implement minimal number of used converters for arguments when find functions.
         CPPUNIT_ASSERT(e.evaluate().getInt64() == 5000000010);
@@ -479,9 +478,9 @@ public:
 
     void evlInt32PlusNull()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("5+NULL");
+        std::shared_ptr< LogicalExpression> le = parseExpression("5+NULL");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().isNull());
@@ -489,9 +488,9 @@ public:
 
     void evlUnaryMinusInt32()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("-5");
+        std::shared_ptr< LogicalExpression> le = parseExpression("-5");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().getInt64() == -5);
@@ -499,9 +498,9 @@ public:
 
     void evlPowDouble()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("pow(0.5, 2.0)");
+        std::shared_ptr< LogicalExpression> le = parseExpression("pow(0.5, 2.0)");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_DOUBLE);
         CPPUNIT_ASSERT(e.evaluate().getDouble() == 0.25);
@@ -509,9 +508,9 @@ public:
 
     void evlSinDouble()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("sin(0.0)");
+        std::shared_ptr< LogicalExpression> le = parseExpression("sin(0.0)");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_DOUBLE);
         CPPUNIT_ASSERT(e.evaluate().getDouble() == 0);
@@ -519,9 +518,9 @@ public:
 
     void evlExplicitConvDouble()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("double(0)");
+        std::shared_ptr< LogicalExpression> le = parseExpression("double(0)");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_DOUBLE);
         CPPUNIT_ASSERT(e.evaluate().getDouble() == 0);
@@ -529,9 +528,9 @@ public:
 
     void evlExplicitConvInt32()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("int32(0.0)");
+        std::shared_ptr< LogicalExpression> le = parseExpression("int32(0.0)");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT32);
         CPPUNIT_ASSERT(e.evaluate().getInt32() == 0);
@@ -539,9 +538,9 @@ public:
 
     void evliif0()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("iif(1 < 0, 0/0 , 1)");
+        std::shared_ptr<LogicalExpression> le = parseExpression("iif(1 < 0, 0/0 , 1)");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().getInt64() == 1);
@@ -549,9 +548,9 @@ public:
 
     void evliif1()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("iif(1 > 0, 5000000000, 0/0)");
+        std::shared_ptr<LogicalExpression> le = parseExpression("iif(1 > 0, 5000000000, 0/0)");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
         CPPUNIT_ASSERT(e.evaluate().getInt64() == 5000000000);
@@ -559,9 +558,9 @@ public:
 
     void evlor_lazy()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("(1 > 0) or 0/0");
+        std::shared_ptr<LogicalExpression> le = parseExpression("(1 > 0) or 0/0");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_BOOL);
         CPPUNIT_ASSERT(e.evaluate().getBool() == true);
@@ -569,9 +568,9 @@ public:
 
     void evland_lazy()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("(1 < 0) and 0/0");
+        std::shared_ptr<LogicalExpression> le = parseExpression("(1 < 0) and 0/0");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_BOOL);
         CPPUNIT_ASSERT(e.evaluate().getBool() == false);
@@ -579,9 +578,9 @@ public:
 
     void evland_lazy2()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("3 > 2 and not (2 = 1)");
+        std::shared_ptr<LogicalExpression> le = parseExpression("3 > 2 and not (2 = 1)");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_BOOL);
         CPPUNIT_ASSERT(e.evaluate().getBool() == true);
@@ -625,10 +624,10 @@ public:
 
     void evlInstanceId()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("instanceid()");
+        std::shared_ptr< LogicalExpression> le = parseExpression("instanceid()");
          Expression e;
 
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT64);
 
@@ -638,9 +637,9 @@ public:
 
     void evlInt8PlusInt16()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("int8(8)+int16(-8)");
+        std::shared_ptr< LogicalExpression> le = parseExpression("int8(8)+int16(-8)");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_INT16);
         CPPUNIT_ASSERT(e.evaluate().getInt16() == 0);
@@ -648,12 +647,12 @@ public:
 
     void evlAPlusB()
     {
-        vector<string> names;
+        std::vector<string> names;
         names.push_back("a");
         names.push_back("b");
         names.push_back("c");
         names.push_back("x");
-        vector<TypeId> types;
+        std::vector<TypeId> types;
         types.push_back(TID_INT64);
         types.push_back(TID_INT64);
         types.push_back(TID_INT64);
@@ -671,9 +670,9 @@ public:
 
     void evlIsNull()
     {
-        boost::shared_ptr< LogicalExpression> le = parseExpression("is_null(NULL)");
+        std::shared_ptr< LogicalExpression> le = parseExpression("is_null(NULL)");
          Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() ==  TID_BOOL);
         CPPUNIT_ASSERT(e.evaluate().getBool() == true);
@@ -681,9 +680,9 @@ public:
 
     void evlMissingReason()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("missing_reason(NULL)");
+        std::shared_ptr<LogicalExpression> le = parseExpression("missing_reason(NULL)");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() == TID_INT32);
         CPPUNIT_ASSERT(e.evaluate().getInt32() == 0);
@@ -691,9 +690,9 @@ public:
 
     void evlStrPlusNull()
     {
-        boost::shared_ptr<LogicalExpression> le = parseExpression("NULL + 'xyz'");
+        std::shared_ptr<LogicalExpression> le = parseExpression("NULL + 'xyz'");
         Expression e;
-        boost::shared_ptr<scidb::Query> emptyQuery;
+        std::shared_ptr<scidb::Query> emptyQuery;
         e.compile(le, emptyQuery, false);
         CPPUNIT_ASSERT(e.getType() == TID_STRING);
         CPPUNIT_ASSERT(e.evaluate().isNull());

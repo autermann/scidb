@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,7 @@
 
 #include <vector>
 #include <set>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <array/Array.h>
 
 namespace scidb
@@ -83,7 +83,7 @@ inline bool operator< (const CoordinatesAndID& a, const CoordinatesAndID& b)
  *
  * @usage The usage pattern is:
  *
- *     vector<shared_ptr<ConstIterator> > inputIters;
+ *     vector<std::shared_ptr<ConstIterator> > inputIters;
  *     Fill the inputIters;
  *     MultiConstIterators multiIters(inputIters);
  *     while (!multiIters.end()) {
@@ -111,7 +111,7 @@ class MultiConstIterators: public ConstIterator
     /**
      * the input array iterators
      */
-    std::vector<boost::shared_ptr<ConstIterator> >& _inputIters;
+    std::vector<std::shared_ptr<ConstIterator> >& _inputIters;
 
     /**
      * The sorted list of (coordinates, ID),
@@ -124,7 +124,7 @@ public:
      * Constructor sets the array iterators.
      * @param[inout] inputIters   the input iterators, on which ++() may be called
      */
-    MultiConstIterators(std::vector<boost::shared_ptr<ConstIterator> >& inputIters);
+    MultiConstIterators(std::vector<std::shared_ptr<ConstIterator> >& inputIters);
 
     /**
      * Get the IDs of the inputIters that have data at the current position.

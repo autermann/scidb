@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -52,8 +52,8 @@ for FILE in \
 	join_nested.afl \
 	join_nested2_lucky.afl \
 	join_nested2_unlucky.afl \
-	join_nested_sg_override.afl 
+	join_nested_sg_override.afl
 do
 	test_file $FILE
-done 
-	
+done
+

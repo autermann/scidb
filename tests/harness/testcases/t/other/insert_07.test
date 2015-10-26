@@ -26,24 +26,21 @@ insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{10000,10000}(90
 insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{9999,9999}(90)]]',true), R)
 insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{5,5}(120)]];[[{7000,7000}(19)]]',true), R)
 
-# Using build literal with unbounded dimension, insert is not possible
+# Using build literal with unbounded dimension, insert is now possible! (Ticket #2016)
 
 build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],'[[{25,25}(1200),{2500,2500}(19)]]',true)
 
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],'[[{25,25}(1200),{2500,2500}(19)]]',true), R)"
+insert(build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],    '[[{25,25}(1200),{2500,2500}(19)]]',true), R)
+insert(build(<val:int64> [x=0:*,5000,0,y=0:10000,5000,0],'[[{25,26}(1201),{2500,2501}(20)]]',true), R)
+insert(build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],    '[[{25,25}(1200),{2500,2500}(19)]]',true), RU1)
+insert(build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],    '[[{25,25}(1200),{2500,2500}(19)]]',true), RU2)
 
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(build(<val:int64> [x=0:*,5000,0,y=0:10000,5000,0],'[[{25,25}(1200),{2500,2500}(19)]]',true), R)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{125,125}(1200),{2500,2500}(19)]]',true), RU)"
 
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],'[[{25,25}(1200),{2500,2500}(19)]]',true), RU1)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{125,125}(1200),{2500,2500}(19)]]',true), RU2)"
 
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(build(<val:int64> [x=0:*,5000,0,y=0:*,5000,0],'[[{25,25}(1200),{2500,2500}(19)]]',true), RU2)"
-
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{125,125}(1200),{2500,2500}(19)]]',true), RU)"
-
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{125,125}(1200),{2500,2500}(19)]]',true), RU2)"
-
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(L,RU)"
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(L,RU2)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "insert(L,RU)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT "insert(L,RU2)"
 
 
 insert(build(<val:int64> [x=0:10000,5000,0,y=0:10000,5000,0],'[[{25,25}(1200),{2500,2500}(19)]]',true), R)

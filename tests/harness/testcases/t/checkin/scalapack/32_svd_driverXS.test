@@ -15,6 +15,6 @@
 --cleanup
 --shell --command "cat /tmp/$HPID.stderr"
 --shell  --store --command "cat /tmp/$HPID.stdout"
---shell --command "rm /tmp/$HPID.cfg"
---shell --command "rm /tmp/$HPID.stdout"
---shell --command "rm /tmp/$HPID.stderr" 
+--shell --command "rm -f /tmp/$HPID.cfg"
+--shell --command "rm -f /tmp/$HPID.stdout"
+--shell --command "rm -f /tmp/$HPID.stderr" 

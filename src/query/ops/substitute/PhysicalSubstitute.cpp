@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,13 +48,13 @@ class SubstituteChunkIterator : public DelegateChunkIterator
         return mode;
     }
 
-    virtual Value& getItem();
+    virtual Value const& getItem();
 
     SubstituteChunkIterator(SubstituteArray& arr, DelegateChunk const* chunk, int iterationMode);
 
   private:
     SubstituteArray& array;
-    shared_ptr<ConstItemIterator> itemIterator;
+    std::shared_ptr<ConstItemIterator> itemIterator;
     int mode;
     Coordinates pos;
 };
@@ -72,14 +72,14 @@ class SubstituteArray : public DelegateArray
         return DelegateArray::createChunkIterator(chunk, iterationMode);
     }
 
-    SubstituteArray(ArrayDesc const& desc, shared_ptr<Array> input, shared_ptr<Array> subst, vector<bool> const& substAttrs)
+    SubstituteArray(ArrayDesc const& desc, std::shared_ptr<Array> input, std::shared_ptr<Array> subst, vector<bool> const& substAttrs)
     : DelegateArray(desc, input, false),
       substArray(subst),
       substituteAttrs(substAttrs)
     {
     }
 
-    shared_ptr<Array> substArray;
+    std::shared_ptr<Array> substArray;
 
   private:
     vector<bool> substituteAttrs;
@@ -96,9 +96,9 @@ SubstituteChunkIterator::SubstituteChunkIterator(SubstituteArray& arr, DelegateC
 }
 
 
-Value& SubstituteChunkIterator::getItem()
+Value const& SubstituteChunkIterator::getItem()
 {
-    Value& val = inputIterator->getItem();
+    Value const& val = inputIterator->getItem();
     if (val.isNull()) {
         pos[0] = val.getMissingReason();
         if (!itemIterator->setPosition(pos))
@@ -127,7 +127,7 @@ public:
 	 * Substitute is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 2);
 
@@ -135,15 +135,15 @@ public:
         vector<bool> substituteAttrs (inputArrays[0]->getArrayDesc().getAttributes().size(), _parameters.size() == 0 ? true : false);
         for (size_t i = 0, n = _parameters.size(); i < n; i++)
         {
-            size_t attId = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
+            size_t attId = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
             substituteAttrs[attId] = true;
         }
 
-        shared_ptr<Array> input1 = redistributeToRandomAccess(inputArrays[1], query, psReplication,
+        std::shared_ptr<Array> input1 = redistributeToRandomAccess(inputArrays[1], query, psReplication,
                                                               ALL_INSTANCE_MASK,
-                                                              shared_ptr<DistributionMapper>(),
+                                                              std::shared_ptr<CoordinateTranslator>(),
                                                               0,
-                                                              shared_ptr<PartitioningSchemaData>());
+                                                              std::shared_ptr<PartitioningSchemaData>());
 
         return make_shared<SubstituteArray>(_schema, inputArrays[0], input1, substituteAttrs);
     }

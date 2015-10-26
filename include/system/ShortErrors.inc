@@ -13,7 +13,7 @@
  *      must still put something there.
  *
  *  See http://www.drdobbs.com/the-new-c-x-macros/184401387 .
- */ 
+ */
 //Name                              Code  Message text
 X(SCIDB_E_NO_ERROR,                   0,  "Success")
 X(SCIDB_SE_QPROC,                     1,  "Query processor error")
@@ -44,3 +44,5 @@ X(SCIDB_SE_MERGE,                     25, "Merge error")
 X(SCIDB_SE_REDISTRIBUTE,              26, "Error during redistribute")
 X(SCIDB_SE_TYPE_CONVERSION,           27, "Type conversion error")
 X(SCIDB_SE_REPLICATION,               28, "Replication error")
+X(SCIDB_SE_INITIALIZATION,            29, "Initialization error")
+X(SCIDB_SE_AUTHENTICATION,            30, "Authentication error")

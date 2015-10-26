@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,19 +34,30 @@
 #include <query/TypeSystem.h>
 #include <util/PluginManager.h>
 #include <smgr/io/Storage.h>
-#include "ListArrayBuilder.h"
+#include "ListArrayBuilders.h"
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/NamespaceDesc.h>
+#include <usr_namespace/UserDesc.h>
+#include <util/session/Session.h>
+
+
+#include <log4cxx/logger.h>
 
 /****************************************************************************/
 namespace scidb {
 /****************************************************************************/
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.PhysicalList"));
 
 using namespace std;
 using namespace boost;
 
 struct PhysicalList : PhysicalOperator
 {
-    PhysicalList(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
-     : PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalList(const string& logicalName,
+                 const string& physicalName,
+                 const Parameters& parameters,
+                 const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
     string getMainParameter() const
@@ -56,7 +67,21 @@ struct PhysicalList : PhysicalOperator
             return "arrays";
         }
 
-        return ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+        OperatorParamPhysicalExpression& exp =
+            *(std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0];
+        return exp.getExpression()->evaluate().getString();
+    }
+
+    bool getShowSysParameter() const
+    {
+        if (_parameters.size() < 2)
+        {
+            return false;
+        }
+
+        OperatorParamPhysicalExpression& exp =
+            *(std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1];
+        return exp.getExpression()->evaluate().getBool();
     }
 
     bool coordinatorOnly() const
@@ -76,62 +101,69 @@ struct PhysicalList : PhysicalOperator
         return !std::binary_search(s,s+SCIDB_SIZE(s),getMainParameter().c_str(),less_strcmp());
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(coordinatorOnly() ? psLocalInstance : psUndefined);
+        return RedistributeContext(coordinatorOnly() ? psLocalInstance : psUndefined);
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         if (coordinatorOnly() && !query->isCoordinator())
         {
             return make_shared<MemArray>(_schema,query);
         }
 
-        vector<string> list;
+        vector<string> items;
         string  const  what = getMainParameter();
+        bool           showSys = getShowSysParameter();
 
         if (what == "aggregates") {
-            boost::shared_ptr<TupleArray> tuples(make_shared<TupleArray>(_schema,_arena));
-            AggregateLibrary::getInstance()->getAggregateNames(list);
-            for (size_t i=0, n=list.size(); i!=n; ++i) {
-                 Value tuple;
-                 tuple.setString(list[i]);
-                 tuples->appendTuple(tuple);
-             }
-             return tuples;
+            ListAggregatesArrayBuilder builder(AggregateLibrary::getInstance()->getNumAggregates());
+            builder.initialize(query);
+            AggregateLibrary::getInstance()->visitPlugins(
+                AggregateLibrary::Visitor(
+                    boost::bind(
+                        &ListAggregatesArrayBuilder::list,&builder,_1,_2,_3)));
+            return builder.getArray();
         } else if (what == "arrays") {
 
             bool showAllArrays = false;
             if (_parameters.size() == 2)
             {
-                showAllArrays = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getBool();
+                showAllArrays = ((std::shared_ptr<OperatorParamPhysicalExpression>&)
+                    _parameters[1])->getExpression()->evaluate().getBool();
             }
             return listArrays(showAllArrays, query);
 
         } else if (what == "operators") {
-            OperatorLibrary::getInstance()->getLogicalNames(list);
-            boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
-            for (size_t i=0, n=list.size(); i!=n; ++i) {
-                Value tuple[2];
-                tuple[0].setString(list[i]);
-                tuple[1].setString(OperatorLibrary::getInstance()->getOperatorLibraries().getObjectLibrary(list[i]));
-                tuples->appendTuple(tuple);
+            OperatorLibrary::getInstance()->getLogicalNames(items, showSys);
+            std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
+            for (size_t i=0, n=items.size(); i!=n; ++i) {
+                Value tuple[3];
+                size_t tupleSize = (showSys ? 3 : 2);
+                tuple[0].setString(items[i]);
+                tuple[1].setString(
+                    OperatorLibrary::getInstance()->getOperatorLibraries().getObjectLibrary(items[i]));
+                if (showSys) {
+                    tuple[2].setBool(OperatorLibrary::isHiddenOp(items[i]));
+                }
+                tuples->appendTuple(PointerRange<Value>(tupleSize, tuple));
             }
             return tuples;
         } else if (what == "types") {
-            list = TypeLibrary::typeIds();
-            boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
-            for (size_t i=0, n=list.size(); i!=n; ++i) {
+            items = TypeLibrary::typeIds();
+            std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
+            for (size_t i=0, n=items.size(); i!=n; ++i) {
                 Value tuple[2];
-                tuple[0].setString(list[i]);
-                tuple[1].setString(TypeLibrary::getTypeLibraries().getObjectLibrary(list[i]));
+                tuple[0].setString(items[i]);
+                tuple[1].setString(
+                    TypeLibrary::getTypeLibraries().getObjectLibrary(items[i]));
                 tuples->appendTuple(tuple);
             }
             return tuples;
         } else if (what == "functions") {
-            boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
+            std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
             funcDescNamesMap& funcs = FunctionLibrary::getInstance()->getFunctions();
             for (funcDescNamesMap::const_iterator i = funcs.begin();
                  i != funcs.end(); ++i)
@@ -166,47 +198,62 @@ struct PhysicalList : PhysicalOperator
         } else if (what == "queries") {
             ListQueriesArrayBuilder builder;
             builder.initialize(query);
-            boost::function<void (const boost::shared_ptr<scidb::Query>&)> f
-            = boost::bind(&ListQueriesArrayBuilder::listElement, &builder, _1);
-            scidb::Query::listQueries(f);
+            Query::visitQueries(
+                Query::Visitor(
+                    boost::bind(
+                        &ListQueriesArrayBuilder::list, &builder, _1)));
             return builder.getArray();
         } else if (what == "instances") {
             return listInstances(query);
+        } else if (what == "users") {
+            return listUsers(query);
+        } else if (what == "namespaces") {
+            return listNamespaces(query);
         } else if (what == "chunk descriptors") {
             ListChunkDescriptorsArrayBuilder builder;
             builder.initialize(query);
-            StorageManager::getInstance().listChunkDescriptors(builder);
+            StorageManager::getInstance().visitChunkDescriptors(
+                Storage::ChunkDescriptorVisitor(
+                    boost::bind(
+                        &ListChunkDescriptorsArrayBuilder::list,&builder,_1,_2)));
             return builder.getArray();
         } else if (what == "chunk map") {
             ListChunkMapArrayBuilder builder;
             builder.initialize(query);
-            StorageManager::getInstance().listChunkMap(builder);
+            StorageManager::getInstance().visitChunkMap(
+                Storage::ChunkMapVisitor(
+                    boost::bind(
+                        &ListChunkMapArrayBuilder::list,&builder,_1,_2,_3,_4,_5)));
             return builder.getArray();
         } else if (what == "libraries") {
             ListLibrariesArrayBuilder builder;
             builder.initialize(query);
-            PluginManager::getInstance()->listPlugins(builder);
+            PluginManager::getInstance()->visitPlugins(
+                PluginManager::Visitor(
+                    boost::bind(
+                        &ListLibrariesArrayBuilder::list,&builder,_1)));
             return builder.getArray();
         } else if (what == "datastores") {
             ListDataStoresArrayBuilder builder;
             builder.initialize(query);
-            StorageManager::getInstance().getDataStores().listDataStores(builder);
-            return builder.getArray();
-        } else if (what == "meminfo") {
-            ListMeminfoArrayBuilder builder;
-            builder.initialize(query);
-            builder.addToArray(::mallinfo());
+            StorageManager::getInstance().getDataStores().visitDataStores(
+                DataStores::Visitor(
+                    boost::bind(
+                        &ListDataStoresArrayBuilder::list,&builder,_1)));
             return builder.getArray();
         } else if (what == "counters") {
             bool reset = false;
             if (_parameters.size() == 2)
             {
-                reset = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)
+                reset = ((std::shared_ptr<OperatorParamPhysicalExpression>&)
                          _parameters[1])->getExpression()->evaluate().getBool();
             }
             ListCounterArrayBuilder builder;
             builder.initialize(query);
-            CounterState::getInstance()->listCounters(builder);
+            CounterState::getInstance()->visitCounters(
+                CounterState::Visitor(
+                    boost::bind(
+                        &ListCounterArrayBuilder::list,&builder,_1)));
             if (reset)
             {
                 CounterState::getInstance()->reset();
@@ -221,52 +268,101 @@ struct PhysicalList : PhysicalOperator
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "PhysicalList::execute";
      }
 
-   boost::shared_ptr<Array> listInstances(const boost::shared_ptr<Query>& query)
-   {
-      boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
-      Instances instances;
-      SystemCatalog::getInstance()->getInstances(instances);
+    std::shared_ptr<Array> listInstances(
+        const std::shared_ptr<Query>& query)
+    {
+        std::shared_ptr<const InstanceLiveness> queryLiveness(
+            query->getCoordinatorLiveness());
 
-      assert(queryLiveness->getNumInstances() == instances.size());
+        Instances instances;
+        SystemCatalog::getInstance()->getInstances(instances);
 
-      boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
+        assert(queryLiveness->getNumInstances() == instances.size());
 
-      for (Instances::const_iterator iter = instances.begin();
-           iter != instances.end(); ++iter) {
+        std::shared_ptr<TupleArray> tuples(
+            std::make_shared<TupleArray>(_schema, _arena));
 
-          Value tuple[5];
+        for (   Instances::const_iterator iter = instances.begin();
+                iter != instances.end();
+                ++iter)
+        {
+            Value tuple[5];
 
-          const InstanceDesc& instanceDesc = *iter;
-          InstanceID instanceId = instanceDesc.getInstanceId();
-          time_t t = static_cast<time_t>(instanceDesc.getOnlineSince());
-          tuple[0].setString(instanceDesc.getHost());
-          tuple[1].setUint16(instanceDesc.getPort());
-          tuple[2].setUint64(instanceId);
-          if ((t == (time_t)0) || queryLiveness->isDead(instanceId)){
-              tuple[3].setString("offline");
-          } else {
-              assert(queryLiveness->find(instanceId));
-              struct tm date;
+            const InstanceDesc& instanceDesc = *iter;
+            InstanceID instanceId = instanceDesc.getInstanceId();
+            time_t t = static_cast<time_t>(instanceDesc.getOnlineSince());
+            tuple[0].setString(instanceDesc.getHost());
+            tuple[1].setUint16(instanceDesc.getPort());
+            tuple[2].setUint64(instanceId);
+            if ((t == (time_t)0) || queryLiveness->isDead(instanceId)){
+                tuple[3].setString("offline");
+            } else {
+                assert(queryLiveness->find(instanceId));
+                struct tm date;
 
-              if (!(&date == gmtime_r(&t, &date)))
-                  throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CANT_GENERATE_UTC_TIME);
+                if (!(&date == gmtime_r(&t, &date)))
+                {
+                  throw SYSTEM_EXCEPTION(
+                      SCIDB_SE_EXECUTION,
+                      SCIDB_LE_CANT_GENERATE_UTC_TIME);
+                }
 
-              string out(boost::str(boost::format("%04d-%02d-%02d %02d:%02d:%02d")
-                                    % (date.tm_year+1900)
-                                    % (date.tm_mon+1)
-                                    % date.tm_mday
-                                    % date.tm_hour
-                                    % date.tm_min
-                                    % date.tm_sec));
-              tuple[3].setString(out);
-          }
-          tuple[4].setString(instanceDesc.getPath());
-          tuples->appendTuple(tuple);
-      }
-      return tuples;
-   }
+                string out(boost::str(
+                    boost::format("%04d-%02d-%02d %02d:%02d:%02d")
+                        % (date.tm_year+1900)
+                        % (date.tm_mon+1)
+                        % date.tm_mday
+                        % date.tm_hour
+                        % date.tm_min
+                        % date.tm_sec));
+                tuple[3].setString(out);
+            }
+            tuple[4].setString(instanceDesc.getPath());
+            tuples->appendTuple(tuple);
+        }
+        return tuples;
+    }
 
-    boost::shared_ptr<Array> listArrays(bool showAllArrays, const boost::shared_ptr<Query>& query)
+    std::shared_ptr<Array> listUsers(
+        const std::shared_ptr<Query>& query)
+    {
+        std::shared_ptr<TupleArray> tuples(
+            std::make_shared<TupleArray>(_schema, _arena));
+
+        std::vector<scidb::UserDesc> users;
+        SystemCatalog::getInstance()->getUsers(users);
+        for (size_t i=0, n=users.size(); i!=n; ++i) {
+            scidb::UserDesc &user = users[i];
+            Value tuple[1];
+            tuple[0].setString(user.getName());
+            tuples->appendTuple(tuple);
+        }
+
+        return tuples;
+    }
+
+     std::shared_ptr<Array> listNamespaces(
+         const std::shared_ptr<Query>& query)
+     {
+        std::shared_ptr<TupleArray> tuples(
+            std::make_shared<TupleArray>(_schema, _arena));
+
+        std::vector<NamespaceDesc> namespaces;
+        SystemCatalog::getInstance()->getNamespaces(namespaces);
+        for (size_t i=0, n=namespaces.size(); i!=n; ++i) {
+            NamespaceDesc &current_namespace = namespaces[i];
+            Value tuple[1];
+            tuple[0].setString(current_namespace.getName());
+            tuples->appendTuple(tuple);
+        }
+
+        return tuples;
+    }
+
+
+    std::shared_ptr<Array> listArrays(
+        bool showAllArrays,
+        const std::shared_ptr<Query>& query)
     {
         ListArraysArrayBuilder builder;
         builder.initialize(query);
@@ -278,9 +374,42 @@ struct PhysicalList : PhysicalOperator
                                                 ignoreOrphanAttributes,
                                                 !showAllArrays);
 
-        for (size_t i=0, n=arrayDescs.size(); i!=n; ++i) {
+
+        scidb::namespaces::Communicator::updateNamespaceId(
+            query->getSession()->getNamespace());
+
+        NamespaceDesc::ID currentNamespaceId =
+            query->getSession()->getNamespace().getId();
+
+
+        for (size_t i=0, n=arrayDescs.size(); i!=n; ++i)
+        {
             const ArrayDesc& desc = arrayDescs[i];
-            builder.listElement(desc);
+            // filter out metadata introduced after the catalog version of this query/txn
+            // XXX TODO: this does not deal with the arrays not locked by this query
+            // XXX TODO: (they can be added/updated/removed mid-flight, i.e. before list::execute() runs).
+            // XXX TODO: Either make list() take an 'ALL' array lock or
+            // XXX TODO: introduce a single serialized PG timestamp, or ...
+            const ArrayID catVersion = query->getCatalogVersion(
+                desc.getName(), true);
+
+            if (desc.getId() <= catVersion && desc.getUAId() <= catVersion)
+            {
+                NamespaceDesc::ID arrayNamespaceId=-1;
+                try {
+                    SystemCatalog::getInstance()->getNamespaceIdFromArrayId(
+                            desc.getId(), arrayNamespaceId);
+                } catch (const scidb::Exception& e ) {
+                    if (e.getLongErrorCode() == SCIDB_LE_ARRAYID_DOESNT_EXIST) {
+                        continue;
+                    }
+                    throw;
+                }
+                if(arrayNamespaceId == currentNamespaceId)
+                {
+                    builder.list(desc);
+                }
+            }
         }
         return builder.getArray();
     }

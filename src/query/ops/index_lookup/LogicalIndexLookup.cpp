@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,6 +22,8 @@
 
 #include <query/Operator.h>
 #include "IndexLookupSettings.h"
+
+using namespace std;
 
 namespace scidb
 {
@@ -108,10 +110,10 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const& schemas)
+    vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const& schemas)
     {
         //Same settings pattern as seen in instance_stats, uniq
-        vector<shared_ptr<OperatorParamPlaceholder> > res;
+        vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() < IndexLookupSettings::MAX_PARAMETERS)
         {
@@ -125,13 +127,13 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         ArrayDesc const& input = schemas[0];
         ArrayDesc const& index = schemas[1];
         //The settings object also checks the input schemas for validity
         IndexLookupSettings settings(input, index, _parameters, true, query);
-        ArrayDesc result (input.getName(), input.getAttributes(true), input.getDimensions());
+        ArrayDesc result (input.getName(), input.getAttributes(true), input.getDimensions(), defaultPartitioning());
         AttributeDesc newAttribute(input.getAttributes(true).size(),
                                    settings.getOutputAttributeName(),
                                    TID_INT64,

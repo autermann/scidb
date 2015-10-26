@@ -1,6 +1,9 @@
 SCIDB QUERY : <create array SortedPrevious <d:int64> [ X=0:*,10000,0]>
 Query was executed successfully
 
+SCIDB QUERY : <${SCIDB_INSTALL_PATH}/bin/scidb -V | sed -n 1p | sed s/[^\:]*\:[^0-9]*// | sed s/\.[0-9]*$/\<=15.7/ | bc>
+1
+
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "load(SortedPrevious, '${TEST_DATA_DIR}/previous.out', -2, 'opaque')">
 Query was executed successfully
 

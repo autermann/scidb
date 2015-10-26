@@ -29,11 +29,14 @@ Query was executed successfully
 {25} 9,8,8,'bar'
 {26} 9,1,8.2,'foo'
 
-SCIDB QUERY : <CREATE ARRAY Data < AV : double NULL > [ I=0:*,4,2, J=0:*,6,2, W(string)=*,5,1 ]>
+SCIDB QUERY : <store(redimension(uniq(sort(project(Raw_Test_Data, W))),<W:string>[i=0:*,1000,0]), w_indices)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <CREATE ARRAY Data < AV : double NULL > [ I=0:*,4,2, J=0:*,6,2, W_dim=0:*,5,1 ]>
 Query was executed successfully
 
-SCIDB QUERY : <store(redimension(Raw_Test_Data, Data, avg ( V ) as AV), Data)>
-I,J,W,AV
+SCIDB QUERY : <store(redimension(project(index_lookup(Raw_Test_Data,w_indices,Raw_Test_Data.W,W_dim),W_dim,V,I,J),Data, avg(V) as AV),Data)>
+I,J,W_dim,AV
 1,1,0,2
 1,1,1,1
 1,2,1,2
@@ -92,7 +95,7 @@ Line,I,J,V,W
 26,9,1,8.2,'foo'
 
 SCIDB QUERY : <scan (Data)>
-I,J,W,AV
+I,J,W_dim,AV
 1,1,0,2
 1,1,1,1
 1,2,1,2
@@ -119,6 +122,8 @@ I,J,W,AV
 9,6,0,7.3
 9,7,1,7
 9,8,0,8
+
+Query was executed successfully
 
 Query was executed successfully
 

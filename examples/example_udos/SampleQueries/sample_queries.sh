@@ -3,8 +3,8 @@
 ##
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,7 @@ store(
   uniq(
    sort(
     project(
-     trades_flat, 
+     trades_flat,
      symbol
     )
    )
@@ -48,7 +48,7 @@ store(
   <symbol:string> [symbol_id=0:*,1000000,0]
  ),
  stock_symbols
-)" > /dev/null 
+)" > /dev/null
 echo
 iquery -ocsv -aq "aggregate(stock_symbols, count(*) as num_unique_symbols)"
 

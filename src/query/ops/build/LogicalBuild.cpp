@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,8 +33,13 @@
 
 using namespace std;
 
-namespace scidb
-{
+namespace scidb {
+
+namespace {
+
+log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.build"));
+#define debug(e) LOG4CXX_DEBUG(logger, "LogicalBuild: " << e)
+#define trace(e) LOG4CXX_TRACE(logger, "LogicalBuild: " << e)
 
 /**
  * @brief The operator: build().
@@ -94,9 +99,9 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         if (_parameters.size() == 3)
         {
             res.push_back(END_OF_VARIES_PARAMS());
@@ -109,18 +114,22 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         assert(schemas.size() == 0);
         assert(_parameters.size() == 2 || _parameters.size() == 3);
         bool asArrayLiteral = false;
         if (_parameters.size() == 3)
         {
-            asArrayLiteral = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
+            asArrayLiteral = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
                 query, TID_BOOL).getBool();
         }
 
-        ArrayDesc desc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc desc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        if(asArrayLiteral) {
+            desc.setPartitioningSchema(psLocalInstance);
+        }
+
         if (!asArrayLiteral && desc.getAttributes(true).size() != 1)
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_BUILD_ERROR2,
                                        _parameters[0]->getParsingContext());
@@ -134,7 +143,8 @@ public:
         Dimensions const& dims = desc.getDimensions();
         for (size_t i = 0, n = dims.size();  i < n; i++)
         {
-            if (dims[i].getLength() == INFINITE_LENGTH && !asArrayLiteral)
+			// Eventually this check should be removed.
+            if (dims[i].isMaxStar() && !asArrayLiteral)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_BUILD_ERROR3,
                                            _parameters[0]->getParsingContext());
         }
@@ -146,7 +156,7 @@ public:
             try
             {
                 Expression e;
-                e.compile(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+                e.compile(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                     query, false, TID_STRING);
                 good = e.isConstant();
             }
@@ -161,10 +171,13 @@ public:
             }
         }
 
+        debug("inferSchema: returning schema with  partitioning:  " << desc.getPartitioningSchema() << ", asArrayLiteral: " << asArrayLiteral);
         return desc;
     }
 };
 
+} // namespace
+
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalBuild, "build")
 
-} //namespace
+} // namespace scidb

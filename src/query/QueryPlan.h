@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,15 +30,14 @@
 #ifndef QUERYPLAN_H_
 #define QUERYPLAN_H_
 
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
+#include <boost/archive/text_iarchive.hpp>
 
-#include "array/Metadata.h"
-#include "query/Operator.h"
-#include "query/OperatorLibrary.h"
-#include "system/SystemCatalog.h"
-
+#include <array/Metadata.h>
+#include <query/Operator.h>
+#include <query/OperatorLibrary.h>
+#include <system/SystemCatalog.h>
+#include <util/SerializedPtrConverter.h>
 
 namespace scidb
 {
@@ -50,24 +49,24 @@ namespace scidb
 class LogicalQueryPlanNode
 {
 public:
-    LogicalQueryPlanNode(boost::shared_ptr<ParsingContext>  const&,
-                         boost::shared_ptr<LogicalOperator> const&);
+    LogicalQueryPlanNode(std::shared_ptr<ParsingContext>  const&,
+                         std::shared_ptr<LogicalOperator> const&);
 
-    LogicalQueryPlanNode(boost::shared_ptr<ParsingContext>  const&,
-                         boost::shared_ptr<LogicalOperator> const&,
-                         std::vector<boost::shared_ptr<LogicalQueryPlanNode> > const &children);
+    LogicalQueryPlanNode(std::shared_ptr<ParsingContext>  const&,
+                         std::shared_ptr<LogicalOperator> const&,
+                         std::vector<std::shared_ptr<LogicalQueryPlanNode> > const &children);
 
-    void addChild(const boost::shared_ptr<LogicalQueryPlanNode>& child)
+    void addChild(const std::shared_ptr<LogicalQueryPlanNode>& child)
     {
         _childNodes.push_back(child);
     }
 
-    boost::shared_ptr<LogicalOperator> getLogicalOperator()
+    std::shared_ptr<LogicalOperator> getLogicalOperator()
     {
         return _logicalOperator;
     }
 
-    std::vector<boost::shared_ptr<LogicalQueryPlanNode> >& getChildren()
+    std::vector<std::shared_ptr<LogicalQueryPlanNode> >& getChildren()
     {
         return _childNodes;
     }
@@ -82,13 +81,13 @@ public:
         return _logicalOperator->getProperties().tile;
     }
 
-    boost::shared_ptr<ParsingContext> getParsingContext() const
+    std::shared_ptr<ParsingContext> getParsingContext() const
     {
         return _parsingContext;
     }
 
-    const ArrayDesc& inferTypes      (boost::shared_ptr<Query>);
-    void             inferArrayAccess(boost::shared_ptr<Query>&);
+    const ArrayDesc& inferTypes      (std::shared_ptr<Query>);
+    void             inferArrayAccess(std::shared_ptr<Query>&);
 
     /**
      * Retrieve a human-readable description.
@@ -102,14 +101,14 @@ public:
     void toString(std::ostream &,int indent = 0,bool children = true) const;
 
   private:
-    boost::shared_ptr<LogicalOperator>                    _logicalOperator;
-    std::vector<boost::shared_ptr<LogicalQueryPlanNode> > _childNodes;
-    boost::shared_ptr<ParsingContext>                     _parsingContext;
+    std::shared_ptr<LogicalOperator>                    _logicalOperator;
+    std::vector<std::shared_ptr<LogicalQueryPlanNode> > _childNodes;
+    std::shared_ptr<ParsingContext>                     _parsingContext;
 };
 
 class PhysicalQueryPlanNode;
-typedef boost::shared_ptr<PhysicalOperator>      PhysOpPtr;
-typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
+typedef std::shared_ptr<PhysicalOperator>      PhysOpPtr;
+typedef std::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
 
 /*
  *  Currently LogicalQueryPlanNode and PhysicalQueryPlanNode have similar structure.
@@ -117,18 +116,18 @@ typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
  */
 class PhysicalQueryPlanNode
     : boost::noncopyable,
-      public boost::enable_shared_from_this<PhysicalQueryPlanNode>
+      public std::enable_shared_from_this<PhysicalQueryPlanNode>
 {
   public:
     PhysicalQueryPlanNode()
     {}
 
     PhysicalQueryPlanNode(PhysOpPtr const& physicalOperator,
-                          bool agg, bool ddl, bool tile);
+                          bool ddl, bool tile);
 
     PhysicalQueryPlanNode(PhysOpPtr const& PhysicalOperator,
                           std::vector<PhysNodePtr> const& childNodes,
-                          bool agg, bool ddl, bool tile);
+                          bool ddl, bool tile);
 
     virtual ~PhysicalQueryPlanNode() {}
 
@@ -211,11 +210,6 @@ class PhysicalQueryPlanNode
         return _parent.lock();
     }
 
-    bool isAgg() const
-    {
-        return _agg;
-    }
-
     bool isDdl() const
     {
         return _ddl;
@@ -266,6 +260,26 @@ class PhysicalQueryPlanNode
     }
 
     /**
+     * Determine if this node is for the PhysicalRedimension operator.
+     * @return true if physicalOperator is PhysicalRedimension. False otherwise.
+     */
+    bool isRedimensionNode() const
+    {
+        return _physicalOperator.get() != NULL &&
+               _physicalOperator->getPhysicalName() == "PhysicalRedimension";
+    }
+
+    /**
+     * Determine if this node is for the PhysicalInput operator.
+     * @return true if physicalOperator is PhysicalInput. False otherwise.
+     */
+    bool isInputNode() const
+    {
+        return _physicalOperator.get() != NULL &&
+               _physicalOperator->getPhysicalName() == "impl_input";
+    }
+
+    /**
      * Determine if this node is for the PhysicalSG operator.
      * @return true if physicalOperator is PhysicalSG. False otherwise.
      */
@@ -276,6 +290,24 @@ class PhysicalQueryPlanNode
     }
 
     bool isStoringSg() const;
+
+    /**
+     * Extract the array name paramenter from SG operator parameters
+     * @return array name, empty if the paramenter is not present or empty
+     */
+    static std::string getSgArrayName(const PhysicalOperator::Parameters& sgParameters);
+
+    /**
+     * Extract the isStrict paramenter from the redimension operator parameters
+     * @return false if the isStrict parameter is specified and is equal to false; true otherwise
+     */
+    static bool getRedimensionIsStrict(const PhysicalOperator::Parameters& redimParameters);
+
+    /**
+     * Extract the isStrict paramenter from the input operator parameters
+     * @return false if the isStrict parameter is specified and is equal to false; true otherwise
+     */
+    static bool getInputIsStrict(const PhysicalOperator::Parameters& inputParameters);
 
     /**
      * @return the sgMovable flag
@@ -371,7 +403,7 @@ class PhysicalQueryPlanNode
     /**
      * @return stats about distribution of node output
      */
-    const ArrayDistribution& getDistribution() const
+    const RedistributeContext& getDistribution() const
     {
         return _distribution;
     }
@@ -384,9 +416,9 @@ class PhysicalQueryPlanNode
      * @param prev distribution stats of previous node's output
      * @return new distribution stats for this node's output
      */
-    const ArrayDistribution& inferDistribution ()
+    const RedistributeContext& inferDistribution ()
     {
-        std::vector<ArrayDistribution> childDistros;
+        std::vector<RedistributeContext> childDistros;
         for (size_t i =0; i<_childNodes.size(); i++)
         {
             childDistros.push_back(_childNodes[i]->getDistribution());
@@ -413,67 +445,133 @@ class PhysicalQueryPlanNode
     }
 
     template<class Archive>
-    void serialize(Archive& ar, const unsigned int version)
-    {
-        ar & _childNodes;
-        ar & _agg;
-        ar & _ddl;
-        ar & _tile;
-        ar & _isSgMovable;
-        ar & _isSgOffsetable;
-        //We don't need distribution or sizing info - they are used for optimization only.
-
-        /*
-         * We not serializing whole operator object, to simplify user's life and get rid work serialization
-         * user classes and inherited SciDB classes. Instead this we serializing operator name and
-         * its parameters, and later construct operator by hand
-         */
-        if (Archive::is_loading::value)
-        {
-            std::string logicalName;
-            std::string physicalName;
-            PhysicalOperator::Parameters parameters;
-            ArrayDesc schema;
-
-            ar & logicalName;
-            ar & physicalName;
-            ar & parameters;
-            ar & schema;
-
-            _physicalOperator = OperatorLibrary::getInstance()->createPhysicalOperator(
-                        logicalName, physicalName, parameters, schema);
-            _physicalOperator->setTileMode(_tile);
-        }
-        else
-        {
-            std::string logicalName = _physicalOperator->getLogicalName();
-            std::string physicalName = _physicalOperator->getPhysicalName();
-            PhysicalOperator::Parameters parameters = _physicalOperator->getParameters();
-            ArrayDesc schema = _physicalOperator->getSchema();
-
-            ar & logicalName;
-            ar & physicalName;
-            ar & parameters;
-            ar & schema;
-        }
-    }
+    void serialize(Archive& ar, const unsigned int version);
 
 private:
     PhysOpPtr _physicalOperator;
 
     std::vector< PhysNodePtr > _childNodes;
-    boost::weak_ptr <PhysicalQueryPlanNode> _parent;
+    std::weak_ptr <PhysicalQueryPlanNode> _parent;
 
-    bool _agg;
     bool _ddl;
     bool _tile;
 
     bool _isSgMovable;
     bool _isSgOffsetable;
 
-    ArrayDistribution _distribution;
+    RedistributeContext _distribution;
     PhysicalBoundaries _boundaries;
 };
+
+/**
+ * A text_iarchive class that helps de-serializing shared_ptr objects,
+ * when a worker instance calls QueryProcessorImpl::parsePhysical().
+ * The idea is that multiple deserialized raw pointers are equal will produce the same shared_ptr.
+*/
+class TextIArchiveQueryPlan: public boost::archive::text_iarchive
+{
+public:
+    TextIArchiveQueryPlan(std::istream & is_, unsigned int flags = 0)
+    : boost::archive::text_iarchive(is_, flags)
+    {}
+
+    struct SerializationHelper
+    {
+        SerializedPtrConverter<PhysicalQueryPlanNode> _nodes;
+        SerializedPtrConverter<OperatorParam> _params;
+
+        void clear()
+        {
+            _nodes.clear();
+            _params.clear();
+        }
+    };
+
+    SerializationHelper _helper;
+};
+
+template<class Archive>
+void PhysicalQueryPlanNode::serialize(Archive& ar, const unsigned int version)
+{
+    // ar & _childNodes;
+    if (Archive::is_loading::value) {
+        TextIArchiveQueryPlan::SerializationHelper& helper = dynamic_cast<TextIArchiveQueryPlan&>(ar)._helper;
+        size_t size = 0;
+        ar & size;
+        _childNodes.resize(size);
+        for (size_t i=0; i<size; ++i) {
+            PhysicalQueryPlanNode* n;
+            ar & n;
+            _childNodes[i] = helper._nodes.getSharedPtr(n);
+        }
+    }
+    else {
+        size_t size = _childNodes.size();
+        ar & size;
+        for (size_t i=0; i<size; ++i) {
+            PhysicalQueryPlanNode* n = _childNodes[i].get();
+            ar & n;
+        }
+    }
+
+    ar & _ddl;
+    ar & _tile;
+    ar & _isSgMovable;
+    ar & _isSgOffsetable;
+    //We don't need distribution or sizing info - they are used for optimization only.
+
+    /*
+     * We not serializing whole operator object, to simplify user's life and get rid work serialization
+     * user classes and inherited SciDB classes. Instead this we serializing operator name and
+     * its parameters, and later construct operator by hand
+     */
+    if (Archive::is_loading::value)
+    {
+        TextIArchiveQueryPlan::SerializationHelper& helper = dynamic_cast<TextIArchiveQueryPlan&>(ar)._helper;
+        std::string logicalName;
+        std::string physicalName;
+        PhysicalOperator::Parameters parameters;
+        ArrayDesc schema;
+
+        ar & logicalName;
+        ar & physicalName;
+
+        // ar & parameters;
+        size_t size = 0;
+        ar & size;
+        parameters.resize(size);
+        for (size_t i=0; i<size; ++i) {
+            OperatorParam* op;
+            ar & op;
+            parameters[i] = helper._params.getSharedPtr(op);
+        }
+        ar & schema;
+
+        _physicalOperator = OperatorLibrary::getInstance()->createPhysicalOperator(
+                    logicalName, physicalName, parameters, schema);
+        _physicalOperator->setTileMode(_tile);
+    }
+    else
+    {
+        std::string logicalName = _physicalOperator->getLogicalName();
+        std::string physicalName = _physicalOperator->getPhysicalName();
+        PhysicalOperator::Parameters parameters = _physicalOperator->getParameters();
+        ArrayDesc schema = _physicalOperator->getSchema();
+
+        ar & logicalName;
+        ar & physicalName;
+
+        //ar & parameters;
+        size_t size = parameters.size();
+        ar & size;
+        for (size_t i=0; i<size; ++i) {
+            OperatorParam* op = parameters[i].get();
+            ar & op;
+        }
+
+        ar & schema;
+    }
+}
 
 /**
  * The LogicalPlan represents result of parsing query and is used for validation query.
@@ -482,24 +580,24 @@ private:
 class LogicalPlan
 {
 public:
-    LogicalPlan(const boost::shared_ptr<LogicalQueryPlanNode>& root);
+    LogicalPlan(const std::shared_ptr<LogicalQueryPlanNode>& root);
 
-    boost::shared_ptr<LogicalQueryPlanNode> getRoot()
+    std::shared_ptr<LogicalQueryPlanNode> getRoot()
     {
         return _root;
     }
 
-    void setRoot(const boost::shared_ptr<LogicalQueryPlanNode>& root)
+    void setRoot(const std::shared_ptr<LogicalQueryPlanNode>& root)
     {
         _root = root;
     }
 
-    const ArrayDesc& inferTypes(boost::shared_ptr< Query>& query)
+    const ArrayDesc& inferTypes(std::shared_ptr< Query>& query)
     {
         return _root->inferTypes(query);
     }
 
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         return _root->inferArrayAccess(query);
     }
@@ -516,7 +614,7 @@ public:
     void toString(std::ostream &str, int indent = 0, bool children = true) const;
 
 private:
-    boost::shared_ptr<LogicalQueryPlanNode> _root;
+    std::shared_ptr<LogicalQueryPlanNode> _root;
 };
 
 /**
@@ -526,16 +624,16 @@ private:
 class PhysicalPlan
 {
 public:
-    PhysicalPlan(const boost::shared_ptr<PhysicalQueryPlanNode>& root);
+    PhysicalPlan(const std::shared_ptr<PhysicalQueryPlanNode>& root);
 
-    boost::shared_ptr<PhysicalQueryPlanNode> getRoot()
+    std::shared_ptr<PhysicalQueryPlanNode> getRoot()
     {
         return _root;
     }
 
     bool empty() const
     {
-        return _root == boost::shared_ptr<PhysicalQueryPlanNode>();    // _root is NULL
+        return _root == std::shared_ptr<PhysicalQueryPlanNode>();    // _root is NULL
     }
 
     bool isDdl() const
@@ -550,7 +648,7 @@ public:
     	return _root->supportsTileMode();
     }
 
-	void setRoot(const boost::shared_ptr<PhysicalQueryPlanNode>& root)
+	void setRoot(const std::shared_ptr<PhysicalQueryPlanNode>& root)
 	{
 		_root = root;
 	}
@@ -567,10 +665,10 @@ public:
     void toString(std::ostream &out, int indent = 0, bool children = true) const;
 
 private:
-    boost::shared_ptr<PhysicalQueryPlanNode> _root;
+    std::shared_ptr<PhysicalQueryPlanNode> _root;
 };
 
-typedef boost::shared_ptr<PhysicalPlan> PhysPlanPtr;
+typedef std::shared_ptr<PhysicalPlan> PhysPlanPtr;
 
 } // namespace
 

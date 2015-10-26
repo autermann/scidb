@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,12 +42,10 @@ section of that chapter."
 #include <stdlib.h>
 #include <string>
 #include <vector>
-#include "boost/shared_ptr.hpp"
+#include <memory>
 using namespace std;
-using namespace boost;
 #include "log4cxx/logger.h"
 #include "query/TypeSystem.h"
-//Igor1: my comment
 #include "query/Value.h"
 #include "array/Metadata.h"
 #include "network/BaseConnection.h"
@@ -85,7 +83,7 @@ using namespace scidb;
 %include "typemaps.i"
 %include "std_string.i"
 %include "std_vector.i"
-%include "boost_shared_ptr.i"
+%include "std_shared_ptr.i"
 
 %include "exception.i"
 %exception {
@@ -142,7 +140,6 @@ namespace scidb {
 %shared_ptr(scidb::RLEChunkIterator);
 
 using namespace std;
-using namespace boost;
 // SWIG does not understand the GCC function attribute syntax, so disable this macro temporarily
 #pragma push_macro("SCIDB_FORCEINLINE")
 #undef SCIDB_FORCEINLINE
@@ -176,9 +173,9 @@ typedef std::vector<DimensionDesc> Dimensions;
 namespace std {
 %template(dimensiondesc) vector<scidb::DimensionDesc,std::allocator< scidb::DimensionDesc > >;
 %template(attributedesc) vector<scidb::AttributeDesc,std::allocator< scidb::AttributeDesc > >;
-%template(constarrayiterator) vector<boost::shared_ptr<scidb::ConstArrayIterator> > ;
-%template(constchunkiterator) vector<boost::shared_ptr<scidb::ConstChunkIterator> > ;
-%template(coordinates) std::vector<scidb::Coordinate>;
+%template(constarrayiterator) vector<std::shared_ptr<scidb::ConstArrayIterator> > ;
+%template(constchunkiterator) vector<std::shared_ptr<scidb::ConstChunkIterator> > ;
+%template(coordinates) vector<scidb::Coordinate>;
 %template(attributetypes) vector<TypeId>;
 }
 

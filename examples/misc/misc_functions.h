@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -86,7 +86,7 @@ void exitOnNotEqual ( const Value** args, Value* res, void*)
 	}
 }
 
-void netPauseHandler(const boost::shared_ptr<boost::asio::deadline_timer>& t,
+void netPauseHandler(const std::shared_ptr<boost::asio::deadline_timer>& t,
                      int32_t duration,
                      const boost::system::error_code& error)
 {
@@ -102,15 +102,15 @@ void netPauseOnNotEqual(const Value** args, Value* res, void*)
    if ( i1 != i2 ) {
       int32_t duration = (int32_t)args[2]->getInt32();
       assert(duration > 0);
-      boost::shared_ptr<boost::asio::deadline_timer> timer
+      std::shared_ptr<boost::asio::deadline_timer> timer
       (new boost::asio::deadline_timer(scidb::getIOService()));
-      timer->expires_from_now(posix_time::seconds(0));
+      timer->expires_from_now(boost::posix_time::seconds(0));
       timer->async_wait(boost::bind(&netPauseHandler, timer, duration, _1));
    }
 }
 
 void collectQueryIds(std::deque<scidb::QueryID>* idList,
-                     const boost::shared_ptr<scidb::Query>& q)
+                     const std::shared_ptr<scidb::Query>& q)
 {
     scidb::QueryID queryId = q->getQueryID();
     idList->push_back(queryId);
@@ -124,8 +124,8 @@ void injectRemoteErrorForQuery(std::deque<scidb::QueryID>& idList, long int errC
         LOG4CXX_ERROR(log4cxx::Logger::getRootLogger(),
                       "Injecting remote error=" << errCode <<" for query="<<queryID);
 
-        boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
-        boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
+        std::shared_ptr<MessageDesc> errorMessage = std::make_shared<MessageDesc>(mtError);
+        std::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
         errorMessage->setQueryID(queryID);
         errorRecord->set_cluster_uuid(Cluster::getInstance()->getUuid());
         errorRecord->set_type(1);
@@ -147,9 +147,7 @@ void injectRemoteError(const Value** args, Value* res, void*)
    }
    std::deque<scidb::QueryID> idList;
 
-   boost::function<void (const boost::shared_ptr<scidb::Query>&)> f =
-       boost::bind(&collectQueryIds, &idList, _1);
-   scidb::Query::listQueries(f);
+   scidb::Query::visitQueries(Query::Visitor(boost::bind(&collectQueryIds, &idList, _1)));
 
    injectRemoteErrorForQuery(idList, errCode);
 
@@ -194,7 +192,7 @@ void injectError(const Value** args, Value* res, void*)
       return;
    }
 
-   boost::shared_ptr<const InjectedError> err = InjectedErrorLibrary::getLibrary()->getError(errID);
+   std::shared_ptr<const InjectedError> err = InjectedErrorLibrary::getLibrary()->getError(errID);
 
    if (!err) {
        return;

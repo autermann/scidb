@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,13 +51,15 @@ namespace scidb
 class PhysicalVariableWindow: public PhysicalOperator
 {
 private:
+    typedef unordered_map<Coordinates, size_t, CoordinatesHash> Coords2Count;
+
     size_t _nPreceding;
     size_t _nFollowing;
     size_t _dimNum;
     size_t _nDims;
-    scoped_ptr<ChunkInstanceMap> _localChunkMap;
-    scoped_ptr<ChunkInstanceMap> _globalChunkMap;
-    unordered_map<Coordinates, size_t> _chunkCounts;
+    unique_ptr<ChunkInstanceMap> _localChunkMap;
+    unique_ptr<ChunkInstanceMap> _globalChunkMap;
+    Coords2Count _chunkCounts;
     size_t _nInstances;
     InstanceID _coordinatorId;
     InstanceID _myInstanceId;
@@ -75,8 +77,8 @@ private:
         {
             if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
             {
-                shared_ptr <OperatorParamAggregateCall>const& ac =
-                    (shared_ptr <OperatorParamAggregateCall> const&) _parameters[i];
+                std::shared_ptr <OperatorParamAggregateCall>const& ac =
+                    (std::shared_ptr <OperatorParamAggregateCall> const&) _parameters[i];
                 AttributeID inAttributeId;
                 AggregatePtr agg = resolveAggregate(ac, _srcDesc.getAttributes(), &inAttributeId);
                 if (inAttributeId == INVALID_ATTRIBUTE_ID)
@@ -185,7 +187,7 @@ private:
     {
         size_t valuesWritten;
         size_t valuesTotal;
-        vector<shared_ptr<ChunkIterator> > iters;
+        vector<std::shared_ptr<ChunkIterator> > iters;
         bool opened;
     };
 
@@ -193,20 +195,22 @@ private:
     class AttributeWriter
     {
     private:
+        typedef unordered_map<Coordinates, ChunkWriterInfo, CoordinatesHash> Coords2ChunkWriterInfo;
+
         int64_t _totalSize;
         int64_t const _maxSize;
         size_t const _nAggs;
-        shared_ptr<Query> const _query;
+        std::shared_ptr<Query> const _query;
         size_t const _eVSize;
-        unordered_map< Coordinates, ChunkWriterInfo > _map;
-        vector<shared_ptr<ArrayIterator> >_daiters;
+        Coords2ChunkWriterInfo _map;
+        vector<std::shared_ptr<ArrayIterator> >_daiters;
         vector<Value> _stubs;
 
     public:
-        AttributeWriter( unordered_map<Coordinates, size_t> const& chunkCounts,
-                         shared_ptr<MemArray> const& dstArray,
+        AttributeWriter( Coords2Count const& chunkCounts,
+                         std::shared_ptr<MemArray> const& dstArray,
                          int64_t maxSize,
-                         shared_ptr<Query> const& query,
+                         std::shared_ptr<Query> const& query,
                          AggIOMapping const& aggMapping):
             _totalSize(0),
             _maxSize(maxSize),
@@ -216,7 +220,7 @@ private:
         {
             assert(_nAggs > 0 && _nAggs == aggMapping.size());
 
-            unordered_map<Coordinates, size_t>::const_iterator iter = chunkCounts.begin();
+            Coords2Count::const_iterator iter = chunkCounts.begin();
             while(iter!=chunkCounts.end())
             {
                 Coordinates const& coords = iter->first;
@@ -226,7 +230,7 @@ private:
                 info.opened = false;
                 for(size_t i=0; i<_nAggs; i++)
                 {
-                    info.iters.push_back(shared_ptr<ChunkIterator> ());
+                    info.iters.push_back(std::shared_ptr<ChunkIterator> ());
                 }
                 iter++;
             }
@@ -246,7 +250,7 @@ private:
 
         inline void flushAll()
         {
-            unordered_map< Coordinates, ChunkWriterInfo >::iterator iter = _map.begin();
+            Coords2ChunkWriterInfo::iterator iter = _map.begin();
             while(iter!=_map.end())
             {
                 ChunkWriterInfo& info = iter->second;
@@ -389,22 +393,22 @@ public:
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
-    void copyEmptyTagAttribute(shared_ptr<Array> & srcArray, shared_ptr<MemArray> & dstArray)
+    void copyEmptyTagAttribute(std::shared_ptr<Array> & srcArray, std::shared_ptr<MemArray> & dstArray)
     {
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         assert (srcArray->getArrayDesc().getEmptyBitmapAttribute()!=NULL);
-        shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(srcArray->getArrayDesc().getEmptyBitmapAttribute()->getId());
-        shared_ptr<ArrayIterator> daiter = dstArray->getIterator(_schema.getEmptyBitmapAttribute()->getId());
+        std::shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(srcArray->getArrayDesc().getEmptyBitmapAttribute()->getId());
+        std::shared_ptr<ArrayIterator> daiter = dstArray->getIterator(_schema.getEmptyBitmapAttribute()->getId());
         _localCellCount =0;
         while(!saiter->end())
         {
            Coordinates const& chunkPos = saiter->getPosition();
            size_t chunkCount = 0;
-           shared_ptr<ConstChunkIterator> sciter = saiter->getChunk().getConstIterator();
+           std::shared_ptr<ConstChunkIterator> sciter = saiter->getChunk().getConstIterator();
            if( !sciter->end())
            {
                _localChunkMap->addChunkInfo(saiter->getPosition(), _myInstanceId);
-               shared_ptr<ChunkIterator> dciter = daiter->newChunk(chunkPos).getIterator(query, ConstChunkIterator::SEQUENTIAL_WRITE | ConstChunkIterator::NO_EMPTY_CHECK);
+               std::shared_ptr<ChunkIterator> dciter = daiter->newChunk(chunkPos).getIterator(query, ConstChunkIterator::SEQUENTIAL_WRITE | ConstChunkIterator::NO_EMPTY_CHECK);
                while(!sciter->end())
                {
                    dciter->setPosition(sciter->getPosition());
@@ -423,9 +427,9 @@ public:
 
     void mergeChunkMap()
     {
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _globalChunkMap.reset( new ChunkInstanceMap(_nDims, _dimNum));
-        shared_ptr<SharedBuffer> mapBuf = _localChunkMap->serialize();
+        std::shared_ptr<SharedBuffer> mapBuf = _localChunkMap->serialize();
         if ( _coordinatorId != INVALID_INSTANCE) //I am NOT the coordinator
         {
             BufSend(_coordinatorId, mapBuf, query);
@@ -560,14 +564,14 @@ public:
 
     void exchangeMessages(vector<VariableWindowMessage>& inMessages, vector<VariableWindowMessage>& outMessages, size_t nAggs)
     {
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         for(InstanceID i =0; i<_nInstances; i++)
         {
             if(i==_myInstanceId)
             {
                 continue;
             }
-            shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, outMessages[i].getBinarySize(_nDims, nAggs)));
+            std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, outMessages[i].getBinarySize(_nDims, nAggs)));
             outMessages[i].marshall(_nDims, nAggs, (char*) buf->getData());
             outMessages[i].clear();
             BufSend(i, buf, query);
@@ -578,7 +582,7 @@ public:
             {
                 continue;
             }
-            shared_ptr<SharedBuffer> buf = BufReceive(i,query);
+            std::shared_ptr<SharedBuffer> buf = BufReceive(i,query);
             inMessages[i].unMarshall((char*) buf->getData(), _nDims, nAggs);
         }
     }
@@ -589,10 +593,10 @@ public:
      */
     bool agreeOnBoolean(bool value)
     {
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         if ( _coordinatorId != INVALID_INSTANCE) //I am NOT the coordinator
         {
-            shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
+            std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
             *((bool*) buf->getData()) = value;
             BufSend(_coordinatorId, buf, query);
             buf = BufReceive(_coordinatorId, query);
@@ -604,12 +608,12 @@ public:
             {
                 if(i != _myInstanceId)
                 {
-                    shared_ptr<SharedBuffer> buf = BufReceive(i,query);
+                    std::shared_ptr<SharedBuffer> buf = BufReceive(i,query);
                     bool otherInstanceFinished = *((bool*) buf->getData());
                     value = value && otherInstanceFinished;
                 }
             }
-            shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
+            std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
             *((bool*) buf->getData()) = value;
             for(InstanceID i=0; i<_nInstances; i++)
             {
@@ -625,7 +629,7 @@ public:
     template <bool USE_SWAP>
     void messageCycle(vector<VariableWindowMessage>& outMessages,
                       vector<VariableWindowMessage>& inMessages,
-                      unordered_map<Coordinates, shared_ptr<ChunkEdge> >& leftEdges,
+                      Coords2ChunkEdge& leftEdges,
                       AttributeWriter<USE_SWAP>& output,
                       vector<AggregatePtr> const& aggs)
     {
@@ -642,12 +646,12 @@ public:
                     continue;
                 }
                 assert(i != _myInstanceId);
-                unordered_map<Coordinates, shared_ptr<ChunkEdge> >::iterator iter = message._chunkEdges.begin();
+                Coords2ChunkEdge::iterator iter = message._chunkEdges.begin();
                 while(iter!=message._chunkEdges.end())
                 {
                     //We've received a chunkEdge from another instance
                     Coordinates const& chunkPos = iter->first;
-                    shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
+                    std::shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
 
                     //find the next chunk for this edge; verify it lives on this instance
                     ChunkLocation ncl = _globalChunkMap->getNextChunkFor(chunkPos);
@@ -655,7 +659,7 @@ public:
                     Coordinates const& nextChunkPos = ncl->first;
 
                     //after we process this chunk edge, we may need to forward it to another instance!
-                    shared_ptr<ChunkEdge> forwardChunkEdge;
+                    std::shared_ptr<ChunkEdge> forwardChunkEdge;
                     InstanceID forwardInstanceId = INVALID_INSTANCE;
 
                     //but if we have a "run" of multiple continuous chunks on this instance, things get a little tricky
@@ -678,7 +682,7 @@ public:
                     }
 
                     //find the matching leftEdge
-                    shared_ptr<ChunkEdge>& leftEdge = leftEdges[nextChunkPos];
+                    std::shared_ptr<ChunkEdge>& leftEdge = leftEdges[nextChunkPos];
                     if(leftEdge.get() == 0 || (haveRunOfChunks && !output.chunkWasOpen(lastChunkInRun)))
                     {
                         //This means that either:
@@ -696,7 +700,7 @@ public:
                     while(iter2 != chunkEdge->end())
                     {
                         Coordinates const& axisPos = iter2->first;
-                        shared_ptr<WindowEdge>& rightWEdge = iter2->second;
+                        std::shared_ptr<WindowEdge>& rightWEdge = iter2->second;
                         LOG4CXX_TRACE(logger, "Received right wedge at chunk "<<CoordsToStr(nextChunkPos)<<
                                                                       " axis "<<CoordsToStr(axisPos)<<
                                                                       " nCoords "<<rightWEdge->getNumCoords()<<
@@ -706,7 +710,7 @@ public:
                         liter2 = leftEdge->find(axisPos);
                         if( liter2 != leftEdge->end())
                         {
-                            shared_ptr<WindowEdge>& leftWEdge = liter2->second;
+                            std::shared_ptr<WindowEdge>& leftWEdge = liter2->second;
                             if(leftWEdge->getNumValues() < _nPreceding + _nFollowing)
                             {
                                 needToForward = true;
@@ -720,7 +724,7 @@ public:
                         }
                         while(rightWEdge->getNumCoords() && (rightWEdge->getNumValues() > (_nPreceding + _nFollowing) || forwardChunkEdge.get()==0 ))
                         {
-                            shared_ptr<AggregatedValue> val = rightWEdge->churn(_nPreceding, _nFollowing, aggs);
+                            std::shared_ptr<AggregatedValue> val = rightWEdge->churn(_nPreceding, _nFollowing, aggs);
                             Coordinates valPos = axisPos;
                             valPos[_dimNum] = val->coord;
                             Coordinates chunkPos = valPos;
@@ -753,12 +757,12 @@ public:
                     iter= message._chunkEdges.erase(iter);
                 }
 
-                unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > >::iterator iter3 = inMessages[i]._computedValues.begin();
+                Coords2Coords2ValueVector::iterator iter3 = inMessages[i]._computedValues.begin();
                 while(iter3!=message._computedValues.end())
                 {
                     Coordinates const& chunkPos = iter3->first;
-                    shared_ptr< unordered_map <Coordinates, vector<Value> > > const& values = iter3->second;
-                    unordered_map <Coordinates, vector<Value> >::iterator iter4 = values->begin();
+                    std::shared_ptr<Coords2ValueVector> const& values = iter3->second;
+                    Coords2ValueVector::iterator iter4 = values->begin();
                     while(iter4 != values->end())
                     {
                         LOG4CXX_TRACE(logger, "W4 chunk "<<CoordsToStr(chunkPos)<< " position "<<CoordsToStr(iter4->first));
@@ -774,10 +778,10 @@ public:
 
     template <bool USE_SWAP>
     void processChunk(ChunkLocation const& cl,
-                      shared_ptr<ConstArrayIterator>& saiter,
-                      shared_ptr<ChunkEdge>& currentRightEdge,
-                      shared_ptr<ChunkEdge>& currentLeftEdge,
-                      unordered_map<Coordinates, shared_ptr<ChunkEdge> >& leftEdges,
+                      std::shared_ptr<ConstArrayIterator>& saiter,
+                      std::shared_ptr<ChunkEdge>& currentRightEdge,
+                      std::shared_ptr<ChunkEdge>& currentLeftEdge,
+                      Coords2ChunkEdge& leftEdges,
                       AttributeWriter<USE_SWAP>& output,
                       vector<VariableWindowMessage>& outMessages,
                       vector<AggregatePtr> const& aggs)
@@ -825,7 +829,7 @@ public:
 
         saiter->setPosition(chunkPos);
         output.notifyChunk(chunkPos);
-        shared_ptr<ConstChunkIterator> sciter = saiter->getChunk().getConstIterator();
+        std::shared_ptr<ConstChunkIterator> sciter = saiter->getChunk().getConstIterator();
         while (!sciter->end())
         {
             Coordinates axisPos = sciter->getPosition();
@@ -834,10 +838,10 @@ public:
             axisPos[_dimNum] = 0;
             Value const& v = sciter->getItem();
 
-            shared_ptr<WindowEdge>& rightWedge = (*currentRightEdge)[axisPos];
+            std::shared_ptr<WindowEdge>& rightWedge = (*currentRightEdge)[axisPos];
             if(currentLeftEdge.get())
             {
-                shared_ptr<WindowEdge>& leftWedge = (*currentLeftEdge)[axisPos];
+                std::shared_ptr<WindowEdge>& leftWedge = (*currentLeftEdge)[axisPos];
                 if (leftWedge.get()==0)
                 {
                     leftWedge.reset(new WindowEdge());
@@ -869,7 +873,7 @@ public:
             //the loop iterates multiple times only when we are at the starting edge of an array
             while(rightWedge.get() && rightWedge->getNumValues() > _nPreceding + _nFollowing)
             {
-                shared_ptr<AggregatedValue> result = rightWedge->churn(_nPreceding, _nFollowing, aggs);
+                std::shared_ptr<AggregatedValue> result = rightWedge->churn(_nPreceding, _nFollowing, aggs);
                 Coordinate prevAxisCoord = result->coord;
                 Coordinates prevValuePos = axisPos;
                 prevValuePos[_dimNum] = prevAxisCoord;
@@ -887,10 +891,10 @@ public:
             {
                 Coordinates const& edgePos = iter->first;
                 Coordinates valuePos = edgePos;
-                shared_ptr<WindowEdge>& wEdge = iter->second;
+                std::shared_ptr<WindowEdge>& wEdge = iter->second;
                 while(wEdge.get() && wEdge->getNumCoords())
                 {
-                    shared_ptr<AggregatedValue> result = wEdge->churn(_nPreceding, _nFollowing, aggs);
+                    std::shared_ptr<AggregatedValue> result = wEdge->churn(_nPreceding, _nFollowing, aggs);
                     valuePos[_dimNum]=result->coord;
                     Coordinates chunkPos = valuePos;
                     _srcDesc.getChunkPositionFor(chunkPos);
@@ -905,12 +909,12 @@ public:
             InstanceID nextInstance = ncl->second;
             //Next chunk is on a different instance. So we need to forward some window edges to that instance.
             //But we can only forward those window edges that have enough values.
-            shared_ptr<ChunkEdge> edgeToForward(new ChunkEdge());
+            std::shared_ptr<ChunkEdge> edgeToForward(new ChunkEdge());
             ChunkEdge::iterator iter = currentRightEdge->begin();
             while(iter!= currentRightEdge->end())
             {
                 Coordinates const& axisPos = iter->first;
-                shared_ptr<WindowEdge>& wEdge = iter->second;
+                std::shared_ptr<WindowEdge>& wEdge = iter->second;
                 if(wEdge.get() ==0)
                 {
                     iter++;
@@ -931,22 +935,22 @@ public:
     }
 
     template <bool USE_SWAP>
-    void flushLeftEdges(unordered_map<Coordinates, shared_ptr<ChunkEdge> > & leftEdges,
+    void flushLeftEdges(Coords2ChunkEdge & leftEdges,
                         AttributeWriter<USE_SWAP> & output,
                         vector<AggregatePtr> const& aggs)
     {
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> >::iterator iter = leftEdges.begin();
+        Coords2ChunkEdge::iterator iter = leftEdges.begin();
         while(iter!=leftEdges.end())
         {
-            shared_ptr<ChunkEdge>& leftEdge = iter->second;
+            std::shared_ptr<ChunkEdge>& leftEdge = iter->second;
             ChunkEdge::iterator iter2 = leftEdge->begin();
             while(iter2!=leftEdge->end())
             {
                 Coordinates valuePos = iter2->first;
-                shared_ptr<WindowEdge>& leftWedge = iter2->second;
+                std::shared_ptr<WindowEdge>& leftWedge = iter2->second;
                 while(leftWedge->getNumCoords())
                 {
-                    shared_ptr<AggregatedValue> result = leftWedge->churn(_nPreceding, _nFollowing, aggs);
+                    std::shared_ptr<AggregatedValue> result = leftWedge->churn(_nPreceding, _nFollowing, aggs);
                     valuePos[_dimNum]=result->coord;
                     Coordinates chunkPos = valuePos;
                     _srcDesc.getChunkPositionFor(chunkPos);
@@ -962,10 +966,10 @@ public:
     Coordinates agreeOnNextAxis(vector<Coordinates> const& axesList, size_t& currentAxis)
     {
         Coordinates result(0);
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         if ( _coordinatorId != INVALID_INSTANCE) //I am NOT the coordinator
         {
-            shared_ptr<SharedBuffer> buf= BufReceive(_coordinatorId, query);
+            std::shared_ptr<SharedBuffer> buf= BufReceive(_coordinatorId, query);
             if(buf->getSize() == sizeof(bool))
             {
                 assert(*((bool*) buf->getData()) == false);
@@ -978,7 +982,7 @@ public:
         {
             if(currentAxis == axesList.size())
             {
-                shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
+                std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
                 *((bool*) buf->getData())=false;
                 for(InstanceID i=0; i<_nInstances; i++)
                 {
@@ -991,7 +995,7 @@ public:
             }
             result = axesList[currentAxis];
             currentAxis++;
-            shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, _nDims * sizeof(Coordinate)));
+            std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, _nDims * sizeof(Coordinate)));
             Coordinate* coordPtr = (Coordinate*) buf->getData();
             for(size_t i=0; i<_nDims; i++)
             {
@@ -1010,24 +1014,24 @@ public:
     }
 
     template <bool USE_SWAP, bool AXIAL_SYNC>
-    void axialMultiInstanceVariableWindow(shared_ptr <Array> const& srcArray,
-                                   shared_ptr <MemArray>& dstArray,
+    void axialMultiInstanceVariableWindow(std::shared_ptr <Array> const& srcArray,
+                                   std::shared_ptr <MemArray>& dstArray,
                                    AggIOMapping const& mapping,
                                    size_t sizeLimit)
     {
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         vector<VariableWindowMessage> outMessages(_nInstances);
         vector<VariableWindowMessage> inMessages(_nInstances);
 
         vector<Coordinates> axesList = _globalChunkMap->getAxesList();
         size_t currentAxis = 0;
 
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> > leftEdges;
-        shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(mapping.getInputAttributeId());
+        Coords2ChunkEdge leftEdges;
+        std::shared_ptr<ConstArrayIterator> saiter = srcArray->getConstIterator(mapping.getInputAttributeId());
         AttributeWriter<USE_SWAP> output(_chunkCounts, dstArray, sizeLimit, query, mapping);
 
-        shared_ptr<ChunkEdge> currentRightEdge;
-        shared_ptr<ChunkEdge> currentLeftEdge;
+        std::shared_ptr<ChunkEdge> currentRightEdge;
+        std::shared_ptr<ChunkEdge> currentLeftEdge;
         ChunkInstanceMap::axial_iterator axiter = _localChunkMap->getAxialIterator();
 
         if (AXIAL_SYNC)
@@ -1085,17 +1089,17 @@ public:
         output.flushAll();
     }
 
-    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
 #if 0
         runVariableWindowUnitTests();
 #endif
         assert(inputArrays.size() == 1);
-        shared_ptr<Array> srcArray = ensureRandomAccess(inputArrays[0], query);
+        std::shared_ptr<Array> srcArray = ensureRandomAccess(inputArrays[0], query);
 
         _srcDesc = srcArray->getArrayDesc();
-        const string& dimName  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        const string& dimAlias = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getArrayName();
+        const string& dimName  = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string& dimAlias = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getArrayName();
         _dimNum = -1;
         bool found = false;
         _nDims = _srcDesc.getDimensions().size();
@@ -1110,15 +1114,15 @@ public:
         }
         found = found;  // to remove release-build warning
         assert(found);
-        _nPreceding = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64();
-        _nFollowing = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getInt64();
+        _nPreceding = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64();
+        _nFollowing = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getInt64();
         _localChunkMap.reset(new ChunkInstanceMap(_srcDesc.getDimensions().size(), _dimNum));
         _myInstanceId = query->getInstanceID();
         _coordinatorId = query->getCoordinatorID();
         _nInstances = query->getInstancesCount();
         _query = query;
 
-        shared_ptr<MemArray> dstArray(new MemArray(_schema, query));
+        std::shared_ptr<MemArray> dstArray(new MemArray(_schema, query));
         copyEmptyTagAttribute(srcArray, dstArray);
         mergeChunkMap();
         ArrayStats stats = calculateArrayStats();

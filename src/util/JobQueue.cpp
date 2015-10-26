@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@ JobQueue::JobQueue()
 }
 
 // Add new job to the end of queue
-void JobQueue::pushJob(boost::shared_ptr<Job> job)
+void JobQueue::pushJob(std::shared_ptr<Job> job)
 {
     { // scope
         ScopedMutexLock scopedMutexLock(_queueMutex);
@@ -56,7 +56,7 @@ void JobQueue::pushJob(boost::shared_ptr<Job> job)
 }
 
 // Add new job to the end of queue
-void JobQueue::pushHighPriorityJob(boost::shared_ptr<Job> job)
+void JobQueue::pushHighPriorityJob(std::shared_ptr<Job> job)
 {
     { // scope
         ScopedMutexLock scopedMutexLock(_queueMutex);
@@ -71,14 +71,14 @@ void JobQueue::pushHighPriorityJob(boost::shared_ptr<Job> job)
 
 // Get next job from the beginning of the queue
 // If there is next element the method waits
-boost::shared_ptr<Job> JobQueue::popJob()
+std::shared_ptr<Job> JobQueue::popJob()
 {
     _queueSemaphore.enter();
     { // scope
         ScopedMutexLock scopedMutexLock(_queueMutex);
         assert(!_queue.empty());
 
-        boost::shared_ptr<Job> job = _queue.front();
+        std::shared_ptr<Job> job = _queue.front();
         _queue.pop_front();
         LOG4CXX_TRACE(logger, "JobQueue::popJob: Q ("<<this<<") size = "<<getSize());
         return job;

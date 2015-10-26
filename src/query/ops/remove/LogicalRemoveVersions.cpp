@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -70,30 +70,36 @@ public:
         LogicalOperator(logicalName, alias)
 	{
             ADD_PARAM_IN_ARRAY_NAME()
-            ADD_PARAM_CONSTANT("uint64")    
+            ADD_PARAM_CONSTANT("uint64")
             _properties.exclusive = true;
             _properties.ddl = true;
 	}
-    
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 0);
-        return ArrayDesc();
+        ArrayDesc arrDesc;
+        arrDesc.setPartitioningSchema(defaultPartitioning());
+        return arrDesc;
     }
 
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
         assert(_parameters.size() == 2);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = 
-            ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string& arrayName =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         assert(arrayName.find('@') == std::string::npos);
         VersionID targetVersion =
-            evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
-                     query, 
+            evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+                     query,
                      TID_INT64).getInt64();
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(
+
+        if (targetVersion < 1 || targetVersion > SystemCatalog::MAX_VERSIONID) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST) << targetVersion;
+        }
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(
             new SystemCatalog::LockDesc(arrayName,
                                         query->getQueryID(),
                                         Cluster::getInstance()->getLocalInstanceId(),
@@ -101,7 +107,7 @@ public:
                                         SystemCatalog::LockDesc::RM)
             );
         lock->setArrayVersion(targetVersion);
-        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         assert(resLock);
         assert(resLock->getLockMode() >= SystemCatalog::LockDesc::RM);
     }

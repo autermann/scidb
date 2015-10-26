@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -117,5 +117,5 @@ while [ "$ORDER" -le "$ORDER_MAX" ] ; do
 done
 
 echo "$0: $0 $ORDER_MIN,$ORDER_MAX_VERBOSE,$ORDER_MAX end"
-echo 
+echo
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,7 +41,7 @@
 namespace scidb
 {
     //static log4cxx::LoggerPtr loggerNS(log4cxx::Logger::getLogger("scidb.smgr.compression.NullSuppression"));
-    
+
     NullSuppression::NullSuppression()
     {
         // generate tables of all prefix combos for prefix bits = 1, 2, 4
@@ -83,7 +83,7 @@ namespace scidb
         }
     }
 
-	
+
     // returns the number of bytes used in a char array of data of size elementSize
     uint8_t NullSuppression::getBytes(uint8_t const * const data, const uint32_t elementSize)
     {
@@ -110,7 +110,7 @@ namespace scidb
             {
                 break;
             }
-	
+
         }
 
         bytesUsed = elementSize - unused;
@@ -118,14 +118,14 @@ namespace scidb
         {
             ++bytesUsed; // use at least one byte for simplicity
         }
-    
+
 
         return bytesUsed;
-    
+
     }
 
-  
-    size_t NullSuppression::compress(void* dst, const ConstChunk& chunk, size_t chunkSize) 
+
+    size_t NullSuppression::compress(void* dst, const ConstChunk& chunk, size_t chunkSize)
     {
         return chunkSize;
     }
@@ -134,7 +134,7 @@ namespace scidb
     {
 
         size_t chunkSize = chunk.getSize();
-        TypeId type = chunk.getAttributeDesc().getType();        
+        TypeId type = chunk.getAttributeDesc().getType();
         size_t elementSize = TypeLibrary::getType(type).byteSize();
         size_t nElems;
 
@@ -160,7 +160,7 @@ namespace scidb
         uint32_t blocks = floor(nElems / blockLength);
         uint32_t endElements = nElems - blocks * blockLength;
         uint8_t *readPtr = (uint8_t *) src;
-    
+
         uint32_t i, j, k;
 
 
@@ -195,7 +195,7 @@ namespace scidb
             // not supported data type -- we should never get here
             memcpy(writePtr, readPtr, chunkSize);
             return chunkSize;
-        }    
+        }
 
 
         if(size == chunkSize)
@@ -225,7 +225,7 @@ namespace scidb
                 } // null the ones that were encoded out
             }// end block
         } // end block iterator
-    
+
 
         blockCode = readPtr;
         ++readPtr;

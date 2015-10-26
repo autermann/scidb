@@ -253,10 +253,10 @@ SCIDB QUERY : <aggregate(versions(MIB),count(*))>
 {0} 3
 
 SCIDB QUERY : <insert(filter(insert(build(MIB,null), MIB),a is null),MIB)>
-[An error expected at this place for the query "insert(filter(insert(build(MIB,null), MIB),a is null),MIB)". And it failed with error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED. Expected error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED.]
+[An error expected at this place for the query "insert(filter(insert(build(MIB,null), MIB),a is null),MIB)". And it failed with error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_UNKNOWN_ERROR. Expected error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_UNKNOWN_ERROR.]
 
 SCIDB QUERY : <insert(insert(build(MIB,null), MIB),MIB)>
-[An error expected at this place for the query "insert(insert(build(MIB,null), MIB),MIB)". And it failed with error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED. Expected error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED.]
+[An error expected at this place for the query "insert(insert(build(MIB,null), MIB),MIB)". And it failed with error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_UNKNOWN_ERROR. Expected error code = scidb::SCIDB_SE_SYSCAT::SCIDB_LE_UNKNOWN_ERROR.]
 
 SCIDB QUERY : <insert(build(B,true),B)>
 {x,y,z} fact

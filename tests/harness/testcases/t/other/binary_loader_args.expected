@@ -79,8 +79,11 @@ SCIDB QUERY : <aggregate(A2a_err,count(*))>
 
 SCIDB QUERY : <save(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,float,string)')>
 {i} a,b,c,d,e,f,g
+
+SCIDB QUERY : <load(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,float,string)')>
+{i} a,b,c,d,e,f,g
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
-{1000} 1000,'last',4.5567,44,false,44.332,'LAST_10'
+{2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
 SCIDB QUERY : <save(SP, 'junk.bin', -2, '(int32,string,double,int64,datetime,float,datetime)')>
 [An error expected at this place for the query "save(SP, 'junk.bin', -2, '(int32,string,double,int64,datetime,float,datetime)')". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER.]
@@ -97,6 +100,9 @@ SCIDB QUERY : <load(SP, 'sp_int32.bin', -2, '(int32,string,double,int64,bool,flo
 
 SCIDB QUERY : <save(SP, 'sp_int32_int64.bin', -2, '(int64,string,double,int64,bool,float,string)')>
 {i} a,b,c,d,e,f,g
+
+SCIDB QUERY : <scan(SP)>
+{i} a,b,c,d,e,f,g
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
 {2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
@@ -112,18 +118,14 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(SP, '${TEST_DATA
 
 SCIDB QUERY : <save(SP@2, 'sp_dbl_flt.bin', -2, '(int64,string,string,int64,bool,float,string)')>
 {i} a,b,c,d,e,f,g
-{1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
-{2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
 SCIDB QUERY : <load(SP, 'sp_dbl_flt.bin', -2, '(int64,string,string,int64,bool,float,string)')>
 {i} a,b,c,d,e,f,g
 {1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
 {2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
-SCIDB QUERY : <save(SP, 'sp_all.bin', -2, '(int64,string,double,,,float,string)')>
-{i} a,b,c,d,e,f,g
-{1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
-{2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
+SCIDB QUERY : <save(project(SP, a, b, c, f, g), 'sp_all.bin', -2, '(int64,string,double,float,string)')>
+{i} a,b,c,f,g
 
 SCIDB QUERY : <load(SP_project, 'sp_all.bin', -2, '(int64,string,double,float,string)')>
 {i} a,b,c,f,g

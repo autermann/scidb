@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,8 +27,8 @@
 
 #include <boost/range/iterator_range.hpp>                // For iterator_range
 #include <boost/operators.hpp>                           // For totally_ordered
-#include <string>                                        // For std::string
 #include <util/arena/Vector.h>                           // For mgd::vector
+#include <util/arena/String.h>                           // For mgd::string
 
 /****************************************************************************/
 namespace scidb {
@@ -97,6 +97,7 @@ class PointerRange : public boost::iterator_range<value*>,
         typedef std::vector<v>                  std_vector_type;
         typedef mgd::vector<v>                  mgd_vector_type;
         typedef std::basic_string<v>            std_string_type;
+        typedef mgd::basic_string<v>            mgd_string_type;
     };
     template<class v>
     struct t<const v>      // ...for constant ranges
@@ -104,6 +105,7 @@ class PointerRange : public boost::iterator_range<value*>,
         typedef std::vector<v>            const std_vector_type;
         typedef mgd::vector<v>            const mgd_vector_type;
         typedef std::basic_string<v>      const std_string_type;
+        typedef mgd::basic_string<v>      const mgd_string_type;
     };
 
  public:                   // Supporting types
@@ -111,6 +113,7 @@ class PointerRange : public boost::iterator_range<value*>,
     typedef typename t<value>::std_vector_type  std_vector_type;
     typedef typename t<value>::mgd_vector_type  mgd_vector_type;
     typedef typename t<value>::std_string_type  std_string_type;
+    typedef typename t<value>::mgd_string_type  mgd_string_type;
 
  public:                   // Construction
                               PointerRange();
@@ -299,7 +302,7 @@ inline PointerRange<v> pointerRange(size_t n,v* i)
 template<class v>
 inline PointerRange<v> pointerRange(std::vector<v>& r)
 {
-    return PointerRange<v>(r);                           // Create from vector
+    return pointerRange(&*r.begin(),&*r.end());          // Create from vector
 }
 
 /**
@@ -308,7 +311,7 @@ inline PointerRange<v> pointerRange(std::vector<v>& r)
 template<class v>
 inline PointerRange<const v> pointerRange(const std::vector<v>& r)
 {
-    return PointerRange<const v>(r);                     // Create from vector
+    return pointerRange(&*r.begin(),&*r.end());          // Create from vector
 }
 
 /**
@@ -317,7 +320,7 @@ inline PointerRange<const v> pointerRange(const std::vector<v>& r)
 template<class v>
 inline PointerRange<v> pointerRange(mgd::vector<v>& r)
 {
-    return PointerRange<v>(r);                           // Create from vector
+    return pointerRange(&*r.begin(),&*r.end());          // Create from vector
 }
 
 /**
@@ -326,7 +329,7 @@ inline PointerRange<v> pointerRange(mgd::vector<v>& r)
 template<class v>
 inline PointerRange<const v> pointerRange(const mgd::vector<v>& r)
 {
-    return PointerRange<const v>(r);                     // Create from vector
+    return pointerRange(&*r.begin(),&*r.end());          // Create from vector
 }
 
 /**
@@ -335,7 +338,7 @@ inline PointerRange<const v> pointerRange(const mgd::vector<v>& r)
 template<class v>
 inline PointerRange<v> pointerRange(std::basic_string<v>& r)
 {
-    return PointerRange<v>(r);                           // Create from string
+    return pointerRange(&*r.begin(),&*r.end());          // Create from string
 }
 
 /**
@@ -344,7 +347,25 @@ inline PointerRange<v> pointerRange(std::basic_string<v>& r)
 template<class v>
 inline PointerRange<const v> pointerRange(const std::basic_string<v>& r)
 {
-    return PointerRange<const v>(r);                     // Create from string
+    return pointerRange(&*r.begin(),&*r.end());          // Create from string
+}
+
+/**
+ *  Construct a range from the characters of the string 'r'.
+ */
+template<class v>
+inline PointerRange<v> pointerRange(const mgd::basic_string<v>& r)
+{
+    return pointerRange(&*r.begin(),&*r.end());          // Create from string
+}
+
+/**
+ *  Construct a range from the characters of the string 'r'.
+ */
+template<class v>
+inline PointerRange<const v> pointerRange(const mgd::basic_string<v>& r)
+{
+    return pointerRange(&*r.begin(),&*r.end());          // Create from string
 }
 
 /**

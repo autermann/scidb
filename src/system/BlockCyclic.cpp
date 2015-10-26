@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -56,13 +56,13 @@ template<typename int_tt, typename int2_tt>
 
 // ProcGrid public methods ---------------------------------------
 
-/// 
+///
 /// ProcGrid::ProcGrid
 /// an object that factors the count of processes into the most
 /// square 2D grid possible and then implements a number of functions
 /// needed to use that process grid to allow SciDB to work with
 /// ScaLAPACK slave processes.
-/// 
+///
 ProcGrid::ProcGrid(const procNum_t numInstances)
 :
     _maxGridSize(findFactorization(std::min(numInstances, procNumLimit())))
@@ -130,7 +130,7 @@ procNum_t ProcGrid::procNum(const procRowCol_t& gridPos,
 /// ProcGrid::gridPos
 /// given the procNum, return the 2D position in the process grid
 /// of that procNum
-// TODO JHM: would be nice to have a unit test that getPnum(getGridPos(x)) = x 
+// TODO JHM: would be nice to have a unit test that getPnum(getGridPos(x)) = x
 //           where do those go?
 procRowCol_t ProcGrid::gridPos(const procNum_t procNum,
                                const procRowCol_t& useGridSize) const
@@ -178,7 +178,7 @@ procNum_t ProcGrid::procNumLimit()
     // when an interface uses unsigned numbers that don't need the largest
     // range possible
 
-    // TODO: find a name and header for the resuse of the expression below 
+    // TODO: find a name and header for the resuse of the expression below
     procNum_t limit = std::numeric_limits<procNum_t>::max()/2 ;
 
     procNum_t result = limit -1 ;
@@ -188,7 +188,7 @@ procNum_t ProcGrid::procNumLimit()
     // we want have in NDEBUG builds when we have a standard mechanism
     // for setting test parameters to avoid server restarts
     procNum_t debugMax = result; // change me to debug,
-    result = std::min(result, debugMax); 
+    result = std::min(result, debugMax);
 #endif
     assert(result < limit);
     return result;
@@ -220,8 +220,8 @@ procRowCol_t ProcGrid::findFactorization(procNum_t numProc)
     for(procNum_t ii = 1; ii <= searchLimit; ++ii) {
         if(numProc % ii == 0) {
             gridSize.row = ii ;        // find largest factor smaller than sqrt(P)
-        }   
-    }   
+        }
+    }
     gridSize.col = numProc / gridSize.row  ; // leaves any non-rectangular portion behind
 
     assert(gridSize.row <= gridSize.col);  // rectangles must be horizontal
@@ -260,17 +260,17 @@ procNum_t getFactorizationSpecialCases(procNum_t numMPIProc)
     case 22: return 2 ;     // 2 x 11 (may be better than 3 x 7)
     case 24: return 4 ;     // 4 x 6
     case 26: return 2 ;     // 2 x 13 (may be better than 4 x 6)
-    case 28: return 4;      // 4 x 7 
-    case 30: return 3;      // 3 x 5 
+    case 28: return 4;      // 4 x 7
+    case 30: return 3;      // 3 x 5
     case 32: return 4;      // 4 x 8
-    case 34: return 4;      // 4 x 17 (may be better than 4 x 8) 
+    case 34: return 4;      // 4 x 17 (may be better than 4 x 8)
     case 36: return 6;      // 6 x 6
     case 38: return 4;      // 2 x 19 (may be better than 6 x 6)
     case 40: return 4;      // 5 x 8
     case 42: return 6;      // 6 x 7
     case 44: return 6;      // 6 x 7
     case 46: return 6;      // 6 x 7
-    case 48: return 6;      // 6 x 8 
+    case 48: return 6;      // 6 x 8
     case 50: return 5;      // 5 x 10 (may be better than 7 x 7)
     }
     return procNum_t( ::sqrt(numMPIProc) ) ; // e.g for  50, would return 7 -> 7 x 7

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,8 +41,8 @@
 #include <iostream>
 #include <vector>
 
-#include "util/Singleton.h"
-#include "system/Utils.h"
+#include <util/Singleton.h>
+#include <system/Utils.h>
 
 namespace scidb
 {
@@ -135,7 +135,10 @@ enum
     CONFIG_MAX_OPEN_FDS,
     CONFIG_PREALLOCATE_SHARED_MEM,
     CONFIG_INSTALL_ROOT,
-    CONFIG_INPUT_DOUBLE_BUFFERING
+    CONFIG_INPUT_DOUBLE_BUFFERING,
+    CONFIG_SECURITY,
+    CONFIG_ENABLE_CHUNKMAP_RECOVERY,
+    CONFIG_SKIP_CHUNKMAP_INTEGRITY_CHECK
 };
 
 enum RepartAlgorithm
@@ -158,9 +161,14 @@ std::vector< std::string > getDefinition(size_t elementCount)
     return result;
 }
 
-class Config: public Singleton<Config>
+class ConfigBase
 {
 public:
+    // This is really a vector but the #define for it is STRING_LIST
+    // To be more consistent with the usage call the variable StringList
+    // Actually, in JSON this is an array of strings.
+    typedef std::vector<std::string> StringList;
+
     typedef enum
     {
         STRING,
@@ -175,7 +183,7 @@ public:
     class ConfigAddOption
     {
     public:
-        ConfigAddOption(Config *owner);
+        ConfigAddOption(ConfigBase *owner);
 
         ConfigAddOption& operator()(
             int32_t option,
@@ -199,7 +207,7 @@ public:
             const boost::any &value = boost::any(),
             bool required = true);
     private:
-        Config *_owner;
+        ConfigBase *_owner;
     };
 
     class ConfigOption
@@ -366,9 +374,10 @@ public:
 
     std::string toString();
 
-private:
-    ~Config();
+protected:
+    ~ConfigBase();
 
+private:
     std::map<int32_t, ConfigOption*> _values;
 
     std::map<std::string, int32_t> _longArgToOption;
@@ -378,7 +387,16 @@ private:
     std::string _configFileName;
 
     std::string _description;
+};
 
+/**
+ * Used to read the ~/.config/scidb/iquery.conf information
+ */
+class Config
+    : public Singleton<Config>
+    , public ConfigBase
+{
+private:
     friend class Singleton<Config>;
 };
 

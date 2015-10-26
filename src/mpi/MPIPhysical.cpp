@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,8 +33,7 @@
 #include <time.h>
 
 // de-facto standards
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 #include <log4cxx/logger.h>
 
@@ -52,6 +51,7 @@
 #include <mpi/MPIPhysical.hpp>
 #include <util/shm/SharedMemoryIpc.h>
 
+using namespace std;
 using namespace boost;
 
 namespace scidb {
@@ -62,8 +62,8 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.mpi
 /// some operators may not be able to work in degraded mode while they are being implemented
 /// this call can make them exit if that is the case.
 /// TODO: add a more explicit message of what is happening
-void throwIfDegradedMode(shared_ptr<Query>& query) {
-    const boost::shared_ptr<const InstanceMembership> membership =
+void throwIfDegradedMode(std::shared_ptr<Query>& query) {
+    const std::shared_ptr<const InstanceMembership> membership =
     Cluster::getInstance()->getInstanceMembership();
     if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
         (membership->getInstances().size() != query->getInstancesCount())) {
@@ -73,20 +73,20 @@ void throwIfDegradedMode(shared_ptr<Query>& query) {
     }
 }
 
-void MPIPhysical::setQuery(const boost::shared_ptr<Query>& query)
+void MPIPhysical::setQuery(const std::shared_ptr<Query>& query)
 {
-    boost::shared_ptr<Query> myQuery = _query.lock();
+    std::shared_ptr<Query> myQuery = _query.lock();
     if (myQuery) {
         assert(query==myQuery);
         assert(_ctx);
         return;
     }
     PhysicalOperator::setQuery(query);
-    _ctx = boost::shared_ptr<MpiOperatorContext>(new MpiOperatorContext(query));
+    _ctx = std::shared_ptr<MpiOperatorContext>(new MpiOperatorContext(query));
     _ctx = MpiManager::getInstance()->checkAndSetCtx(query,_ctx);
 }
 
-void MPIPhysical::postSingleExecute(shared_ptr<Query> query)
+void MPIPhysical::postSingleExecute(std::shared_ptr<Query> query)
 {
     // On a non-participating launcher instance it is difficult
     // to determine when the launch is complete without a sync point.
@@ -97,7 +97,7 @@ void MPIPhysical::postSingleExecute(shared_ptr<Query> query)
     assert(_ctx);
     const uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
 
-    boost::shared_ptr<MpiLauncher> launcher(_ctx->getLauncher(lastIdInUse));
+    std::shared_ptr<MpiLauncher> launcher(_ctx->getLauncher(lastIdInUse));
     assert(launcher);
     if (launcher && launcher == _launcher) {
         LOG4CXX_DEBUG(logger, "MPIPhysical::postSingleExecute: destroying last launcher for launch = " << lastIdInUse);
@@ -109,7 +109,7 @@ void MPIPhysical::postSingleExecute(shared_ptr<Query> query)
     _ctx.reset();
 }
 
-bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves)
+bool MPIPhysical::launchMPISlaves(std::shared_ptr<Query>& query, const size_t maxSlaves)
 {
     LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(query, maxSlaves: " << maxSlaves << ") called.");
 
@@ -124,32 +124,32 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
     _launchId = _ctx->getNextLaunchId(); // bump the launch ID by 1
 
     Cluster* cluster = Cluster::getInstance();
-    const boost::shared_ptr<const InstanceMembership> membership = cluster->getInstanceMembership();
+    const std::shared_ptr<const InstanceMembership> membership = cluster->getInstanceMembership();
     const string& installPath = MpiManager::getInstallPath(membership);
 
     uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();
     assert(lastIdInUse < _launchId);
 
-    boost::shared_ptr<MpiSlaveProxy> slave;
+    std::shared_ptr<MpiSlaveProxy> slave;
 
     // check if our logical ID is within the set of instances that will have a corresponding slave
     InstanceID iID = query->getInstanceID();
     if ( iID < maxSlaves) {
-        slave = boost::make_shared<MpiSlaveProxy>(_launchId, query, installPath);
+        slave = std::make_shared<MpiSlaveProxy>(_launchId, query, installPath);
         _ctx->setSlave(slave);
     }
 
     _mustLaunch = query->isCoordinator();
     if (_mustLaunch) {
 
-        boost::shared_ptr<MpiLauncher> oldLauncher = _ctx->getLauncher(lastIdInUse);
+        std::shared_ptr<MpiLauncher> oldLauncher = _ctx->getLauncher(lastIdInUse);
         if (oldLauncher) {
             assert(lastIdInUse == oldLauncher->getLaunchId());
             LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): destroying last launcher for launch = " << lastIdInUse);
             oldLauncher->destroy();
             oldLauncher.reset();
         }
-        _launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
+        _launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(_launchId, query));
         _ctx->setLauncher(_launcher);
         std::vector<std::string> args;
         _launcher->launch(args, membership, maxSlaves);
@@ -171,7 +171,7 @@ bool MPIPhysical::launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlav
                       << " launchId=" << _launchId);
 
 
-        boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(lastIdInUse);
+        std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(lastIdInUse);
         if (oldSlave) {
             assert(lastIdInUse == oldSlave->getLaunchId());
             LOG4CXX_DEBUG(logger, "MPIPhysical::launchMPISlaves(): oldSlave->destroy() & .reset()");

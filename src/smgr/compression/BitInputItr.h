@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,17 +40,17 @@ namespace scidb
 	  _bitsRead = 8;
 	}
     };
-    
+
     // pack a set of right-aligned bits and pack them to the left, put completed byte to ByteInputItr
     // bits must be 1...8
     int32_t get(uint8_t &dst, const size_t bits);
-    
+
      // close out the _src itr, return # of bytes written
     int32_t close()
     {
       return _src->close();
     }
-    
+
   private:
     ByteInputItr * const _src;
     uint8_t _bits; // current byte from input that we are working from

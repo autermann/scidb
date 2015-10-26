@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,6 +27,7 @@
  */
 
 #include <query/Operator.h>
+using namespace std;
 
 namespace scidb
 {
@@ -92,11 +93,11 @@ public:
         ADD_PARAM_VARIES(); // a string that contains the named semiring option
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
         nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas) {
 
         // required by ADD_PARAM_VARIES() -- this is copy pasted, not understood
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         switch (_parameters.size()) {
         // either one or two extra parameters, both of which must be string
@@ -111,7 +112,7 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 2);
 
@@ -120,10 +121,10 @@ public:
         if (schemas[0].getDimensions().size() != 2 || schemas[1].getDimensions().size() != 2)
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_MULTIPLY_ERROR3);
 
-        if (schemas[0].getDimensions()[0].getLength() == INFINITE_LENGTH
-                || schemas[0].getDimensions()[1].getLength() == INFINITE_LENGTH
-                || schemas[1].getDimensions()[0].getLength() == INFINITE_LENGTH
-                || schemas[1].getDimensions()[1].getLength() == INFINITE_LENGTH)
+        if (schemas[0].getDimensions()[0].isMaxStar()
+                || schemas[0].getDimensions()[1].isMaxStar()
+                || schemas[1].getDimensions()[0].isMaxStar()
+                || schemas[1].getDimensions()[1].isMaxStar())
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_MULTIPLY_ERROR4);
 
         if (schemas[0].getDimensions()[1].getLength() != schemas[1].getDimensions()[0].getLength()
@@ -155,7 +156,7 @@ public:
             break; // done
         case 1:
         case 2:
-            typedef boost::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
+            typedef std::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
             namedOptionStr = evaluate(reinterpret_cast<ParamType_t&>(_parameters[0])->getExpression(), query, TID_STRING).getString();
             if (namedOptionStr != "min.+" &&
                 namedOptionStr != "max.+" &&
@@ -183,25 +184,25 @@ public:
         Dimensions dims(2);
         DimensionDesc const& d1 = schemas[0].getDimensions()[0];
         dims[0] = DimensionDesc(d1.getBaseName(),
-                                d1.getNamesAndAliases(), 
-                                d1.getStartMin(), 
-                                d1.getCurrStart(), 
-                                d1.getCurrEnd(), 
-                                d1.getEndMax(), 
-                                d1.getChunkInterval(), 
+                                d1.getNamesAndAliases(),
+                                d1.getStartMin(),
+                                d1.getCurrStart(),
+                                d1.getCurrEnd(),
+                                d1.getEndMax(),
+                                d1.getChunkInterval(),
                                 0);
 
         DimensionDesc const& d2 = schemas[1].getDimensions()[1];
         dims[1] = DimensionDesc(d1.getBaseName() == d2.getBaseName() ? d1.getBaseName() + "2" : d2.getBaseName(),
-                                d2.getNamesAndAliases(), 
-                                d2.getStartMin(), 
-                                d2.getCurrStart(), 
-                                d2.getCurrEnd(), 
-                                d2.getEndMax(), 
-                                d2.getChunkInterval(), 
+                                d2.getNamesAndAliases(),
+                                d2.getStartMin(),
+                                d2.getCurrStart(),
+                                d2.getCurrEnd(),
+                                d2.getEndMax(),
+                                d2.getChunkInterval(),
                                 0);
 
-        return ArrayDesc("Multiply", addEmptyTagAttribute(atts),dims);
+        return ArrayDesc("Multiply", addEmptyTagAttribute(atts), dims, defaultPartitioning());
     }
 
 };

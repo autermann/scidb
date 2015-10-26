@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -20,19 +20,13 @@
 ########################################
 
 # C O M P O N E N T S
-#libscidbclient pakcage
-install(FILES "${GENERAL_OUTPUT_DIRECTORY}/libscidbclient${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib COMPONENT libscidbclient)
+#scidb-client package
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/libscidbclient${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib COMPONENT scidb-client)
 
 #scidb-utils package
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/iquery" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/gen_matrix" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/benchGen" DESTINATION bin COMPONENT scidb-utils)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/csv2scidb" DESTINATION bin COMPONENT scidb-utils)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/tsv2scidb" DESTINATION bin COMPONENT scidb-utils)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbLoadCsv.sh" DESTINATION bin COMPONENT scidb-utils)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/osplitcsv" DESTINATION bin COMPONENT scidb-utils)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/splitcsv" DESTINATION bin COMPONENT scidb-utils)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/loadcsv.py" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/loadpipe.py" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/calculate_chunk_length.py" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/remove_arrays.py" DESTINATION bin COMPONENT scidb-utils)
@@ -46,18 +40,17 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/statistics.py" DESTINATIO
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/util.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/counter.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_psf.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_control.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/pgpass_updater.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 
 #scidb-jdbc package
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/scidb4j.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
-install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/jiquery.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/example.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/jdbctest.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
 
 #scidb-dev-tools package
 install(PROGRAMS "${CMAKE_BINARY_DIR}/tests/unit/unit_tests" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestharness" DESTINATION bin COMPONENT scidb-dev-tools)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/shim" DESTINATION bin COMPONENT scidb-dev-tools)
-install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/shimsvc" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/arg_separator" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestprep.py" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/mu_admin.py" DESTINATION bin COMPONENT scidb-dev-tools)
@@ -65,6 +58,11 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/daemon.py" DESTINATION etc COMPONE
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/mu_config.ini" DESTINATION etc COMPONENT scidb-dev-tools)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/log4j.properties" DESTINATION etc COMPONENT scidb-dev-tools)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/libdmalloc${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib COMPONENT libdmalloc)
+
+#scidb-shim package
+#Building shim is temporarily disabled because it does not work with C++14. See #4745.
+#install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/shim" DESTINATION bin COMPONENT scidb-shim)
+#install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/shimsvc" DESTINATION bin COMPONENT scidb-shim)
 
 #
 # P L U G I N S
@@ -78,6 +76,7 @@ install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libcomplex${CMAKE_SHARED_LIBR
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libra_decl${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmore_math${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmisc${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
+install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libprototype_load_tools${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libtile_integration${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib/scidb/plugins COMPONENT scidb-plugins)
@@ -118,41 +117,32 @@ if (NOT WITHOUT_SERVER)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/prelude.txt"       DESTINATION lib/scidb/modules COMPONENT scidb)
 endif()
 
-if(SWIG2_FOUND AND PYTHONLIBS_FOUND)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/_libscidbpython${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/libscidbpython.py" DESTINATION lib COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/scidbapi.py" DESTINATION lib COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/README" DESTINATION share/scidb/examples/python COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/sample.py" DESTINATION share/scidb/examples/python COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/simplearray.data" DESTINATION share/scidb/examples/python COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/sample2.py" DESTINATION share/scidb/examples/python COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/sample2.csv" DESTINATION share/scidb/examples/python COMPONENT libscidbclient-python)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/log4cxx.properties" DESTINATION share/scidb/examples/python COMPONENT libscidbclient-python)
-endif(SWIG2_FOUND AND PYTHONLIBS_FOUND)
+#SWIG-based python connector is temporarily disabled because it does not work with C++14. See #4745.
+#if(SWIG2_FOUND AND PYTHONLIBS_FOUND)
+if(false)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/_libscidbpython${CMAKE_SHARED_LIBRARY_SUFFIX}" DESTINATION lib COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/libscidbpython.py" DESTINATION lib COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/scidbapi.py" DESTINATION lib COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/README" DESTINATION share/scidb/examples/python COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/sample.py" DESTINATION share/scidb/examples/python COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/simplearray.data" DESTINATION share/scidb/examples/python COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/sample2.py" DESTINATION share/scidb/examples/python COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/sample2.csv" DESTINATION share/scidb/examples/python COMPONENT scidb-client-python)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/pythonexamples/log4cxx.properties" DESTINATION share/scidb/examples/python COMPONENT scidb-client-python)
+endif()
 
 #scidb-dev package
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include COMPONENT scidb-dev PATTERN ".svn" EXCLUDE)
 
-#scidb-doc package
-if(SCIDB_DOC_TYPE STREQUAL "FULL" OR SCIDB_DOC_TYPE STREQUAL "API" AND BUILD_USER_DOC)
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/doc/api/html/) #create doxygen out dir so make install will work even without 'make doc'
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/api/html/ DESTINATION share/doc/api COMPONENT scidb-doc PATTERN ".svn" EXCLUDE)
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/user/pdf/ DESTINATION share/doc/user COMPONENT scidb-doc PATTERN ".svn" EXCLUDE)
-endif()
-
 # D E B U G   P A C K A G E S
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
-    #libscidbclient-dbg package
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/libscidbclient${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT libscidbclient-dbg)
+    #scidb-client-dbg package
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/libscidbclient${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-client-dbg)
 
     #scidb-utils-dbg package
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/iquery${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/gen_matrix${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/benchGen${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
-    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/csv2scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
-    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/tsv2scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
-    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/osplitcsv${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
-    install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/splitcsv${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-utils-dbg)
 
     #scidb-dev-tools-dbg package
     install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/scidbtestharness${DEBUG_SYMBOLS_EXTENSION}" DESTINATION bin/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-dev-tools-dbg)
@@ -173,6 +163,7 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libra_decl${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmore_math${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmisc${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
+    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libprototype_load_tools${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libtile_integration${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libfits${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-plugins-dbg)
@@ -185,9 +176,11 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
         install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/plugins/${DEBUG_SYMBOLS_DIRECTORY}/mpi_slave_scidb${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/scidb/plugins/${DEBUG_SYMBOLS_EXTENSION} COMPONENT scidb-plugins-dbg)
     endif ()
 
-    #libscidbclient-python-dbg package
-    if(SWIG_FOUND AND PYTHONLIBS_FOUND)
-        install(FILES "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/_libscidbpython${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT libscidbclient-python-dbg)
+    #scidb-client-python-dbg package
+    #SWIG-based python connector is temporarily disabled because it does not work with C++14. See #4745.
+    #if(SWIG_FOUND AND PYTHONLIBS_FOUND)
+    if(false)
+        install(FILES "${GENERAL_OUTPUT_DIRECTORY}/${DEBUG_SYMBOLS_DIRECTORY}/_libscidbpython${CMAKE_SHARED_LIBRARY_SUFFIX}${DEBUG_SYMBOLS_EXTENSION}" DESTINATION lib/${DEBUG_SYMBOLS_DIRECTORY} COMPONENT scidb-client-python-dbg)
     endif()
 endif ()
 # E N D   C O M P O N E N T S
@@ -201,6 +194,7 @@ add_custom_target(src_package
     COMMAND rm -rf ${CMAKE_BINARY_DIR}/${SRC_PACKAGE_FILE_NAME}.tgz
     COMMAND svn export ${CMAKE_SOURCE_DIR} ${SRC_PACKAGE_FILE_NAME}
     COMMAND cp ${CMAKE_BINARY_DIR}/revision ${SRC_PACKAGE_FILE_NAME}
+    COMMAND ${CMAKE_BINARY_DIR}/../utils/licensing.pl ${SRC_PACKAGE_FILE_NAME} ${CMAKE_BINARY_DIR}/../utils/scidb.lic
     COMMAND tar -czf ${CMAKE_BINARY_DIR}/${SRC_PACKAGE_FILE_NAME}.tgz ${SRC_PACKAGE_FILE_NAME}
     WORKING_DIRECTORY /tmp
     )

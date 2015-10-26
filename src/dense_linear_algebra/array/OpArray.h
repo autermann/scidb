@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -44,7 +44,6 @@
 #include <array/DelegateArray.h>        // for SplitArray
 
 using namespace std;            // TODO: fix me
-using namespace boost;          // TODO: fix me
 
 namespace scidb
 {
@@ -79,9 +78,9 @@ class OpArray : public SplitArray
 {
 public:
     enum dbgLevel_e {
-        DBG_NONE = 0, 
-        DBG_SIMPLE, 
-        DBG_DETAIL, 
+        DBG_NONE = 0,
+        DBG_SIMPLE,
+        DBG_DETAIL,
         DBG_LOOP_SIMPLE,
         DBG_LOOP_DETAIL,
         DBG = DBG_NONE};  // change this one to enable debug traces
@@ -101,7 +100,7 @@ public:
             bool tmp = SplitArray::ArrayIterator::end();
             if (DBG >= DBG_DETAIL && tmp) {
                 std::cerr << "@@ "
-                          << _SDbgClass << "::end() returns:" 
+                          << _SDbgClass << "::end() returns:"
                           << tmp << std::endl;
             }
             return tmp;
@@ -109,8 +108,8 @@ public:
         virtual const Coordinates& getPosition() {
             const Coordinates& tmp = SplitArray::ArrayIterator::getPosition();
             if (DBG >= DBG_LOOP_DETAIL) {
-                std::cerr << "@@@@ " 
-                          << _SDbgClass << "::getPos() -> " 
+                std::cerr << "@@@@ "
+                          << _SDbgClass << "::getPos() -> "
                           << tmp[0] << "," << tmp[1] << std::endl;
             }
             return tmp;
@@ -119,7 +118,7 @@ public:
             bool tmp = SplitArray::ArrayIterator::setPosition(pos);
             if (DBG >= DBG_LOOP_DETAIL) {
                 std::cerr << "@@@@ "
-                          << _SDbgClass << "::setPos(" 
+                          << _SDbgClass << "::setPos("
                           << pos[0] << "," << pos[1] << ") ->" << tmp << std::endl;
             }
             return tmp;
@@ -128,7 +127,7 @@ public:
 
     protected:
         static const char _SDbgClass[]; //e.g. = "OpArray<Op_tt>::ArrayIterator";
-        const OpArray&  _array;
+        const OpArray&    _array;
     };
     friend class ArrayIterator;
 
@@ -136,7 +135,7 @@ public:
     OpArray(ArrayDesc const& desc, const boost::shared_array<char>& dummy,
             const Op_tt& op, Coordinates const& from, Coordinates const& till,
             Coordinates const& delta,
-            const boost::shared_ptr<scidb::Query>& query);
+            const std::shared_ptr<scidb::Query>& query);
     virtual ~OpArray();
 
     virtual Access getSupportedAccess() const
@@ -163,7 +162,7 @@ template<class Op_tt>
 OpArray<Op_tt>::OpArray(ArrayDesc const& desc,
                         const boost::shared_array<char>& dummy, const Op_tt& op,
                         Coordinates const& from, Coordinates const& till, Coordinates const& delta,
-                        const boost::shared_ptr<scidb::Query>& query)
+                        const std::shared_ptr<scidb::Query>& query)
 :
     SplitArray(desc, dummy, from, till, query),
     _op(op),
@@ -192,7 +191,7 @@ OpArray<Op_tt>::ArrayIterator::ArrayIterator(OpArray const& delegate,
                                              AttributeID attrID)
 :
     SplitArray::ArrayIterator(delegate, attrID),
-    _array(delegate)
+    _array(delegate) //,
 {
     if(DBG >= DBG_LOOP_DETAIL) {
         std::cerr << "@@@@ OpArray<Op_tt>::ArrayIterator::ArrayIterator()" << std::endl;
@@ -266,12 +265,12 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
         }
         // chunk is the MemChunk on SplitArray::ArrayIterator
         chunk.initialize(&array, &array.getArrayDesc(), addr, 0);
-        
+
         // duration of getChunk() short enough (<--- DJG this is worrisome!)
-        const boost::shared_ptr<scidb::Query>
+        const std::shared_ptr<scidb::Query>
             localQueryPtr(Query::getValidQueryPtr(_array._query));
 
-        boost::shared_ptr<ChunkIterator> chunkIter =
+        std::shared_ptr<ChunkIterator> chunkIter =
             chunk.getIterator(localQueryPtr, ChunkIterator::SEQUENTIAL_WRITE);
 
         Coordinates const& first = chunk.getFirstPosition(false);
@@ -306,9 +305,11 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
             //       we are just using a variable that is consistent with the "last" dimension, (nDims-1),
             //       as used in the nDims==2 case below, so that we can share some common code
             //       (setup of colsTillEnd, colCount) with that code
+            Op_tt op(_array._op);  // need a non-const copy, array's is const
+            op.blockBegin();
             int64_t colEnd = first[0] + colCount ;
             for(int64_t col = first[0]; col < colEnd; col++) {
-                double val = _array._op.operator()(col);
+                double val = op.operator()(col);
                 if(DBG >= DBG_DETAIL) {
                     std::cerr << dbgPrefix << "  ["<< col << "]"
                               << " -> val: " << val << std::endl ;
@@ -316,6 +317,7 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
                 pos[0] = col ; chunkIter->setPosition(pos);
                 value.setDouble(val); chunkIter->writeItem(value);
             }
+            op.blockEnd();
         } else {
             assert(nDims==2);
             int64_t rowsTillEnd = (_array.till())[0] - first[0] + 1 ;
@@ -332,9 +334,11 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
             int64_t colEnd = first[1] + colCount;
             // note that SciDB chunks are stored in row-major order, so we
             // iterate columns in the inner loop.
+            Op_tt op(_array._op);  // need a non-const copy, array's is const
+            op.blockBegin();
             for(int64_t row = first[0]; row < rowEnd; row++) {
                 for(int64_t col = first[1]; col < colEnd; col++) {
-                    double val = _array._op.operator()(row, col);
+                    double val = op.operator()(row, col);
                     if(DBG >= DBG_LOOP_SIMPLE) {
                         std::cerr << dbgPrefix << " ["<< row << "," << col << "] "
                                   << " -> val: " << val << std::endl ;
@@ -343,6 +347,7 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
                     value.setDouble(val); chunkIter->writeItem(value);
                 }
             }
+            op.blockEnd();
         }
         chunkIter->flush(); // vital
         chunkInitialized = true;
@@ -372,7 +377,7 @@ ConstChunk const& OpArray<Op_tt>::ArrayIterator::getChunk()
             }
             if (!oob) {
                 // len in doubles, (not in bytes like original)
-                size_t len = min(size_t(array.till()[nDims-1] - pos[nDims-1] + 1),
+                size_t len = std::min(size_t(array.till()[nDims-1] - pos[nDims-1] + 1),
                                  size_t(dims[nDims-1].getChunkInterval())); // *attrBitSize >> 3);
                 //memcpy(dst, src + (offs*attrBitSize >> 3),
                 for(size_t ii=0; ii < len; ii++) {

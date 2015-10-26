@@ -20,10 +20,19 @@ scan(B)
 insert(A,B)
 scan(B)
 
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(C,A)"
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(A,C)"
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(A,D)"
---error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH "insert(repart(D,<val:double> [x=0:3,2,0]),D)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_START_INDEX_MISMATCH  "insert(C,A)"
+--error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_START_INDEX_MISMATCH  "insert(A,C)"
+
+# This insert() now works because of auto-repartitioning (ticket #4665).
+insert(A,D)
+
+# Fails because any explicit repart() is almost certainly wrong.
+--error --code scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN "insert(repart(D,<val:double> [x=0:3,2,0]),D)"
+
+# For backward compat, it works OK iff the manual repart() is the same as would have been done automatically.
+insert(repart(D, <val:double> [x=0:3,4,0]),D)
+
+
 --error --code scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2 "insert(B, repart(D,<sal:double> [x=0:3,2,0]))"
 --error --code scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAY_DOESNT_EXIST "insert(B,ZZ)"
 

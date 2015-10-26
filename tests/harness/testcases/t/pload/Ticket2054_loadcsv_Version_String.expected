@@ -1,3 +1,6 @@
+SCIDB QUERY : <create array array_sm10 <a:int64,b:int64,c:int64>[i=0:*,3,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
 SCIDB QUERY : <sort(array_sm10,a)>
 {n} a,b,c
 {0} 1,2,3
@@ -18,4 +21,7 @@ SCIDB QUERY : <sort(array_sm10,a)>
 {15} 46,47,48
 {16} 49,50,51
 {17} 52,53,54
+
+SCIDB QUERY : <remove(array_sm10)>
+Query was executed successfully
 

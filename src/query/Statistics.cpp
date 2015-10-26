@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,7 +28,7 @@
  * @brief Implementation of statistic gatharing class
  */
 
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <log4cxx/logger.h>
 
 #include <pqxx/connection>
@@ -208,15 +208,15 @@ private:
     log4cxx::LoggerPtr _logger;
 };
 
-shared_ptr<StatisticsMonitor> StatisticsMonitor::create(size_t type, const string& params)
+std::shared_ptr<StatisticsMonitor> StatisticsMonitor::create(size_t type, const string& params)
 {
     switch (type)
     {
     case smPostgres:
-        return shared_ptr<StatisticsMonitor>(new PostgresStatisticsMonitor(params));
+        return std::shared_ptr<StatisticsMonitor>(new PostgresStatisticsMonitor(params));
     case smLogger:
     default:
-        return shared_ptr<StatisticsMonitor>(new LoggerStatisticsMonitor(params));
+        return std::shared_ptr<StatisticsMonitor>(new LoggerStatisticsMonitor(params));
     }
 }
 

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -25,17 +25,18 @@ set -e
 function usage()
 {
 cat <<EOF
-Usage: 
+Usage:
     $0 <rpm|deb> insource <result dir> [chroot distro]
     $0 <rpm|deb> <local|chroot> <Debug|RelWithDebInfo> <result dir> [chroot distro]
 EOF
     exit 1
 }
 
-[ "$#" -lt 3 ] && usage
+[ "$#" -lt 4 ] && usage
 
 type=$1
 target=$2
+PKGNAME=${!#}
 
 case $type in
     deb|rpm);;
@@ -53,7 +54,7 @@ case $target in
 	result_dir=$4
 	distro=${5-""}
 	;;
-    *) 
+    *)
 	usage
 	;;
 esac
@@ -69,7 +70,7 @@ scidb_src_dir=$(readlink -f $(dirname $0)/..)
 
 if [ $target != "insource" ]; then
     build_dir="`pwd`/scidb_packaging"
-    build_src_dir="${build_dir}/scidb-sources"
+    build_src_dir="${build_dir}/${PKGNAME}-sources"
 else
     build_dir="`pwd`"
 fi
@@ -77,9 +78,9 @@ fi
 function cleanup()
 {
   if [ $target != "insource" ]; then
-       echo Removing ${build_dir}
-       rm -rf "${build_dir}"
-       sudo rm -rf "${build_dir}"
+      echo Removing ${build_dir}
+      rm -rf "${build_dir}"
+      sudo rm -rf "${build_dir}"
   fi
 }
 
@@ -120,7 +121,7 @@ if [ -n "${SCIDB_INSTALL_PREFIX}" ]; then
     echo "SciDB installation: ${SCIDB_INSTALL_PREFIX}"
 fi
 
-M4="m4 -DVERSION_MAJOR=${VERSION_MAJOR} -DVERSION_MINOR=${VERSION_MINOR} -DVERSION_PATCH=${VERSION_PATCH} -DBUILD=${REVISION}"
+M4="m4 -DPKGNAME=${PKGNAME} -DVERSION_MAJOR=${VERSION_MAJOR} -DVERSION_MINOR=${VERSION_MINOR} -DVERSION_PATCH=${VERSION_PATCH} -DBUILD=${REVISION}"
 
 if [ $target != "insource" ]; then
     M4="${M4} -DPACKAGE_BUILD_TYPE=${build_type}" || die ${M4} failed
@@ -173,10 +174,10 @@ if [ "$type" == "deb" ]; then
 	for filename in changelog rules; do
 	    $M4 ${dirSrc}/${filename}.in > ${dirTgt}/${filename} || die $M4 failed
 	done
-        $M4 ${dirSrc}/postinst_in > ${dirTgt}/scidb-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postinst || die $M4 failed
-        $M4 ${dirSrc}/postrm_in > ${dirTgt}/scidb-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postrm || die $M4 failed
+        $M4 ${dirSrc}/postinst_in > ${dirTgt}/${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postinst || die $M4 failed
+        $M4 ${dirSrc}/postrm_in > ${dirTgt}/${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postrm || die $M4 failed
     }
-    DSC_FILE_NAME="scidb-${VERSION_MAJOR}.${VERSION_MINOR}_${VERSION_PATCH}-$REVISION.dsc"
+    DSC_FILE_NAME="${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}_${VERSION_PATCH}-$REVISION.dsc"
 
     if [ $target != "insource" ]; then
 	    deb_prepare_sources ${debian_dir} "${build_src_dir}/debian"
@@ -189,9 +190,9 @@ if [ "$type" == "deb" ]; then
         if [ "$target" == "local" ]; then
             echo Building binary packages locally
             pushd "${build_dir}"
-                dpkg-source -x ${DSC_FILE_NAME} scidb-build || die dpkg-source failed
+                dpkg-source -x ${DSC_FILE_NAME} ${PKGNAME}-build || die dpkg-source failed
             popd
-            pushd "${build_dir}"/scidb-build
+            pushd "${build_dir}"/${PKGNAME}-build
                 dpkg-buildpackage -rfakeroot -uc -us -j${jobs} || die dpkg-buildpackage failed
             popd
             pushd "${build_dir}"
@@ -214,7 +215,7 @@ if [ "$type" == "deb" ]; then
            cp -r ${debian_dir} ${build_debian_dir} || die cp failed
         fi
 
-        deb_prepare_sources ${build_debian_dir} ${build_debian_dir} 
+        deb_prepare_sources ${build_debian_dir} ${build_debian_dir}
 
         echo Building binary packages locally
         pushd ${build_dir}
@@ -257,7 +258,7 @@ elif [ "$type" == "rpm" ]; then
             rpmbuild -D"_topdir ${build_dir}" -bs ./scidb.spec || die rpmbuild failed
         popd
 
-	SCIDB_SRC_RPM=scidb-${VERSION_MAJOR}.${VERSION_MINOR}-${VERSION_PATCH}-$REVISION.src.rpm
+	SCIDB_SRC_RPM=${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-${VERSION_PATCH}-$REVISION.src.rpm
 
         if [ "$target" == "local" ]; then
             echo Building RPM locally

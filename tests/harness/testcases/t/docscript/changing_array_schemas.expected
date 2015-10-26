@@ -114,9 +114,6 @@ SCIDB QUERY : <show(m3x3)>
 SCIDB QUERY : <SELECT * FROM m3x3>
 [[(0),(1),(2)],[(3),(4),(5)],[(6),(7),(8)]]
 
-SCIDB QUERY : <SELECT * FROM reverse(m3x3)>
-[[(8),(7),(6)],[(5),(4),(3)],[(2),(1),(0)]]
-
 SCIDB QUERY : <show(m4x4)>
 {i} schema
 {0} 'm4x4<val:double> [i=0:3,4,0,j=0:3,4,0]'
@@ -150,9 +147,6 @@ SCIDB QUERY : <show(m4x4)>
 SCIDB QUERY : <scan(m4x4)>
 [[(0),(1),(2),(3)],[(4),(5),(6),(7)],[(8),(9),(10),(11)],[(12),(13),(14),(15)]]
 
-SCIDB QUERY : <thin(m4x4, 0, 2, 0, 2)>
-[[(0),(2)],[(8),(10)]]
-
 SCIDB QUERY : <create array square_array <val:int64>[i=0:15,16,0,j=0:15,16,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
@@ -168,16 +162,7 @@ SCIDB QUERY : <slice(square_array,j,5)>
 SCIDB QUERY : <slice(square_array,i,9)>
 [(144),(145),(146),(147),(148),(149),(150),(151),(152),(153),(154),(155),(156),(157),(158),(159)]
 
-SCIDB QUERY : <thin(square_array,0,4,0,8)>
-[[(0),(8)],[(64),(72)],[(128),(136)],[(192),(200)]]
-
-SCIDB QUERY : <thin(square_array,0,8,0,2)>
-[[(0),(2),(4),(6),(8),(10),(12),(14)],[(128),(130),(132),(134),(136),(138),(140),(142)]]
-
-SCIDB QUERY : <thin(square_array,2,8,1,2)>
-[[(33),(35),(37),(39),(41),(43),(45),(47)],[(161),(163),(165),(167),(169),(171),(173),(175)]]
-
-SCIDB QUERY : <SELECT * INTO m3x3_new FROM attribute_rename(m3x3,val,val2)>
+SCIDB QUERY : <SELECT * INTO m3x3_new FROM project(apply(m3x3,val2,val),val2)>
 [[(0),(1),(2)],[(3),(4),(5)],[(6),(7),(8)]]
 
 SCIDB QUERY : <show(m3x3_new)>
@@ -271,44 +256,6 @@ SCIDB QUERY : <SELECT * INTO Dsp_slice_2 FROM slice(Dsp, device_id, 2)>
 SCIDB QUERY : <show(Dsp_slice_2)>
 {i} schema
 {0} 'Dsp_slice_2<val:double> [probe_id=0:4,5,0]'
-
-SCIDB QUERY : <SELECT * INTO Dsp_1d FROM concat(Dsp_slice_0, Dsp_slice_2)>
-{probe_id} val
-{0} 0.01
-{1} 30.36
-{2} 111.21
-{3} 242.56
-{4} 424.41
-{5} 6.09
-{6} 56.64
-{7} 157.69
-{8} 309.24
-{9} 511.29
-
-SCIDB QUERY : <show(Dsp_1d)>
-{i} schema
-{0} 'Dsp_1d<val:double> [probe_id=0:9,5,0]'
-
-SCIDB QUERY : <store( concat( redimension( apply(Dsp_slice_0, d, 0), <val:double> [d=0:0,1,0,probe_id=0:4,5,0]), redimension( apply(Dsp_slice_2, d, 0), <val:double> [d=0:0,1,0,probe_id=0:4,5,0]) ), Dsp_new)>
-{d,probe_id} val
-{0,0} 0.01
-{0,1} 30.36
-{0,2} 111.21
-{0,3} 242.56
-{0,4} 424.41
-{1,0} 6.09
-{1,1} 56.64
-{1,2} 157.69
-{1,3} 309.24
-{1,4} 511.29
-
-SCIDB QUERY : <show(Dsp_new)>
-{i} schema
-{0} 'Dsp_new<val:double> [d=0:1,1,0,probe_id=0:4,5,0]'
-
-Query was executed successfully
-
-Query was executed successfully
 
 Query was executed successfully
 

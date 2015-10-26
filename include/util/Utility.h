@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -85,16 +85,16 @@ class stackonly
  *              the object when there are no remaining references. The factory
  *              function:
  *  @code
- *                  shared_ptr<X>   newX();
+ *                  std::shared_ptr<X>   newX();
  *  @endcode
  *              might sometimes wish to return a statically allocated instance
  *              for example. The solution is to use a null_deleter:
  *  @code
- *                  shared_ptr<X> newX()
+ *                  std::shared_ptr<X> newX()
  *                  {
  *                      static X x;                      // Must Not delete x
  *
- *                      return shared_ptr<X>(&x,null_deleter());
+ *                      return std::shared_ptr<X>(&x,null_deleter());
  *                  }
  *  @endcode
  *              This same technique also works for any object that is known to
@@ -235,6 +235,37 @@ inline bool isPowerOfTwo(size_t n)
 
     return n!=0 && (n & (n - 1))==0;                     // Just one bit set?
 }
+
+
+/**
+ *  @brief      Determine the count of trailing zero in the binary
+ *              representation of a number.
+ *
+ *  @details    The value parameter is the number for which the
+ *              count of trailing zeros is to be determined.
+ *              Example, lets take the number 32. In binary:
+  *             00000000 00000000 00000000 00100000
+ *              Notice there are five zeros to the right of the
+ *              rightmost 1 bit.  Therefore, this routine will return 5.
+ *
+ *  @param      value  The value to use for the determination
+ *
+ *  @return     # of zero bits in the 64 bit word.
+ *
+ *  @author     mcorbett@paradigm4.com
+ *
+ */
+size_t getTrailingZeros(size_t in_value);  // See Utility.cpp for non-GNUC version
+
+#if defined (__GNUC__)
+inline size_t getTrailingZeros(size_t value)
+{
+    if (0UL == value)  return 64;
+    return static_cast<size_t>( __builtin_ctzl(value));  // O(1)
+}
+#endif
+
+
 
 /**
  *  @brief      Backward compatibility interface to the One True TSV Parser.

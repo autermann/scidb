@@ -13,8 +13,6 @@ create array Test4 <y:int64> [a=1:2,2,0]
 
 --test
 --igdata "project(sort(list(),id),name,id)"
-project(reverse(Test1),b)
-project(reverse(Test1),a)
 project(sort(Test1,b),a)
 
 --error --code scidb::SCIDB_SE_SYNTAX::SCIDB_LE_AMBIGUOUS_ATTRIBUTE "project(join(Test1,Test1),a)"
@@ -45,7 +43,6 @@ project(rank(Test1),a_rank)
 
 project(quantile(Test1,2),a_quantile,percentage)
 project(quantile(Test1,2,a),percentage)
-project(normalize(project(Test1,a)),a)
 project(merge(Test1,Test1),b,a)
 
 project(transpose(Test2),a)
@@ -61,9 +58,6 @@ project(dimensions(Test1),length,chunk_overlap,name)
 project(dimensions(Test2),length,chunk_overlap,name)
 project(reshape(subarray(Test2,1,1,1,2),<a:double> [x=0:1,2,0 ,y=0:0,2,0]),a)
 
-project(thin(Test1,1,2),b,a)
-project(thin(Test1,1,2),a)
-project(thin(Test2,1,2,1,2),a)
 project(slice(Test2,x,2),a)
 project(apply(Test2,b,a+10),b,a)
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,6 +30,8 @@
 
 #include "DLAErrors.h"
 #include "scalapackUtil/ScaLAPACKLogical.hpp"
+
+using namespace std;
 
 namespace scidb
 {
@@ -63,7 +65,7 @@ inline int_tt divCeil(int_tt val, int_tt divisor) {
  /// <br>        or
  /// <br>        'VT' (aka 'right')
  /// <br>        or
- /// <br>        'S' (aka 'SIGMA','values') 
+ /// <br>        'S' (aka 'SIGMA','values')
  ///
  /// @par Output array:
  ///   <br> <
@@ -112,10 +114,10 @@ public:
         ADD_PARAM_CONSTANT("string")
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query);
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query);
 };
 
-ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
 {
     enum dumm { SINGLE_MATRIX = 1 };
     assert(schemas.size() == SINGLE_MATRIX);
@@ -134,7 +136,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
     //       hint: have Cmake adjust the type of slpp::int_t
     //       hint: maximum ScaLAPACK WORK array is usually determined by the function and its argument sizes
 
-    const string& whichMatrix = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_STRING).getString();
+    const string& whichMatrix = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_STRING).getString();
 
     const Dimensions& dims = schemas[0].getDimensions();
     size_t minRowCol = std::min(dims[0].getLength(),
@@ -169,7 +171,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                   ZERO_OUTPUT_OVERLAP);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "u", TID_DOUBLE, 0, 0);
-        ArrayDesc result("U", addEmptyTagAttribute(atts), outDims);
+        ArrayDesc result("U", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
         log4cxx_debug_dimensions("SVDLogical::inferSchema(U)", result.getDimensions());
         return result;
     }
@@ -201,7 +203,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                 ZERO_OUTPUT_OVERLAP);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "v", TID_DOUBLE, 0, 0);
-        ArrayDesc result("VT", addEmptyTagAttribute(atts), outDims);
+        ArrayDesc result("VT", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
         log4cxx_debug_dimensions("SVDLogical::inferSchema(VT)", result.getDimensions());
         return result;
     }
@@ -221,7 +223,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_
                                    ZERO_OUTPUT_OVERLAP);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "sigma", TID_DOUBLE, 0, 0);
-        ArrayDesc result("SIGMA", addEmptyTagAttribute(atts), outDims);
+        ArrayDesc result("SIGMA", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
         log4cxx_debug_dimensions("SVDLogical::inferSchema(SIGMA)", result.getDimensions());
         return result;
     } else {

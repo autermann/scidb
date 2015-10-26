@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -56,8 +56,8 @@ class PhysicalAverageRank: public PhysicalOperator
     //We require that input is distributed round-robin so that our parallel trick works
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
-        vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
+        vector<RedistributeContext> requiredDistribution;
+        requiredDistribution.push_back(RedistributeContext(defaultPartitioning()));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -66,29 +66,29 @@ class PhysicalAverageRank: public PhysicalOperator
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                     const std::vector< ArrayDesc> & inputSchemas) const
     {
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         const size_t nInstances = query->getInstancesCount();
         const size_t nDims = _schema.getDimensions().size();
 
         DimensionVector offset(nDims);
 
         offset[nDims-1] += (nInstances-1)*_schema.getDimensions()[nDims-1].getChunkInterval();
-        return ArrayDistribution(psHashPartitioned, DistributionMapper::createOffsetMapper(offset));
+        return RedistributeContext(defaultPartitioning(), CoordinateTranslator::createOffsetMapper(offset));
     }
 
-    shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        shared_ptr<Array> inputArray = inputArrays[0];
+        std::shared_ptr<Array> inputArray = inputArrays[0];
         if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
         {   //if input supports MULTI_PASS, don't bother converting it
             inputArray = ensureRandomAccess(inputArray, query);
         }
 
         const ArrayDesc& input = inputArray->getArrayDesc();
-        string attName = _parameters.size() > 0 ? ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName() :
+        string attName = _parameters.size() > 0 ? ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName() :
                                                 input.getAttributes()[0].getName();
 
         AttributeID rankedAttributeID = 0;
@@ -107,8 +107,8 @@ class PhysicalAverageRank: public PhysicalOperator
         {
             size_t i, j;
             for (i = 0; i < _parameters.size()-1; i++) {
-               const string& dimName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getObjectName();
-               const string& dimAlias = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getArrayName();
+               const string& dimName = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getObjectName();
+               const string& dimAlias = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getArrayName();
                for (j = 0; j < dims.size(); j++) {
                    if (dims[j].hasNameAndAlias(dimName, dimAlias)) {
                        groupBy.push_back(dims[j]);

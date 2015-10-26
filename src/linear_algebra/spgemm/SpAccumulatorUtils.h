@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -58,15 +58,12 @@ namespace scidb
  * @return                 resultChunkIn, or if null and the SPA is not empty, a newly created chunk.
  */
 template<class IdAdd_tt, class SpAccumulator_tt>
-shared_ptr<scidb::ChunkIterator>
+std::shared_ptr<scidb::ChunkIterator>
 spAccumulatorFlushToChunk(SpAccumulator_tt& spa, scidb::Coordinate rowNum,
-                          shared_ptr<scidb::ArrayIterator>& resultArray, shared_ptr<scidb::ChunkIterator> resultChunkIn, scidb::Coordinates chunkPos,
-                          scidb::TypeEnum scidbTypeEnum, scidb::Type scidbType, shared_ptr<scidb::Query>& query, SpgemmTimes& times)
+        std::shared_ptr<scidb::ArrayIterator>& resultArray, std::shared_ptr<scidb::ChunkIterator> resultChunkIn, scidb::Coordinates chunkPos,
+        scidb::TypeEnum scidbTypeEnum, scidb::Type scidbType, std::shared_ptr<scidb::Query>& query, SpgemmTimes& times)
 {
     typedef typename SpAccumulator_tt::Val_t Val_t;
-
-    using namespace boost;
-    using namespace scidb;
 
     // quick return if there is nothing to write, to avoid cluttering the caller with a test.
     if(spa.empty()) return resultChunkIn ;

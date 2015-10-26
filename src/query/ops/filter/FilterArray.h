@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,7 +42,6 @@ namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class FilterArray;
 class FilterArrayIterator;
@@ -59,26 +58,26 @@ class FilterChunkIterator : public DelegateChunkIterator
     void nextVisible();
 
   public:
-    virtual Value& getItem();
+    virtual Value const& getItem();
     virtual void operator ++();
     virtual void reset();
     virtual bool end();
     virtual bool setPosition(Coordinates const& pos);
-    virtual boost::shared_ptr<Query> getQuery() { return _query; }
+    virtual std::shared_ptr<Query> getQuery() { return _query; }
     FilterChunkIterator(FilterArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode);
 
   protected:
-    MemChunk shapeChunk;
+    MemChunk _shapeChunk;
     FilterArray const& _array;
-    vector< boost::shared_ptr<ConstChunkIterator> > _iterators;
-    boost::shared_ptr<ConstChunkIterator> emptyBitmapIterator;
+    std::vector< std::shared_ptr<ConstChunkIterator> > _iterators;
+    std::shared_ptr<ConstChunkIterator> _emptyBitmapIterator;
     ExpressionContext _params;
     bool _hasCurrent;
     int _mode;
-    Value tileValue;
+    Value _tileValue;
     TypeId _type;
  private:
-    boost::shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
 };
 
 
@@ -114,8 +113,8 @@ class FilterArrayIterator : public DelegateArrayIterator
     FilterArrayIterator(FilterArray const& array, AttributeID attrID,  AttributeID inputAttrID);
 
   private:
-    vector< boost::shared_ptr<ConstArrayIterator> > iterators;
-    boost::shared_ptr<ConstArrayIterator> emptyBitmapIterator;
+    std::vector< std::shared_ptr<ConstArrayIterator> > iterators;
+    std::shared_ptr<ConstArrayIterator> emptyBitmapIterator;
     AttributeID inputAttrID;
 };
 
@@ -137,17 +136,17 @@ class FilterArray : public DelegateArray
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    boost::shared_ptr<DelegateChunk> getEmptyBitmapChunk(FilterArrayEmptyBitmapIterator* iterator);
+    std::shared_ptr<DelegateChunk> getEmptyBitmapChunk(FilterArrayEmptyBitmapIterator* iterator);
 
-    FilterArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array,
-                boost::shared_ptr< Expression> expr, boost::shared_ptr<Query>& query,
+    FilterArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array,
+                std::shared_ptr< Expression> expr, std::shared_ptr<Query>& query,
                 bool tileMode);
 
   private:
-    std::map<Coordinates, boost::shared_ptr<DelegateChunk>, CoordinatesLess > cache;
+    std::map<Coordinates, std::shared_ptr<DelegateChunk>, CoordinatesLess > cache;
     Mutex mutex;
-    boost::shared_ptr<Expression> expression;
-    vector<BindInfo> bindings;
+    std::shared_ptr<Expression> expression;
+    std::vector<BindInfo> bindings;
     bool _tileMode;
     size_t cacheSize;
     AttributeID emptyAttrID;

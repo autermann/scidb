@@ -203,7 +203,7 @@ join(join(gemm(intRows22c32, intRows22c32, build(ident22c32,0)), gemm(intRows22c
 filter(join(project(join(sub_test as A, subarray(gemm(sub_test,sub_test,sub_test), null, null, null, null) as B), gemm) as C, sub_expected as D), C.gemm<>D.gemm)
 filter(join(project(join(subarray(gemm(sub_test,sub_test,sub_test), 1, 2, null, null) as B, sub_test as A), gemm) as C, subarray(sub_expected, 1,2,null,null) as D), C.gemm<>D.gemm)
 subarray(gemm(sub_test, sub_test, sub_test), 1, 2, 50, 60)
-sg(subarray(gemm(sub_test, sub_test, sub_test), 1, 2, 50, 60), 1, -1)
+_sg(subarray(gemm(sub_test, sub_test, sub_test), 1, 2, 50, 60), 1, -1)
 
 --cleanup
 

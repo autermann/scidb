@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -59,7 +59,7 @@ private:
         Coordinates low (nDims);
         for (size_t i= 0; i<nDims; ++i)
         {
-            low[i] =  max<int64_t> (itemPos[i] - dims[i].getChunkOverlap(), dims[i].getStartMin());
+            low[i] =  std::max<int64_t> (itemPos[i] - dims[i].getChunkOverlap(), dims[i].getStartMin());
             low[i] -= (low[i] - dims[i].getStartMin()) % dims[i].getChunkInterval();
         }
         return low;
@@ -71,15 +71,15 @@ private:
         Coordinates high (nDims);
         for (size_t i= 0; i<nDims; ++i)
         {
-            high[i] =  min<int64_t> (itemPos[i] + dims[i].getChunkOverlap(), dims[i].getEndMax());
+            high[i] =  std::min<int64_t> (itemPos[i] + dims[i].getChunkOverlap(), dims[i].getEndMax());
         }
         return high;
     }
 
-    static vector<size_t> getIntervals(Dimensions const& dims)
+    static std::vector<size_t> getIntervals(Dimensions const& dims)
     {
         size_t const nDims = dims.size();
-        vector<size_t> res (nDims);
+        std::vector<size_t> res (nDims);
         for (size_t i =0; i<nDims; ++i)
         {
             res[i] = dims[i].getChunkInterval();

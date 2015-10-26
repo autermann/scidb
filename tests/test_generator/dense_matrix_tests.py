@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-# Initialize, start and stop scidb. 
-# Supports single instance and cluster configurations. 
+# Initialize, start and stop scidb.
+# Supports single instance and cluster configurations.
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -47,17 +47,17 @@ def usage():
   sys.exit(2)
 
 # class to define a test
-    
+
 # dictionaries filled with commands
 matrixNames = ["T", "E", "R"]
 matrixSizes = [ [3,4,2,3], [13,21,13,21], [13,21,11,17], [1000,200], [1001,201], [1000,1000], [1024,1024,1024,1024], [1024,1024,256,256], [1050,1050], [1001,1001], [1001,999,101,99] ]
 #matrixSizes = [ [1000,200], [1001,201], [1000,1000], [1050,1050], [1001,1001] ]
 #matrixSizes = [ [5,2], [3,3] ]
 #matrixSizes = [ [13,21], [301,301], [201,201], [200,200] ]
-#dataTypes   = ["double", "int64", "int32", "int16", "uint64", "float" ] 
-#dataTypes   = ["double"] 
-dataTypes   = ["double", "int64"] 
-#dataTypes   = ["float"] 
+#dataTypes   = ["double", "int64", "int32", "int16", "uint64", "float" ]
+#dataTypes   = ["double"]
+dataTypes   = ["double", "int64"]
+#dataTypes   = ["float"]
 successString = "Command completed successfully"
 # each test is a sequence of create, fill and comparison (and, of course, cleanup)
 tests = []
@@ -166,7 +166,7 @@ t.setResultDataType("double")
 t.setNullableResult(True)
 tests.append(t)
 
-            
+
 #t = SciDBTest("i+j","stdev(T)", "sqrt(%(I)d * %(J)d /6.)", isOnlySquare=True)
 t = SciDBTest("i+j","aggregate(T, stdev(x))", "sqrt( %(I)d * %(J)d * (%(I)d * %(I)d + %(J)d * %(J)d -2.)/(12.*(%(I)d * %(J)d -1.)))")
 t.setResultDim(0)

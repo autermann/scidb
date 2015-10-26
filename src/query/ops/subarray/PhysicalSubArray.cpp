@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,7 +51,7 @@ public:
         Coordinates result (nDims);
         for (size_t i = 0; i < nDims; i++)
         {
-            Value const& low = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate();
+            Value const& low = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate();
             if ( low.isNull() || low.getInt64() < dims[i].getStartMin())
             {
                 result[i] = dims[i].getStartMin();
@@ -72,7 +72,7 @@ public:
         Coordinates result (nDims);
         for (size_t i  = 0; i < nDims; i++)
         {
-            Value const& high = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i + nDims])->getExpression()->evaluate();
+            Value const& high = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i + nDims])->getExpression()->evaluate();
             if (high.isNull() || high.getInt64() > dims[i].getEndMax())
             {
                 result[i] = dims[i].getEndMax();
@@ -146,7 +146,7 @@ public:
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
         if (!changesDistribution(inputSchemas))
@@ -154,26 +154,26 @@ public:
             return inputDistributions[0];
         }
         DimensionVector offset = getOffsetVector(inputSchemas);
-        boost::shared_ptr<DistributionMapper> distMapper;
-        ArrayDistribution inputDistro = inputDistributions[0];
+        std::shared_ptr<CoordinateTranslator> distMapper;
+        RedistributeContext inputDistro = inputDistributions[0];
         if (inputDistro.isUndefined() ||
             inputDistro.getPartitioningSchema() == psScaLAPACK ||
             inputDistro.getPartitioningSchema() == psGroupby)
         {
-            return ArrayDistribution(psUndefined);
+            return RedistributeContext(psUndefined);
         }
         else
         {
-            boost::shared_ptr<DistributionMapper> inputMapper = inputDistro.getMapper();
+            std::shared_ptr<CoordinateTranslator> inputMapper = inputDistro.getMapper();
             if (!offset.isEmpty())
             {
-                distMapper = DistributionMapper::createOffsetMapper(offset) ->combine(inputMapper);
+                distMapper = CoordinateTranslator::createOffsetMapper(offset) ->combine(inputMapper);
             }
             else
             {
                 distMapper = inputMapper;
             }
-            return ArrayDistribution(inputDistro.getPartitioningSchema(), distMapper);
+            return RedistributeContext(inputDistro.getPartitioningSchema(), distMapper);
         }
     }
 
@@ -206,16 +206,16 @@ public:
     /**
      * @see PhysicalOperator::execute
      */
-    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
-                                      boost::shared_ptr< Query> query)
+    std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
+                                      std::shared_ptr< Query> query)
     {
         assert(inputArrays.size() == 1);
-        shared_ptr<Array> input = ensureRandomAccess(inputArrays[0], query);
+        std::shared_ptr<Array> input = ensureRandomAccess(inputArrays[0], query);
 
         ArrayDesc const& desc = input->getArrayDesc();
         Dimensions const& srcDims = desc.getDimensions();
         size_t nDims = srcDims.size();
-        
+
         /***
          * Fetch and calculate the subarray window
          */
@@ -224,13 +224,13 @@ public:
         for(size_t i=0; i<nDims; i++)
         {
             if (lowPos[i] > highPos[i]) {
-                return boost::shared_ptr<Array>(new MemArray(_schema,query));
+                return std::shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
         /***
          * Create an iterator-based array implementation for the operator
          */
-        boost::shared_ptr< Array> arr = boost::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, input, query));
+        std::shared_ptr< Array> arr = std::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, input, query));
         return arr;
     }
 };

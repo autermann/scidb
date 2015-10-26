@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,7 +48,7 @@ namespace scidb
 /**
  * Add a mapping between chunkPos to chunkID, if not exist.
  */
-void addChunkPosToID(boost::shared_ptr<MapChunkPosToID>& mapChunkPosToID, Coordinates pos, size_t chunkID) {
+void addChunkPosToID(std::shared_ptr<MapChunkPosToID>& mapChunkPosToID, Coordinates pos, size_t chunkID) {
     MapChunkPosToIDIter iter = mapChunkPosToID->find(pos);
     if (iter==mapChunkPosToID->end()) {
         mapChunkPosToID->insert(std::pair<Coordinates, size_t>(pos, chunkID));
@@ -79,8 +79,8 @@ public:
     //We require that input is distributed round-robin so that our parallel trick works
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
-        vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
+        vector<RedistributeContext> requiredDistribution;
+        requiredDistribution.push_back(RedistributeContext(psHashPartitioned));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -89,15 +89,15 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                     const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
-    shared_ptr<Array> execute(std::vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        shared_ptr<Array> inputArray = inputArrays[0];
+        std::shared_ptr<Array> inputArray = inputArrays[0];
         if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
         {   //if input supports MULTI_PASS, don't bother converting it
             inputArray = ensureRandomAccess(inputArray, query);
@@ -108,7 +108,7 @@ public:
         ElapsedMilliSeconds timing;
 
         const ArrayDesc& inputSchema = inputArray->getArrayDesc();
-        string attName = _parameters.size() > 0 ? ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName() :
+        string attName = _parameters.size() > 0 ? ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName() :
                                                 inputSchema.getAttributes()[0].getName();
 
         // The attrID of the ranked attribute in the original array.
@@ -129,8 +129,8 @@ public:
         {
             size_t i, j;
             for (i = 0; i < _parameters.size()-1; i++) {
-               const string& dimName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getObjectName();
-               const string& dimAlias = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getArrayName();
+               const string& dimName = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getObjectName();
+               const string& dimAlias = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 1])->getArrayName();
                for (j = 0; j < dims.size(); j++) {
                    if (dims[j].hasNameAndAlias(dimName, dimAlias)) {
                        groupBy.push_back(dims[j]);
@@ -145,7 +145,7 @@ public:
         // For now, just use Alex's old implementation.
         if (groupBy.size() == 0) {
             LOG4CXX_DEBUG(logger, "[Rank] Building RankArray, because this is not a group-by rank.");
-            shared_ptr<Array> rankArray = buildRankArray(inputArray, rankedAttributeID, groupBy, query);
+            std::shared_ptr<Array> rankArray = buildRankArray(inputArray, rankedAttributeID, groupBy, query);
 
             timing.logTiming(logger, "[Rank] buildRankArray", false); // false = no need to restart
             LOG4CXX_DEBUG(logger, "[Rank] finished!")
@@ -156,7 +156,7 @@ public:
         // if every cell is a separate group, return "all-ranked-one"
         if (groupBy.size() == dims.size()) {
             LOG4CXX_DEBUG(logger, "[Rank] Building AllRankedOneArray, because all the dimensions are involved.");
-            shared_ptr<Array> allRankedOne = make_shared<AllRankedOneArray>(
+            std::shared_ptr<Array> allRankedOne = make_shared<AllRankedOneArray>(
                 getRankingSchema(inputSchema, rankedAttributeID),
                 inputArray, rankedAttributeID);
 
@@ -169,7 +169,7 @@ public:
         LOG4CXX_DEBUG(logger, "[Rank] Begin redistribution (first phase of group-by rank).");
 
         // For every dimension, determine whether it is a groupby dimension
-        shared_ptr<PartitioningSchemaDataGroupby> psdGroupby = make_shared<PartitioningSchemaDataGroupby>();
+        std::shared_ptr<PartitioningSchemaDataGroupby> psdGroupby = make_shared<PartitioningSchemaDataGroupby>();
         psdGroupby->_arrIsGroupbyDim.reserve(dims.size());
         for (size_t i=0; i<dims.size(); ++i)
         {
@@ -217,17 +217,17 @@ public:
                                        0);
         }
 
-        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims);
+        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims, defaultPartitioning());
 
         vector<AttributeID> projection(1);
         projection[0] = rankedAttributeID;
 
-        shared_ptr<Array> projected = make_shared<SimpleProjectArray>(projectSchema, inputArray, projection);
+        std::shared_ptr<Array> projected = make_shared<SimpleProjectArray>(projectSchema, inputArray, projection);
 
         // Redistribute, s.t. all records in the same group go to the same instance.
-        shared_ptr<Array> redistributed = redistributeToRandomAccess(projected, query, psGroupby,
+        std::shared_ptr<Array> redistributed = redistributeToRandomAccess(projected, query, psGroupby,
                                                                      ALL_INSTANCE_MASK,
-                                                                     shared_ptr<DistributionMapper>(),
+                                                                     std::shared_ptr<CoordinateTranslator>(),
                                                                      0,
                                                                      psdGroupby);
         // timing
@@ -249,20 +249,20 @@ public:
                 AttributeDesc::IS_NULLABLE, 0));
         RowCollectionGroup rcGroup(query, "", rcGroupAttrs);
 
-        boost::shared_ptr<ConstArrayIterator> srcArrayIterValue = redistributed->getConstIterator(0);
+        std::shared_ptr<ConstArrayIterator> srcArrayIterValue = redistributed->getConstIterator(0);
         size_t chunkID = 0;
         size_t itemID = 0;
         size_t totalItems = 0;
         vector<Value> itemInRowCollectionGroup(4);
         Coordinates group(groupBy.size());
 
-        boost::shared_ptr<MapChunkPosToID> mapChunkPosToID = boost::shared_ptr<MapChunkPosToID>(new MapChunkPosToID());
+        std::shared_ptr<MapChunkPosToID> mapChunkPosToID = std::shared_ptr<MapChunkPosToID>(new MapChunkPosToID());
 
         size_t reportATimingAfterHowManyChunks = 10; // report a timing after how many chunks?
         while (!srcArrayIterValue->end()) {
             const ConstChunk& chunk = srcArrayIterValue->getChunk();
             addChunkPosToID(mapChunkPosToID, chunk.getFirstPosition(false), chunkID);
-            boost::shared_ptr<ConstChunkIterator> srcChunkIter = chunk.getConstIterator();
+            std::shared_ptr<ConstChunkIterator> srcChunkIter = chunk.getConstIterator();
             while (!srcChunkIter->end()) {
                 size_t g = 0;   // g is the number of group-by dimensions whose coordinates have been copied out to 'group'.
                 const Coordinates& full = srcChunkIter->getPosition();
@@ -348,7 +348,7 @@ public:
         DoubleFloatOther type = getDoubleFloatOther(strType);
 
         for (size_t rowId=0; rowId<rcGroupSorted.numRows(); ++rowId) {
-            boost::scoped_ptr<RIGroup> riGroupSorted(rcGroupSorted.openRow(rowId));
+            std::unique_ptr<RIGroup> riGroupSorted(rcGroupSorted.openRow(rowId));
             double prevRank = 1;
             size_t processed = 0;
             Value prevValue;
@@ -404,7 +404,7 @@ public:
 
         // Sort every row in rcChunk, by itemID, to rcChunkSorted.
         // We need a heap allocation because the pointer needs to be valid after exec() finishes.
-        shared_ptr<RowCollectionChunk> pRowCollectionChunkSorted = shared_ptr<RowCollectionChunk>(
+        std::shared_ptr<RowCollectionChunk> pRowCollectionChunkSorted = std::shared_ptr<RowCollectionChunk>(
                 new RowCollectionChunk(query, "", rcChunkAttrs));
         pRowCollectionChunkSorted->copyGroupsFrom(rcChunk);
         rcChunk.sortAllRows(1, TID_UINT64, &*pRowCollectionChunkSorted);
@@ -413,7 +413,7 @@ public:
         // timing
         timing.logTiming(logger, "[Rank] Second sort", false);
 
-        boost::shared_ptr<GroupbyRankArray> dest =
+        std::shared_ptr<GroupbyRankArray> dest =
                 make_shared<GroupbyRankArray>(outputSchema, redistributed, pRowCollectionChunkSorted, 0, mapChunkPosToID);
 
         LOG4CXX_DEBUG(logger, "[Rank] finished!")

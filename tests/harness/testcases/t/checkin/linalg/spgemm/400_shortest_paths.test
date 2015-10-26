@@ -10,9 +10,6 @@ create array GRAPH_WEIGHTS_6_9 <w:float>[v0=0:5,10,0, v1=0:5,10,0]
 --start-query-logging
 --start-igdata
 
-# csv to .scidb
-#--shell --command "csv2scidb < ${TEST_DATA_DIR}/graph_triplets6_9.csv > /tmp/graph_triplets6_9.scidb.txt"
-# Note: load() supports direct loading of CSV in 14.12 and later.
 --shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "load(GRAPH_TRIPLETS_6_9, '${TEST_DATA_DIR}/graph_triplets6_9.scidb.txt')""
 # turn list of triplets into adjacency matrix
 store(redimension(GRAPH_TRIPLETS_6_9, GRAPH_WEIGHTS_6_9),GRAPH_WEIGHTS_6_9)

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -56,13 +56,13 @@ public:
 	 * Cast is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
-        boost::shared_ptr<Array> inputArray = inputArrays[0];
-        if (_schema.getAttributes().size() != inputArray->getArrayDesc().getAttributes().size()) 
-        { 
-            inputArray = boost::shared_ptr<Array>(new NonEmptyableArray(inputArray));
+        std::shared_ptr<Array> inputArray = inputArrays[0];
+        if (_schema.getAttributes().size() != inputArray->getArrayDesc().getAttributes().size())
+        {
+            inputArray = std::shared_ptr<Array>(new NonEmptyableArray(inputArray));
         }
 
         CastArray::CastingMap castingMap;
@@ -93,12 +93,12 @@ public:
                     srcDim.getChunkOverlap());
         }
 
-        ArrayDesc dstSchema("", _schema.getAttributes(), dstDimensions, _schema.getFlags());
+        ArrayDesc dstSchema("", _schema.getAttributes(), dstDimensions, defaultPartitioning(), _schema.getFlags());
 
-        return boost::shared_ptr<Array>(new CastArray(dstSchema, inputArray, castingMap));
+        return std::shared_ptr<Array>(new CastArray(dstSchema, inputArray, castingMap));
 	 }
 };
-    
+
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalCast, "cast", "physicalCast")
 
 }  // namespace scidb

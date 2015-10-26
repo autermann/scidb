@@ -87,11 +87,10 @@ load(gradebook, '/tmp/tsv_io.load', -2, 'tsv')
 
 --echo Test TSV string field encoding
 
-# Painfully get a few hard tabs into SciDB.
+# Get a few hard tabs into SciDB.
 --shell --command "echo 'Hunter,	,Q' > /tmp/tabby.csv"
 --shell --command "echo 'Get it? It is a 	 joke.,Ha,ha' >> /tmp/tabby.csv"
---shell --command "csv2scidb -p sss < /tmp/tabby.csv > /tmp/tabby.scidb"
---igdata "load(funky, '/tmp/tabby.scidb')"
+--igdata "load(funky, '/tmp/tabby.csv', -2, 'csv')"
 --igdata "save(funky, '/tmp/tabby.tsv', -2, 'tsv')"
 --shell --store --command "cat /tmp/tabby.tsv"
 --shell --command "rm /tmp/tabby.*"

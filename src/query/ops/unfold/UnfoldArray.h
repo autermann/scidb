@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,7 +42,7 @@ namespace scidb
   public:
     UnfoldArrayIter(DelegateArray const& delegate,
 		    AttributeID attrID,
-		    const shared_ptr<Array>& inputArray);
+		    const std::shared_ptr<Array>& inputArray);
 
     virtual ~UnfoldArrayIter();
 
@@ -82,7 +82,7 @@ namespace scidb
     UnfoldArrayIter(const UnfoldArrayIter&);
     UnfoldArrayIter& operator=(const UnfoldArrayIter&);
 
-    std::vector<boost::shared_ptr<ConstArrayIterator> > _inputArrayIterators;
+    std::vector<std::shared_ptr<ConstArrayIterator> > _inputArrayIterators;
     Coordinates _position;
   };
 
@@ -90,8 +90,8 @@ namespace scidb
   {
   public:
     UnfoldArray(ArrayDesc const& schema,
-		const shared_ptr<Array>& pinputArray,
-		const shared_ptr<Query>& pquery);
+		const std::shared_ptr<Array>& pinputArray,
+		const std::shared_ptr<Query>& pquery);
 
     virtual ~UnfoldArray();
 
@@ -153,7 +153,7 @@ namespace scidb
 
     virtual ~UnfoldChunkIter();
 
-    virtual Value& getItem();
+    virtual Value const& getItem();
 
     virtual bool isEmpty();
 
@@ -174,7 +174,7 @@ namespace scidb
     UnfoldChunkIter(const UnfoldChunkIter&);
     UnfoldChunkIter& operator=(const UnfoldChunkIter&);
 
-    std::vector<boost::shared_ptr<ConstChunkIterator> > _inputChunkIterators;
+    std::vector<std::shared_ptr<ConstChunkIterator> > _inputChunkIterators;
     AttributeID _visitingAttribute;
     Coordinates _currentPosition;
   };

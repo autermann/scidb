@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,52 +34,62 @@
 #include <map>
 #include <vector>
 #include <string>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
-#include "query/Operator.h"
-#include "util/Singleton.h"
-#include "util/StringUtil.h"
-
+#include <query/Operator.h>
+#include <util/Singleton.h>
+#include <util/StringUtil.h>
 
 namespace scidb
 {
 
 /**
- * The class is entry point to operators library and will create every known for it operator.
- * In order to create operator it must have object factory class and possibility to register it
- * in library. It's implemented in cpp file.
+ * A library of all operators.
  */
 class OperatorLibrary: public Singleton<OperatorLibrary>
 {
 public:
+    /// The constructor loads all built-in operators.
     OperatorLibrary();
 
-    // @return logical operator by its name or NULL if not found
-    boost::shared_ptr<LogicalOperator> createLogicalOperator(const std::string& logicalName,
+    /// @return logical operator by its name or NULL if not found
+    std::shared_ptr<LogicalOperator> createLogicalOperator(const std::string& logicalName,
             const std::string& alias = "");
 
-    // @return a physical operator for given logical and physical operator name
-    boost::shared_ptr<PhysicalOperator> createPhysicalOperator(const std::string& logicalName,
+    /// @return a physical operator for given logical and physical operator name
+    std::shared_ptr<PhysicalOperator> createPhysicalOperator(const std::string& logicalName,
             const std::string& physicalName, const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema);
 
-    // @return a vector of physical operators for given logical operator name
+    /// @return a vector of physical operators for given logical operator name
     void createPhysicalOperators(const std::string& logicalName,
-            std::vector< boost::shared_ptr<PhysicalOperator> >& physicalOperators,
+            std::vector< std::shared_ptr<PhysicalOperator> >& physicalOperators,
             const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema);
 
-    // Add new logical operator factory
+    /// Add new logical operator factory
     void addLogicalOperatorFactory(BaseLogicalOperatorFactory*);
 
-    // Add new physical operator factory
+    /// Add new physical operator factory
     void addPhysicalOperatorFactory(BasePhysicalOperatorFactory*);
 
     void getPhysicalNames(const std::string& logicalName, std::vector<std::string>& physicalOperatorsNames);
-    void getLogicalNames(std::vector<std::string>& logicalOperatorsNames);
+    void getLogicalNames(std::vector<std::string>& logicalOperatorsNames, bool showHidden);
 
     bool hasLogicalOperator(const std::string &logicalOperatorName);
 
     const PluginObjects& getOperatorLibraries() {
         return _operatorLibraries;
+    }
+
+    /**
+     * Decide whether an operator is hidden (internal) or not based on its name.
+     *
+     * Operators considered internal are not shown in ordinary
+     * "list('operators')" output.  To see them you must use
+     * "list('operators', true)".
+     */
+    static bool isHiddenOp(const std::string& logicalName)
+    {
+        return !logicalName.empty() && logicalName[0] == '_';
     }
 
 private:
@@ -92,7 +102,6 @@ private:
     PhysicalOperatorFactoriesMap _physicalOperatorFactories;
     PluginObjects _operatorLibraries;
 };
-
 
 } // namespace
 

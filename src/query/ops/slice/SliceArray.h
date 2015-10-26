@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,14 +40,14 @@
 #define SLICE_ARRAY_H_
 
 #include <string>
-#include "array/Array.h"
-#include "array/Metadata.h"
+
+#include <array/Array.h>
+#include <array/Metadata.h>
 
 namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class SliceArray;
 class SliceArrayIterator;
@@ -63,7 +63,7 @@ class SliceChunk : public ConstChunk
     int getCompressionMethod() const;
     Coordinates const& getFirstPosition(bool withOverlap) const;
     Coordinates const& getLastPosition(bool withOverlap) const;
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
     void setInputChunk(ConstChunk const* inputChunk);
     Array const& getArray() const;
 
@@ -78,13 +78,13 @@ class SliceChunk : public ConstChunk
     Coordinates lastPos;
     Coordinates lastPosWithOverlap;
 };
-    
+
 class SliceChunkIterator : public ConstChunkIterator
 {
   public:
-    int getMode();
-    Value& getItem();
-    bool isEmpty();
+    int getMode() const;
+    Value const& getItem();
+    bool isEmpty() const;
     bool end();
     void operator ++();
     Coordinates const& getPosition();
@@ -99,20 +99,20 @@ class SliceChunkIterator : public ConstChunkIterator
 
     SliceArray const& array;
     SliceChunk const& chunk;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
-    Coordinates inPos; 
-    Coordinates outPos; 
-    Coordinates firstPos; 
-    Coordinates lastPos; 
+    std::shared_ptr<ConstChunkIterator> inputIterator;
+    Coordinates inPos;
+    Coordinates outPos;
+    Coordinates firstPos;
+    Coordinates lastPos;
     bool hasCurrent;
 };
 
 class SimpleSliceChunkIterator : public ConstChunkIterator
 {
   public:
-    int getMode();
-    Value& getItem();
-    bool isEmpty();
+    int getMode() const;
+    Value const& getItem();
+    bool isEmpty() const;
     bool end();
     void operator ++();
     Coordinates const& getPosition();
@@ -125,9 +125,9 @@ class SimpleSliceChunkIterator : public ConstChunkIterator
   private:
     SliceArray const& array;
     SliceChunk const& chunk;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
-    Coordinates inPos; 
-    Coordinates outPos; 
+    std::shared_ptr<ConstChunkIterator> inputIterator;
+    Coordinates inPos;
+    Coordinates outPos;
 };
 
 /***
@@ -189,11 +189,11 @@ class SliceArrayIterator : public ConstArrayIterator
   private:
     void moveNext();
 
-    SliceArray const& array;	
-    boost::shared_ptr<ConstArrayIterator> inputIterator;
+    SliceArray const& array;
+    std::shared_ptr<ConstArrayIterator> inputIterator;
     SliceChunk chunk;
-	Coordinates inPos; 
-	Coordinates outPos; 
+	Coordinates inPos;
+	Coordinates outPos;
     bool hasCurrent;
     bool chunkInitialized;
 };
@@ -252,11 +252,11 @@ class InfiniteSliceArrayIterator : public ConstArrayIterator
   private:
     void nextAvailable();
 
-    SliceArray const& array;	
-    boost::shared_ptr<ConstArrayIterator> inputIterator;
+    SliceArray const& array;
+    std::shared_ptr<ConstArrayIterator> inputIterator;
     SliceChunk chunk;
-	Coordinates inPos; 
-	Coordinates outPos; 
+	Coordinates inPos;
+	Coordinates outPos;
     bool chunkInitialized;
 };
 
@@ -280,12 +280,12 @@ class SliceArray : public Array
      */
     static const size_t SLICE_INFINITE_ITERATOR_THRESHOLD = 6000;
 
-	SliceArray(ArrayDesc& d, Coordinates const& slice, uint64_t mask, boost::shared_ptr<Array> input);
+	SliceArray(ArrayDesc& d, Coordinates const& slice, uint64_t mask, std::shared_ptr<Array> input);
 
-	virtual string const& getName() const;
+	virtual std::string const& getName() const;
 	virtual ArrayID getHandle() const;
 	virtual const ArrayDesc& getArrayDesc() const;
-	virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const;
+	virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const;
 
   private:
 	ArrayDesc desc;
@@ -293,7 +293,7 @@ class SliceArray : public Array
     uint64_t mask;
     bool     useInfiniteIterator;
     bool     simple;
-	boost::shared_ptr<Array> inputArray;
+	std::shared_ptr<Array> inputArray;
     Dimensions const& inputDims;
 };
 

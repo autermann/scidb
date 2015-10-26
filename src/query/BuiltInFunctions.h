@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -320,7 +320,7 @@ void isNull(const Value** args, Value* res, void*)
 
 void isNan(const Value** args, Value* res, void*)
 {
-    res->setBool(isnan(args[0]->getDouble()));
+    res->setBool(std::isnan(args[0]->getDouble()));
 }
 
 // missing_reason implementation
@@ -333,7 +333,7 @@ void missing(const Value** args, Value* res, void*)
 {
     int32_t i = args[0]->getInt32();
 
-    if (i<0 || i>127)
+    if (!Value::isValidMissingReason(i))
     {
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION,SCIDB_LE_BAD_MISSING_REASON) << i;
     }
@@ -396,8 +396,8 @@ void strPlusStr(const Value** args, Value* res, void*)
         res->setNull();
         return;
     }
-    const string str1(args[0]->getString());
-    const string str2(args[1]->getString());
+    const std::string str1(args[0]->getString());
+    const std::string str2(args[1]->getString());
     res->setString((str1 + str2).c_str());
 }
 
@@ -407,7 +407,7 @@ void subStr(const Value** args, Value* res, void*)
         res->setNull();
         return;
     }
-    const string str(args[0]->getString());
+    const std::string str(args[0]->getString());
     res->setString(str.substr(args[1]->getInt32(), args[2]->getInt32()).c_str());
 }
 
@@ -829,10 +829,11 @@ void convStr2DateTimeTz(const  Value** args,  Value* res, void*)
 #ifndef SCIDB_CLIENT
 void length(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
-    const string dimName = args[1]->getString();
+    const std::string arrayName = args[0]->getString();
+    const std::string dimName = args[1]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     const size_t nDims = dims.size();
 
@@ -847,10 +848,11 @@ void length(const Value** args, Value* res, void*)
 
 void first_index(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
-    const string dimName = args[1]->getString();
+    const std::string arrayName = args[0]->getString();
+    const std::string dimName = args[1]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     const size_t nDims = dims.size();
 
@@ -865,10 +867,11 @@ void first_index(const Value** args, Value* res, void*)
 
 void last_index(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
-    const string dimName = args[1]->getString();
+    const std::string arrayName = args[0]->getString();
+    const std::string dimName = args[1]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     const size_t nDims = dims.size();
 
@@ -883,10 +886,11 @@ void last_index(const Value** args, Value* res, void*)
 
 void low(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
-    const string dimName = args[1]->getString();
+    const std::string arrayName = args[0]->getString();
+    const std::string dimName = args[1]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     const size_t nDims = dims.size();
     Coordinates lowBoundary = SystemCatalog::getInstance()->getLowBoundary(arrayDesc.getId());
@@ -902,10 +906,11 @@ void low(const Value** args, Value* res, void*)
 
 void high(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
-    const string dimName = args[1]->getString();
+    const std::string arrayName = args[0]->getString();
+    const std::string dimName = args[1]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName,  SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     const size_t nDims = dims.size();
     Coordinates highBoundary = SystemCatalog::getInstance()->getHighBoundary(arrayDesc.getId());
@@ -921,9 +926,10 @@ void high(const Value** args, Value* res, void*)
 
 void length1(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
+    const std::string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName,  SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     if (dims.size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_DIMENSION_EXPECTED);
@@ -932,9 +938,10 @@ void length1(const Value** args, Value* res, void*)
 
 void first_index1(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
+    const std::string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName,  SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     if (dims.size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_DIMENSION_EXPECTED);
@@ -943,9 +950,10 @@ void first_index1(const Value** args, Value* res, void*)
 
 void last_index1(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
+    const std::string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     if (dims.size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_DIMENSION_EXPECTED);
@@ -954,9 +962,10 @@ void last_index1(const Value** args, Value* res, void*)
 
 void low1(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
+    const std::string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     if (dims.size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_DIMENSION_EXPECTED);
@@ -966,9 +975,10 @@ void low1(const Value** args, Value* res, void*)
 
 void high1(const Value** args, Value* res, void*)
 {
-    const string arrayName = args[0]->getString();
+    const std::string arrayName = args[0]->getString();
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+    SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                               LAST_VERSION, arrayDesc);
     const Dimensions& dims = arrayDesc.getDimensions();
     if (dims.size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_DIMENSION_EXPECTED);

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,10 +33,10 @@
 # include <string>
 # include <vector>
 
-# define LOGGER_PROPERTIES_FILE        "log4j.properties" 
-# define SCIDBCAPI_LOGGER_NAME         "scidb.services.network" 
+# define LOGGER_PROPERTIES_FILE        "log4j.properties"
+# define SCIDBCAPI_LOGGER_NAME         "scidb.services.network"
 
-# define DEFAULT_SCIDB_CONNECTION      "localhost" 
+# define DEFAULT_SCIDB_CONNECTION      "localhost"
 # define DEFAULT_SCIDB_PORT             1239
 # define DEFAULT_DEBUGLEVEL             3
 # define MIN_DEBUG_LEVEL                0
@@ -184,6 +184,8 @@ struct InfoForExecutor
 	/* Test Section Time */
 	long int startTestSectionMillisec;
 	long int endTestSectionMillisec;
+    std::string             userName;
+    std::string             userPassword;
 };
 
 struct IndividualTestInfo
@@ -238,6 +240,8 @@ struct HarnessCommandLineOptions
     bool                    selfTesting;
     bool                    log_queries;
     bool                    save_failures;
+    std::string             userName;
+    std::string             userPassword;
 };
 
 } //END namespace scidbtestharness

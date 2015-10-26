@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include <iostream>         // For the operator<< and the dump().
 #include <vector>
 #include <algorithm>
-#include <boost/make_shared.hpp>
+#include <memory>
 
 #include <array/Array.h>
 #include <array/Tile.h>
@@ -40,18 +40,26 @@
 #endif
 #include <array/DelegateArray.h>
 
-namespace scidb {
+namespace scidb
+{
     /**
      * Templated chunk iterator wrapper that routes getItem() calls to getData() calls.
      * The getItem() method returns an element from an internally buffered tile, in other words this iterator
      * prefetches a tile worth of data at a time.
+     *
+     * USAGE:
+     * The main purpose for this adaptor is to facilitate the introduction of the getData() based operators/iterators without
+     * the burden of implementing getItem() calls (which should be phased out over time).
+     * To ensure interoperability, a chunk iterator supporting the getData() API can simply be wrapped into BufferedConstChunkIterator
+     * before being returned to the consumer.
+     * @note XXX TODO: implement setPosition()/getPosition() in terms of getData()
      */
     template< class TiledChunkIterator >
     class BufferedConstChunkIterator : public ConstChunkIterator
     {
     public:
         BufferedConstChunkIterator(TiledChunkIterator tiledIterator,
-                                   boost::shared_ptr<Query> const& query);
+                                   std::shared_ptr<Query> const& query);
 
         Value& getItem();
         Coordinates const& getPosition();
@@ -62,31 +70,31 @@ namespace scidb {
         void reset();
         bool end();
 
-        virtual int getMode()  { return _tiledChunkIterator->getMode(); }
-        virtual bool isEmpty() { return _tiledChunkIterator->isEmpty(); }
+        virtual int getMode() const  { return _tiledChunkIterator->getMode(); }
+        virtual bool isEmpty() const { return _tiledChunkIterator->isEmpty(); }
         virtual const scidb::ConstChunk& getChunk() { return _tiledChunkIterator->getChunk(); }
 
         /// @see ConstChunkIterator
         virtual const Coordinates& getData(scidb::Coordinates& logicalStart /*IN/OUT*/,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData,
-                                           boost::shared_ptr<BaseTile>& tileCoords);
+                                           std::shared_ptr<BaseTile>& tileData,
+                                           std::shared_ptr<BaseTile>& tileCoords);
         /// @see ConstChunkIterator
         virtual position_t getData(position_t logicalStart,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData,
-                                   boost::shared_ptr<BaseTile>& tileCoords);
+                                   std::shared_ptr<BaseTile>& tileData,
+                                   std::shared_ptr<BaseTile>& tileCoords);
         /// @see ConstChunkIterator
         virtual const Coordinates&
         getData(scidb::Coordinates& offset,
                 size_t maxValues,
-                boost::shared_ptr<BaseTile>& tileData);
+                std::shared_ptr<BaseTile>& tileData);
 
         /// @see ConstChunkIterator
         virtual position_t
         getData(position_t logicalOffset,
                 size_t maxValues,
-                boost::shared_ptr<BaseTile>& tileData);
+                std::shared_ptr<BaseTile>& tileData);
 
         /// @see ConstChunkIterator
         virtual operator const CoordinatesMapper* () const
@@ -104,19 +112,19 @@ namespace scidb {
                 _tileCoords.reset();
             }
         }
-        bool isCurrentLPosNotInTile()
+        bool isCurrentLPosNotInTile() const
         {
             return (_currLPosInTile < 0);
         }
-        static bool findPosition(const boost::shared_ptr<BaseTile>& tileCoords, position_t pos, size_t& index);
+        static bool findPosition(const std::shared_ptr<BaseTile>& tileCoords, position_t pos, size_t& index);
         static const uint64_t DEFAULT_TILE_SIZE=10000;
         static log4cxx::LoggerPtr _logger;
         static const bool _sDebug = false;
 
         TiledChunkIterator _tiledChunkIterator;
         uint64_t     _tileSize;
-        boost::shared_ptr<BaseTile> _tileData;
-        boost::shared_ptr<BaseTile> _tileCoords;
+        std::shared_ptr<BaseTile> _tileData;
+        std::shared_ptr<BaseTile> _tileCoords;
         position_t _currLPosInTile;
         size_t     _currTileIndex;
         Coordinates _currPos;
@@ -125,7 +133,7 @@ namespace scidb {
 
     template<typename TiledChunkIterator>
     BufferedConstChunkIterator<TiledChunkIterator>::BufferedConstChunkIterator(TiledChunkIterator tiledIterator,
-                                                                               boost::shared_ptr<Query> const& query)
+                                                                               std::shared_ptr<Query> const& query)
 
     : _tiledChunkIterator(tiledIterator),
     _tileSize(DEFAULT_TILE_SIZE),
@@ -310,8 +318,8 @@ namespace scidb {
     const Coordinates&
     BufferedConstChunkIterator<TiledChunkIterator>::getData(scidb::Coordinates& offset,
                                                             size_t maxValues,
-                                                            boost::shared_ptr<BaseTile>& tileData,
-                                                            boost::shared_ptr<BaseTile>& tileCoords)
+                                                            std::shared_ptr<BaseTile>& tileData,
+                                                            std::shared_ptr<BaseTile>& tileCoords)
     {
         clearCurrentLPosInTile(true);
         return _tiledChunkIterator->getData(offset,
@@ -324,8 +332,8 @@ namespace scidb {
     position_t
     BufferedConstChunkIterator<TiledChunkIterator>::getData(position_t logicalOffset,
                                                             size_t maxValues,
-                                                            boost::shared_ptr<BaseTile>& tileData,
-                                                            boost::shared_ptr<BaseTile>& tileCoords)
+                                                            std::shared_ptr<BaseTile>& tileData,
+                                                            std::shared_ptr<BaseTile>& tileCoords)
     {
         clearCurrentLPosInTile(true);
         return _tiledChunkIterator->getData(logicalOffset,
@@ -338,7 +346,7 @@ namespace scidb {
     const Coordinates&
     BufferedConstChunkIterator<TiledChunkIterator>::getData(scidb::Coordinates& offset,
                                                             size_t maxValues,
-                                                            boost::shared_ptr<BaseTile>& tileData)
+                                                            std::shared_ptr<BaseTile>& tileData)
     {
         clearCurrentLPosInTile(true);
         return _tiledChunkIterator->getData(offset,
@@ -350,7 +358,7 @@ namespace scidb {
     position_t
     BufferedConstChunkIterator<TiledChunkIterator>::getData(position_t logicalOffset,
                                                             size_t maxValues,
-                                                            boost::shared_ptr<BaseTile>& tileData)
+                                                            std::shared_ptr<BaseTile>& tileData)
     {
         clearCurrentLPosInTile(true);
         return _tiledChunkIterator->getData(logicalOffset,
@@ -366,7 +374,7 @@ namespace scidb {
      */
     template<typename TiledChunkIterator>
     bool
-    BufferedConstChunkIterator<TiledChunkIterator>::findPosition(const boost::shared_ptr<BaseTile>& tileCoords,
+    BufferedConstChunkIterator<TiledChunkIterator>::findPosition(const std::shared_ptr<BaseTile>& tileCoords,
                                                                  position_t pos,
                                                                  size_t& index)
     {
@@ -444,16 +452,16 @@ namespace scidb {
     log4cxx::LoggerPtr BufferedConstChunkIterator<TiledChunkIterator>::_logger(log4cxx::Logger::getLogger("scidb.array.tile"));
 
     /**
-     * Templated chunk iterator wrapper that routes getData() calls to a series of getData() calls.
+     * Templated chunk iterator wrapper that routes getData() calls to a series of getItem() calls.
      */
     template< class ItemChunkIterator >
     class TileConstChunkIterator : public ConstChunkIterator
     {
     public:
         TileConstChunkIterator(ItemChunkIterator tiledIterator,
-                               boost::shared_ptr<Query> const& query);
+                               std::shared_ptr<Query> const& query);
 
-        Value& getItem() { return _itemChunkIterator->getItem(); }
+        Value const& getItem() { return _itemChunkIterator->getItem(); }
 
         Coordinates const& getPosition()         { return _itemChunkIterator->getPosition(); }
         position_t getLogicalPosition();
@@ -464,28 +472,28 @@ namespace scidb {
         void reset()       { _itemChunkIterator->reset(); }
         bool end()         { return _itemChunkIterator->end(); }
 
-        virtual int getMode()  { return _itemChunkIterator->getMode(); }
-        virtual bool isEmpty() { return _itemChunkIterator->isEmpty(); }
+        virtual int getMode() const  { return _itemChunkIterator->getMode(); }
+        virtual bool isEmpty() const { return _itemChunkIterator->isEmpty(); }
         virtual const scidb::ConstChunk& getChunk() { return _itemChunkIterator->getChunk(); }
 
         /// @see ConstChunkIterator
         virtual const Coordinates& getData(scidb::Coordinates& logicalStart /*IN/OUT*/,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData,
-                                           boost::shared_ptr<BaseTile>& tileCoords);
+                                           std::shared_ptr<BaseTile>& tileData,
+                                           std::shared_ptr<BaseTile>& tileCoords);
         /// @see ConstChunkIterator
         virtual position_t getData(position_t logicalStart,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData,
-                                   boost::shared_ptr<BaseTile>& tileCoords);
+                                   std::shared_ptr<BaseTile>& tileData,
+                                   std::shared_ptr<BaseTile>& tileCoords);
         /// @see ConstChunkIterator
         virtual const Coordinates& getData(scidb::Coordinates& offset,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData);
+                                           std::shared_ptr<BaseTile>& tileData);
         /// @see ConstChunkIterator
         virtual position_t getData(position_t logicalOffset,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData);
+                                   std::shared_ptr<BaseTile>& tileData);
         /// @see ConstChunkIterator
         virtual operator const CoordinatesMapper* () const
         {
@@ -514,14 +522,14 @@ namespace scidb {
         position_t
         getDataInternal(position_t logicalOffset,
                         size_t maxValues,
-                        boost::shared_ptr<BaseTile>& tileData,
-                        boost::shared_ptr<BaseTile>& tileCoords,
+                        std::shared_ptr<BaseTile>& tileData,
+                        std::shared_ptr<BaseTile>& tileCoords,
                         BaseTile::Context* coordCtx);
         const Coordinates&
         getDataInternal(scidb::Coordinates& offset,
                         size_t maxValues,
-                        boost::shared_ptr<BaseTile>& tileData,
-                        boost::shared_ptr<BaseTile>& tileCoords,
+                        std::shared_ptr<BaseTile>& tileData,
+                        std::shared_ptr<BaseTile>& tileCoords,
                         BaseTile::Context* coordCtx);
         /**
          * Populate supplied tiles with data and coordinates
@@ -531,8 +539,8 @@ namespace scidb {
          * @param coordTile may be NULL
          */
         void populateTiles(size_t maxValues,
-                      boost::shared_ptr<BaseTile>& dataTile,
-                      boost::shared_ptr<BaseTile>& coordTile);
+                      std::shared_ptr<BaseTile>& dataTile,
+                      std::shared_ptr<BaseTile>& coordTile);
 
         static log4cxx::LoggerPtr _logger;
 
@@ -548,7 +556,7 @@ namespace scidb {
 
     template<typename ItemChunkIterator>
     TileConstChunkIterator<ItemChunkIterator>::TileConstChunkIterator(ItemChunkIterator itemIterator,
-                                                                      boost::shared_ptr<Query> const& query)
+                                                                      std::shared_ptr<Query> const& query)
     : _itemChunkIterator(itemIterator),
     _itemChunkCoordMapper(itemIterator->getChunk()),
     _tileFactory(TileFactory::getInstance()),
@@ -562,8 +570,8 @@ namespace scidb {
     const Coordinates&
     TileConstChunkIterator<ItemChunkIterator>::getData(scidb::Coordinates& offset,
                                                        size_t maxValues,
-                                                       boost::shared_ptr<BaseTile>& tileData,
-                                                       boost::shared_ptr<BaseTile>& tileCoords)
+                                                       std::shared_ptr<BaseTile>& tileData,
+                                                       std::shared_ptr<BaseTile>& tileCoords)
     {
         if (_passThru) {
             try {
@@ -585,8 +593,8 @@ namespace scidb {
     position_t
     TileConstChunkIterator<ItemChunkIterator>::getData(position_t logicalOffset,
                                                        size_t maxValues,
-                                                       boost::shared_ptr<BaseTile>& tileData,
-                                                       boost::shared_ptr<BaseTile>& tileCoords)
+                                                       std::shared_ptr<BaseTile>& tileData,
+                                                       std::shared_ptr<BaseTile>& tileCoords)
     {
         if (_passThru) {
             try {
@@ -652,7 +660,7 @@ namespace scidb {
     const Coordinates&
     TileConstChunkIterator<ItemChunkIterator>::getData(scidb::Coordinates& offset,
                                                        size_t maxValues,
-                                                       boost::shared_ptr<BaseTile>& tileData)
+                                                       std::shared_ptr<BaseTile>& tileData)
     {
         if (_passThru) {
             try {
@@ -664,7 +672,7 @@ namespace scidb {
                 _passThru = false;
             }
         }
-        boost::shared_ptr<BaseTile> tileCoords;
+        std::shared_ptr<BaseTile> tileCoords;
         return getDataInternal(offset, maxValues,
                                tileData, tileCoords,
                                NULL);
@@ -674,7 +682,7 @@ namespace scidb {
     position_t
     TileConstChunkIterator<ItemChunkIterator>::getData(position_t logicalOffset,
                                                        size_t maxValues,
-                                                       boost::shared_ptr<BaseTile>& tileData)
+                                                       std::shared_ptr<BaseTile>& tileData)
     {
         if (_passThru) {
             try {
@@ -686,7 +694,7 @@ namespace scidb {
                 _passThru = false;
             }
         }
-        boost::shared_ptr<BaseTile> tileCoords;
+        std::shared_ptr<BaseTile> tileCoords;
         return getDataInternal(logicalOffset, maxValues,
                                tileData, tileCoords,
                                NULL);
@@ -696,8 +704,8 @@ namespace scidb {
     position_t
     TileConstChunkIterator<ItemChunkIterator>::getDataInternal(position_t logicalOffset,
                                                                size_t maxValues,
-                                                               boost::shared_ptr<BaseTile>& tileData,
-                                                               boost::shared_ptr<BaseTile>& tileCoords,
+                                                               std::shared_ptr<BaseTile>& tileData,
+                                                               std::shared_ptr<BaseTile>& tileCoords,
                                                                BaseTile::Context* coordCtx)
     {
         assert(! (getMode() & TILE_MODE));
@@ -717,8 +725,8 @@ namespace scidb {
         }
         const TypeId& dataType = _itemChunkIterator->getChunk().getAttributeDesc().getType();
 
-        boost::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
-        boost::shared_ptr<BaseTile> coordTile;
+        std::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
+        std::shared_ptr<BaseTile> coordTile;
 
         if (coordCtx) {
             const scidb::TypeId& coordTileType = "scidb::Coordinates";
@@ -738,9 +746,11 @@ namespace scidb {
         }
 
         tileData.swap(dataTile);
+        assert(tileData);
         if (coordCtx) {
-            assert(tileData->size() == coordTile->size());
             tileCoords.swap(coordTile);
+            assert(tileCoords);
+            assert(tileCoords->size() == tileData->size());
         }
         return pos;
     }
@@ -749,8 +759,8 @@ namespace scidb {
     const Coordinates&
     TileConstChunkIterator<ItemChunkIterator>::getDataInternal(scidb::Coordinates& offset,
                                                                size_t maxValues,
-                                                               boost::shared_ptr<BaseTile>& tileData,
-                                                               boost::shared_ptr<BaseTile>& tileCoords,
+                                                               std::shared_ptr<BaseTile>& tileData,
+                                                               std::shared_ptr<BaseTile>& tileCoords,
                                                                BaseTile::Context* coordCtx)
     {
         assert(! (getMode() & TILE_MODE));
@@ -764,8 +774,8 @@ namespace scidb {
         }
         const TypeId& dataType = _itemChunkIterator->getChunk().getAttributeDesc().getType();
 
-        boost::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
-        boost::shared_ptr<BaseTile> coordTile;
+        std::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(dataType, BaseEncoding::RLE);
+        std::shared_ptr<BaseTile> coordTile;
         if (coordCtx) {
             const scidb::TypeId& coordTileType = "scidb::Coordinates";
             coordTile = _tileFactory->construct(coordTileType, BaseEncoding::ARRAY, coordCtx);
@@ -781,9 +791,11 @@ namespace scidb {
         }
 
         tileData.swap(dataTile);
+        assert(tileData);
         if (coordCtx) {
             assert(tileData->size() == coordTile->size());
             tileCoords.swap(coordTile);
+            assert(tileCoords);
         }
         return offset;
     }
@@ -791,8 +803,8 @@ namespace scidb {
     template<typename ItemChunkIterator>
     void
     TileConstChunkIterator<ItemChunkIterator>::populateTiles(size_t maxValues,
-                                                             boost::shared_ptr<BaseTile>& dataTile,
-                                                             boost::shared_ptr<BaseTile>& coordTile)
+                                                             std::shared_ptr<BaseTile>& dataTile,
+                                                             std::shared_ptr<BaseTile>& coordTile)
     {
         assert(dataTile);
 
@@ -852,8 +864,8 @@ namespace scidb {
         virtual const Coordinates&
         getData(scidb::Coordinates& offset,
                 size_t maxValues,
-                boost::shared_ptr<BaseTile>& tileData,
-                boost::shared_ptr<BaseTile>& tileCoords)
+                std::shared_ptr<BaseTile>& tileData,
+                std::shared_ptr<BaseTile>& tileCoords)
         {
             return inputIterator->getData(offset,
                                           maxValues,
@@ -865,8 +877,8 @@ namespace scidb {
         virtual position_t
         getData(position_t logicalOffset,
                 size_t maxValues,
-                boost::shared_ptr<BaseTile>& tileData,
-                boost::shared_ptr<BaseTile>& tileCoords)
+                std::shared_ptr<BaseTile>& tileData,
+                std::shared_ptr<BaseTile>& tileCoords)
         {
             return inputIterator->getData(logicalOffset,
                                           maxValues,
@@ -878,7 +890,7 @@ namespace scidb {
         virtual const Coordinates&
         getData(scidb::Coordinates& offset,
                 size_t maxValues,
-                boost::shared_ptr<BaseTile>& tileData)
+                std::shared_ptr<BaseTile>& tileData)
         {
             return inputIterator->getData(offset,
                                           maxValues,
@@ -889,7 +901,7 @@ namespace scidb {
         virtual position_t
         getData(position_t logicalOffset,
                 size_t maxValues,
-                boost::shared_ptr<BaseTile>& tileData)
+                std::shared_ptr<BaseTile>& tileData)
         {
             return inputIterator->getData(logicalOffset,
                                           maxValues,

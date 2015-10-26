@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -106,11 +106,11 @@ CS_COPRIME_SECOND *= MULTIPLIER
 CHUNK_SIZES_DICT= {
     SAME:              { SOURCE: { SIZE: CS_VALUE,            COUNT: CS_VALUE            },
                          RESULT: { SIZE: CS_VALUE,            COUNT: CS_VALUE            } },
-    ALIGNED_INCREASE:  { SOURCE: { SIZE: CS_LESSER,           COUNT: CS_GREATER          }, 
+    ALIGNED_INCREASE:  { SOURCE: { SIZE: CS_LESSER,           COUNT: CS_GREATER          },
                          RESULT: { SIZE: CS_GREATER,          COUNT: CS_LESSER           } },
     ALIGNED_DECREASE:  { SOURCE: { SIZE: CS_GREATER,          COUNT: CS_LESSER           },
                          RESULT: { SIZE: CS_LESSER,           COUNT: CS_GREATER          } },
-    NOT_ALIGNED:       { SOURCE: { SIZE: CS_COPRIME_FIRST,    COUNT: CS_COPRIME_SECOND   }, 
+    NOT_ALIGNED:       { SOURCE: { SIZE: CS_COPRIME_FIRST,    COUNT: CS_COPRIME_SECOND   },
                          RESULT: { SIZE: CS_COPRIME_SECOND,   COUNT: CS_COPRIME_FIRST    } },
     PARTIALLY_ALIGNED: { SOURCE: { SIZE: CS_COPRIME_FIRST*2,  COUNT: CS_COPRIME_SECOND*2 },
                          RESULT: { SIZE: CS_COPRIME_SECOND*2, COUNT: CS_COPRIME_FIRST*2  } }
@@ -118,8 +118,8 @@ CHUNK_SIZES_DICT= {
 
 def create_dimension_pair(name, chunk_sizes_str, overlap_str, max_gap_str):
     max_gap = MAX_GAP_DICT[max_gap_str]
-    test_name = '-'.join([name, 
-                          "size_" + chunk_sizes_str, 
+    test_name = '-'.join([name,
+                          "size_" + chunk_sizes_str,
                           "overlap_" + overlap_str,
                           "gap_" + max_gap_str])
     chunk_sizes = CHUNK_SIZES_DICT[chunk_sizes_str]
@@ -137,7 +137,7 @@ def create_dimension_pair(name, chunk_sizes_str, overlap_str, max_gap_str):
                        overlap=overlap[RESULT])
     return { 'TEST_NAME': test_name,
              SOURCE: source,
-             RESULT: result }    
+             RESULT: result }
 
 def iterate_dimension_pair(name):
     for chunk_sizes_str in CHUNK_SIZES_LIST:
@@ -145,7 +145,7 @@ def iterate_dimension_pair(name):
             continue
         for overlap_str in OVERLAP_LIST:
             for max_gap_str in MAX_GAP_LIST:
-                yield create_dimension_pair(name, 
+                yield create_dimension_pair(name,
                                             chunk_sizes_str,
                                             overlap_str,
                                             max_gap_str)
@@ -164,9 +164,9 @@ def iterate_arrays():
     yield create_array_pair([y])
     for x in iterate_dimension_pair('x'):
         yield create_array_pair([x])
-        yield create_array_pair([x, y])    
-        yield create_array_pair([y, x])    
-        
+        yield create_array_pair([x, y])
+        yield create_array_pair([y, x])
+
 
 def generate(d):
     set_name(d['TEST_NAME'])
@@ -180,10 +180,10 @@ def generate(d):
             build = "(%s)*%s+%s" % (build, d.maximum - d.minimum, d.name)
     build = "build(source, %s)" % build
     setup = ['--setup',
-             source.create(), 
-             result.create(), 
+             source.create(),
+             result.create(),
              'store(%s, source)' % build ]
-    test = ['--test', 
+    test = ['--test',
             'scan(source)',
             'repart(source, result)',
             'store(repart(source, result), result)',

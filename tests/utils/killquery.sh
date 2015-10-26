@@ -1,8 +1,8 @@
 #!/bin/bash
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -19,11 +19,11 @@
 # END_COPYRIGHT
 #
 
-# This script is used within the SciDB test harness to exercise 
-# iquery aborts/recovery. 
+# This script is used within the SciDB test harness to exercise
+# iquery aborts/recovery.
 
 query="$4"
-signal="" 
+signal=""
 command="iquery -p ${IQUERY_PORT:=1239} -c ${IQUERY_HOST:=localhost}"
 
 # seconds after running query to wait before issuing kill
@@ -70,9 +70,9 @@ else
 	then
 		command="$command -f $tmpfile "
 	fi
-	
+
 	if [ "$1" == "-afl" ]
-	then 
+	then
 		command="$command -a -f $tmpfile "
 	fi
 fi
@@ -88,7 +88,7 @@ else
 fi
 
 ##################################################################
-# MAIN - Do work. 
+# MAIN - Do work.
 ##################################################################
 
 # store the query in a temp file because bash is being a pain about processing it through the command line

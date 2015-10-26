@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -105,10 +105,10 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
     nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
 
         // All parameters are optional.
         res.push_back(END_OF_VARIES_PARAMS());
@@ -120,7 +120,7 @@ public:
         }
         else
         {
-            boost::shared_ptr<OperatorParam> lastParam = _parameters[_parameters.size() - 1];
+            std::shared_ptr<OperatorParam> lastParam = _parameters[_parameters.size() - 1];
             if (lastParam->getParamType() == PARAM_AGGREGATE_CALL)
             {
                 // If the previous parameter was an aggregate call, this one can be another aggregate call or a dim name.
@@ -155,11 +155,11 @@ public:
      */
     void addDimension(Dimensions const& inputDims,
                       Dimensions& outDims,
-                      shared_ptr<OperatorParam> const& param,
+                      std::shared_ptr<OperatorParam> const& param,
                       size_t chunkSize)
     {
-        boost::shared_ptr<OperatorParamReference> const& reference =
-            (boost::shared_ptr<OperatorParamReference> const&) param;
+        std::shared_ptr<OperatorParamReference> const& reference =
+            (std::shared_ptr<OperatorParamReference> const&) param;
 
         string const& dimName = reference->getObjectName();
         string const& dimAlias = reference->getArrayName();
@@ -184,7 +184,7 @@ public:
             << dimName << "aggregate input" << inputDims;
     }
 
-    ArrayDesc inferSchema(vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         ArrayDesc const& input = schemas[0];
@@ -237,7 +237,7 @@ public:
                     // i=2 ==> index = 4
                     size_t index = i + numGroupbyDims;
                     assert(index < _parameters.size());
-                    chunkSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[index])->getExpression(),
+                    chunkSize = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[index])->getExpression(),
                             query, TID_INT64).getInt64();
                     if (chunkSize<=0) {
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE);
@@ -258,13 +258,13 @@ public:
             grand = false;
         }
 
-        ArrayDesc outSchema(input.getName(), Attributes(), outDims);
+        ArrayDesc outSchema(input.getName(), Attributes(), outDims, defaultPartitioning());
         for (size_t i =0, n = _parameters.size(); i<n; i++)
         {
             if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)
             {
                 bool isInOrderAggregation = false;
-                addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) _parameters[i], input,
+                addAggregatedAttribute( (std::shared_ptr <OperatorParamAggregateCall> &) _parameters[i], input,
                                         outSchema, isInOrderAggregation);
             }
         }

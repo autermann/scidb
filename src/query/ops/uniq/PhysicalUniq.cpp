@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,6 +25,8 @@
 #include <util/arena/Map.h>
 
 #include "UniqSettings.h"
+
+using namespace std;
 
 namespace scidb
 {
@@ -73,35 +75,9 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.operators.uni
  * <br> Instance 1: Chunk{5} -> f,g,h,i,
  * <br> Instance 2:
  *
- * @par A word about SciDB data distribution:
- * <br>
- * <br>
- * The default distribution scheme that SciDB uses is called "psHashPartitioned". In reality, it is a hash of the chunk
- * coordinates, modulo the number of instances. In the one-dimensional case, if data starts at 1 with a chunk size
- * of 10 on 3 instances, then chunk 1 goes to instance 0,  chunk 11 to instance 1, chunk 21 to instance 2, chunk 31 to
- * instance 0, and on...
- * <br>
- * <br>
- * In the two-plus dimensional case, the hash is not so easy to describe. For the exact definition, read
- * getInstanceForChunk() in Operator.cpp.
- * <br>
- * <br>
- * All data is currently stored with this distribution. But operators emit data in different distributions quite often.
- * For example, ops like cross, cross_join and some linear algebra routines will output data in a completely different
- * distribution. Worse, ops like slice, subarray, repart may emit "partially filled" or "ragged" chunks - just like
- * we do in the algorithm example above.
- * <br>
- * <br>
- * Data whose distribution is so "violated" must be redistributed before it is stored or processed by other ops that
- * need a particular distribution. The function redistribute() is available and is sometimes called directly by the
- * operator (see PhysicalIndexLookup.cpp for example). Other times, the operator simply tells the SciDB optimizer that
- * it may output data in an incorrect distribution. The optimizer then determines when and how to redistribute the data.
- * That approach is more advanatageous, as the optimizer is liable to get smarter about delaying or waiving the
- * call to redistribute(). For this purpose, the functions
- * <br> getOutputDistribution(),
- * <br> changedDistribution() and
- * <br> outputFullChunks()
- * are provided. See their usage in the operator code below.
+ *
+ * @par NOTE: SciDB data distributions vary and an operator must be aware of that.  See the
+ * notes about data distribution in ArrayDistribution.h
  *
  * @author apoliakov@paradigm4.com
  */
@@ -294,9 +270,9 @@ private:
          * Marshall this into a new SharedBuffer.
          * @return a buffer containing all of the data from this.
          */
-        virtual shared_ptr<SharedBuffer> marshall() const
+        virtual std::shared_ptr<SharedBuffer> marshall() const
         {
-            shared_ptr <SharedBuffer> result ( make_shared<MemoryBuffer>( static_cast<void*>(NULL), _marshalledSize));
+            std::shared_ptr <SharedBuffer> result ( make_shared<MemoryBuffer>( static_cast<void*>(NULL), _marshalledSize));
             size_t* sptr = static_cast<size_t*> (result->getData());
             *sptr = super::size();
             ++sptr;
@@ -314,7 +290,7 @@ private:
          * Add data from a marshalled buffer to this.
          * @param buf a buffer obtained by calling marshall() on another object of this type.
          */
-        virtual void unMarshall(shared_ptr<SharedBuffer>& buf)
+        virtual void unMarshall(std::shared_ptr<SharedBuffer>& buf)
         {
             size_t* sptr = static_cast<size_t*> (buf->getData());
             size_t numEntries = *sptr;
@@ -442,15 +418,15 @@ private:
     class OutputArraySequentialWriter : public boost::noncopyable
     {
     private:
-        shared_ptr<Array> const _output;
+        std::shared_ptr<Array> const _output;
         Coordinates _outputChunkPosition;
         Coordinates _outputCellPosition;
-        shared_ptr<ArrayIterator> _outputArrayIterator;
-        shared_ptr<ChunkIterator> _outputChunkIterator;
+        std::shared_ptr<ArrayIterator> _outputArrayIterator;
+        std::shared_ptr<ChunkIterator> _outputChunkIterator;
 
     public:
-        OutputArraySequentialWriter(ArrayDesc const& schema, shared_ptr<Query>& query):
-            _output(boost::make_shared<MemArray>(schema,query)),
+        OutputArraySequentialWriter(ArrayDesc const& schema, std::shared_ptr<Query>& query):
+            _output(std::make_shared<MemArray>(schema,query)),
             _outputChunkPosition(1, -1),
             _outputCellPosition(1, -1),
             _outputArrayIterator(_output->getIterator(0)) //the chunk iterator is NULL at the start
@@ -467,7 +443,7 @@ private:
          * @param value the data to write
          * @param query the query context
          */
-        void writeValue(Coordinate const position, Value const& value, shared_ptr<Query>& query)
+        void writeValue(Coordinate const position, Value const& value, std::shared_ptr<Query>& query)
         {
             EXCEPTION_ASSERT(position > _outputCellPosition[0] && !value.isNull());
             _outputCellPosition[0] = position;
@@ -494,7 +470,7 @@ private:
          * Flush the last chunk and return the resulting array object. After this, the class is invalidated.
          * @return the output array
          */
-        shared_ptr<Array> finalize()
+        std::shared_ptr<Array> finalize()
         {
             if(_outputChunkIterator)
             {
@@ -520,18 +496,18 @@ private:
     /**
      * Read the input array (whatever part of it we have on the local instance) and populate an inputArrayInfo struct.
      */
-    void fillInputArrayInfo(shared_ptr<Array>& inputArray, InputArrayInfo& inputArrayInfo)
+    void fillInputArrayInfo(std::shared_ptr<Array>& inputArray, InputArrayInfo& inputArrayInfo)
     {
-        shared_ptr<ConstArrayIterator> inputArrayIter = inputArray->getConstIterator(0);
+        std::shared_ptr<ConstArrayIterator> inputArrayIter = inputArray->getConstIterator(0);
         while(!inputArrayIter->end())
         {
             ConstChunk const& inputChunk = inputArrayIter->getChunk();
             Coordinate chunkCoord = inputArrayIter->getPosition()[0]; ///get the position of the chunk
             InputChunkInfo inputChunkInfo;
-            shared_ptr<ConstChunkIterator> inputChunkIter = inputChunk.getConstIterator();
+            std::shared_ptr<ConstChunkIterator> inputChunkIter = inputChunk.getConstIterator();
             while(!inputChunkIter->end())
             {
-                Value& val = inputChunkIter->getItem();
+                Value const& val = inputChunkIter->getItem();
                 if(!val.isNull())
                 {
                     if(inputChunkInfo.startingValue.isNull()) //first value
@@ -598,9 +574,9 @@ private:
      *             instances
      * @param query the query context
      */
-    void exchangeArrayInfo(InputArrayInfo& inputArrayInfo, OutputArrayInfo& outputArrayInfo, shared_ptr<Query>& query)
+    void exchangeArrayInfo(InputArrayInfo& inputArrayInfo, OutputArrayInfo& outputArrayInfo, std::shared_ptr<Query>& query)
     {
-        shared_ptr<SharedBuffer> buf = inputArrayInfo.marshall();
+        std::shared_ptr<SharedBuffer> buf = inputArrayInfo.marshall();
         InstanceID myInstanceId = query->getInstanceID();
         for (InstanceID i = 0; i< query->getInstancesCount(); ++i)
         {
@@ -625,11 +601,11 @@ private:
     /**
      * Given the input array and an OutputArrayInfo, populate and return the local portion of the output array.
      */
-    shared_ptr<Array> writeOutputArray(shared_ptr<Array>& inputArray, OutputArrayInfo const& outputArrayInfo,
-                                       shared_ptr<Query>& query)
+    std::shared_ptr<Array> writeOutputArray(std::shared_ptr<Array>& inputArray, OutputArrayInfo const& outputArrayInfo,
+                                       std::shared_ptr<Query>& query)
     {
         OutputArraySequentialWriter outputWriter(_schema, query);
-        for (shared_ptr<ConstArrayIterator> inputArrayIter = inputArray->getConstIterator(0);
+        for (std::shared_ptr<ConstArrayIterator> inputArrayIter = inputArray->getConstIterator(0);
              !inputArrayIter->end();
              ++(*inputArrayIter))  //for each chunk in input
         {
@@ -643,11 +619,11 @@ private:
             }
             Coordinate currentOutputPos = iter->second.startingPosition; //write data to output starting at this pos
             Value lastVal; //constructed as null
-            for(shared_ptr<ConstChunkIterator> inputChunkIter = inputChunk.getConstIterator();
+            for(std::shared_ptr<ConstChunkIterator> inputChunkIter = inputChunk.getConstIterator();
                 !inputChunkIter->end();
                 ++(*inputChunkIter)) //for each value in the chunk
             {
-                Value& inputValue = inputChunkIter->getItem();
+                Value const& inputValue = inputChunkIter->getItem();
                 if(lastVal != inputValue) //new unique value or first value
                 {
                     if(iter->second.writeFirstValue || !lastVal.isNull())
@@ -678,13 +654,13 @@ public:
      * @param inputDistributions the distributions of all the input arrays
      * @param inputSchemas the shapes of the input arrays.
      */
-    virtual ArrayDistribution getOutputDistribution(vector<ArrayDistribution> const&,
+    virtual RedistributeContext getOutputDistribution(vector<RedistributeContext> const&,
                                                     vector<ArrayDesc> const&) const
     {
        /* Usually the answer is either "psHashPartitioned" or "psUndefined". Other distributions are a more advanced topic.
         * psUndefined is a catch-all.
         */
-       return ArrayDistribution(psUndefined);
+       return RedistributeContext(psUndefined);
     }
 
     /**
@@ -715,7 +691,7 @@ public:
        return inputBoundaries[0];
     }
 
-    shared_ptr<Array> execute(vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         InputArrayInfo inputArrayInfo;
         fillInputArrayInfo(inputArrays[0], inputArrayInfo);

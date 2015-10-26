@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,9 +27,10 @@
  * @brief This file implement logical operator SCATTER/GATHER
  */
 
-#include "query/Operator.h"
+#include <query/Operator.h>
 #include <smgr/io/Storage.h>
 
+using namespace std;
 
 namespace scidb
 {
@@ -93,9 +94,9 @@ public:
         ADD_PARAM_VARIES();
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
 
         // sanity check: #parameters is at least 1 (i.e. partitionSchema), but no more than #dims+4.
         if (_parameters.size()==0 || _parameters.size() > schemas[0].getDimensions().size() + 4) {
@@ -139,6 +140,7 @@ public:
 
         return res;
     }
+    private:
 
     std::string getArrayNameForStore() const
     {
@@ -150,17 +152,18 @@ public:
         return arrayName;
     }
 
+    public:
     /**
      * The schema of output array is the same as input
      */
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 1);
         ArrayDesc const& desc = inputSchemas[0];
 
         //validate the partitioning schema
         const PartitioningSchema ps = (PartitioningSchema)
-            evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_INT32).getInt32();
+            evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_INT32).getInt32();
         if (! isValidPartitioningSchema(ps, false)) // false = not allow optional data associated with the partitioning schema
         {
             throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_REDISTRIBUTE_ERROR);
@@ -179,10 +182,10 @@ public:
                 assert(lExp->getExpectedType()==TypeLibrary::getType(TID_BOOL));
             }
         }
-        return ArrayDesc(resultArrayName, desc.getAttributes(), desc.getDimensions());
+        return ArrayDesc(resultArrayName, desc.getAttributes(), desc.getDimensions(), ps);
     }
 
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
 
@@ -190,21 +193,28 @@ public:
         if (resultArrayName.empty()) {
             return;
         }
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(resultArrayName));
 
-        assert(resultArrayName.find('@') == std::string::npos);
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(resultArrayName,
-                                                                                     query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalInstanceId(),
-                                                                                     SystemCatalog::LockDesc::COORD,
-                                                                                     SystemCatalog::LockDesc::WR));
-        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
-        assert(resLock);
-        assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
+        ArrayDesc srcDesc;
+        SCIDB_ASSERT(!srcDesc.isTransient());
+        const bool dontThrow(false);
+
+        SystemCatalog::getInstance()->getArrayDesc(resultArrayName, SystemCatalog::ANY_VERSION, srcDesc, dontThrow);
+
+        const SystemCatalog::LockDesc::LockMode lockMode =
+            srcDesc.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
+
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(resultArrayName,
+                                                                                       query->getQueryID(),
+                                                                                       Cluster::getInstance()->getLocalInstanceId(),
+                                                                                       SystemCatalog::LockDesc::COORD,
+                                                                                       lockMode));
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        SCIDB_ASSERT(resLock);
+        SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
     }
 };
 
-
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSG, "sg")
-
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSG, "_sg")
 
 } //namespace

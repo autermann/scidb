@@ -4,8 +4,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -146,7 +146,7 @@ def executeIt(cmdList,
 def postCleanup(name, enable=True):
     if enable:
         _usedMatrices[name]=1
-    
+
 #
 # Remove a given array from SciDB
 # if autoCleanup=True, name is added into usedMatrices
@@ -298,7 +298,7 @@ RangeStruct = collections.namedtuple("RangeStruct", "start last step stepOp")  #
 # Format: '+'|'*':startVal:lastVal:stepVal
 # If string is invalid, an exception is raised
 def rangeStructFromStr(rangeStr):
-    # Try to parse the range 
+    # Try to parse the range
     args = string.split(rangeStr,':')
     if len(args) != 4:
         raise Exception("rangeStr must have 4 parts separated by colons, got: %s " % (rangeStr))
@@ -320,7 +320,7 @@ def rangeStructFromStr(rangeStr):
 #
 def xrangeGeneralized(start, stop, step=1, dtype=None,        # xrange()-compatible
                       stepOp=(lambda a,b:a+b), final=None):   # extension arguments
-    
+
     value = start
     lastYeilded = None
     # generalize value < stop for negative step values
@@ -329,7 +329,7 @@ def xrangeGeneralized(start, stop, step=1, dtype=None,        # xrange()-compati
         lastYeilded = value if dtype is None else dtype(value);
         yield lastYeilded
         value = stepOp(value, step)
-    
+
     if (final != lastYeilded and final is not None):
         yield final
 
@@ -415,7 +415,7 @@ def varyChunkSizes(mat_order, scalapack_block_sizes, divs):
           # add on order-1 andl order ... order+1 is over the limit
           chunkSizes[mat_order-1]=1
           chunkSizes[mat_order]=1
-       elif mat_order<=max_scalapack_block: # XXX: svd errors out on chunk sizes > max_scalapack_block 
+       elif mat_order<=max_scalapack_block: # XXX: svd errors out on chunk sizes > max_scalapack_block
           # just order itself
           chunkSizes[mat_order]=1
 
@@ -464,7 +464,7 @@ def getMatrixTypeAfl(nrow, ncol, chunkSize, matrixTypeName):
                                       # same as k, but with T[0,0] = 1 AND T[n-1, n-1] = 1
                                       # it is symmetric, non-invertible, and (moreover) positive semi-definite
                                       # [can't define until these defs are parameterized on ORDER]
-                                      
+
         "col" :"c",                   # helpful to debug,e.g. multiply
         "kr_plus_c":"100*r+c",        # helpful to debug,e.g. multiply
         "flt_1_c" :"1.0/(1+c)",       # converges to 1/6 PI**2 as c -> inf, when mult by its transpose
@@ -523,7 +523,7 @@ def doTest(funcName=None, func=None, matrixTypeName=None, nrow=None, ncol=None, 
         traceback.print_exc()
         sys.stderr.flush()
         raise
-        
+
 
 
 def iterateOverTests(orderStr, errorLimit, testNames=allTests.keys(), matrixTypeNamesIn=None):
@@ -541,7 +541,7 @@ def iterateOverTests(orderStr, errorLimit, testNames=allTests.keys(), matrixType
         printDebugForce("Iterating over matrix data types: " + str(matrixTypeNames))
         printDebugForce("And matrix orders: " + orderStr)
         printDebugForce("And chunk sizes: %s"% str(getChunkSizeList()) )
-        
+
         oRS = rangeStructFromStr(orderStr) # oRS = order RangeStruct, e.g oRS.start is the start value
         for order in xrangeGeneralizedFromRangeStruct(oRS):
             for chunkSize in getChunkSizeRange(order, getChunkSizeList()): # TODO: upgrade to rangeStruct way
@@ -555,7 +555,7 @@ def iterateOverTests(orderStr, errorLimit, testNames=allTests.keys(), matrixType
                             printDebug("TEST %s, chunkSize %s, dtype %s, nrow %s , ncol=order %s" % (testName, chunkSize, matrixTypeName, nrow, order,))
                             doTest(funcName=testName, func=allTests[testName], matrixTypeName=matrixTypeName,
                                    nrow=nrow, ncol=order, chunkSize=chunkSize, errorLimit=errorLimit)
-                        
+
                         # from order high & start wide to square (final is order)
                         for ncol in xrangeGeneralized(start, order+1, oRS.step, dtype=int, stepOp=oRS.stepOp, final=order):
                             printDebug("TEST %s, chunkSize %s, dtype %s, nrow=order %s , ncol %s" % (testName, chunkSize, matrixTypeName, order, ncol,))
@@ -565,7 +565,7 @@ def iterateOverTests(orderStr, errorLimit, testNames=allTests.keys(), matrixType
                         printDebug("TEST %s, chunkSize %s, dtype %s, nrow = ncol = order %s" % (testName, chunkSize, matrixTypeName, order,))
                         doTest(funcName=testName, func=allTests[testName], matrixTypeName=matrixTypeName,
                                nrow=order, ncol=order, chunkSize=chunkSize, errorLimit=errorLimit)
-                
+
                 printDebugForce("TESTS END: %s, chunkSize %s, order %s" % (testName, chunkSize, order,))
 
 
@@ -609,7 +609,7 @@ def generateDiagonal(vector, result, autoCleanup=True):
    #
 
    VEC_1="VEC_1"
-   createMatrix(VEC_1, 1, ncol, rowChunkSize=1, colChunkSize=chunkSize) # 
+   createMatrix(VEC_1, 1, ncol, rowChunkSize=1, colChunkSize=chunkSize) #
    populateMatrix(VEC_1, getMatrixExpressionAfl(1, ncol, rowChunkSize=1, colChunkSize=chunkSize, expr="1")) #matrix of ones
 
    ADDDIM_Q=getAdddim(vector,'c')
@@ -706,7 +706,7 @@ class TimerRealTime():
     def __enter__(self):     self.start = time.time() ; return self
     def __exit__(self, *args): self.end = time.time() ; self.interval = self.end - self.start
 
-        
+
 # Compute residual measures: (MAT_1-MAT_2)
 def computeResidualMeasures(MAT_1, attr_1, MAT_2, attr_2, attr_result_residual, MAT_RES=None):
     printDebug("computeResidualMeasures start")
@@ -749,7 +749,7 @@ def dbgGetErrorMetric(testName, ARRAY_RMS_ERROR, attr_error_metric, errorLimit):
     if _DBG:
         printDebugForce("DEBUG dbgGetErrorMetric")
         aflStderr(passTestAfl)
-    
+
     (ret,result)=aflResult(passTestAfl)
     firstLine = string.split(result)[1]  # split on newline, take first line
     vals = string.split(firstLine,',')   # split on commas
@@ -774,7 +774,7 @@ def testForError(testName, ARRAY_RMS_ERROR, attr_error_metric, errorLimit):
      hasError = not (errorMetric <= errorLimit)
      return hasError
 
-   
+
 def doSvdSanityCount(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_which):
     printDebug("doSvdSanityCount start")
 
@@ -809,7 +809,7 @@ def doSvdSanityCount(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_
         extraApplyAfl = "apply(filter(%s, %s > 1.0), copy, %s)"  % (MAT_WHICH, attr_which, attr_which)
         printDebugForce("%s now apply value to itself, to see if will print differently" % (msgPrefix,))
         printDebugForce("%s query: %s" % (msgPrefix, extraApplyAfl))
-        aflStderr(extraApplyAfl, format="-odcsv") 
+        aflStderr(extraApplyAfl, format="-odcsv")
         printDebugForce("%s end of query output")
 
         showAfl = "show(%s)"  % (MAT_WHICH)
@@ -819,7 +819,7 @@ def doSvdSanityCount(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_
 
         applyAfl = "apply(%s, copy, %s)"  % (MAT_WHICH, attr_which)
         printDebugForce("%s query: %s" % (msgPrefix, applyAfl))
-        aflStderr(applyAfl, format="-odcsv") 
+        aflStderr(applyAfl, format="-odcsv")
         printDebugForce("%s end of query output")
 
         return False
@@ -827,7 +827,7 @@ def doSvdSanityCount(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_
     return True
 
 
- 
+
 def doSvdSanityApply(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_which):
     printDebug("doSvdSanityApply start")
 
@@ -850,7 +850,7 @@ def doSvdSanityApply(nrow,ncol,MAT_INPUT, VEC_S, MAT_U, MAT_VT, MAT_WHICH, attr_
                     (msgPrefix, count, "=" , 0, str.upper(success)))
     printInfo("%s PASS? : %s" % \
                  (msgPrefix, str.upper(success)))
-    
+
     if count > 0 :
         printDebugForce("%s count %d failing cells" % (msgPrefix, count))
         printDebugForce("%s failing query, results on next line: %s" % (msgPrefix, badApplyAfl))
@@ -904,7 +904,7 @@ def getMatrixSvdRandomAfl(nrow, ncol, chunkSize, randomAfl):
     zerosAflA = "build(%s,0)" % (getMatrixSchema(minrc, ncol, chunkSize, chunkSize),)
     zerosAflB = "build(%s,0)" % (getMatrixSchema(nrow, ncol, chunkSize, chunkSize),)
     gemmAfl = "gemm(%s, gemm(%s,%s,%s),%s)" % (leftAfl, evenSpacedDiagAfl, rightAfl, zerosAflA, zerosAflB)
-    productAfl = "attribute_rename(%s, gemm, v)" % (gemmAfl,)
+    productAfl = "project(apply(%s, v, gemm), v)" % (gemmAfl,)
 
     return productAfl
 
@@ -1180,9 +1180,9 @@ def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
             printDebugForce("SVD_SETUP%s PASS (exception): FALSE" % (resultMesg,))
             printInfo("SVD_SETUP%s PASS (exception): FALSE" % (resultMesg,)) # make a message with format similar to test failure
             return
-        
+
         printDebug("Generating SVD matrices, S, U, VT")
-        
+
         S="S"
         SAfl = "gesvd(%s,'values')" % INPUT
         eliminate(S)
@@ -1238,7 +1238,7 @@ def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
             printDebug("Computing the error metric 1")
             ARRAY_RMS_ERROR="RMS_ERROR"
             ATTR_ERROR_METRIC="rms_ulp_error"
-            
+
             if matrixTypeName in ("zero","identity") :
                 # these special matrices should result in no residual at all
                 errorLimit = 0
@@ -1268,7 +1268,7 @@ def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
                     doSvdMetric2(U, nrow, ncol, chunkSize, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC)
                 printDebug("%s took %s" % ("svdMetric2", timer.interval,), _TIME_OPS)
                 Uerr = (testForError("SVD_METRIC_2"+resultMesg, ARRAY_RMS_ERROR, ATTR_ERROR_METRIC, errorLimit)
-                       or Uerr)    
+                       or Uerr)
             # orthoginality of VT
             checkOrthoVT = True
             if checkOrthoVT :
@@ -1305,7 +1305,7 @@ def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
                                                 # as many elements as they should.  But hasn't happend
                                                 # for a while, so commenting out.
                 newNameSuffix = "%s_%s" % (nrow, ncol)
-                
+
                 newName = "ERR_IN_%s" % newNameSuffix
                 printDebugForce("testSVDByDim Terr and _SAVE_BAD_MATRICES: renaming INPUT to %s" % (newName))
                 eliminate(newName, autoCleanup=False)
@@ -1335,7 +1335,7 @@ def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
                 afl("rename(%s,%s)" %  (S, newName))
 
 
-        # Matrix check -- U 
+        # Matrix check -- U
         if Uerr or forceSanityCheck :
             aflStderr("show(%s)" % (U,) ) # confirm that it exists
             Uerr = (not doSvdSanityCount(nrow, ncol, INPUT, S, U, VT,    U, "u")
@@ -1354,7 +1354,7 @@ def testSVDByDim(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
                      or VTerr)
             VTerr = (not doSvdSanityApply(nrow, ncol, INPUT, S, U, VT,    VT, "v")
                      or VTerr)
- 
+
             if VTerr or _SAVE_BAD_MATRICES:
                 eliminate("ERR_VT_%s" % (nrow,))
                 afl("rename(%s,ERR_VT_%s)" % (VT, nrow))
@@ -1376,7 +1376,7 @@ def doNormResidualMetric(matrixTypeName, exprAfl, exprAttr, referenceAfl, refere
 
    residualAfl = computeResidualMeasures(exprAfl, exprAttr,  referenceAfl, referenceAttr, "resid")
    residualNormAfl = norm(residualAfl, "resid", "resid_norm")
-   
+
    referenceNormAfl = norm(referenceAfl, referenceAttr, "ref_norm")
 
    if matrixTypeName in ("zero"):
@@ -1394,7 +1394,7 @@ def doNormResidualMetric(matrixTypeName, exprAfl, exprAttr, referenceAfl, refere
 
    hasError = not (errorMetric <= errorLimit)
    if hasError:
-      printDebugForce("doNormResidualMetric Error %s exceeds %s @ size %s x %s " % (errorMetric, errorLimit, nrow, ncol))      
+      printDebugForce("doNormResidualMetric Error %s exceeds %s @ size %s x %s " % (errorMetric, errorLimit, nrow, ncol))
       printDebugForce("doNormResidualMetric I. residual query is %s" %(residualAfl))
       valLimit=0.1
       printDebugForce("doNormResidualMetric II. abs residual exceeding threshold %s" %(valLimit))
@@ -1459,9 +1459,9 @@ def testTranspose(matrixTypeName, AFL_INPUT, nrow, ncol, chunkSize, errorLimit):
                                        # otherwise, we can't compare two operators on the same input
    printDebug("INPUT vs transpose(transpose(INPUT))) nrow %s, ncol %s, chunkSize %s" % (nrow, ncol, chunkSize))
 
-   transposeAfl = "cast(transpose(%s), %s)" % (INPUT, getMatrixSchema(ncol, nrow, chunkSize, chunkSize)) # note row,col reversal   
+   transposeAfl = "cast(transpose(%s), %s)" % (INPUT, getMatrixSchema(ncol, nrow, chunkSize, chunkSize)) # note row,col reversal
    transpose2Afl = "cast(transpose(%s), %s)" % (transposeAfl, getMatrixSchema(nrow, ncol, chunkSize, chunkSize,"t")) # note row,col back to normal
-   
+
    printDebug("Computing TRANSPOSE error metric, using doNormResidualMetric")
    ARRAY_RMS_ERROR="RMS_ERROR"
    ATTR_ERROR_METRIC="rms_ulp_error"

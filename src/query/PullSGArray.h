@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,7 +28,7 @@
 
 #ifndef PULL_SG_ARRAY_H_
 #define PULL_SG_ARRAY_H_
-#include <boost/unordered_set.hpp>
+#include <unordered_set>
 #include <log4cxx/logger.h>
 #include <array/Metadata.h>
 #include <array/StreamArray.h>
@@ -67,7 +67,7 @@ public:
      * @param chunkDesc the message structure
      * @param sourceInstance logical source instance ID
      */
-    void handleChunkMsg(const boost::shared_ptr<MessageDesc>& chunkDesc,
+    void handleChunkMsg(const std::shared_ptr<MessageDesc>& chunkDesc,
                         const InstanceID sourceInstance);
 
     /**
@@ -75,7 +75,7 @@ public:
      * This implementation always returns the same iterator object.
      * It is created on the first invocation and incremented(operator++()) on the subsequent
      */
-    boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const ;
+    std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const ;
 
     /**
      * Callback to invoke when a remote chunk becomes available
@@ -98,6 +98,15 @@ public:
      */
     RescheduleCallback resetCallback(AttributeID attId,
                                      const RescheduleCallback& newCb);
+
+    /**
+     * Intended to be called by scidb::PullSGContext & PullSGArray's children
+     * @return true if the input array (the one to redistribute)
+     * is wrapped into a single attribute array with an extra coordinate
+     * corresponding to the attribute ID
+     */
+    bool isSerialized() const;
+
 protected:
 
     /**
@@ -108,7 +117,7 @@ protected:
      * if 0, CONFIG_SG_RECEIVE_QUEUE_SIZE is used instead
      */
     PullSGArray(const ArrayDesc& arrayDesc,
-                const boost::shared_ptr<Query>& query,
+                const std::shared_ptr<Query>& query,
                 bool enforceDataIntegrity,
                 uint32_t chunkPrefetchPerAttribute=0);
     /**
@@ -179,8 +188,8 @@ private:
      * @return a message contating only the next chunk coordinates or NULL
      * (if the next position is not available or the next chunk is already queued locally)
      */
-    boost::shared_ptr<MessageDesc>
-    toPositionMesg(const boost::shared_ptr<MessageDesc>& chunkMsg);
+    std::shared_ptr<MessageDesc>
+    toPositionMesg(const std::shared_ptr<MessageDesc>& chunkMsg);
 
     /**
      * Remove redundant position-only messages from the queue.
@@ -234,19 +243,19 @@ private:
         uint64_t cachedSize() const     { return _cachedSize; }
         bool isPending() const          { return _isPending; }
         void setPending(bool bit)       { _isPending = bit; }
-        void push(const boost::shared_ptr<MessageDesc>& msg)
+        void push(const std::shared_ptr<MessageDesc>& msg)
         {
             _msgs.push_back(msg);
             if (msg->getBinary()) { ++_cachedSize; }
         }
-        const boost::shared_ptr<MessageDesc>& head()
+        const std::shared_ptr<MessageDesc>& head()
         {
             return _msgs.front();
         }
-        boost::shared_ptr<MessageDesc> pop();
+        std::shared_ptr<MessageDesc> pop();
 
     private:
-        std::deque<boost::shared_ptr<MessageDesc> > _msgs;
+        std::deque<std::shared_ptr<MessageDesc> > _msgs;
         uint64_t _requested;  // number of *DATA* chunks requested but not yet available,
                               // position information can be piggy-backed on chunks (but does not have to be)
         uint64_t _cachedSize; // number of messages with chunk bodies (i.e. with binary data),
@@ -293,7 +302,7 @@ private:
  * immediately after consuming all the data
  */
 class PullSGArrayBlocking : public SynchableArray, public PullSGArray,
-                            public boost::enable_shared_from_this<PullSGArrayBlocking>
+                            public std::enable_shared_from_this<PullSGArrayBlocking>
 {
 public:
     /**
@@ -304,8 +313,8 @@ public:
      * if 0, CONFIG_SG_RECEIVE_QUEUE_SIZE is used instead
      */
     PullSGArrayBlocking(const ArrayDesc& arrayDesc,
-                        const boost::shared_ptr<Query>& query,
-                        const boost::shared_ptr<Array>& inputSGArray,
+                        const std::shared_ptr<Query>& query,
+                        const std::shared_ptr<Array>& inputSGArray,
                         bool enforceDataIntegrity,
                         uint32_t chunkPrefetchPerAttribute=0);
 
@@ -319,30 +328,32 @@ public:
     /// To be called immediately after consuming all the chunks
     virtual void sync();
 
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const ;
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const ;
 
+    /// Functor type for handling chunks returned by PullSGArrayBlocking
+    typedef boost::function< void (const AttributeID attId,
+                                   const ConstChunk& chunk,
+                                   const std::shared_ptr<Query>& query) > ChunkHandler;
     /**
-     * An INTERNAL helper template function for continually draining of MultiStreamArray
+     * A method for continually draining of this array.
      * @param attributesToPull a set of attributes to pull from the array
      *        NOTE that this parameter is mutable, its contents are undefined upon return
      * @param func a chunk handling functor
      */
-    template <class ChunkHandler_tt>
-    void pullAttributes(boost::unordered_set<AttributeID>& attributesToPull,
-                        ChunkHandler_tt& func);
+    void pullAttributes(std::unordered_set<AttributeID>& attributesToPull,
+                        ChunkHandler& func);
 private:
 
     /**
      * Gets the next chunk from PullSGArray
      */
-    template<typename ChunkHandler_tt>
-    bool pullChunk(ChunkHandler_tt& chunkHandler, const AttributeID attId);
+    bool pullChunk(ChunkHandler& chunkHandler, const AttributeID attId);
 
-    bool isInputSinglePass() const { return _sgInputAccess==Array::SINGLE_PASS; }
+    bool isInputSinglePass() const { return (!isSerialized() && _sgInputAccess==Array::SINGLE_PASS); }
 
     void validateIncomingChunk(ConstChunk const* chunk, const AttributeID attId);
 
-    boost::shared_ptr<Array> _inputSGArray;
+    std::shared_ptr<Array> _inputSGArray;
     const Array::Access _sgInputAccess;
     bool _nonBlockingMode;
 
@@ -357,23 +368,25 @@ private:
     Event _ev;
     bool _cond;
     Event::ErrorChecker _ec;
-    boost::shared_ptr<Exception> _error;
-    boost::unordered_set<AttributeID> _activeAttributes;
+    std::shared_ptr<Exception> _error;
+    std::unordered_set<AttributeID> _activeAttributes;
 
 public:
 
-    SyncCtx(const shared_ptr<Query>& query) :
+    SyncCtx(const std::shared_ptr<Query>& query) :
     _cond(false),
-    _ec(boost::bind(&Query::getValidQueryPtr, boost::weak_ptr<Query>(query)))
+    _ec(boost::bind(&Query::isValidQueryPtr, std::weak_ptr<Query>(query)))
     {}
 
-    SyncCtx(const weak_ptr<Query>& query) :
+    SyncCtx(const std::weak_ptr<Query>& query) :
     _cond(false),
-    _ec(boost::bind(&Query::getValidQueryPtr, query))
+    _ec(boost::bind(&Query::isValidQueryPtr, query))
     {}
 
     void signal(AttributeID attrId, const Exception* error);
-    void waitForActiveAttributes(boost::unordered_set<AttributeID>& activeAttributes);
+    /// Wait for attribute chunks to be available for consumption
+    /// @param activeAttributes[in,out] empty upon return
+    void waitForActiveAttributes(std::unordered_set<AttributeID>& activeAttributes);
 private:
     SyncCtx();
     SyncCtx(const SyncCtx& );
@@ -381,102 +394,6 @@ private:
 };
 
 };
-
-template <class ChunkHandler_tt>
-void PullSGArrayBlocking::pullAttributes(boost::unordered_set<AttributeID>& attributesToPull,
-                                         ChunkHandler_tt& func)
-{
-    _nonBlockingMode = true;
-    const static char* funcName =  "PullSGArrayBlocking::pullAttributes: ";
-    if (isInputSinglePass()) {
-        if (attributesToPull.size() != _iterators.size()) {
-            stringstream ss; ss << funcName << "all attributes are required for SINGLE_PASS array";
-            ASSERT_EXCEPTION(false, ss.str());
-        }
-        SinglePassArray* spa = dynamic_cast<SinglePassArray*>(_inputSGArray.get());
-        if (spa==NULL || !spa->isEnforceHorizontalIteration()) {
-            stringstream ss; ss << funcName << "SinglePassArray is required with horizontal iteration enforced";
-            ASSERT_EXCEPTION(false, ss.str());
-        }
-    }
-
-    shared_ptr<SyncCtx> ctx = boost::make_shared<SyncCtx>(_query);
-    for (boost::unordered_set<AttributeID>::const_iterator i = attributesToPull.begin();
-         i != attributesToPull.end(); ++i) {
-        const AttributeID attId = *i;
-        assert(attId<_iterators.size());
-        if (_iterators[attId])  {
-            stringstream ss; ss << funcName << "attribute "<< attId << " already pulled";
-            ASSERT_EXCEPTION(false, ss.str());
-        }
-        PullSGArray::RescheduleCallback cb = boost::bind(&SyncCtx::signal, ctx, attId, _1);
-        resetCallback(attId, cb);
-    }
-
-    boost::unordered_set<AttributeID> activeAttributes(attributesToPull);
-    while (!attributesToPull.empty()) {
-        LOG4CXX_TRACE(PullSGArray::_logger, funcName
-                      << " active attrs size="<<activeAttributes.size());
-        for (boost::unordered_set<AttributeID>::iterator iter = activeAttributes.begin();
-             iter != activeAttributes.end(); ) {
-            const AttributeID attId = *iter;
-            bool eof = false;
-            try {
-                eof = pullChunk(func,attId);
-            } catch (const scidb::MultiStreamArray::RetryException& ) {
-                boost::unordered_set<AttributeID>::iterator iterToErase = iter;
-                ++iter;
-                activeAttributes.erase(iterToErase);
-                continue;
-            }
-
-            if (eof) {
-                boost::unordered_set<AttributeID>::iterator iterToErase = iter;
-                ++iter;
-                activeAttributes.erase(iterToErase);
-                resetCallback(attId);
-                attributesToPull.erase(attId);
-                LOG4CXX_DEBUG(PullSGArray::_logger, funcName
-                              << "EOF attId="<< attId
-                              <<", remain="<<attributesToPull.size());
-                continue;
-            }
-            ++iter;
-        }
-        if (!attributesToPull.empty() &&
-            activeAttributes.empty()) {
-            LOG4CXX_TRACE(PullSGArray::_logger,  funcName
-                          << "waiting, active attrs size="<<activeAttributes.size());
-            ctx->waitForActiveAttributes(activeAttributes);
-        }
-    }
-    _nonBlockingMode = false;
-}
-
-template<typename ChunkHandler_tt>
-bool PullSGArrayBlocking::pullChunk(ChunkHandler_tt& chunkHandler,
-                                    const AttributeID attId)
-{
-    const static char* funcName =  "PullSGArrayBlocking::consumeChunk: ";
-    if (isDebug()) {
-        LOG4CXX_TRACE(PullSGArray::_logger, funcName << "trying to consume chunk for attId="<<attId);
-    }
-    boost::shared_ptr<ConstArrayIterator> arrIter = PullSGArray::getConstIterator(attId);
-    if (arrIter->end()) {
-        LOG4CXX_DEBUG(PullSGArray::_logger,  funcName << "EOF attId="<<attId);
-        return true;
-    }
-    const ConstChunk& chunk = arrIter->getChunk();
-    validateIncomingChunk(&chunk, attId);
-
-    shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-    chunkHandler(attId, chunk, query);
-
-    if (isDebug()) {
-        LOG4CXX_TRACE(PullSGArray::_logger, funcName << "advanced attId="<<attId);
-    }
-    return false;
-}
 
 } // namespace
 

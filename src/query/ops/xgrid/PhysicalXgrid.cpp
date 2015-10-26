@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -71,7 +71,7 @@ class PhysicalXgrid : public  PhysicalOperator
         Coordinates outStart, outEnd;
         for (size_t i =0; i<inDims.size(); i++)
         {
-            int32_t grid = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate().getInt32();
+            int32_t grid = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i])->getExpression()->evaluate().getInt32();
             outStart.push_back( inDims[i].getStartMin() + grid * (inStart[i] - inDims[i].getStartMin()) );
             outEnd.push_back( inDims[i].getStartMin() + grid * (inEnd[i] - inDims[i].getStartMin()) + grid - 1 );
         }
@@ -84,16 +84,16 @@ class PhysicalXgrid : public  PhysicalOperator
 	 * Xgrid is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-    boost::shared_ptr<Array> execute(
-            vector< boost::shared_ptr<Array> >& inputArrays,
-            boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(
+            vector< std::shared_ptr<Array> >& inputArrays,
+            std::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
 		assert(_parameters.size() == _schema.getDimensions().size());
-		return boost::shared_ptr<Array>(new XgridArray(_schema, inputArrays[0]));
+		return std::shared_ptr<Array>(new XgridArray(_schema, inputArrays[0]));
 	 }
 };
-    
+
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalXgrid, "xgrid", "physicalXgrid")
 
 }  // namespace scidb

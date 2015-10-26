@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,9 +42,9 @@ namespace scidb {
 
   UnfoldArrayIter::UnfoldArrayIter(DelegateArray const& delegate,
 				   AttributeID attrID,
-				   const shared_ptr<Array>& inputArray)
+				   const std::shared_ptr<Array>& inputArray)
     : DelegateArrayIterator(delegate, attrID,
-			    boost::shared_ptr<ConstArrayIterator>()),
+			    std::shared_ptr<ConstArrayIterator>()),
       _inputArrayIterators(0),
       _position(0)
   {
@@ -55,12 +55,12 @@ namespace scidb {
 
     // Set the inputIterator on the base since it was initialized to NULL
     // in the DelegateArrayIterator base constructor above.
-    inputIterator = 
+    inputIterator =
       inputArray->getConstIterator(attrID == 0 ? 0 : pattrDesc->getId());
 
     _position.resize(parrayDesc.getDimensions().size()+1);
 
-    // There are only two attributes in the output array: the data 
+    // There are only two attributes in the output array: the data
     // attribute and the empty tag attribute.
     if (attrID == 0) {
       // The array resulting from this operator has only two attributes:  the
@@ -93,7 +93,7 @@ namespace scidb {
     if (isDebug()) {
       // end() is true as soon as any one of the input
       // iterators has reached the end.
-      for (std::vector<boost::shared_ptr<ConstArrayIterator> >::const_iterator citer =
+      for (std::vector<std::shared_ptr<ConstArrayIterator> >::const_iterator citer =
 	     _inputArrayIterators.begin();
 	   citer != _inputArrayIterators.end();
 	   ++citer) {
@@ -113,7 +113,7 @@ namespace scidb {
   UnfoldArrayIter::operator ++()
   {
     // Increment all of the attribute iterators in lock-step.
-    for (std::vector<boost::shared_ptr<ConstArrayIterator> >::const_iterator citer =
+    for (std::vector<std::shared_ptr<ConstArrayIterator> >::const_iterator citer =
 	   _inputArrayIterators.begin();
 	 citer != _inputArrayIterators.end();
 	 ++citer) {
@@ -142,8 +142,8 @@ namespace scidb {
     // that is not a valid coordinate for the input chunks.
     Coordinates mapped(pos.begin(), pos.end()-1);
     bool success = true;
-  
-    for (std::vector<boost::shared_ptr<ConstArrayIterator> >::const_iterator citer =
+
+    for (std::vector<std::shared_ptr<ConstArrayIterator> >::const_iterator citer =
 	   _inputArrayIterators.begin();
 	 (citer != _inputArrayIterators.end()) && success;
 	 ++citer) {
@@ -156,7 +156,7 @@ namespace scidb {
   UnfoldArrayIter::reset()
   {
     // Reset all of the attribute iterators in lock-step.
-    for (std::vector<boost::shared_ptr<ConstArrayIterator> >::const_iterator citer =
+    for (std::vector<std::shared_ptr<ConstArrayIterator> >::const_iterator citer =
 	   _inputArrayIterators.begin();
 	 citer != _inputArrayIterators.end();
 	 ++citer) {
@@ -186,8 +186,8 @@ namespace scidb {
   DelegateArrayIterator*
   UnfoldArray::createArrayIterator(AttributeID id) const
   {
-    // Return an iterator to this array.  This array will have only one 
-    // data attribute.  The number of dimensions will be:  the number of 
+    // Return an iterator to this array.  This array will have only one
+    // data attribute.  The number of dimensions will be:  the number of
     // dimensions in the input array plus 1.
     // This is a pipelined operator which means:  as the consumer pulls
     // on the data via the iterators we provide, we, in turn, need to
@@ -209,8 +209,8 @@ namespace scidb {
   }
 
   UnfoldArray::UnfoldArray(ArrayDesc const& schema,
-			   const shared_ptr<Array>& pinputArray,
-			   const shared_ptr<Query>& pquery)
+			   const std::shared_ptr<Array>& pinputArray,
+			   const std::shared_ptr<Query>& pquery)
     : DelegateArray(schema, pinputArray)
   {
     Array::_query = pquery;
@@ -299,7 +299,7 @@ namespace scidb {
   {
   }
 
-  Value&
+  Value const&
   UnfoldChunkIter::getItem()
   {
     return _inputChunkIterators[_visitingAttribute]->getItem();
@@ -317,7 +317,7 @@ namespace scidb {
     if (isDebug()) {
       // end() is true when when any one of the
       // input chunks is at its end.
-      for (std::vector<boost::shared_ptr<ConstChunkIterator> >::const_iterator citer =
+      for (std::vector<std::shared_ptr<ConstChunkIterator> >::const_iterator citer =
 	     _inputChunkIterators.begin();
 	   citer != _inputChunkIterators.end();
 	   ++citer) {
@@ -342,7 +342,7 @@ namespace scidb {
     // to the next line on a typewriter.
     ++_visitingAttribute;
     if (_visitingAttribute >= _inputChunkIterators.size()) {
-      for (std::vector<boost::shared_ptr<ConstChunkIterator> >::const_iterator citer =
+      for (std::vector<std::shared_ptr<ConstChunkIterator> >::const_iterator citer =
 	     _inputChunkIterators.begin();
 	   citer != _inputChunkIterators.end();
 	   ++citer) {
@@ -372,7 +372,7 @@ namespace scidb {
     // the attribute index which must be set independently.
     Coordinates mapped(pos.begin(), pos.end()-1);
     bool success = true;
-    for (std::vector<boost::shared_ptr<ConstChunkIterator> >::const_iterator citer =
+    for (std::vector<std::shared_ptr<ConstChunkIterator> >::const_iterator citer =
 	   _inputChunkIterators.begin();
 	 (citer != _inputChunkIterators.end()) && success;
 	 ++citer) {
@@ -393,7 +393,7 @@ namespace scidb {
   {
     // Reset each of the input chunk iterators and reset the
     // _visitingAttribute back to zero (initial state).
-    for (std::vector<boost::shared_ptr<ConstChunkIterator> >::const_iterator citer =
+    for (std::vector<std::shared_ptr<ConstChunkIterator> >::const_iterator citer =
 	   _inputChunkIterators.begin();
 	 citer != _inputChunkIterators.end();
 	 ++citer) {
@@ -459,7 +459,7 @@ namespace scidb {
     // the attribute index which must be set independently.
     Coordinates mapped(pos.begin(), pos.end()-1);
     AttributeID visitingAttr = *(pos.end()-1);
-    if (visitingAttr < _nAttrs && 
+    if (visitingAttr < _nAttrs &&
         inputIterator->setPosition(mapped)) {
         _visitingAttribute = visitingAttr;
         return true;

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -55,44 +55,44 @@ public:
     uint32_t getHDU() const
     {
         if (_parameters.size() >= 3) {  // Arguments include HDU number
-            boost::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2];
+            std::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2];
             return paramExpr->getExpression()->evaluate().getUint32();
         }
         return 0;                       // Otherwise, assume primary HDU
     }
 
-    InstanceID getFileInstanceID(boost::shared_ptr<Query>& query) const
+    InstanceID getFileInstanceID(std::shared_ptr<Query>& query) const
     {
         if (_parameters.size() == 4) {      // Arguments include instance ID
-            boost::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[3];
+            std::shared_ptr<OperatorParamPhysicalExpression> paramExpr = (std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[3];
             return paramExpr->getExpression()->evaluate().getUint64();
         }
         return query->getInstanceID();          // Otherwise, use current instance ID
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const&,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const&,
             std::vector<ArrayDesc> const&) const
     {
-        return ArrayDistribution(psLocalInstance);
+        return RedistributeContext(psLocalInstance);
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
-                                     boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
+                                     std::shared_ptr<Query> query)
     {
-        const string filePath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
+        const string filePath = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
         uint32_t hdu = getHDU();
         InstanceID fileInstanceID = getFileInstanceID(query);
         InstanceID myInstanceID = query->getInstanceID();
 
-        boost::shared_ptr<Array> result;
+        std::shared_ptr<Array> result;
         if (fileInstanceID == myInstanceID) {   // This is the instance containing the file
-            result = boost::shared_ptr<Array>(new FITSInputArray(_schema, filePath, hdu, query));
+            result = std::shared_ptr<Array>(new FITSInputArray(_schema, filePath, hdu, query));
             if (_schema.getEmptyBitmapAttribute() != NULL) {
-                result = boost::shared_ptr<Array>(new NonEmptyableArray(result));
+                result = std::shared_ptr<Array>(new NonEmptyableArray(result));
             }
         } else {                        // Otherwise, return empty array
-            result = boost::shared_ptr<Array>(new MemArray(_schema,query));
+            result = std::shared_ptr<Array>(new MemArray(_schema,query));
         }
 
         return result;

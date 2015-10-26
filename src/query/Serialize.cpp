@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,10 +36,10 @@
 
 #include <sstream>
 
-#include "query/Serialize.h"
-#include "query/QueryPlan.h"
-#include "query/LogicalExpression.h"
-#include "query/Operator.h"
+#include <query/Serialize.h>
+#include <query/QueryPlan.h>
+#include <query/LogicalExpression.h>
+#include <query/Operator.h>
 
 using namespace std;
 using namespace boost;
@@ -48,24 +48,17 @@ using namespace boost::archive;
 namespace scidb
 {
 
-string serializePhysicalPlan(const shared_ptr<PhysicalPlan> &plan)
+string serializePhysicalPlan(const std::shared_ptr<PhysicalPlan> &plan)
 {
     stringstream ss;
     text_oarchive oa(ss);
 
-    const shared_ptr<PhysicalQueryPlanNode> &queryRoot = plan->getRoot();
+    const std::shared_ptr<PhysicalQueryPlanNode> &queryRoot = plan->getRoot();
 
-    oa.register_type(static_cast<OperatorParam*>(NULL));
-    oa.register_type(static_cast<OperatorParamReference*>(NULL));
-    oa.register_type(static_cast<OperatorParamArrayReference*>(NULL));
-    oa.register_type(static_cast<OperatorParamAttributeReference*>(NULL));
-    oa.register_type(static_cast<OperatorParamDimensionReference*>(NULL));
-    oa.register_type(static_cast<OperatorParamLogicalExpression*>(NULL));
-    oa.register_type(static_cast<OperatorParamPhysicalExpression*>(NULL));
-    oa.register_type(static_cast<OperatorParamSchema*>(NULL));
-    oa.register_type(static_cast<OperatorParamAggregateCall*>(NULL));
-    oa.register_type(static_cast<OperatorParamAsterisk*>(NULL));
-    oa & queryRoot;
+    registerLeafDerivedOperatorParams<text_oarchive>(oa);
+
+    PhysicalQueryPlanNode* n = queryRoot.get();
+    oa & n;
 
     return ss.str();
 }

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,7 @@
 #include "GEMMOptions.hpp"
 #include "DLAErrors.h"
 
-
+using namespace std;
 using namespace scidb;
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_linear_algebra.ops.gemm"));
@@ -103,16 +103,16 @@ public:
         //       and have him include the pointer to the netlib page "for more detail"
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query);
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query);
 
-    typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > ParamPlaceholders_t ;
+    typedef std::vector<std::shared_ptr<OperatorParamPlaceholder> > ParamPlaceholders_t ;
     ParamPlaceholders_t nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas);
 };
 
 // required by ADD_PARAM_VARIES()
 GEMMLogical::ParamPlaceholders_t GEMMLogical::nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
 {
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
     res.push_back(END_OF_VARIES_PARAMS());
     switch (_parameters.size()) {
     case 0:
@@ -125,7 +125,7 @@ GEMMLogical::ParamPlaceholders_t GEMMLogical::nextVaryParamPlaceholder(const std
     return res;
 }
 
-ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
 {
     LOG4CXX_TRACE(logger, "GEMMLogical::inferSchema(): begin.");
 
@@ -146,7 +146,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
     case 0:
         break;
     case 1:
-        typedef boost::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
+        typedef std::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
         namedOptionStr = evaluate(reinterpret_cast<ParamType_t&>(_parameters[0])->getExpression(), query, TID_STRING).getString();
         break;
     default:
@@ -190,7 +190,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
     //       to make the iteration as simple as possible
     //
     const Dimensions& dimsCC = schemas[CC].getDimensions();
-    
+
     std::pair<string, string> distinctNames = ScaLAPACKDistinctDimensionNames(dimsCC[ROW].getBaseName(),
                                                                               dimsCC[COL].getBaseName());
     Dimensions outDims(2);
@@ -213,7 +213,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared
     Attributes atts(1); atts[0] = AttributeDesc(AttributeID(0), "gemm", TID_DOUBLE, 0, 0);
 
     LOG4CXX_TRACE(logger, "GEMMLogical::inferSchema(): end.");
-    return ArrayDesc("GEMM", addEmptyTagAttribute(atts), outDims);
+    return ArrayDesc("GEMM", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
 }
 
 REGISTER_LOGICAL_OPERATOR_FACTORY(GEMMLogical, "gemm");

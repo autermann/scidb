@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -23,6 +23,7 @@ set(metadata_files
     meta.sql
     1.sql
     2.sql
+    3.sql
 )
 
 set(genmeta_output
@@ -30,7 +31,7 @@ set(genmeta_output
 )
 
 add_custom_command(
-  OUTPUT ${genmeta_output}  
+  OUTPUT ${genmeta_output}
   COMMAND python genmeta.py ${metadata_files} -o ${genmeta_output}
   DEPENDS genmeta.py ${metadata_files}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

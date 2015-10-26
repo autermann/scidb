@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,12 +22,14 @@
 
 /*
  * Counter.h
- * 
+ *
  * A counter/ stat gathering utility
  */
 
 #ifndef COUNTER_H_
 #define COUNTER_H_
+
+#include <boost/function.hpp>
 
 #include <util/Timing.h>
 #include <util/Singleton.h>
@@ -40,7 +42,7 @@ namespace scidb
 
     /**
      * @brief   Global stat structure for Counter and CounterTimer classes
-     * 
+     *
      * @details To add a new type of counter, add an entry in the "CounterId"
      *          enum (before the "LastCounter" entry).  Also add a corresponding
      *          string initialization in the constructor so that list('counters')
@@ -57,19 +59,21 @@ namespace scidb
             MemArrayCleanSwap,
             LastCounter             // This entry must be last!
         };
-        
+
         struct Entry
         {
-            CounterId _id;    // the id --- only set when we are listing w/ builder
+            CounterId _id;    // the counter id
             uint64_t  _num;   // the number of hits
             uint64_t  _msecs; // total msecs elapsed (if this is a timer)
-            
+
             Entry() : _id(LastCounter), _num(0), _msecs(0)
                 {}
         };
-        
+
         friend class Counter;
         friend class CounterTimer;
+
+        typedef boost::function<void(const Entry&)> Visitor;
 
         /**
          * Reset all the stats
@@ -85,8 +89,8 @@ namespace scidb
         /**
          * List all stats to the builder
          */
-        void listCounters(ListCounterArrayBuilder& builder);
-        
+        void visitCounters(const Visitor&) const;
+
         /**
          * Get the name for an id
          */
@@ -102,16 +106,18 @@ namespace scidb
             _entries(LastCounter),
             _names(LastCounter)
             {
+                for (size_t i=0; i!=_entries.size(); ++i)
+                    _entries[i]._id = CounterId(i);
                 _names[MemArrayChunkWrite] = "MemArrayChunkWrite";
                 _names[MemArrayChunkRead] = "MemArrayChunkRead";
                 _names[MemArrayCleanSwap] = "MemArrayCleanSwap";
             }
 
     private:
-        
-        Mutex                    _stateMutex;  // protects global data structure
-        std::vector<Entry>       _entries;     // global tally of counters/timers
-        std::vector<std::string> _names;       // names of counters for output
+
+        Mutex                    mutable _stateMutex;  // protects global data structure
+        std::vector<Entry>               _entries;     // global tally of counters/timers
+        std::vector<std::string>         _names;       // names of counters for output
     };
 
     /**
@@ -128,7 +134,7 @@ namespace scidb
     class Counter
     {
     public:
-        
+
         /**
          * Constructor/Destructor
          */

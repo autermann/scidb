@@ -78,15 +78,6 @@ SCIDB QUERY : <sort(filter(A, x<> 14 and x<>16))>
 {4} '301'
 {5} '341'
 
-SCIDB QUERY : <sort(reverse(filter(A, x<> 14 and x<>16)),2)>
-{n} r
-{0} '201'
-{1} '221'
-{2} '241'
-{3} '261'
-{4} '301'
-{5} '341'
-
 SCIDB QUERY : <sort(B,s)>
 {n} r,s
 {0} '261',null
@@ -141,17 +132,6 @@ SCIDB QUERY : <rank(A)>
 {15} '301',6
 {16} '321',7
 {17} '341',8
-
-SCIDB QUERY : <rank(reverse(A))>
-{x} r,r_rank
-{10} '341',8
-{11} '321',7
-{12} '301',6
-{13} '281',5
-{14} '261',4
-{15} '241',3
-{16} '221',2
-{17} '201',1
 
 SCIDB QUERY : <rank(filter(A, r> '250'))>
 {x} r,r_rank

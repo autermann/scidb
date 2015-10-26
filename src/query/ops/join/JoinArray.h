@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,7 +39,7 @@ class JoinEmptyableArray;
 class JoinEmptyableArrayIterator;
 
 class JoinChunkIterator : public DelegateChunkIterator
-{    
+{
   public:
     virtual void operator ++();
     virtual bool isEmpty();
@@ -47,16 +47,16 @@ class JoinChunkIterator : public DelegateChunkIterator
     virtual void reset();
 	virtual bool setPosition(Coordinates const& pos);
     JoinChunkIterator(JoinEmptyableArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode);
-    
+
   protected:
     bool join();
     void alignIterators();
 
-    boost::shared_ptr<ConstChunkIterator> joinIterator;
+    std::shared_ptr<ConstChunkIterator> joinIterator;
     int mode;
     bool hasCurrent;
 };
-   
+
 
 class JoinBitmapChunkIterator : public JoinChunkIterator
 {
@@ -68,24 +68,24 @@ class JoinBitmapChunkIterator : public JoinChunkIterator
   private:
      Value value;
 };
-     
+
 
 class JoinEmptyableArrayIterator : public DelegateArrayIterator
 {
     friend class JoinChunkIterator;
     friend class JoinEmptyableArray;
-  public: 
+  public:
     bool setPosition(Coordinates const& pos);
     virtual void reset();
     virtual void operator ++();
     virtual bool end();
 	virtual ConstChunk const& getChunk();
-    JoinEmptyableArrayIterator(JoinEmptyableArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator, boost::shared_ptr<ConstArrayIterator> joinIterator, bool chunkLevelJoin);
+    JoinEmptyableArrayIterator(JoinEmptyableArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator, std::shared_ptr<ConstArrayIterator> joinIterator, bool chunkLevelJoin);
 
   private:
     void alignIterators();
-    
-    boost::shared_ptr<ConstArrayIterator> _joinIterator;
+
+    std::shared_ptr<ConstArrayIterator> _joinIterator;
     bool _hasCurrent;
     bool _chunkLevelJoin;
 };
@@ -98,11 +98,11 @@ class JoinEmptyableArray : public DelegateArray
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    JoinEmptyableArray(ArrayDesc const& desc, boost::shared_ptr<Array> left, boost::shared_ptr<Array> right);
+    JoinEmptyableArray(ArrayDesc const& desc, std::shared_ptr<Array> left, std::shared_ptr<Array> right);
 
   private:
-    boost::shared_ptr<Array> left;
-    boost::shared_ptr<Array> right;
+    std::shared_ptr<Array> left;
+    std::shared_ptr<Array> right;
     size_t nLeftAttributes;
     int    leftEmptyTagPosition;
     int    rightEmptyTagPosition;

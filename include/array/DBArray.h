@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,7 +20,6 @@
 * END_COPYRIGHT
 */
 
-
 /*
  * DBArray.h
  *
@@ -33,66 +32,61 @@
 #define DBARRAY_H_
 
 #include <vector>
-#include "array/MemArray.h"
+
+#include <array/MemArray.h>
 
 namespace scidb
 {
+/**
+ * Implementation of database array.
+ */
+class DBArray : public Array, public std::enable_shared_from_this<DBArray>
+{
+public:
+    virtual std::string const& getName() const;
+    virtual ArrayID getHandle() const;
+
+    virtual ArrayDesc const& getArrayDesc() const;
+
+    virtual std::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
+
     /**
-     * Implementation of database array
+     * Returns a flag indicating that this array has an available list of chunk positions
+     * @return true unless we don't have a query context
      */
-    class DBArray : public Array, public boost::enable_shared_from_this<DBArray>
+    virtual bool hasChunkPositions() const
     {
-        string getRealName() const;
-      public:
-        virtual string const& getName() const;
-        virtual ArrayID getHandle() const;
+        return true;
+    }
 
-        virtual ArrayDesc const& getArrayDesc() const;
+    /**
+     * Build and return a list of the chunk positions.
+     * @return the new sorted set of coordinates, containing the first coordinate of every chunk present in the array
+     */
+    virtual std::shared_ptr<CoordinateSet> getChunkPositions() const;
 
-        virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attId);
-        virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
+    /**
+     * @see Array::isMaterialized()
+     */
+    virtual bool isMaterialized() const
+    {
+        return true;
+    }
+    static std::shared_ptr<DBArray> newDBArray(ArrayDesc const& desc, const std::shared_ptr<Query>& query)
+    {
+        return std::shared_ptr<DBArray>(new DBArray(desc, query));
+    }
 
-        /**
-         * Returns a flag indicating that this array has an available list of chunk positions
-         * @return true unless we don't have a query context
-         */
-        virtual bool hasChunkPositions() const
-        {
-            return true;
-        }
+private:
+    DBArray(ArrayDesc const& desc, const std::shared_ptr<Query>& query);
+    DBArray();
+    DBArray(const DBArray& other);
+    DBArray& operator=(const DBArray& other);
 
-        /**
-         * Build and return a list of the chunk positions.
-         * @return the new sorted set of coordinates, containing the first coordinate of every chunk present in the array
-         */
-        virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const;
+private:
+    ArrayDesc _desc;
+};
 
-        /**
-         * @see Array::isMaterialized()
-         */
-        virtual bool isMaterialized() const
-        {
-            return true;
-        }
-        static boost::shared_ptr<DBArray> newDBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query)
-        {
-            return boost::shared_ptr<DBArray>(new DBArray(desc, query));
-        }
-        static boost::shared_ptr<DBArray> newDBArray(std::string const& name, const boost::shared_ptr<Query>& query)
-        {
-            return boost::shared_ptr<DBArray>(new DBArray(name, query));
-        }
-
-      private:
-        DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query);
-        DBArray(std::string const& name, const boost::shared_ptr<Query>& query);
-        DBArray();
-        DBArray(const DBArray& other);
-        DBArray& operator=(const DBArray& other);
-
-      private:
-        ArrayDesc _desc;
-    };
-}
-
+} // namespace
 #endif

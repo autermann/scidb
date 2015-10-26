@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -90,7 +90,7 @@ public:
             {
                 continue;
             }
-            shared_ptr<OperatorParamAttributeReference> sortColumn = ((shared_ptr<OperatorParamAttributeReference>&)_parameters[i]);
+            std::shared_ptr<OperatorParamAttributeReference> sortColumn = ((std::shared_ptr<OperatorParamAttributeReference>&)_parameters[i]);
             SortingAttributeInfo k;
             k.columnNo = sortColumn->getObjectNo();
             k.ascent = sortColumn->getSortAscent();
@@ -131,16 +131,16 @@ public:
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     /***
      * Sort operates by using the generic array sort utility provided by SortArray
      */
-    shared_ptr< Array> execute(vector< shared_ptr< Array> >& inputArrays,
-                                      shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(vector< std::shared_ptr< Array> >& inputArrays,
+                                      std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
         ElapsedMilliSeconds timing;
@@ -157,8 +157,8 @@ public:
         const bool preservePositions = true;
         SortArray sorter(inputArrays[0]->getArrayDesc(), _arena, preservePositions, _schema.getDimensions()[0].getChunkInterval());
         ArrayDesc const& expandedSchema = sorter.getOutputArrayDesc();
-        shared_ptr<TupleComparator> tcomp(make_shared<TupleComparator>(sortingAttributeInfos, expandedSchema));
-        shared_ptr<MemArray> sortedLocalData = sorter.getSortedArray(inputArrays[0], query, tcomp);
+        std::shared_ptr<TupleComparator> tcomp(make_shared<TupleComparator>(sortingAttributeInfos, expandedSchema));
+        std::shared_ptr<MemArray> sortedLocalData = sorter.getSortedArray(inputArrays[0], query, tcomp);
 
         timing.logTiming(logger, "[sort] Sorting local data");
 
@@ -167,7 +167,7 @@ public:
         // Also note that sortedLocalData->getArrayDesc() differs from expandedSchema, in that:
         //   - expandedSchema._dimensions[0]._endMax = INT_MAX, but
         //   - the schema in sortedLocalData has _endMax which may be the actual number of local records minus 1.
-        shared_ptr<MemArray> distributedSortResult = sortedLocalData;
+        std::shared_ptr<MemArray> distributedSortResult = sortedLocalData;
         if (query->getInstancesCount() > 1) {
             DistributedSort ds(query, sortedLocalData, expandedSchema, _arena, sortingAttributeInfos, timing);
             distributedSortResult = ds.sort();

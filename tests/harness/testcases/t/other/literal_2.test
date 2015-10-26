@@ -22,8 +22,11 @@ aggregate(build(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),()]', 1),avg(a))
 --aql select max(a),min(a),avg(a) from array(<a:double> [x=0:3,4,0], '[(nan),(nan),(nan),(234.56)]')
 --aql select max(a),max(b),min(a),min(b) from array(<a:double, b:float, c:string> [x=110:112,2,0], '[(nan,inf,Bio),(-inf,inf,Phy),(inf,nan,Math)]')
 
+create array L <a:double> [x=10:12,3,0]
 --shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "save(build(<a:double> [x=10:12,3,0], '[(nan),(inf),(inf)]', 1), '${TEST_DATA_DIR}/literal.txt')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(L, '${TEST_DATA_DIR}/literal.txt')""
 --shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "save(build(<a:double> [x=10:12,3,0], '[(nan),(inf),(inf)]', 1), '${TEST_DATA_DIR}/literal.txt')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(L, '${TEST_DATA_DIR}/literal.txt')""
 
 store(build(<a:double> [x=10:12,3,0], '[(nan),(inf),(inf)]', 1),Test1)
 sort(Test1)
@@ -60,6 +63,7 @@ build(<a:datetime default now() , days: string default 'Thursday'> [x=0:2,3,0], 
 
 
 --cleanup
+remove(L)
 remove(Test1)
 
 --stop-query-logging

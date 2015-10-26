@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,12 +32,11 @@
 #include <list>
 #include <vector>
 #include <sstream>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/scoped_array.hpp>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/asio.hpp>
-#include <boost/make_shared.hpp>
 #include <log4cxx/logger.h>
 #include <util/Thread.h>
 #include <util/Network.h>
@@ -65,7 +64,7 @@ static const bool DBG = false;
 static const bool DBG = true;
 #endif
 
-MpiLauncher::MpiLauncher(uint64_t launchId, const boost::shared_ptr<Query>& q)
+MpiLauncher::MpiLauncher(uint64_t launchId, const std::shared_ptr<Query>& q)
   : _pid(0),
     _status(0),
     _queryId(q->getQueryID()),
@@ -78,7 +77,7 @@ MpiLauncher::MpiLauncher(uint64_t launchId, const boost::shared_ptr<Query>& q)
 {
 }
 
-MpiLauncher::MpiLauncher(uint64_t launchId, const boost::shared_ptr<Query>& q, uint32_t timeout)
+MpiLauncher::MpiLauncher(uint64_t launchId, const std::shared_ptr<Query>& q, uint32_t timeout)
   : _pid(0),
     _status(0),
     _queryId(q->getQueryID()),
@@ -102,7 +101,7 @@ void MpiLauncher::getPids(vector<pid_t>& pids)
 }
 
 void MpiLauncher::launch(const vector<string>& slaveArgs,
-                         const boost::shared_ptr<const InstanceMembership>& membership,
+                         const std::shared_ptr<const InstanceMembership>& membership,
                          const size_t maxSlaves)
 {
     vector<string> extraEnvVars;
@@ -113,11 +112,12 @@ void MpiLauncher::launch(const vector<string>& slaveArgs,
             throw InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
                 << " MPI launcher is already running";
         }
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
 
         buildArgs(extraEnvVars, args, slaveArgs, membership, query, maxSlaves);
     }
-    pid_t pid = fork();
+
+    pid_t pid = scidb::fork();
 
     if (pid < 0) {
         // error
@@ -138,6 +138,8 @@ void MpiLauncher::launch(const vector<string>& slaveArgs,
 
     }  else {
         // child
+        // NB. be careful not to allocate memory from any arena other than
+        // the root from here until the call to execv()
         becomeProcGroupLeader();
         recordPids();
         setupLogging();
@@ -227,7 +229,7 @@ void MpiLauncher::destroy(bool force)
             if (!force) {
                 scheduleKillTimer();
             } else { // kill right away
-                boost::shared_ptr<boost::asio::deadline_timer> dummyTimer;
+                std::shared_ptr<boost::asio::deadline_timer> dummyTimer;
                 boost::system::error_code dummyErr;
                 handleKillTimeout(dummyTimer, dummyErr);
             }
@@ -266,7 +268,7 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
     for (std::set<std::string>::const_iterator i=_ipcNames.begin();
          i != _ipcNames.end(); ++i) {
         const std::string& ipcName = *i;
-        boost::scoped_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName,isPreallocateShm()));
+        std::unique_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName,isPreallocateShm()));
         shmIpc->remove();
         shmIpc.reset();
     }
@@ -303,7 +305,7 @@ void MpiLauncher::completeLaunch(pid_t pid, const std::string& pidFile, int stat
            << "MpiLauncher::completeLaunch");
 }
 
- void MpiLauncher::handleKillTimeout(boost::shared_ptr<boost::asio::deadline_timer>& killTimer,
+ void MpiLauncher::handleKillTimeout(std::shared_ptr<boost::asio::deadline_timer>& killTimer,
                                      const boost::system::error_code& error)
  {
      ScopedMutexLock lock(_mutex);
@@ -346,8 +348,8 @@ static void validateLauncherArg(const std::string& arg)
 void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
                                 vector<string>& args,
                                 const vector<string>& slaveArgs,
-                                const boost::shared_ptr<const InstanceMembership>& membership,
-                                const boost::shared_ptr<Query>& query,
+                                const std::shared_ptr<const InstanceMembership>& membership,
+                                const std::shared_ptr<Query>& query,
                                 const size_t maxSlaves)
 {
     for (vector<string>::const_iterator iter=slaveArgs.begin();
@@ -448,7 +450,7 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipc = " << ipcName);
 
-    boost::scoped_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName,isPreallocateShm()));
+    std::unique_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName,isPreallocateShm()));
     char* ptr = initIpcForWrite(shmIpc.get(), shmSize);
     assert(ptr);
 
@@ -539,7 +541,7 @@ void MpiLauncherOMPI::addPerInstanceArgsOMPI(const InstanceID myId, const Instan
 
 void MpiLauncher::getSortedInstances(map<InstanceID,const InstanceDesc*>& sortedInstances,
                                      const Instances& instances,
-                                     const boost::shared_ptr<Query>& query)
+                                     const std::shared_ptr<Query>& query)
 {
     for (Instances::const_iterator i = instances.begin(); i != instances.end(); ++i) {
         InstanceID id = i->getInstanceId();
@@ -615,7 +617,7 @@ void MpiLauncher::scheduleKillTimer()
     // this->_mutex must be locked
     assert (_pid > 1);
     assert(!_killTimer);
-    _killTimer = boost::shared_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(getIOService()));
+    _killTimer = std::shared_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(getIOService()));
     int rc = _killTimer->expires_from_now(boost::posix_time::seconds(_MPI_LAUNCHER_KILL_TIMEOUT));
     if (rc != 0) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
@@ -657,8 +659,8 @@ bool MpiLauncher::waitForExit(pid_t pid, int *status, bool noWait)
 void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
                                  vector<string>& args,
                                  const vector<string>& slaveArgs,
-                                 const boost::shared_ptr<const InstanceMembership>& membership,
-                                 const boost::shared_ptr<Query>& query,
+                                 const std::shared_ptr<const InstanceMembership>& membership,
+                                 const std::shared_ptr<Query>& query,
                                  const size_t maxSlaves)
 {
     for (vector<string>::const_iterator iter=slaveArgs.begin();
@@ -687,7 +689,7 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
                           std::min(maxSlaves, sortedInstances.size()) ;
     args.clear();
     args.reserve(totalArgsNum);
-    boost::shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
+    std::shared_ptr<vector<string> > hosts = std::make_shared<vector<string> >();
     hosts->reserve(std::min(maxSlaves, sortedInstances.size()));
 
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
@@ -773,9 +775,9 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipcArgs = " << ipcNameArgs <<
           ", ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
 
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcArgs (mpi::newSharedMemoryIpc(ipcNameArgs, isPreallocateShm()));
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts,isPreallocateShm()));
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec, isPreallocateShm()));
+    std::unique_ptr<SharedMemoryIpc> shmIpcArgs (mpi::newSharedMemoryIpc(ipcNameArgs, isPreallocateShm()));
+    std::unique_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts,isPreallocateShm()));
+    std::unique_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec, isPreallocateShm()));
 
     char* ptrArgs (MpiLauncher::initIpcForWrite(shmIpcArgs.get(),  shmSizeArgs));
     char* ptrHosts(MpiLauncher::initIpcForWrite(shmIpcHosts.get(), shmSizeHosts));
@@ -854,10 +856,10 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
     envVars.push_back(mpi::getScidbMPIEnvVar(mpi::getShmIpcType(), clusterUuid, queryId, launchId));
 }
 
-void MpiLauncher::resolveHostNames(boost::shared_ptr<vector<string> >& hosts)
+void MpiLauncher::resolveHostNames(std::shared_ptr<vector<string> >& hosts)
 {
-    boost::shared_ptr<JobQueue>  jobQueue  = boost::make_shared<JobQueue>();
-    boost::shared_ptr<WorkQueue> workQueue = boost::make_shared<WorkQueue>(jobQueue, hosts->size(), hosts->size());
+    std::shared_ptr<JobQueue>  jobQueue  = std::make_shared<JobQueue>();
+    std::shared_ptr<WorkQueue> workQueue = std::make_shared<WorkQueue>(jobQueue, hosts->size(), hosts->size());
     workQueue->start();
 
     for (size_t i=0; i<hosts->size(); ++i) {
@@ -876,8 +878,8 @@ void MpiLauncher::resolveHostNames(boost::shared_ptr<vector<string> >& hosts)
     jobQueue.reset();
 }
 
-void MpiLauncher::handleHostNameResolve(const boost::shared_ptr<WorkQueue>& workQueue,
-                                        boost::shared_ptr<vector<string> >& hosts,
+void MpiLauncher::handleHostNameResolve(const std::shared_ptr<WorkQueue>& workQueue,
+                                        std::shared_ptr<vector<string> >& hosts,
                                         size_t indx,
                                         const boost::system::error_code& error,
                                         boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
@@ -888,7 +890,7 @@ void MpiLauncher::handleHostNameResolve(const boost::shared_ptr<WorkQueue>& work
     workQueue->enqueue(item);
 }
 
-void MpiLauncher::processHostNameResolve(boost::shared_ptr<vector<string> >& hosts,
+void MpiLauncher::processHostNameResolve(std::shared_ptr<vector<string> >& hosts,
                                          size_t indx,
                                          const boost::system::error_code& error,
                                          boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
@@ -1024,10 +1026,10 @@ char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, uint64_t shmSize)
         ptr = reinterpret_cast<char*>(shmIpc->get());
     }  catch(scidb::SharedMemoryIpc::NoShmMemoryException& e) {
         LOG4CXX_ERROR(logger, "initIpcForWrite: Not enough shared memory: " << formatLog4Msg(e));
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_MEMORY_ALLOCATION_ERROR) << formatThrowMsg(e)); 
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_MEMORY_ALLOCATION_ERROR) << formatThrowMsg(e));
     }  catch(scidb::SharedMemoryIpc::ShmMapErrorException& e) {
         LOG4CXX_ERROR(logger, "initIpcForWrite: Cannot map shared memory: " << formatLog4Msg(e));
-        throw (SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_MEMORY_ALLOCATION_ERROR) << formatThrowMsg(e)); 
+        throw (SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_MEMORY_ALLOCATION_ERROR) << formatThrowMsg(e));
     } catch(scidb::SharedMemoryIpc::SystemErrorException& e) {
         LOG4CXX_ERROR(logger, "initIpcForWrite: Cannot map shared memory: " << formatLog4Msg(e));
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED_WITH_ERRNO)
@@ -1048,8 +1050,8 @@ char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, uint64_t shmSize)
 void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
                                  vector<string>& args,
                                  const vector<string>& slaveArgs,
-                                 const boost::shared_ptr<const InstanceMembership>& membership,
-                                 const boost::shared_ptr<Query>& query,
+                                 const std::shared_ptr<const InstanceMembership>& membership,
+                                 const std::shared_ptr<Query>& query,
                                  const size_t maxSlaves)
 {
     for (vector<string>::const_iterator iter=slaveArgs.begin();
@@ -1078,7 +1080,7 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
                           std::min(maxSlaves, sortedInstances.size()) ;
     args.clear();
     args.reserve(totalArgsNum);
-    boost::shared_ptr<vector<string> > hosts = boost::make_shared<vector<string> >();
+    std::shared_ptr<vector<string> > hosts = std::make_shared<vector<string> >();
     hosts->reserve(std::min(maxSlaves, sortedInstances.size()));
 
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
@@ -1156,8 +1158,8 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
 
     LOG4CXX_TRACE(logger, "MPI launcher arguments ipcHosts = "<<ipcNameHosts << ", ipcExec = "<<ipcNameExec);
 
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts,isPreallocateShm()));
-    boost::scoped_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec, isPreallocateShm()));
+    std::unique_ptr<SharedMemoryIpc> shmIpcHosts(mpi::newSharedMemoryIpc(ipcNameHosts,isPreallocateShm()));
+    std::unique_ptr<SharedMemoryIpc> shmIpcExec (mpi::newSharedMemoryIpc(ipcNameExec, isPreallocateShm()));
 
     char* ptrHosts(MpiLauncher::initIpcForWrite(shmIpcHosts.get(), shmSizeHosts));
     char* ptrExec (MpiLauncher::initIpcForWrite(shmIpcExec.get(),  execContents.size()));

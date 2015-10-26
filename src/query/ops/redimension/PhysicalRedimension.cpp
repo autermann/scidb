@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,8 +29,9 @@
  */
 
 #include <boost/foreach.hpp>
-#include "RedimensionCommon.h"
 #include <log4cxx/logger.h>
+#include <query/QueryPlan.h>
+#include "RedimensionCommon.h"
 
 namespace scidb
 {
@@ -71,7 +72,7 @@ public:
             return true;
         }
 
-        ArrayDesc dstDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc dstDesc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
         BOOST_FOREACH(const DimensionDesc &dstDim, dstDesc.getDimensions())
         {
             BOOST_FOREACH(const AttributeDesc &srcAttr, srcDesc.getAttributes())
@@ -95,72 +96,54 @@ public:
     }
 
     /**
-     * @see PhysicalOperator::changesDistribution
-     */
-    bool changesDistribution(vector<ArrayDesc> const& sourceSchemas) const
-    {
-        return true;
-    }
-
-    /**
-     * @return true if the isStrict parameter is specified and is equal to true; false otherwise
+     * @return false if the isStrict parameter is specified and is equal to false; true otherwise
      */
     bool isStrict() const
     {
-        bool isStrict = false;
-        if (_parameters.size() == 2 &&
-            _parameters[1]->getParamType() == PARAM_PHYSICAL_EXPRESSION) {
-            OperatorParamPhysicalExpression* paramExpr = static_cast<OperatorParamPhysicalExpression*>(_parameters[1].get());
-            assert(paramExpr->isConstant());
-            isStrict = paramExpr->getExpression()->evaluate().getBool();
-        }
-        return isStrict;
+        return PhysicalQueryPlanNode::getRedimensionIsStrict(_parameters);
     }
 
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const& inputDistros,
-                                                    std::vector< ArrayDesc> const& inputSchemas) const
+    virtual RedistributeContext getOutputDistribution(vector<RedistributeContext>const&  sourceDistribution,
+                                                      vector<ArrayDesc>const& inputSchemas) const
     {
-        if (haveAggregatesOrSynthetic(inputSchemas[0]) ||
-            isStrict()) {
-            return ArrayDistribution(psHashPartitioned);
+        if (haveAggregatesOrSynthetic(inputSchemas[0])) {
+            return RedistributeContext(defaultPartitioning());
         }
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     /**
      * @see PhysicalOperator::outputFullChunks
      */
-    virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
+    virtual bool outputFullChunks(std::vector<ArrayDesc>const& inputSchemas) const
     {
-        return (isStrict() || haveAggregatesOrSynthetic(inputSchemas[0]));
+        return haveAggregatesOrSynthetic(inputSchemas[0]);
     }
 
     /**
      * @see PhysicalOperator::execute
      */
-    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
-        shared_ptr<Array>& srcArray = inputArrays[0];
+        std::shared_ptr<Array>& srcArray = inputArrays[0];
         ArrayDesc const& srcArrayDesc = srcArray->getArrayDesc();
 
         Attributes const& destAttrs = _schema.getAttributes(true); // true = exclude empty tag.
-        Dimensions const& destDims = _schema.getDimensions();
+        Dimensions const& destDims  = _schema.getDimensions();
 
         vector<AggregatePtr> aggregates (destAttrs.size());
-        vector<size_t> attrMapping(destAttrs.size());
-        vector<size_t> dimMapping(_schema.getDimensions().size());
+        vector<size_t>       attrMapping(destAttrs.size());
+        vector<size_t>       dimMapping (destDims.size());
 
         setupMappings(srcArrayDesc, aggregates, attrMapping, dimMapping, destAttrs, destDims);
         ElapsedMilliSeconds timing;
 
         RedistributeMode redistributeMode(AUTO);
         if (haveAggregatesOrSynthetic(srcArrayDesc)) {
-            //XXX TODO: until redistributeAggregate() is cut over to pullRedistribute(),
-            // the aggreagted SG does not enforce data integrity
             redistributeMode = AGGREGATED;
         } else if ( isStrict()) {
             redistributeMode = VALIDATED;

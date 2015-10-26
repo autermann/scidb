@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -68,7 +68,7 @@ extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "iquery" iquery)
 set_target_properties(iquery PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
 target_link_libraries(iquery
 	scidbclient
-	${Boost_LIBRARIES} 
+	${Boost_LIBRARIES}
 	${LIBREADLINE_LIBRARIES}
         ${CURSES_LIBRARIES}
 	${LIBRT_LIBRARIES}
@@ -76,7 +76,7 @@ target_link_libraries(iquery
 )
 
 set_target_properties(iquery
-	PROPERTIES 
+	PROPERTIES
 #       BUILD_WITH_INSTALL_RPATH TRUE
 #	CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE
 #	INSTALL_RPATH ${DEFAULT_RPATH}

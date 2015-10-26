@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,7 +54,7 @@ namespace scidb {
  *   <br>   srcAttrs: all the attributes are retained.
  *   <br> >
  *   <br> [
- *   <br>   n: start=0, end=MAX_COORDINATE, chunk interval = min{defaultChunkSize, #logical cells in srcArray)
+ *   <br>   n: start=0, end=CoordinateBounds::getMax(), chunk interval = min{defaultChunkSize, #logical cells in srcArray)
  *   <br> ]
  *
  * @par Examples:
@@ -77,16 +77,16 @@ public:
 		ADD_PARAM_VARIES()
 	}
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
 	{
-		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+		std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
 		res.push_back(PARAM_IN_ATTRIBUTE_NAME("void"));
 		res.push_back(PARAM_CONSTANT("int64"));
 		res.push_back(END_OF_VARIES_PARAMS());
 		return res;
 	}
-    
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
 	{
         //As far as chunk sizes, they can be a pain! So we allow the user to specify an optional chunk size
         //as part of the sort op.
@@ -98,7 +98,7 @@ public:
         {
             if(_parameters[i]->getParamType()==PARAM_LOGICAL_EXPRESSION)
             {
-                chunkSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
+                chunkSize = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
                                      query, TID_INT64).getInt64();
                 if(chunkSize <= 0)
                 {

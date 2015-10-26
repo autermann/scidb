@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -21,26 +21,26 @@
 #
 #
 #
-#  PGB: This description isn't correct. In addition to what I show here, I need 
-#           to calculate the Sum ( Xi * 1.0 ) in addition to the Sum ( Xi * Xi ). This 
-#           means augmenting the values with a row of "1.0" values. 
+#  PGB: This description isn't correct. In addition to what I show here, I need
+#           to calculate the Sum ( Xi * 1.0 ) in addition to the Sum ( Xi * Xi ). This
+#           means augmenting the values with a row of "1.0" values.
 #
-#  PGB: Also note - the numerical stability of these calculations is a bit suspect. 
-#           I think we can fix this. 
+#  PGB: Also note - the numerical stability of these calculations is a bit suspect.
+#           I think we can fix this.
 #
-#  This script is meant to show off the utility of SciDB's multiply 
+#  This script is meant to show off the utility of SciDB's multiply
 # operation. The goal is to compute a variance/covariance matrix.
-# 
-#  Given a matrix Xnm, the variance/covariance matrix Sx is computed as: 
-#   
+#
+#  Given a matrix Xnm, the variance/covariance matrix Sx is computed as:
+#
 #    Sx = 1/(n-1) * transpose ( X ) X
 #
-#  If you pick two columns of X say [i], and [j], then Sxij is the 
-# covariance of X[*,i] and X[*,j]. If i = j, then you have the variance of 
-# the values at X[*,i] in Sxii. 
+#  If you pick two columns of X say [i], and [j], then Sxij is the
+# covariance of X[*,i] and X[*,j]. If i = j, then you have the variance of
+# the values at X[*,i] in Sxii.
 #
 #
-# Environment variables. 
+# Environment variables.
 SCIDB_HOME=~/src/trunk/
 SCIDB_BIN=$SCIDB_HOME/bin
 DATA_HOME=/tmp
@@ -50,7 +50,7 @@ DATA_FILE=$DATA_HOME/Data
 NUM_SYMS=9
 NUM_TIMES=9999
 #
-# Phase 1: Set up. 
+# Phase 1: Set up.
 #
 QN1="list ('arrays')"
 QN2="remove (TS_Data)"
@@ -70,7 +70,7 @@ QN12="store ( build ( TS_Skel_10, 0, 1 ), TS_Manip_10)"
 QN13="store ( build ( TS_Skel_100, 0, 1 ), TS_Manip_100)"
 #
 #
-# Create the "TS_Data data" load file. 
+# Create the "TS_Data data" load file.
 #
 echo "#!/bin/sh"
 echo "# "
@@ -94,14 +94,14 @@ do
 	echo "# "
 	echo "$SCIDB_BIN/iquery --afl -q \"$Query\" > /dev/null"
 	fi
-    
+
     QNNum=`expr $QNNum + 1`;
 done
 
 #
 # Phase 2: The queries. What does the input data look like?
 #
-#SELECT COUNT(*) FROM TS_Data; 
+#SELECT COUNT(*) FROM TS_Data;
 #
 QS1="count ( TS_Data )"
 #
@@ -110,12 +110,12 @@ QS2="project ( subarray ( TS_Data, 0, 0, $NUM_SYMS, $NUM_TIMES ), B1)"
 #
 #   WITH ( ) AS D,
 #   SELECT * FROM transpose(D) MULTIPLY D;
-# 
+#
 #   The following query generates a variance/covariance matrix. The input
 #   is a sub-sample from the larger array -- only 10 rows, and only 10,000
-#   values. 
+#   values.
 #
-QS3="store ( multiply ( 
+QS3="store ( multiply (
 	transpose ( project ( subarray ( TS_Data, 0, 0, $NUM_TIMES, $NUM_SYMS ), B1)),
 	project ( subarray ( TS_Data, 0, 0, $NUM_TIMES, $NUM_SYMS ), B1)
 ), TS_Datac)"
@@ -125,7 +125,7 @@ QS4="scan ( TS_Datac )"
 #
 QS5="dimensions ( TS_Datac )"
 QS6="attributes ( TS_Datac )"
-# 
+#
 QS7="filter ( TS_Datac, J = J2 )"
 #
 QS8="project ( filter ( TS_Datac, J = J2 ), multiply)"
@@ -133,14 +133,14 @@ QS8="project ( filter ( TS_Datac, J = J2 ), multiply)"
 QS9="dimensions ( TS_Manip_10 )"
 QS10="dimensions ( TS_Datac )"
 #
-#   Having computed the variance/covariance array, the next step is to 
-#   pull out the variance statistics, which are found along the 
-#   diagonal. This actually produces the standard deviation values. 
-# 
-#QS11="transpose ( 
-#    project ( 
-#	apply ( 
-#	    multiply ( 
+#   Having computed the variance/covariance array, the next step is to
+#   pull out the variance statistics, which are found along the
+#   diagonal. This actually produces the standard deviation values.
+#
+#QS11="transpose (
+#    project (
+#	apply (
+#	    multiply (
 #		TS_Manip_10,
 #		project ( filter ( TS_Datac, J = J2 ), multiply)
 #		),
@@ -151,9 +151,9 @@ QS10="dimensions ( TS_Datac )"
 #	)
 #)"
 #
-#  I can also compute the correlations, but converting all of the values 
+#  I can also compute the correlations, but converting all of the values
 #  in A[*,i] to a Z score according to the standard deviations computed
-#  above, and then do the correlation calculation again. 
+#  above, and then do the correlation calculation again.
 
 QS11="store(multiply(TS_Manip_10, TS_Datac), TS_Product)"
 QS12="sum(TS_Product)"
@@ -171,7 +171,7 @@ do
 	echo "echo Query = \"$Query\" "
 	echo "#  "
 	echo $SCIDB_BIN/iquery --afl -q \"$Query\"
-	fi 
+	fi
     QNNum=`expr $QNNum + 1`;
 done
 #

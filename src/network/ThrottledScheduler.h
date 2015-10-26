@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@
 
 #include <assert.h>
 #include <boost/asio.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 #include <util/Mutex.h>
 #include <system/ErrorCodes.h>
 #include <system/Exceptions.h>
@@ -40,12 +40,12 @@
 namespace scidb
 {
 
- class ThrottledScheduler : public Scheduler, virtual public boost::enable_shared_from_this<ThrottledScheduler>
+ class ThrottledScheduler : public Scheduler, virtual public std::enable_shared_from_this<ThrottledScheduler>
  {
  public:
     ThrottledScheduler(int64_t maxDelay,
                        Work& work,
-                       asio::io_service& io_service)
+                       boost::asio::io_service& io_service)
     : _maxDelay(maxDelay), _work(work), _timer(io_service),
     _lastTime(0), _isScheduled(0), _isRunning(0)
     {
@@ -78,11 +78,11 @@ namespace scidb
        secToWait = (secToWait > 0) ? secToWait : 0;
        assert(secToWait <= _maxDelay);
 
-       size_t n = _timer.expires_from_now(posix_time::seconds(secToWait));
+       size_t n = _timer.expires_from_now(boost::posix_time::seconds(secToWait));
        if (n)
            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_TIMER_RETURNED_UNEXPECTED_ERROR) << n;
        _timer.async_wait(bind(&ThrottledScheduler::_run,
-                              shared_from_this(), asio::placeholders::error));
+                              shared_from_this(), boost::asio::placeholders::error));
        _isScheduled = true;
    }
 

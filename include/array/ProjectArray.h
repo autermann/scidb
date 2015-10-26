@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@
 #define PROJECTARRAY_H_
 
 #include <vector>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <array/DelegateArray.h>
 
@@ -42,8 +42,8 @@ namespace scidb
  * Internally, it keeps a vector, that projects a dest attrID to a src attrID.
  *
  * @note projection use case:
- *   - You have a shared_ptr<Array> called src, with three attributes <Name, Address, EmptyBitmap>.
- *   - You want to get a shared_ptr<Array> called dest, with two attributes <Name, EmptyBitmap>.
+ *   - You have a std::shared_ptr<Array> called src, with three attributes <Name, Address, EmptyBitmap>.
+ *   - You want to get a std::shared_ptr<Array> called dest, with two attributes <Name, EmptyBitmap>.
  *   - Solution: return a ProjectArray with projection = [0, 2].
  *   - Explanation: the dest attribute 0 comes from src attribute 0, and
  *     dest attribute 1 (i.e. index in projection) comes from src attribute 2 (i.e. the value at projection[1]).
@@ -68,7 +68,7 @@ public:
         return new DelegateArrayIterator(*this, id, inputArray->getConstIterator(_projection[id]));
     }
 
-    ProjectArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array, std::vector<AttributeID> const& projection)
+    ProjectArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array, std::vector<AttributeID> const& projection)
     : DelegateArray(desc, array, true),
       _projection(projection)
     {

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -64,9 +64,9 @@ namespace scidb
         LOG4CXX_TRACE(logger, "ChunkPrefetchJob::~ChunkPrefetchJob "<<this);
     }
 
-    ParallelAccumulatorArray::ChunkPrefetchJob::ChunkPrefetchJob(const shared_ptr<ParallelAccumulatorArray>& array,
+    ParallelAccumulatorArray::ChunkPrefetchJob::ChunkPrefetchJob(const std::shared_ptr<ParallelAccumulatorArray>& array,
                                                                  AttributeID attr,
-                                                                 const shared_ptr<Query>& query)
+                                                                 const std::shared_ptr<Query>& query)
     : Job(query),
       _queryLink(query),
       _arrayLink(array),
@@ -75,6 +75,7 @@ namespace scidb
       _resultChunk(NULL)
     {
         assert(query);
+        _isCoordinator = query->isCoordinator();
     }
 
     void ParallelAccumulatorArray::ChunkPrefetchJob::run()
@@ -87,7 +88,7 @@ namespace scidb
         if (!_query) {
             return;
         }
-        shared_ptr<ParallelAccumulatorArray> acc = _arrayLink.lock();
+        std::shared_ptr<ParallelAccumulatorArray> acc = _arrayLink.lock();
         if (!acc) {
             return;
         }
@@ -102,9 +103,9 @@ namespace scidb
                     Address addr(_attrId, inputChunk.getFirstPosition(false));
                     _accChunk.initialize(acc.get(), &acc->desc, addr, inputChunk.getCompressionMethod());
                     _accChunk.setBitmapChunk((Chunk*)&inputChunk);
-                    shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE |
+                    std::shared_ptr<ConstChunkIterator> src = inputChunk.getConstIterator(ChunkIterator::INTENDED_TILE_MODE |
                                                                                             ChunkIterator::IGNORE_EMPTY_CELLS);
-                    shared_ptr<ChunkIterator> dst =
+                    std::shared_ptr<ChunkIterator> dst =
                         _accChunk.getIterator(_query,
                                               (src->getMode() & ChunkIterator::TILE_MODE) |
                                               ChunkIterator::NO_EMPTY_CHECK |
@@ -113,7 +114,7 @@ namespace scidb
                     while (!src->end()) {
                         const Coordinates& srcPos = src->getPosition();
                         if (dst->setPosition(srcPos)) {
-                            Value& v = src->getItem();
+                            Value const& v = src->getItem();
                             dst->writeItem(v);
                             count += 1;
                         }
@@ -124,7 +125,7 @@ namespace scidb
                     }
                     dst->flush();
                     _resultChunk = &_accChunk;
-             }
+                }
             } else {
                 _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_OPERATION_FAILED) << "setPosition";
             }
@@ -133,7 +134,7 @@ namespace scidb
         }
     }
 
-    ParallelAccumulatorArray::ParallelAccumulatorArray(const shared_ptr<Array>& array)
+    ParallelAccumulatorArray::ParallelAccumulatorArray(const std::shared_ptr<Array>& array)
     : StreamArray(array->getArrayDesc(), false),
       iterators(array->getArrayDesc().getAttributes().size()),
       pipe(array),
@@ -149,7 +150,7 @@ namespace scidb
         }
     }
 
-    void ParallelAccumulatorArray::start(const shared_ptr<Query>& query)
+    void ParallelAccumulatorArray::start(const std::shared_ptr<Query>& query)
     {
         PhysicalOperator::getGlobalQueueForOperators();
         size_t nAttrs = iterators.size();
@@ -160,7 +161,7 @@ namespace scidb
         int nPrefetchedChunks = Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE);
         do {
             for (size_t i = 0; i < nAttrs; i++) {
-                shared_ptr<ChunkPrefetchJob> job = make_shared<ChunkPrefetchJob>(shared_from_this(), i, query);
+                std::shared_ptr<ChunkPrefetchJob> job = make_shared<ChunkPrefetchJob>(shared_from_this(), i, query);
                 doNewJob(job);
             }
         } while ((nPrefetchedChunks -= nAttrs) > 0);
@@ -170,14 +171,14 @@ namespace scidb
     {
         LOG4CXX_TRACE(logger, "ParallelAccumulatorArray::~ParallelAccumulatorArray "<<this << ", active jobs #="<<activeJobs.size());
         for (size_t i = 0; i < activeJobs.size(); i++) {
-            list< shared_ptr<ChunkPrefetchJob> >& jobs = activeJobs[i];
-            for (list< shared_ptr<ChunkPrefetchJob> >::iterator j = jobs.begin(); j != jobs.end(); ++j) {
+            list< std::shared_ptr<ChunkPrefetchJob> >& jobs = activeJobs[i];
+            for (list< std::shared_ptr<ChunkPrefetchJob> >::iterator j = jobs.begin(); j != jobs.end(); ++j) {
                 (*j)->skip();
             }
         }
     }
 
-    void ParallelAccumulatorArray::doNewJob(shared_ptr<ChunkPrefetchJob>& job)
+    void ParallelAccumulatorArray::doNewJob(std::shared_ptr<ChunkPrefetchJob>& job)
     {
         AttributeID attrId = job->getAttributeID();
         if (!iterators[attrId]->end()) {
@@ -203,5 +204,4 @@ namespace scidb
         activeJobs[attId].pop_front();
         return completedJobs[attId]->getResult();
     }
-
 }

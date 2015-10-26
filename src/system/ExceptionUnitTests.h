@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
@@ -68,7 +68,7 @@ private:
 	}
 
 	void throwUserQueryException(int ErrorNum) {
-        boost::shared_ptr< ParsingContext> foo(new  ParsingContext("Foo Bar", 1, 0));
+        std::shared_ptr< ParsingContext> foo(new  ParsingContext("Foo Bar", 1, 0));
 		throw USER_QUERY_EXCEPTION( ErrorNum, boost::str(boost::format("Throwing Error Number %d") % ErrorNum), foo );
 	}
 

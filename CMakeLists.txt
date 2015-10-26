@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -21,6 +21,24 @@
 message(STATUS "****************** BEGIN CMakeLists.txt ******************")
 
 cmake_minimum_required(VERSION 2.6)
+
+if(EXISTS "/usr/bin/g++-4.9")
+  set(CMAKE_C_COMPILER "/usr/bin/gcc-4.9")
+  set(MPICH_CC "/usr/bin/gcc-4.9")
+  set(CMAKE_CXX_COMPILER "/usr/bin/g++-4.9")
+  set(MPICH_CXX "/usr/bin/g++-4.9")
+  set(CMAKE_Fortran_COMPILER "/usr/bin/gfortran-4.9")
+  set(MPICH_FC "/usr/bin/gfortran-4.9")
+elseif(EXISTS "/opt/rh/devtoolset-3/root/usr/bin/g++")
+  set(CMAKE_C_COMPILER "/opt/rh/devtoolset-3/root/usr/bin/gcc")
+  set(MPICH_CC "/opt/rh/devtoolset-3/root/usr/bin/gcc")
+  set(CMAKE_CXX_COMPILER "/opt/rh/devtoolset-3/root/usr/bin/g++")
+  set(MPICH_CXX "/opt/rh/devtoolset-3/root/usr/bin/g++")
+  set(CMAKE_Fortran_COMPILER "/opt/rh/devtoolset-3/root/usr/bin/gfortran")
+  set(MPICH_FC "/opt/rh/devtoolset-3/root/usr/bin/gfortran")
+else()
+  message(FATAL_ERROR "SCIDBTRUNK/CMakeLists.txt: cannot find g++ 4.9")
+endif()
 
 project(SciDB C CXX Fortran)
 
@@ -108,11 +126,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 include(LinuxDistroVersion)
 message(STATUS "DISTRO_NAME_VER is " ${DISTRO_NAME_VER})
 
-if(${DISTRO_NAME_VER} MATCHES "Ubuntu-14.04")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++98 -pedantic -W -Wextra -Wall -Wno-unused-local-typedefs -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -Wno-variadic-macros -fPIC -D__STDC_FORMAT_MACROS")
-else()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++98 -pedantic -W -Wextra -Wall -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -Wno-variadic-macros -fPIC -D__STDC_FORMAT_MACROS")
-endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pedantic -W -Wextra -Wall -Wno-unused-local-typedefs -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -Wno-variadic-macros -fPIC -D__STDC_FORMAT_MACROS")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-system-headers -isystem /opt/local/include/ -isystem /usr/local/include/")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_LIMIT_MACROS")
@@ -125,18 +139,17 @@ set(CMAKE_CXX_FLAGS_VALGRIND "-g -O0 -DCLEAN_EXIT")
 
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-DNDEBUG -O3 -fno-omit-frame-pointer -g -ggdb3")
 
-if(${DISTRO_NAME_VER} MATCHES "Ubuntu-14.04")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic -W -Wextra -Wall -Wno-unused-local-typedefs -Wno-long-long -Wno-unused-parameter -fPIC -D__STDC_FORMAT_MACROS")
-else()
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic -W -Wextra -Wall -Wno-long-long -Wno-unused-parameter -fPIC -D__STDC_FORMAT_MACROS")
-endif()
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic -W -Wextra -Wall -Wno-unused-local-typedefs -Wno-long-long -Wno-unused-parameter -fPIC -D__STDC_FORMAT_MACROS")
 
 set(CMAKE_C_FLAGS_PROFILE "-O2 -pg -DNDEBUG")
 set(CMAKE_C_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0 -DCLEAN_EXIT")
 set(CMAKE_C_FLAGS_VALGRIND "-g -O0 -DCLEAN_EXIT")
 
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fno-f2c -Wline-truncation")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/mpich2/include/mpi")
+
+if(${DISTRO_NAME_VER} MATCHES "Ubuntu")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/mpich2/include/mpi")
+endif()
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I/opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/boost/include/boost")
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${ALL_FLAGS}")
 set(CMAKE_Fortran_FLAGS_RELWITHDEBINFO "-DNDEBUG -O3 -fno-omit-frame-pointer -g -ggdb3")
@@ -248,6 +261,19 @@ endif()
 find_package(LibRT REQUIRED)
 
 #
+# CITYHASH CONFIG
+#
+set(CITYHASH_ROOT /opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/cityhash)
+set(CityHash_NO_SYSTEM_PATHS TRUE)
+set(CityHash_NO_CITYHASH_CMAKE TRUE)
+
+find_package(CityHash REQUIRED system program_options serialization regex filesystem thread date_time)
+
+if(NOT CityHash_FOUND)
+ message(FATAL_ERROR "Could not find any version of cityhash")
+endif(NOT CityHash_FOUND)
+
+#
 # BOOST CONFIG
 #
 set(BOOST_ROOT /opt/scidb/${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}/3rdparty/boost)
@@ -283,7 +309,9 @@ find_package(LibPQ REQUIRED)
 #       items should not be grouped by special platform handling
 pkg_check_modules(CPPUNIT cppunit)
 
-if (NOT WITHOUT_PYTHON_BINDING)
+#SWIG-based python connector is temporarily disabled because it does not work with C++14. See #4745
+#if (NOT WITHOUT_PYTHON_BINDING)
+if(false)
     find_package(SWIG2 "2.0")
     find_package(PythonLibs)
     if (NOT SWIG2_FOUND OR NOT PYTHONLIBS_FOUND)
@@ -381,7 +409,6 @@ endmacro(extractDebugInfo)
 add_subdirectory("extern")
 add_subdirectory("src")
 add_subdirectory("utils")
-add_subdirectory("doc")
 if (NOT WITHOUT_SERVER)
     add_subdirectory("tests")
     add_subdirectory("examples")
@@ -394,22 +421,41 @@ ENABLE_TESTING()
 INCLUDE(CTest)
 
 if (CDASH_CONFIG)
-  ADD_TEST(NightlyTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/build_install_test.sh ${CDASH_CONFIG} "prepare_run")
-  ADD_TEST(NightlyTestResult "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "collect_cleanup")
-else()
-  ADD_TEST(NightlyTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash/SciDB_Build-Packages_Install_Test.sh)
+  ADD_TEST(ScidbInstall "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/install.sh ${CDASH_CONFIG})
+  ADD_TEST(ScidbTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "prepare_run")
+  ADD_TEST(ScidbResult "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "collect_cleanup")
+  ADD_TEST(P4Install "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/p4/install.sh ${CDASH_CONFIG})
+  ADD_TEST(P4Test "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "prepare_run")
+  ADD_TEST(P4Result "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "collect_cleanup")
+  #
+  # TEST INSTALL TIMEOUT
+  #
+  if (NOT INSTALL_TIMEOUT)
+    set(INSTALL_TIMEOUT 3600) # 1 hour.
+  endif(NOT INSTALL_TIMEOUT)
+  #
+  # TEST TIMEOUT
+  #
+  if (NOT HARNESS_TEST_TIMEOUT)
+    set(HARNESS_TEST_TIMEOUT 32000) # Between 8 and 9 hours - for regular build/tests.
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "Valgrind")
+      set(HARNESS_TEST_TIMEOUT 86400) # 24 hours - for Valgrind build/tests.
+    endif("${CMAKE_BUILD_TYPE}" STREQUAL "Valgrind")
+  endif(NOT HARNESS_TEST_TIMEOUT)
+  #
+  # TEST RESULTS COLLECTION TIMEOUT
+  #
+  if (NOT RESULTS_COLLECTION_TIMEOUT)
+    set(RESULTS_COLLECTION_TIMEOUT 3600) # 1 hour.
+  endif(NOT RESULTS_COLLECTION_TIMEOUT)
+
+  set_tests_properties (ScidbInstall PROPERTIES TIMEOUT ${INSTALL_TIMEOUT})
+  set_tests_properties (P4Install PROPERTIES TIMEOUT ${INSTALL_TIMEOUT})
+  set_tests_properties (ScidbTest PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
+  set_tests_properties (P4Test PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
+  set_tests_properties (ScidbResult PROPERTIES TIMEOUT ${RESULTS_COLLECTION_TIMEOUT})
+  set_tests_properties (P4Result PROPERTIES TIMEOUT ${RESULTS_COLLECTION_TIMEOUT})
 endif()
-
-#
-# TEST TIMEOUT
-#
-if (NOT HARNESS_TEST_TIMEOUT)
-  set(HARNESS_TEST_TIMEOUT 420000)
-endif(NOT HARNESS_TEST_TIMEOUT)
-
-set_tests_properties (NightlyTest PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
-
-
 #
 # Custom uninstall target
 #
@@ -423,11 +469,7 @@ add_custom_target(uninstall
 
 # BEGIN dummy target for adding misc files into the IDE projects like QtCreator
 file(GLOB MISC_FILES_SRC
-    "doc/pages/*.dox"
-    "doc/*.htm*"
     "src/capi/scidbpython.i"
-    "doc/api/*"
-    "doc/*.txt"
 )
 add_library(misc_files EXCLUDE_FROM_ALL examples/point/point.cpp ${MISC_FILES_SRC})
 # End of dummy target

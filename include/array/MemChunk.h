@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,16 +33,12 @@
 #include <vector>
 #include <map>
 #include <assert.h>
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/weak_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
+
 #include <util/Lru.h>
 #include <util/CoordinatesMapper.h>
 #include <array/Tile.h>
-
-using namespace std;
-using namespace boost;
 
 namespace scidb
 {
@@ -186,15 +182,15 @@ namespace scidb
         ArrayDesc const* arrayDesc;
         Chunk* bitmapChunk;
         Array const* array;
-        boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-        boost::shared_ptr<ConstChunkIterator>
-            getConstIterator(boost::shared_ptr<Query> const& query, int iterationMode) const;
+        std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+        std::shared_ptr<ConstChunkIterator>
+            getConstIterator(std::shared_ptr<Query> const& query, int iterationMode) const;
       public:
         MemChunk();
         ~MemChunk();
 
-        boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
-        void setEmptyBitmap(boost::shared_ptr<ConstRLEEmptyBitmap> const& bitmap);
+        std::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
+        void setEmptyBitmap(std::shared_ptr<ConstRLEEmptyBitmap> const& bitmap);
 
         Address const& getAddress() const
         {
@@ -232,12 +228,13 @@ namespace scidb
         /**
          * @see Chunk::write
          */
-        virtual void write(const boost::shared_ptr<Query>& query);
+        virtual void write(const std::shared_ptr<Query>& query);
 
         void fillRLEBitmap();
 
         virtual void initialize(Array const* array, ArrayDesc const* desc,
                                 const Address& firstElem, int compressionMethod);
+
         virtual void initialize(ConstChunk const& srcChunk);
 
         void setBitmapChunk(Chunk* bitmapChunk);
@@ -268,16 +265,27 @@ namespace scidb
         void free();
         Coordinates const& getFirstPosition(bool withOverlap) const;
         Coordinates const& getLastPosition(bool withOverlap) const;
-        boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query, int iterationMode);
-        boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+        std::shared_ptr<ChunkIterator> getIterator(std::shared_ptr<Query> const& query, int iterationMode);
+        std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
         bool pin() const;
         void unPin() const;
 
-        void compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
+        void compress(CompressedBuffer& buf, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
         void decompress(const CompressedBuffer& buf);
+        void setData(SharedBuffer const* buf);
 
         static size_t getFootprint(size_t ndims)
         { return sizeof(MemChunk) + (4 * (ndims * sizeof(Coordinate))); }
+
+        virtual void showInfo(log4cxx::LoggerPtr const &logger, std::string const &prefix) const
+        {
+#ifndef NDEBUG
+            if( isInitialized() )
+            {
+                ConstChunk::showInfo(logger, prefix);
+            }
+#endif
+        }
     };
 
 
@@ -370,7 +378,7 @@ namespace scidb
         /**
          * @see Chunk::write
          */
-        virtual void write(const boost::shared_ptr<Query>& query);
+        virtual void write(const std::shared_ptr<Query>& query);
 
         /**
          * Initialize chunk
@@ -384,8 +392,8 @@ namespace scidb
         virtual void initialize(Array const* array, ArrayDesc const* desc,
                                 const Address& firstElem, int compressionMethod);
         virtual void initialize(ConstChunk const& srcChunk);
-        boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
-        boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
+        std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+        std::shared_ptr<ChunkIterator> getIterator(std::shared_ptr<Query> const& query,
                                                      int iterationMode);
 
         /**
@@ -409,7 +417,7 @@ namespace scidb
         bool   hasOverlap;
         bool   isEmptyable;
         int    mode;
-        boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+        std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
         ConstRLEEmptyBitmap::iterator emptyBitmapIterator;
 
         Coordinates currPos;
@@ -419,14 +427,14 @@ namespace scidb
         uint64_t tilePos;
         uint64_t tileSize;
         bool isEmptyIndicator;
-        boost::weak_ptr<Query> _query;
+        std::weak_ptr<Query> _query;
 
-        BaseChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, int iterationMode, boost::shared_ptr<Query> const& query);
+        BaseChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, int iterationMode, std::shared_ptr<Query> const& query);
         ~BaseChunkIterator();
 
       public:
-        int  getMode();
-        bool isEmpty();
+        int  getMode() const;
+        bool isEmpty() const;
         bool end();
         bool setPosition(Coordinates const& pos);
         void operator ++();
@@ -435,8 +443,8 @@ namespace scidb
         void writeItem(const Value& item);
         void flush();
         Coordinates const& getPosition();
-        boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap();
-        boost::shared_ptr<Query> getQuery()
+        std::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap();
+        std::shared_ptr<Query> getQuery()
         {
             return _query.lock();
         }
@@ -446,9 +454,10 @@ namespace scidb
     {
       public:
         RLEConstChunkIterator(ArrayDesc const& desc, AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode,
-                              boost::shared_ptr<Query> const& query);
+                              std::shared_ptr<Query> const& query);
 
-        Value& getItem();
+        Value const& getItem();
+        using ConstChunkIterator::setPosition;
         bool setPosition(Coordinates const& pos);
         void operator ++();
         void reset();
@@ -463,13 +472,13 @@ namespace scidb
     class RLEBitmapChunkIterator : public BaseChunkIterator
     {
       public:
-        Value& getItem();
+        Value const& getItem();
 
         RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr,
                                Chunk* data,
                                Chunk* bitmap,
                                int iterationMode,
-                               boost::shared_ptr<Query> const& query);
+                               std::shared_ptr<Query> const& query);
 
       private:
         Value trueValue;
@@ -479,8 +488,8 @@ namespace scidb
     class RLEChunkIterator : public BaseChunkIterator
     {
       public:
-        bool isEmpty();
-        Value& getItem();
+        bool isEmpty() const;
+        Value const& getItem();
         void writeItem(const Value& item);
         void flush();
         bool setPosition(Coordinates const& pos);
@@ -489,11 +498,11 @@ namespace scidb
                          Chunk* data,
                          Chunk* bitmap,
                          int iterationMode,
-                         boost::shared_ptr<Query> const& query);
+                         std::shared_ptr<Query> const& query);
         virtual ~RLEChunkIterator();
 
       private:
-        position_t getPos() {
+        position_t getPos() const {
             return isEmptyable ? emptyBitmapIterator.getLPos() : emptyBitmapIterator.getPPos();
         }
         arena::ArenaPtr const _arena;
@@ -504,7 +513,7 @@ namespace scidb
         Value     falseValue;
         Value     tmpValue;
         Value     tileValue;
-        shared_ptr<ChunkIterator> emptyChunkIterator;
+        std::shared_ptr<ChunkIterator> emptyChunkIterator;
         RLEPayload payload;
         Chunk* bitmapChunk;
         RLEPayload::append_iterator appender;
@@ -532,22 +541,22 @@ namespace scidb
         bool   _hasCurrent;
         bool   _hasOverlap;
         int    _mode;
-        boost::shared_ptr<ConstRLEEmptyBitmap> _emptyBitmap;
+        std::shared_ptr<ConstRLEEmptyBitmap> _emptyBitmap;
         ConstRLEEmptyBitmap::iterator _emptyBitmapIterator;
         Coordinates _currPos;
-        boost::weak_ptr<Query> _query;
+        std::weak_ptr<Query> _query;
 
         BaseTileChunkIterator(ArrayDesc const& desc,
                               AttributeID attr,
                               Chunk* data,
                               int iterationMode,
-                              boost::shared_ptr<Query> const& query);
+                              std::shared_ptr<Query> const& query);
 
         virtual ~BaseTileChunkIterator();
 
       public:
-        int  getMode();
-        bool isEmpty();
+        int  getMode() const;
+        bool isEmpty() const;
         bool end();
         virtual position_t getLogicalPosition();
       protected:
@@ -558,7 +567,7 @@ namespace scidb
         Coordinates const& getPosition();
     public:
         ConstChunk const& getChunk();
-        boost::shared_ptr<Query> getQuery()
+        std::shared_ptr<Query> getQuery()
         {
             return _query.lock();
         }
@@ -578,9 +587,9 @@ namespace scidb
                                   Chunk* data,
                                   Chunk* bitmap,
                                   int iterationMode,
-                                  boost::shared_ptr<Query> const& query);
+                                  std::shared_ptr<Query> const& query);
         ~RLETileConstChunkIterator();
-        Value& getItem();
+        Value const& getItem();
         Coordinates const& getPosition();
         bool setPosition(Coordinates const& pos);
         virtual bool setPosition(position_t pos);
@@ -590,24 +599,24 @@ namespace scidb
         /// @see ConstChunkIterator
         virtual const Coordinates& getData(scidb::Coordinates& logicalStart /*IN/OUT*/,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData,
-                                           boost::shared_ptr<BaseTile>& tileCoords);
+                                           std::shared_ptr<BaseTile>& tileData,
+                                           std::shared_ptr<BaseTile>& tileCoords);
 
         /// @see ConstChunkIterator
         virtual position_t getData(position_t logicalStart,
                            size_t maxValues,
-                           boost::shared_ptr<BaseTile>& tileData,
-                           boost::shared_ptr<BaseTile>& tileCoords);
+                           std::shared_ptr<BaseTile>& tileData,
+                           std::shared_ptr<BaseTile>& tileCoords);
 
         /// @see ConstChunkIterator
         virtual const Coordinates& getData(scidb::Coordinates& logicalStart /*IN/OUT*/,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData);
+                                           std::shared_ptr<BaseTile>& tileData);
 
         /// @see ConstChunkIterator
         virtual position_t getData(position_t logicalStart,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData);
+                                   std::shared_ptr<BaseTile>& tileData);
 
         /// @see ConstChunkIterator
         operator const CoordinatesMapper* () const { return this; }
@@ -636,8 +645,8 @@ namespace scidb
         position_t
         getDataInternal(position_t logicalStart,
                         size_t maxValues,
-                        boost::shared_ptr<BaseTile>& tileData,
-                        boost::shared_ptr<BaseTile>& tileCoords,
+                        std::shared_ptr<BaseTile>& tileData,
+                        std::shared_ptr<BaseTile>& tileCoords,
                         const scidb::TypeId& coordTileType,
                         const BaseTile::Context* coordCtx);
         /**
@@ -654,7 +663,7 @@ namespace scidb
         position_t
         getDataInternal(position_t logicalOffset,
                         size_t maxValues,
-                        boost::shared_ptr<BaseTile>& tileData);
+                        std::shared_ptr<BaseTile>& tileData);
 
         class CoordinatesMapperWrapper : public CoordinatesMapperProvider
         {

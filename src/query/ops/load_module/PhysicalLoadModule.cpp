@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,12 +39,12 @@ struct PhysicalLoadModule : PhysicalOperator
        : PhysicalOperator(l,p,a,s)
     {}
 
-    shared_ptr<Array>
-    execute(vector<shared_ptr<Array> >&,shared_ptr<Query> query)
+    std::shared_ptr<Array>
+    execute(vector<std::shared_ptr<Array> >&,std::shared_ptr<Query> query)
     {
         if (query->isCoordinator())                      // Are we a coordinator?
         {
-            string path(((shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString());
+            string path(((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString());
 
             if (!Resources::getInstance()->fileExists(path,0,query))
             {
@@ -54,7 +54,7 @@ struct PhysicalLoadModule : PhysicalOperator
             loadModule(path);                            // ...load user module
         }
 
-        return shared_ptr<Array>();                      // Nothing to return
+        return std::shared_ptr<Array>();                      // Nothing to return
     }
 };
 

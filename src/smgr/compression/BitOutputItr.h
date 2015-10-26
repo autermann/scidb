@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,17 +35,17 @@ namespace scidb
   {
   public:
   BitOutputItr(ByteOutputItr * const d) : _dst(d), _bits(0), _bitsWritten(0) {};
-    
+
     // pack a set of right-aligned bits and pack them to the left, put completed byte to ByteOutputItr
     // bits must be 1...8
     int32_t put(const uint8_t e, const size_t bits);
-    
+
     // push what we have to the _dst itr
     int32_t flush();
 
     // close out the _dst itr, return # of bytes written
-    int32_t close(); 
-    
+    int32_t close();
+
   private:
     ByteOutputItr * const _dst;
     uint8_t _bits;

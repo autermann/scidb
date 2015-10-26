@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,13 +27,13 @@
  */
 
 #include <log4cxx/logger.h>
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 
 #include <system/Cluster.h>
 #include <network/MessageUtils.h>
 #include <query/ParsingContext.h>
 
+using namespace std;
 using namespace boost;
 
 namespace scidb
@@ -43,10 +43,10 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.netw
 
 #ifndef SCIDB_CLIENT
 
-boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID)
+std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID)
 {
-    boost::shared_ptr<MessageDesc> errorMessage = boost::make_shared<MessageDesc>(mtError);
-    boost::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
+    std::shared_ptr<MessageDesc> errorMessage = std::make_shared<MessageDesc>(mtError);
+    std::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
     errorMessage->setQueryID(queryID);
 
     errorRecord->set_cluster_uuid(Cluster::getInstance()->getUuid());
@@ -72,7 +72,7 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     else if (dynamic_cast<const UserQueryException*>(&e) != NULL)
     {
         errorRecord->set_type(3);
-        const shared_ptr<ParsingContext> &ctxt = ((const UserQueryException&) e).getParsingContext();
+        const std::shared_ptr<ParsingContext> &ctxt = ((const UserQueryException&) e).getParsingContext();
         ::scidb_msg::Error_ParsingContext *mCtxt = errorRecord->mutable_parsing_context();
         mCtxt->set_query_string(ctxt->getQueryString());
         mCtxt->set_line_start(ctxt->getLineStart());
@@ -89,10 +89,10 @@ boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
     return errorMessage;
 }
 
-boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID)
+std::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID)
 {
-    boost::shared_ptr<MessageDesc> okMessage = boost::make_shared<MessageDesc>(mtError);
-    boost::shared_ptr<scidb_msg::Error> okRecord = okMessage->getRecord<scidb_msg::Error>();
+    std::shared_ptr<MessageDesc> okMessage = std::make_shared<MessageDesc>(mtError);
+    std::shared_ptr<scidb_msg::Error> okRecord = okMessage->getRecord<scidb_msg::Error>();
     okMessage->setQueryID(queryID);
     okRecord->set_cluster_uuid(Cluster::getInstance()->getUuid());
     okRecord->set_type(0);
@@ -103,7 +103,7 @@ boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID)
     return okMessage;
 }
 
-static bool parseInstanceList(shared_ptr<InstanceLiveness>& queryLiveness,
+static bool parseInstanceList(std::shared_ptr<InstanceLiveness>& queryLiveness,
                           const scidb_msg::PhysicalPlan_InstanceList& instanceList,
                           const bool isDeadList)
 
@@ -133,44 +133,44 @@ static bool parseInstanceList(shared_ptr<InstanceLiveness>& queryLiveness,
    return true;
 }
 
-boost::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID)
+std::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID)
 {
-   boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtAbort);
-   boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
+   std::shared_ptr<MessageDesc> msg = std::make_shared<MessageDesc>(mtAbort);
+   std::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
    msg->setQueryID(queryID);
    record->set_cluster_uuid(Cluster::getInstance()->getUuid());
    return msg;
 }
 
-boost::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID)
+std::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID)
 {
-   boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtCommit);
-   boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
+   std::shared_ptr<MessageDesc> msg = std::make_shared<MessageDesc>(mtCommit);
+   std::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
    msg->setQueryID(queryID);
    record->set_cluster_uuid(Cluster::getInstance()->getUuid());
    return msg;
 }
 
-boost::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID)
+std::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID)
 {
-    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtWait);
-    boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
+    std::shared_ptr<MessageDesc> msg = std::make_shared<MessageDesc>(mtWait);
+    std::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
     msg->setQueryID(queryID);
     record->set_cluster_uuid(Cluster::getInstance()->getUuid());
     return msg;
 }
 
-boost::shared_ptr<MessageDesc> makeNotifyMessage(QueryID queryID)
+std::shared_ptr<MessageDesc> makeNotifyMessage(QueryID queryID)
 {
-    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtNotify);
-    boost::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
+    std::shared_ptr<MessageDesc> msg = std::make_shared<MessageDesc>(mtNotify);
+    std::shared_ptr<scidb_msg::DummyQuery> record = msg->getRecord<scidb_msg::DummyQuery>();
     msg->setQueryID(queryID);
     record->set_cluster_uuid(Cluster::getInstance()->getUuid());
     return msg;
 }
 
-bool parseQueryLiveness(shared_ptr<InstanceLiveness>& queryLiveness,
-                        shared_ptr<scidb_msg::PhysicalPlan>& ppMsg)
+bool parseQueryLiveness(std::shared_ptr<InstanceLiveness>& queryLiveness,
+                        std::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg)
 {
    assert(ppMsg);
    assert(ppMsg->IsInitialized());
@@ -181,7 +181,7 @@ bool parseQueryLiveness(shared_ptr<InstanceLiveness>& queryLiveness,
    }
 
    queryLiveness =
-   shared_ptr<scidb::InstanceLiveness>(new scidb::InstanceLiveness(ppMsg->view_id(), 0));
+   std::shared_ptr<scidb::InstanceLiveness>(new scidb::InstanceLiveness(ppMsg->view_id(), 0));
 
    if (!ppMsg->has_dead_list()) {
       assert(false);
@@ -210,8 +210,8 @@ bool parseQueryLiveness(shared_ptr<InstanceLiveness>& queryLiveness,
    return true;
 }
 
-bool serializeQueryLiveness(shared_ptr<const InstanceLiveness>& queryLiveness,
-                            shared_ptr<scidb_msg::PhysicalPlan>& ppMsg)
+bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLiveness,
+                            std::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg)
 {
    assert(ppMsg);
    assert(queryLiveness);
@@ -251,28 +251,28 @@ bool serializeQueryLiveness(shared_ptr<const InstanceLiveness>& queryLiveness,
 
 #endif //SCIDB_CLIENT
 
-shared_ptr<Exception> makeExceptionFromErrorMessage(const boost::shared_ptr<MessageDesc> &msg)
+std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<MessageDesc> &msg)
 {
-    boost::shared_ptr<scidb_msg::Error> errorRecord = msg->getRecord<scidb_msg::Error>();
+    std::shared_ptr<scidb_msg::Error> errorRecord = msg->getRecord<scidb_msg::Error>();
 
     assert(SCIDB_E_NO_ERROR != errorRecord->short_error_code());
 
     switch (errorRecord->type())
     {
         case 1:
-            return shared_ptr<Exception>(new SystemException(errorRecord->file().c_str(), errorRecord->function().c_str(),
+            return std::shared_ptr<Exception>(new SystemException(errorRecord->file().c_str(), errorRecord->function().c_str(),
                 errorRecord->line(), errorRecord->errors_namespace().c_str(), errorRecord->short_error_code(),
                 errorRecord->long_error_code(),  errorRecord->what_str().c_str(),
                 errorRecord->stringified_short_error_code().c_str(), errorRecord->stringified_long_error_code().c_str(),
                 msg->getQueryID()));
         case 2:
-            return shared_ptr<Exception>(new UserException(errorRecord->file().c_str(), errorRecord->function().c_str(),
+            return std::shared_ptr<Exception>(new UserException(errorRecord->file().c_str(), errorRecord->function().c_str(),
                 errorRecord->line(), errorRecord->errors_namespace().c_str(), errorRecord->short_error_code(),
                 errorRecord->long_error_code(),  errorRecord->what_str().c_str(),
                 errorRecord->stringified_short_error_code().c_str(), errorRecord->stringified_long_error_code().c_str(),
                 msg->getQueryID()));
         case 3:
-            return shared_ptr<Exception>(new UserQueryException(errorRecord->file().c_str(), errorRecord->function().c_str(),
+            return std::shared_ptr<Exception>(new UserQueryException(errorRecord->file().c_str(), errorRecord->function().c_str(),
                 errorRecord->line(), errorRecord->errors_namespace().c_str(), errorRecord->short_error_code(),
                 errorRecord->long_error_code(),  errorRecord->what_str().c_str(),
                 errorRecord->stringified_short_error_code().c_str(), errorRecord->stringified_long_error_code().c_str(),
@@ -291,10 +291,10 @@ shared_ptr<Exception> makeExceptionFromErrorMessage(const boost::shared_ptr<Mess
             throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_MESSAGE_FORMAT)  << messageType;
         }
     }
-    return boost::shared_ptr<Exception>();
+    return std::shared_ptr<Exception>();
 }
 
-void makeExceptionFromErrorMessageAndThrow(const boost::shared_ptr<MessageDesc> &msg)
+void makeExceptionFromErrorMessageAndThrow(const std::shared_ptr<MessageDesc> &msg)
 {
     makeExceptionFromErrorMessage(msg)->raise();
 }

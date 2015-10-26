@@ -9,6 +9,9 @@ days' worth of historical sample TAQ data can be obtained from:
 
         http://www.nyxdata.com/Data-Products/NYSE-Trades-EOD
 
+(You may need to hunt around a bit, search the site for "sample data"
+or "historical data samples".)
+
 The file format for this data is described by http://www.nyxdata.com/doc/76994 .
 Be sure to read the "Terms of Use" section of the nyxdata.com website for
 restrictions on the use and copying of the sample data.
@@ -41,9 +44,7 @@ make_nyse_arrays.sh
 
 nyse_loader.sh
     This shell script shows how the loadpipe.py script is invoked
-    for this demo.  Note that command line options after the '--'
-    are passed directly to loadcsv.py, so you have the full range of
-    loadcsv capabilities available to you.
+    for this demo.
 
 rsyslog-conf.diff
     Patch file showing one of many possible ways to configure logging
@@ -65,7 +66,7 @@ track_favorites.py
     NOTE: Running this loop when nyse_feeder.py is feeding data at
     close to real time (--scale=N and N < about 10), the several
     iquery invocations will begin to conflict with loadpipe.py's
-    loadcsv calls, and loadpipe.py will fall behind.  Just sayin'.
+    queries, and loadpipe.py will fall behind.  Just sayin'.
 
 Demo Cookbook
 =============

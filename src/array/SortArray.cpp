@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,10 +39,10 @@
 #include <util/Timing.h>
 #include <boost/scope_exit.hpp>
 
-using namespace std;
-using namespace boost;
-
 namespace scidb {
+
+    using namespace std;
+    using namespace boost;
 
     log4cxx::LoggerPtr SortArray::logger(log4cxx::Logger::getLogger("scidb.array.SortArray"));
 
@@ -54,7 +54,7 @@ namespace scidb {
      * Constructor -- create iterators and position them at the correct
      * chunk
      */
-    SortArray::SortIterators::SortIterators(boost::shared_ptr<Array>& input,
+    SortArray::SortIterators::SortIterators(std::shared_ptr<Array>const& input,
                                             size_t shift,
                                             size_t step) :
         _arrayIters(input->getArrayDesc().getAttributes().size()),
@@ -100,13 +100,13 @@ namespace scidb {
      * The input array may not have an empty tag,
      * but the output array has an empty tag.
      */
-    SortArray::SortJob::SortJob(SortArray& sorter,
-                                shared_ptr<Query> query,
+    SortArray::SortJob::SortJob(SortArray* sorter,
+                                std::shared_ptr<Query>const& query,
                                 size_t id,
-                                SortIterators& iters)
+                                SortIterators* iters)
         : Job(query),
-          _sorter(sorter),
-          _sortIters(iters),
+          _sorter(*sorter),
+          _sortIters(*iters),
           _complete(false),
           _id(id)
     {
@@ -137,13 +137,13 @@ namespace scidb {
         // does not have an empty tag (but the output array does).
         //
         size_t tupleArraySizeHint = _sorter._memLimit / _sorter._tupleSize;
-        shared_ptr<TupleArray> buffer =
+        std::shared_ptr<TupleArray> buffer =
             make_shared<TupleArray>(*(_sorter._outputSchema),
                                     _sortIters.getIterators(),
                                     _sorter.getInputArrayDesc(),
                                     0,
                                     tupleArraySizeHint,
-                                    10*MiB,
+                                    16*MiB,
                                     _sorter._arena,
                                     _sorter.preservePositions());
 
@@ -155,12 +155,12 @@ namespace scidb {
             size_t currentSize = buffer->getNumberOfTuples() * _sorter._tupleSize;
             if (currentSize > _sorter._memLimit)
             {
-                shared_ptr<Array> baseBuffer =
+                std::shared_ptr<Array> baseBuffer =
                     static_pointer_cast<TupleArray, Array> (buffer);
                 buffer->sort(_sorter._tupleComp);
                 buffer->truncate();
                 {
-                    shared_ptr<Array> ma(new MemArray(baseBuffer, getQuery()));
+                    std::shared_ptr<Array> ma(make_shared<MemArray>(baseBuffer, getQuery()));
                     ScopedMutexLock sm(_sorter._sortLock);
                     _sorter._results.push_back(ma);
                     _sorter._runsProduced++;
@@ -173,14 +173,14 @@ namespace scidb {
                 if (limitReached) {
                     buffer.reset();
                 } else {
-                    buffer.reset(new TupleArray(*(_sorter._outputSchema),
+                    buffer = std::make_shared<TupleArray>(*(_sorter._outputSchema),
                                                 _sortIters.getIterators(),
                                                 _sorter._inputSchema,
                                                 0,
                                                 tupleArraySizeHint,
-                                                10*MiB,
+                                                16*MiB,
                                                 _sorter._arena,
-                                                _sorter.preservePositions()));
+                                                _sorter.preservePositions());
                 }
             }
             _sortIters.advanceIterators();
@@ -191,12 +191,12 @@ namespace scidb {
         {
             if (buffer && buffer->getNumberOfTuples())
             {
-                shared_ptr<Array> baseBuffer =
+                std::shared_ptr<Array> baseBuffer =
                     static_pointer_cast<TupleArray, Array> (buffer);
                 buffer->sort(_sorter._tupleComp);
                 buffer->truncate();
                 {
-                    shared_ptr<Array> ma(new MemArray(baseBuffer, getQuery()));
+                    std::shared_ptr<Array> ma(make_shared<MemArray>(baseBuffer, getQuery()));
                     ScopedMutexLock sm(_sorter._sortLock);
                     _sorter._results.push_back(ma);
                     _sorter._runsProduced++;
@@ -215,11 +215,11 @@ namespace scidb {
     /**
      * Constructor
      */
-    SortArray::MergeJob::MergeJob(SortArray& sorter,
-                                  boost::shared_ptr<Query> query,
+    SortArray::MergeJob::MergeJob(SortArray* sorter,
+                                  std::shared_ptr<Query>const& query,
                                   size_t id) :
         Job(query),
-        _sorter(sorter),
+        _sorter(*sorter),
         _id(id)
     {
     }
@@ -230,9 +230,9 @@ namespace scidb {
      */
     void SortArray::MergeJob::run()
     {
-        vector< shared_ptr<Array> > mergeStreams;
-        shared_ptr<Array> merged;
-        shared_ptr<Array> materialized;
+        vector< std::shared_ptr<Array> > mergeStreams;
+        std::shared_ptr<Array> merged;
+        std::shared_ptr<Array> materialized;
 
         // At the end of run(), we must always put the result (if it exists) on the end of the
         // list, mark ourselves on the stopped job list, and signal the main thread
@@ -270,23 +270,38 @@ namespace scidb {
 
         // merge the streams -- true means the array contains local data only
         size_t nStreams = mergeStreams.size();
-        shared_ptr<vector<size_t> > streamSizes = shared_ptr<vector<size_t> >(new vector<size_t>(nStreams));
+        std::shared_ptr<vector<size_t> > streamSizes = make_shared< vector<size_t> > (nStreams);
         for (size_t i=0; i<nStreams; ++i) {
             (*streamSizes)[i] = -1;
         }
-        merged.reset(new MergeSortArray(getQuery(),
+        merged = make_shared<MergeSortArray>(getQuery(),
                                         *(_sorter._outputSchema),
                                         mergeStreams,
                                         _sorter._tupleComp,
                                         0,  // Do not add an offset to the cell's coordinates.
                                         streamSizes // Using -1 preserves the behavior of the original code here.
-                                        ));
+                                        );
 
         // false means perform a horizontal copy (copy all attributes for chunk 1,
         // all attributes for chunk 2,...)
-        materialized.reset(new MemArray(merged, getQuery(), false));
+        materialized = make_shared<MemArray>(merged, getQuery(), false);
     }
 
+    /**
+     *
+     */
+    SortArray::SortArray(const ArrayDesc& inputSchema,arena::ArenaPtr const& arena,bool preservePositions,size_t chunkSize)
+         : _inputSchema(inputSchema),
+           _arena(arena),
+           _partitionComplete(arena),
+           _sortIterators(arena),
+           _runningJobs(arena),
+           _waitingJobs(arena),
+           _stoppedJobs(arena),
+           _preservePositions(preservePositions)
+     {
+         calcOutputSchema(inputSchema, chunkSize);
+     }
 
     /**
      * Output schema matches input attributes, but contains only one dimension, "n".
@@ -322,8 +337,7 @@ namespace scidb {
             }
         }
 
-        Dimensions newDims(1);
-        newDims[0] = DimensionDesc("n", 0, 0, MAX_COORDINATE, MAX_COORDINATE, chunkSize, 0);
+        Dimensions newDims(1,DimensionDesc("n", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), chunkSize, 0));
 
         const bool excludeEmptyBitmap = true;
         Attributes attributes = inputSchema.getAttributes(excludeEmptyBitmap);
@@ -344,9 +358,10 @@ namespace scidb {
                             0  // defaultCompressionMethod
                             ));
         }
-        _outputSchema.reset(new ArrayDesc(inputSchema.getName(),
+        _outputSchema = make_shared<ArrayDesc>(inputSchema.getName(),
                                           addEmptyTagAttribute(attributes),
-                                          newDims));
+                                          newDims,
+                                          defaultPartitioning());
     }
 
 
@@ -356,9 +371,9 @@ namespace scidb {
      * logic within its iterator classes.  To complete the sort, we materialize the merge
      * Array.
      */
-    shared_ptr<MemArray> SortArray::getSortedArray(boost::shared_ptr<Array> inputArray,
-                                                   boost::shared_ptr<Query> query,
-                                                   boost::shared_ptr<TupleComparator> tcomp)
+    std::shared_ptr<MemArray> SortArray::getSortedArray(std::shared_ptr<Array> inputArray,
+                                                   std::shared_ptr<Query> query,
+                                                   std::shared_ptr<TupleComparator> tcomp)
     {
         // Timing for Sort
         LOG4CXX_DEBUG(logger, "[SortArray] Sort for array " << _outputSchema->getName() << " begins");
@@ -386,7 +401,7 @@ namespace scidb {
         }
 
         // Init sorting state
-        shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
+        std::shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
         _input = inputArray;
         _tupleComp = tcomp;
         _tupleSize = TupleArray::getTupleFootprint(_outputSchema->getAttributes());
@@ -402,12 +417,12 @@ namespace scidb {
         for (size_t i = 0; i < numJobs; i++)
         {
             _sortIterators[i] =
-                shared_ptr<SortIterators>(new SortIterators(_input, i, numJobs));
+                std::shared_ptr<SortIterators>(make_shared<SortIterators>(_input, i, numJobs));
             _waitingJobs[i] =
-                shared_ptr<Job>(new SortJob(*this,
+                std::shared_ptr<Job>(make_shared<SortJob>(this,
                                             query,
                                             i,
-                                            *(_sortIterators[i])));
+                                            _sortIterators[i].get()));
             _partitionComplete[i] = false;
         }
 
@@ -447,7 +462,7 @@ namespace scidb {
 
                     nextJobType nextJob = JobNone;
                     bool jobSuccess = true;
-                    shared_ptr<SortJob> sJob;
+                    std::shared_ptr<SortJob> sJob;
 
                     jobSuccess = _stoppedJobs[i]->wait();
 
@@ -483,16 +498,14 @@ namespace scidb {
 
                         if (nextJob == JobSort)
                         {
-                            _waitingJobs[i].reset(new SortJob(*this,
+                            _waitingJobs[i] = make_shared<SortJob>(this,
                                                               query,
                                                               i,
-                                                              *(_sortIterators[i])));
+                                                              _sortIterators[i].get());
                         }
                         else if (nextJob == JobMerge)
                         {
-                            _waitingJobs[i].reset(new MergeJob(*this,
-                                                               query,
-                                                               i));
+                            _waitingJobs[i] = make_shared<MergeJob>(this,query,i);
                         }
                     }
                     else
@@ -518,9 +531,7 @@ namespace scidb {
         // If there were no failed jobs, we still may need one last merge
         if (_results.size() > 1)
         {
-            shared_ptr<Job> lastJob(new MergeJob(*this,
-                                                 query,
-                                                 0));
+            std::shared_ptr<Job> lastJob(make_shared<MergeJob>(this,query,0));
             queue->pushJob(lastJob);
             lastJob->wait(true);
         }
@@ -528,13 +539,12 @@ namespace scidb {
         timing.logTiming(logger, "[SortArray] merge sorted chunks complete");
 
         // Return the result
-        if (_results.size() == 0)
+        if (_results.empty())
         {
-            shared_ptr<Array> materialized(new MemArray(*_outputSchema, query));
-            _results.push_back(materialized);
+            _results.push_back(make_shared<MemArray>(*_outputSchema, query));
         }
 
-        shared_ptr<MemArray> ret = dynamic_pointer_cast<MemArray, Array> (_results.front());
+        std::shared_ptr<MemArray> ret = dynamic_pointer_cast<MemArray, Array> (_results.front());
         _results.clear();
         return ret;
     }

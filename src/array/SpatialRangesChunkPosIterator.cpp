@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,11 +28,13 @@
  */
 
 #include <array/SpatialRangesChunkPosIterator.h>
+
+using namespace std;
 using namespace boost;
 
 namespace scidb
 {
-SpatialRangesChunkPosIterator::SpatialRangesChunkPosIterator(boost::shared_ptr<SpatialRanges> const& spatialRanges, ArrayDesc const& schema)
+SpatialRangesChunkPosIterator::SpatialRangesChunkPosIterator(std::shared_ptr<SpatialRanges> const& spatialRanges, ArrayDesc const& schema)
 : _numRanges(spatialRanges->_ranges.size()),
   _spatialRanges(spatialRanges),
   _schema(schema),
@@ -96,7 +98,7 @@ void SpatialRangesChunkPosIterator::reset()
     }
 
     // Note: the code below does not compile with make_shared.
-    _wrapperIterator = shared_ptr<MultiConstIterators>(new MultiConstIterators(_rawIterators));
+    _wrapperIterator = std::shared_ptr<MultiConstIterators>(new MultiConstIterators(_rawIterators));
 }
 
 bool SpatialRangesChunkPosIterator::advancePositionToAtLeast(Coordinates const& newPos)
@@ -116,7 +118,7 @@ bool SpatialRangesChunkPosIterator::advancePositionToAtLeast(Coordinates const& 
     }
 
     // Note: the code below does not compile with make_shared.
-    _wrapperIterator = shared_ptr<MultiConstIterators>(new MultiConstIterators(_rawIterators));
+    _wrapperIterator = std::shared_ptr<MultiConstIterators>(new MultiConstIterators(_rawIterators));
     return true;
 }
 

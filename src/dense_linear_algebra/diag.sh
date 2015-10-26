@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -101,7 +101,7 @@ LENGTHS=`iquery -o dense -aq "project(dimensions(${VEC_IN}),length)"`
 
 # NOTE: there was a suggestion that maybe -ocsv[+] might make the parsing below easier
 #COLS="${LENGTHS:2:-2}"
-# bash 4.2.x accepts the -2, above.  
+# bash 4.2.x accepts the -2, above.
 # bash 4.1.5 does not like the -2, so explicitly subtract instead
 SUBSTR_LEN=`expr length ${LENGTHS} - 4` # length that will drop trailing ")]"
 COLS="${LENGTHS:2:$SUBSTR_LEN}"         # 2: is to drop the leading "[("
@@ -154,7 +154,7 @@ fi
 iquery -naq "store(aggregate(apply(cross_join(transpose(${ADDDIM_Q}) as A, ${TMP_VEC_1} as B, A.c, B.r), s, A.sigma*B.v), sum(s) as multiply, A.i, B.c),${TMP_OUTER_PRODUCT})" >> /dev/null
 
 # then we just use iif to set off-diagonal values to 0
-#  
+#
 #
 #    [ a 0 0 ]
 # -> [ 0 b 0 ] which is our result

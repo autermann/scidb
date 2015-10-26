@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,9 +22,16 @@
 
 /****************************************************************************/
 
+#include <fstream>
+
 #include <array/Compressor.h>
+#include <boost/assign.hpp>
 #include <query/ParsingContext.h>
+#include <query/FunctionDescription.h>
+#include <query/FunctionLibrary.h>
 #include <query/Serialize.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <util/session/Session.h>
 #include "AST.h"
 
 /****************************************************************************/
@@ -40,59 +47,71 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc.altrans
 namespace scidb { namespace parser {
 /****************************************************************************/
 
-typedef shared_ptr<ParsingContext>              ContextPtr;
-typedef shared_ptr<LogicalExpression>           LEPtr;
-typedef shared_ptr<LogicalQueryPlanNode>        LQPNPtr;
-typedef shared_ptr<OperatorParamArrayReference> OPARPtr;
+typedef std::shared_ptr<ParsingContext>              ContextPtr;
+typedef std::shared_ptr<LogicalExpression>           LEPtr;
+typedef std::shared_ptr<LogicalQueryPlanNode>        LQPNPtr;
+typedef std::shared_ptr<OperatorParamArrayReference> OPARPtr;
 
 /****************************************************************************/
 
 class Translator
 {
  public:
-                              Translator(Factory& f,Log& l,const StringPtr& s,const QueryPtr& q=QueryPtr())
+                              Translator(Factory& f,Log& l,const StringPtr& s,const QueryPtr& q)
                                 : _fac(f),_log(l),_txt(s),_qry(q)
                               {}
 
  public:
-            LQPNPtr           AstToLogicalPlan          (const Node*,bool = false);
-            LEPtr             AstToLogicalExpression    (const Node*);
+            /**
+             * @param depthOperator depth of this node in the query plan tree.
+             * @note SciDB allows up to Translator::MAX_DEPTH_OPERATOR nested levels.
+             */
+            LQPNPtr           AstToLogicalPlan          (const Node*, size_t depthOperator, bool = false);
+
+            /**
+             * @param depthExpression  depth of this expression. E.g. when parsing 1+2+3, the depth is 3.
+             * @note SciDB allows up to Translator::MAX_DEPTH_EXPRESSION operands.
+             */
+            LEPtr             AstToLogicalExpression    (const Node* node, size_t depthExpression=0);
+
+ private:   // @see AstToLogicalPlan() for depthOperator.
+            LQPNPtr           passAFLOperator           (const Node*, size_t depthOperator);
+            LQPNPtr           passSelectStatement       (const Node*, size_t depthOperator);
+            LQPNPtr           passJoins                 (const Node*, size_t depthOperator);
+            LQPNPtr           passIntoClause            (const Node*,LQPNPtr&, size_t depthOperator);
+            LQPNPtr           passGeneralizedJoin       (const Node*, size_t depthOperator);
+            LQPNPtr           passCrossJoin             (const Node*, size_t depthOperator);
+            LQPNPtr           passJoinItem              (const Node*, size_t depthOperator);
+            LQPNPtr           passImplicitScan          (const Node*, size_t depthOperator);
+            LQPNPtr           passFilterClause          (const Node*,const LQPNPtr&, size_t depthOperator);
+            LQPNPtr           passOrderByClause         (const Node*,const LQPNPtr&, size_t depthOperator);
+            LQPNPtr           passThinClause            (const Node*, size_t depthOperator);
+            LQPNPtr           passSelectList            (LQPNPtr&,const Node*,const Node*, size_t depthOperator);
+            LQPNPtr           passUpdateStatement       (const Node*, size_t depthOperator);
+            LQPNPtr           passInsertIntoStatement   (const Node*, size_t depthOperator);
 
  private:
-            LQPNPtr           passAFLOperator           (const Node*);
-            LQPNPtr           passSelectStatement       (const Node*);
-            LQPNPtr           passJoins                 (const Node*);
-            LQPNPtr           passIntoClause            (const Node*,LQPNPtr&);
-            LQPNPtr           passGeneralizedJoin       (const Node*);
-            LQPNPtr           passCrossJoin             (const Node*);
-            LQPNPtr           passJoinItem              (const Node*);
-            LQPNPtr           passImplicitScan          (const Node*);
-            LQPNPtr           passFilterClause          (const Node*,const LQPNPtr&);
-            LQPNPtr           passOrderByClause         (const Node*,const LQPNPtr&);
-            LQPNPtr           passThinClause            (const Node*);
-            LQPNPtr           passSelectList            (LQPNPtr&,const Node*,const Node*);
-            LQPNPtr           passUpdateStatement       (const Node*);
-            LQPNPtr           passInsertIntoStatement   (const Node*);
-
- private:
-    shared_ptr<OperatorParamAggregateCall>
+    std::shared_ptr<OperatorParamAggregateCall>
                               passAggregateCall               (const Node*,const vector<ArrayDesc>&);
             Value             passConstantExpression          (const Node*,const TypeId&);
             int64_t           passIntegralExpression          (const Node*);
             void              passSchema                      (const Node*,ArrayDesc &,const string&);
             void              passReference                   (const Node*,chars&,chars&);
-            bool              passGeneralizedJoinOnClause     (vector<shared_ptr<OperatorParamReference> > &params,const Node*);
+            bool              passGeneralizedJoinOnClause     (
+                                                                vector<std::shared_ptr<OperatorParamReference> > &params,
+                                                                const Node*,
+                                                                size_t depthExpression);
             void              passDimensions                  (const Node*,Dimensions&,const string&,set<string>&);
 
  private:
             LQPNPtr           fitInput                        (LQPNPtr&,const ArrayDesc&);
             LQPNPtr           canonicalizeTypes               (const LQPNPtr&);
             LQPNPtr           appendOperator                  (const LQPNPtr&,const string&,const LogicalOperator::Parameters&,const ContextPtr&);
-            string            placeholdersToString            (const vector<shared_ptr<OperatorParamPlaceholder> > &)const;
+            string            placeholdersToString            (const vector<std::shared_ptr<OperatorParamPlaceholder> > &)const;
             string            astParamToString                (const Node*)const;
-            bool              resolveParamAttributeReference  (const vector<ArrayDesc>&,shared_ptr<OperatorParamReference> &,bool = true);
-            bool              resolveParamDimensionReference  (const vector<ArrayDesc>&,shared_ptr<OperatorParamReference> &,bool = true);
-            bool              placeholdersVectorContainType   (const vector<shared_ptr<OperatorParamPlaceholder> > &,OperatorParamPlaceholderType );
+            bool              resolveParamAttributeReference  (const vector<ArrayDesc>&,std::shared_ptr<OperatorParamReference> &,bool = true);
+            bool              resolveParamDimensionReference  (const vector<ArrayDesc>&,std::shared_ptr<OperatorParamReference> &,bool = true);
+            bool              placeholdersVectorContainType   (const vector<std::shared_ptr<OperatorParamPlaceholder> > &,OperatorParamPlaceholderType );
             bool              checkAttribute                  (const vector<ArrayDesc>&,const string& aliasName,const string& attributeName,const ContextPtr&);
             bool              checkDimension                  (const vector<ArrayDesc>&,const string& aliasName,const string& dimensionName,const ContextPtr&);
             void              checkLogicalExpression          (const vector<ArrayDesc>&,const ArrayDesc &,const LEPtr &);
@@ -105,7 +124,66 @@ class Translator
             bool              resolveDimension                (const vector<ArrayDesc> &inputSchemas,const string&,const string&,size_t&,size_t&,const ContextPtr&,bool);
             bool              astHasUngroupedReferences       (const Node*,const set<string>&)const;
             bool              astHasAggregates                (const Node*)                   const;
-            bool              matchOperatorParam              (const Node*,const OperatorParamPlaceholders &,vector<ArrayDesc> &inputSchemas,vector<LQPNPtr> &inputs,shared_ptr<OperatorParam> &param);
+            bool              matchOperatorParam              (
+                                                                const Node*,
+                                                                const OperatorParamPlaceholders &,
+                                                                vector<ArrayDesc> &inputSchemas,
+                                                                vector<LQPNPtr> &inputs,
+                                                                std::shared_ptr<OperatorParam> &param,
+                                                                size_t depthOperator);
+
+            /**
+             * Get array metadata for the array name as of a given catalog version.
+             * The metadata provided by this method corresponds to an array with id <= catalogVersion
+             * @param[in] array_name Array name
+             * @param[in] catalogVersion as previously returned by getCurrentVersion().
+             *            If catalogVersion == SystemCatalog::ANY_VERSION,
+             *            the result metadata array ID is not bounded by catalogVersion
+             * @param[out] array_desc Array descriptor
+             * @exception scidb::SystemException
+             * @see SystemCatalog::getCurrentVersion()
+             */
+            void              getArrayDesc                    (const std::string& array_name,
+                                                              const ArrayID catalogVersion,
+                                                              ArrayDesc& array_desc);
+
+            /**
+             * Get array metadata for the array name as of a given catalog version.
+             * The metadata provided by this method corresponds to an array with id <= catalogVersion
+             * @param[in] array_name Array name
+             * @param[in] catalogVersion as previously returned by getCurrentVersion().
+             *            If catalogVersion == SystemCatalog::ANY_VERSION,
+             *            the result metadata array ID is not bounded by catalogVersion
+             * @param[out] array_desc Array descriptor
+             * @param[in] throwException throw exception if array with specified name is not found
+             * @return true if array is found, false if array is not found and throwException is false
+             * @exception scidb::SystemException
+             */
+            bool                getArrayDesc                  (const std::string &arrayName,
+                                                              const ArrayID catalogVersion,
+                                                              ArrayDesc &arrayDesc,
+                                                              const bool throwException);
+
+            /**
+             * Get array metadata for the array name as of a given catalog version.
+             * The metadata provided by this method corresponds to an array with id <= catalogVersion
+             * @param[in] array_name Array name
+             * @param[in] catalogVersion as previously returned by getCurrentVersion().
+             *            If catalogVersion == SystemCatalog::ANY_VERSION,
+             *            the result metadata array ID is not bounded by catalogVersion
+             * @param[in] array_version version identifier or LAST_VERSION
+             * @param[out] array_desc Array descriptor
+             * @param[in] throwException throw exception if array with specified name is not found
+             * @return true if array is found, false if array is not found and throwException is false
+             * @exception scidb::SystemException
+             */
+            bool              getArrayDesc                    (const std::string &arrayName,
+                                                              const ArrayID catalogVersion,
+                                                              VersionID version,
+                                                              ArrayDesc &arrayDesc,
+                                                              const bool throwException = true);
+
+            bool              checkArrayAccess                (ArrayID arrayId) const;
 
  private:                  // Expressions
             LEPtr             onNull              (const Node*);
@@ -113,21 +191,34 @@ class Translator
             LEPtr             onInteger           (const Node*);
             LEPtr             onBoolean           (const Node*);
             LEPtr             onString            (const Node*);
-            LEPtr             onScalarFunction    (const Node*);
+
+            // @see AstToLogicalExpression().
+            LEPtr             onScalarFunction    (const Node*, size_t depthExpression);
+
             LEPtr             onAttributeReference(const Node*);
 
  private:
             ContextPtr        newParsingContext(const Node*  n)                         {return make_shared<ParsingContext>(_txt,n->getWhere());}
-            ContextPtr        newParsingContext(const shared_ptr<OperatorParam>&  n)    {return n->getParsingContext();}
-            ContextPtr        newParsingContext(const shared_ptr<AttributeReference>& n){return n->getParsingContext();}
+            ContextPtr        newParsingContext(const std::shared_ptr<OperatorParam>&  n)    {return n->getParsingContext();}
+            ContextPtr        newParsingContext(const std::shared_ptr<AttributeReference>& n){return n->getParsingContext();}
             ContextPtr        newParsingContext(const ContextPtr& n)                    {return n;}
             void              fail(const UserException& x)                              {_log.fail(x);}
+
+ private:
+            void              checkDepthExpression(size_t depthExpression);
+            void              checkDepthOperator(size_t depthOperator);
 
  private:                  // Representation
             Factory&          _fac;                      // Abstract factory
             Log&              _log;                      // Abstract error log
       const StringPtr&        _txt;                      // The source text: yuk!
             QueryPtr    const _qry;                      // The query
+
+      // If this constant is changed, also change the error string SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS.
+      static const size_t MAX_DEPTH_EXPRESSION = 446;
+
+      // If this constant is changed, also change the error string SCIDB_LE_TOO_MANY_OPERANDS_IN_EXPRESSION.
+      static const size_t MAX_DEPTH_OPERATOR = 95;
 };
 
 /****************************************************************************/
@@ -202,18 +293,20 @@ static chars getStringReferenceArgName     (const Node* n){if (const Node* s=get
 static chars getStringReferenceArgArrayName(const Node* n){if (const Node* s=getReferenceArgArrayName(n)){return s->getString();} return "";}
 /****************************************************************************/
 
-LQPNPtr Translator::AstToLogicalPlan(const Node* ast,bool canonicalize)
+LQPNPtr Translator::AstToLogicalPlan(const Node* ast, size_t depthOperator, bool canonicalize)
 {
+    checkDepthOperator(depthOperator);
+
     LQPNPtr r;
 
     switch (ast->getType())
     {
         default:          SCIDB_UNREACHABLE();  // jab:
-        case application: r = passAFLOperator(ast);          break;
-        case reference:   r = passImplicitScan(ast);         break;
-        case insertArray: r = passInsertIntoStatement(ast);  break;
-        case selectArray: r = passSelectStatement(ast);      break;
-        case updateArray: r = passUpdateStatement(ast);      break;
+        case application: r = passAFLOperator(ast, depthOperator);          break;
+        case reference:   r = passImplicitScan(ast, depthOperator);         break;
+        case insertArray: r = passInsertIntoStatement(ast, depthOperator);  break;
+        case selectArray: r = passSelectStatement(ast, depthOperator);      break;
+        case updateArray: r = passUpdateStatement(ast, depthOperator);      break;
     }
 
     if (canonicalize && !r->isDdl())
@@ -257,6 +350,96 @@ int64_t Translator::estimateChunkInterval(cnodes nodes)
     return r;
 }
 
+/*
+ *  Verify that this array belongs to the current namespace or to the
+ *  public namespace.
+ */
+bool Translator::checkArrayAccess(ArrayID arrayId) const
+{
+    if(_qry->isFake())
+    {
+        /*
+         * A fake query is created when code similiar to that shown 
+         * below is executed.  The fake query creation occurs in
+         * Query::createFakeQuery(...) which creates a query that has
+         * an id of Query::FAKE_QUERY_ID.
+         *
+         * create array A <a:string> [x=-2:3,2,1];
+         * show('select * from A');
+         */
+        return true;
+    }
+
+    std::shared_ptr<Session> session = _qry->getSession();
+LOG4CXX_DEBUG(logger, "checkArrayAccess("
+    << "_qry=" << _qry << ","
+    << "id=" << _qry->getQueryID() << ","
+    << "arrayId=" << arrayId << ","
+    << "session=" << session.get() << ")" );
+
+    Session *pSession = session.get();
+    ASSERT_EXCEPTION(pSession!=nullptr, "NULL session");
+
+    return scidb::namespaces::Communicator::checkArrayAccess(
+        session, arrayId );
+}
+
+void Translator::getArrayDesc(
+    const std::string& arrayName,
+    const ArrayID catalogVersion,
+    ArrayDesc& arrayDesc)
+{
+    SystemCatalog::getInstance()->getArrayDesc(
+        arrayName, catalogVersion, arrayDesc);
+
+    if(false == checkArrayAccess(arrayDesc.getId()))
+    {
+        throw SYSTEM_EXCEPTION(
+            SCIDB_SE_SYSCAT,
+            SCIDB_LE_ARRAY_DOESNT_EXIST)
+                << arrayName;
+    }
+}
+
+
+bool Translator::getArrayDesc(
+    const std::string &arrayName,
+    const ArrayID catalogVersion,
+    ArrayDesc &arrayDesc,
+    const bool throwException)
+{
+    bool ret;
+
+    ret = SystemCatalog::getInstance()->getArrayDesc(
+        arrayName, catalogVersion, arrayDesc, throwException);
+    if(!ret) return ret;
+
+    ret = checkArrayAccess(arrayDesc.getId());
+    return ret;
+}
+
+bool Translator::getArrayDesc(
+    const std::string &arrayName,
+    const ArrayID catalogVersion,
+    VersionID version,
+    ArrayDesc &arrayDesc,
+    const bool throwException /* = true */)
+{
+    bool ret;
+
+    ret = SystemCatalog::getInstance()->getArrayDesc(
+        arrayName, catalogVersion, version, arrayDesc, throwException);
+    if(!ret)
+    {
+        return ret;
+    }
+
+    ret = checkArrayAccess(arrayDesc.getId());
+    return ret;
+}
+
+
+
 Value Translator::passConstantExpression(const Node* ast,const TypeId& targetType)
 {
     Expression pExpr;
@@ -297,7 +480,7 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
 
         string  const nm = d->get(dimensionArgName)->getString();
         int64_t       lo = 0;                            // ...lower bound
-        int64_t       hi = INFINITE_LENGTH;              // ...upper bound
+        int64_t       hi = CoordinateBounds::getMax();               // ...upper bound
         int64_t       ci = 0;                            // ...chunk interval
         int64_t       co = 0;                            // ...chunk overlap
 
@@ -331,19 +514,19 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
             co = passIntegralExpression(n);
         }
 
-        if (lo == MAX_COORDINATE)
+        if (lo == CoordinateBounds::getMax() && hi != CoordinateBounds::getMax())
         {
             fail(SYNTAX(SCIDB_LE_DIMENSION_START_CANT_BE_UNBOUNDED,getChildSafely(d,dimensionArgLoBound)));
         }
 
-        if (lo<=MIN_COORDINATE || MAX_COORDINATE<lo)
+        if (lo<CoordinateBounds::getMin() || CoordinateBounds::getMax()<lo)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgLoBound)) << MIN_COORDINATE << MAX_COORDINATE);
+            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgLoBound)) << CoordinateBounds::getMin() << CoordinateBounds::getMax());
         }
 
-        if (hi<=MIN_COORDINATE || MAX_COORDINATE<hi)
+        if (hi<CoordinateBounds::getMin() || CoordinateBounds::getMax()<hi)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgHiBound))<< MIN_COORDINATE << MAX_COORDINATE);
+            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgHiBound))<< CoordinateBounds::getMin() << CoordinateBounds::getMax());
         }
 
         if (hi<lo && hi+1!=lo)
@@ -484,18 +667,20 @@ void Translator::passSchema(const Node* ast,ArrayDesc& schema,const string& arra
 
     passDimensions(ast->get(schemaArgDimensions),dimensions,arrayName,usedNames);
 
-    schema = ArrayDesc(0,0,0,arrayName,attributes,dimensions);
+    schema = ArrayDesc(0,0,0,arrayName,attributes,dimensions, defaultPartitioning());
 }
 
-LQPNPtr Translator::passAFLOperator(const Node *ast)
+LQPNPtr Translator::passAFLOperator(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     const chars opName   = getStringApplicationArgName(ast);
     cnodes astParameters = ast->getList(applicationArgOperands);
     const string opAlias = getString(ast,applicationArgAlias);
 
     vector<LQPNPtr >            opInputs;
     vector<ArrayDesc>           inputSchemas;
-    shared_ptr<LogicalOperator> op;
+    std::shared_ptr<LogicalOperator> op;
 
     try
     {
@@ -583,8 +768,8 @@ LQPNPtr Translator::passAFLOperator(const Node *ast)
 
             try
             {
-                shared_ptr<OperatorParam> opParam;
-                if (matchOperatorParam(astParam, supposedPlaceholders, inputSchemas, opInputs, opParam))
+                std::shared_ptr<OperatorParam> opParam;
+                if (matchOperatorParam(astParam, supposedPlaceholders, inputSchemas, opInputs, opParam, depthOperator))
                     op->addParameter(opParam);
             }
             catch (const UserQueryException &e)
@@ -615,12 +800,12 @@ LQPNPtr Translator::passAFLOperator(const Node *ast)
     // all params and can get operator output schema. On each iteration we checking references in
     // all non-constant expressions. If ok, we trying to compile expression to check type compatibility.
     size_t paramNo = inputSchemas.size(); // Inputs parameters too, but only in AST
-    BOOST_FOREACH(const shared_ptr<OperatorParam> &param, result->getLogicalOperator()->getParameters())
+    BOOST_FOREACH(const std::shared_ptr<OperatorParam> &param, result->getLogicalOperator()->getParameters())
     {
         ++paramNo;
         if (PARAM_LOGICAL_EXPRESSION == param->getParamType())
         {
-            const shared_ptr<OperatorParamLogicalExpression>& paramLE = (const shared_ptr<OperatorParamLogicalExpression>&) param;
+            const std::shared_ptr<OperatorParamLogicalExpression>& paramLE = (const std::shared_ptr<OperatorParamLogicalExpression>&) param;
 
             if (paramLE->isConstant())
                 continue;
@@ -630,7 +815,7 @@ LQPNPtr Translator::passAFLOperator(const Node *ast)
             const LEPtr& lExpr = paramLE->getExpression();
             checkLogicalExpression(inputSchemas, outputSchema, lExpr);
 
-            shared_ptr<Expression> pExpr = make_shared<Expression>();
+            std::shared_ptr<Expression> pExpr = make_shared<Expression>();
 
             try
             {
@@ -650,7 +835,7 @@ LQPNPtr Translator::passAFLOperator(const Node *ast)
     return result;
 }
 
-shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(const Node *arrayReferenceAST,bool inputSchema)
+std::shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(const Node *arrayReferenceAST,bool inputSchema)
 {
     ArrayDesc schema;
     string arrayName = getStringReferenceArgName(arrayReferenceAST);
@@ -671,11 +856,20 @@ shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(co
 
     SystemCatalog *systemCatalog = SystemCatalog::getInstance();
     VersionID version = 0;
+    assert(_qry);
 
-    if (!systemCatalog->getArrayDesc(arrayName, schema, false))
+
+
+    if (!getArrayDesc(  arrayName,
+                        _qry->getCatalogVersion(arrayName),
+                        schema, false))
     {
-        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST,getReferenceArgName(arrayReferenceAST)) << arrayName);
+        fail(QPROC(
+            SCIDB_LE_ARRAY_DOESNT_EXIST,
+            getReferenceArgName(arrayReferenceAST))
+                << arrayName);
     }
+
 
     version = LAST_VERSION;
 
@@ -694,11 +888,11 @@ shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(co
 
             if (pExpr.getType() == TID_INT64)
             {
-                version = value.getUint64();
-                if (version > systemCatalog->getLastVersion(schema.getId()))
-                {
-                    version = 0;
-                }
+                version = std::max(int64_t(0),value.get<int64_t>());
+            }
+            else if (pExpr.getType() == TID_UINT64)
+            {
+                version = value.get<uint64_t>();
             }
             else if (pExpr.getType() == TID_DATETIME)
             {
@@ -706,14 +900,15 @@ shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(co
             }
             else
             {
-                SCIDB_UNREACHABLE();
+                fail(SYNTAX(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,arrayReferenceAST->get(referenceArgVersion)) << arrayName);
             }
         }
     }
-
-    if (!version)
+    if (version == 0 ||
+        (!getArrayDesc(arrayName, _qry->getCatalogVersion(arrayName), version, schema, false) &&
+         version != LAST_VERSION) ) {
         fail(QPROC(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,arrayReferenceAST->get(referenceArgVersion)) << arrayName);
-    systemCatalog->getArrayDesc(arrayName, version, schema);
+    }
 
     assert(arrayName.find('@') == string::npos);
     return make_shared<OperatorParamArrayReference>(newParsingContext(arrayReferenceAST), "",arrayName, inputSchema, version);
@@ -723,12 +918,15 @@ bool Translator::matchOperatorParam(const Node* ast,
         const OperatorParamPlaceholders &placeholders,
         vector<ArrayDesc> &inputSchemas,
         vector<LQPNPtr > &inputs,
-        shared_ptr<OperatorParam> &param)
+        std::shared_ptr<OperatorParam> &param,
+        size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     int matched = 0;
 
     //Each operator parameter from AST can match several placeholders. We trying to catch best one.
-    BOOST_FOREACH(const shared_ptr<OperatorParamPlaceholder>& placeholder, placeholders)
+    BOOST_FOREACH(const std::shared_ptr<OperatorParamPlaceholder>& placeholder, placeholders)
     {
         switch (placeholder->getPlaceholderType())
         {
@@ -743,12 +941,12 @@ bool Translator::matchOperatorParam(const Node* ast,
                         fail(SYNTAX(SCIDB_LE_SORTING_QUIRK_WRONG_USAGE,ast->get(referenceArgOrder)));
                     }
 
-                    input = passImplicitScan(ast);
+                    input = passImplicitScan(ast, depthOperator+1);
                 }
                 //This input is result of other operator, so go deeper in tree and translate this operator.
                 else if (ast->is(application) || ast->is(selectArray))
                 {
-                    input = AstToLogicalPlan(ast);
+                    input = AstToLogicalPlan(ast, depthOperator+1);
                     prohibitDdl(input);
                     prohibitNesting(input);
                 }
@@ -796,7 +994,7 @@ bool Translator::matchOperatorParam(const Node* ast,
             {
                 if (ast->is(reference) && !ast->has(referenceArgVersion))
                 {
-                    shared_ptr<OperatorParamAttributeReference> opParam = make_shared<OperatorParamAttributeReference>(
+                    std::shared_ptr<OperatorParamAttributeReference> opParam = make_shared<OperatorParamAttributeReference>(
                             newParsingContext(ast),
                             getStringReferenceArgArrayName(ast),
                             getStringReferenceArgName(ast),
@@ -807,7 +1005,7 @@ bool Translator::matchOperatorParam(const Node* ast,
                     //Trying resolve attribute in input schema
                     if (placeholder->isInputSchema())
                     {
-                        if (!resolveParamAttributeReference(inputSchemas, (shared_ptr<OperatorParamReference>&)opParam, false))
+                        if (!resolveParamAttributeReference(inputSchemas, (std::shared_ptr<OperatorParamReference>&)opParam, false))
                             break;
                     }
 
@@ -846,7 +1044,7 @@ bool Translator::matchOperatorParam(const Node* ast,
             {
                 if (ast->is(reference) && !ast->has(referenceArgVersion))
                 {
-                    shared_ptr<OperatorParamReference> opParam = make_shared<OperatorParamDimensionReference>(
+                    std::shared_ptr<OperatorParamReference> opParam = make_shared<OperatorParamDimensionReference>(
                             newParsingContext(ast),
                             getStringReferenceArgArrayName(ast),
                             getStringReferenceArgName(ast),
@@ -900,7 +1098,7 @@ bool Translator::matchOperatorParam(const Node* ast,
                  || ast->is(cinteger))
                 {
                     LEPtr lExpr;
-                    shared_ptr<Expression> pExpr = make_shared<Expression>();
+                    std::shared_ptr<Expression> pExpr = make_shared<Expression>();
 
                     try
                     {
@@ -1010,7 +1208,10 @@ bool Translator::matchOperatorParam(const Node* ast,
 
                     const chars arrayName = getStringReferenceArgName(ast);
                     ArrayDesc schema;
-                    if (!SystemCatalog::getInstance()->getArrayDesc(arrayName, schema, false))
+                    assert(_qry);
+                    if (!getArrayDesc(  arrayName,
+                                        _qry->getCatalogVersion(arrayName),
+                                        schema, false))
                     {
                         fail(SYNTAX(SCIDB_LE_ARRAY_DOESNT_EXIST, ast) << arrayName);
                     }
@@ -1052,11 +1253,11 @@ bool Translator::matchOperatorParam(const Node* ast,
     return true;
 }
 
-string Translator::placeholdersToString(const vector<shared_ptr<OperatorParamPlaceholder> > & placeholders) const
+string Translator::placeholdersToString(const vector<std::shared_ptr<OperatorParamPlaceholder> > & placeholders) const
 {
     bool first = true;
     ostringstream ss;
-    BOOST_FOREACH(const shared_ptr<OperatorParamPlaceholder> &placeholder, placeholders)
+    BOOST_FOREACH(const std::shared_ptr<OperatorParamPlaceholder> &placeholder, placeholders)
     {
         if (!first)
             ss << " or ";
@@ -1126,7 +1327,7 @@ string Translator::astParamToString(const Node* ast) const
     return string();
 }
 
-bool Translator::resolveParamAttributeReference(const vector<ArrayDesc> &inputSchemas, shared_ptr<OperatorParamReference> &attRef, bool throwException)
+bool Translator::resolveParamAttributeReference(const vector<ArrayDesc> &inputSchemas, std::shared_ptr<OperatorParamReference> &attRef, bool throwException)
 {
     bool found = false;
 
@@ -1141,7 +1342,7 @@ bool Translator::resolveParamAttributeReference(const vector<ArrayDesc> &inputSc
             {
                 if (found)
                 {
-                    const string fullName = str(format("%s%s") % (attRef->getArrayName() != "" ? attRef->getArrayName() + "." : "") % attRef->getObjectName() );
+                    const string fullName = str(boost::format("%s%s") % (attRef->getArrayName() != "" ? attRef->getArrayName() + "." : "") % attRef->getObjectName() );
                     fail(SYNTAX(SCIDB_LE_AMBIGUOUS_ATTRIBUTE,attRef) << fullName);
                 }
                 found = true;
@@ -1156,7 +1357,7 @@ bool Translator::resolveParamAttributeReference(const vector<ArrayDesc> &inputSc
 
     if (!found && throwException)
     {
-        const string fullName = str(format("%s%s") % (attRef->getArrayName() != "" ? attRef->getArrayName() + "." : "") % attRef->getObjectName() );
+        const string fullName = str(boost::format("%s%s") % (attRef->getArrayName() != "" ? attRef->getArrayName() + "." : "") % attRef->getObjectName() );
         fail(SYNTAX(SCIDB_LE_ATTRIBUTE_NOT_EXIST, attRef) << fullName);
     }
 
@@ -1176,7 +1377,7 @@ bool Translator::resolveDimension(const vector<ArrayDesc> &inputSchemas, const s
         {
             if (found)
             {
-                const string fullName = str(format("%s%s") % (alias != "" ? alias + "." : "") % name );
+                const string fullName = str(boost::format("%s%s") % (alias != "" ? alias + "." : "") % name );
                 fail(SYNTAX(SCIDB_LE_AMBIGUOUS_DIMENSION, parsingContext) << fullName);
             }
             found = true;
@@ -1184,20 +1385,20 @@ bool Translator::resolveDimension(const vector<ArrayDesc> &inputSchemas, const s
             inputNo = _inputNo;
             dimensionNo = _dimensionNo;
         }
-        
+
         ++_inputNo;
     }
 
     if (!found && throwException)
     {
-        const string fullName = str(format("%s%s") % (alias != "" ? alias + "." : "") % name );
+        const string fullName = str(boost::format("%s%s") % (alias != "" ? alias + "." : "") % name );
         fail(SYNTAX(SCIDB_LE_DIMENSION_NOT_EXIST, parsingContext) << fullName << "input" << "?");
     }
 
     return found;
 }
 
-bool Translator::resolveParamDimensionReference(const vector<ArrayDesc> &inputSchemas, shared_ptr<OperatorParamReference>& dimRef, bool throwException)
+bool Translator::resolveParamDimensionReference(const vector<ArrayDesc> &inputSchemas, std::shared_ptr<OperatorParamReference>& dimRef, bool throwException)
 {
     size_t inputNo = 0;
     size_t dimensionNo = 0;
@@ -1212,7 +1413,7 @@ bool Translator::resolveParamDimensionReference(const vector<ArrayDesc> &inputSc
     return false;
 }
 
-shared_ptr<OperatorParamAggregateCall> Translator::passAggregateCall(const Node* ast, const vector<ArrayDesc> &inputSchemas)
+std::shared_ptr<OperatorParamAggregateCall> Translator::passAggregateCall(const Node* ast, const vector<ArrayDesc> &inputSchemas)
 {
     if (ast->get(applicationArgOperands)->getSize() != 1)
     {
@@ -1221,18 +1422,18 @@ shared_ptr<OperatorParamAggregateCall> Translator::passAggregateCall(const Node*
 
     const Node* const arg = ast->get(applicationArgOperands)->get(listArg0);
 
-    shared_ptr<OperatorParam> opParam;
+    std::shared_ptr<OperatorParam> opParam;
 
     if (arg->is(reference))
     {
-        shared_ptr <AttributeReference> argument = static_pointer_cast<AttributeReference>(onAttributeReference(arg));
+        std::shared_ptr <AttributeReference> argument = static_pointer_cast<AttributeReference>(onAttributeReference(arg));
 
         opParam = make_shared<OperatorParamAttributeReference>( newParsingContext(arg),
                                                                 argument->getArrayName(),
                                                                 argument->getAttributeName(),
                                                                 true );
 
-        resolveParamAttributeReference(inputSchemas, (shared_ptr<OperatorParamReference>&) opParam, true);
+        resolveParamAttributeReference(inputSchemas, (std::shared_ptr<OperatorParamReference>&) opParam, true);
     }
     else
     if (arg->is(asterisk))
@@ -1251,10 +1452,10 @@ shared_ptr<OperatorParamAggregateCall> Translator::passAggregateCall(const Node*
             getString(ast,applicationArgAlias));
 }
 
-bool Translator::placeholdersVectorContainType(const vector<shared_ptr<OperatorParamPlaceholder> > &placeholders,
+bool Translator::placeholdersVectorContainType(const vector<std::shared_ptr<OperatorParamPlaceholder> > &placeholders,
     OperatorParamPlaceholderType placeholderType)
 {
-    BOOST_FOREACH(const shared_ptr<OperatorParamPlaceholder> &placeholder, placeholders)
+    BOOST_FOREACH(const std::shared_ptr<OperatorParamPlaceholder> &placeholder, placeholders)
     {
         if (placeholder->getPlaceholderType() == placeholderType)
             return true;
@@ -1262,8 +1463,10 @@ bool Translator::placeholdersVectorContainType(const vector<shared_ptr<OperatorP
     return false;
 }
 
-LQPNPtr Translator::passSelectStatement(const Node *ast)
+LQPNPtr Translator::passSelectStatement(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LQPNPtr result;
 
     const Node* const fromClause = ast->get(selectArrayArgFromClause);
@@ -1273,22 +1476,22 @@ LQPNPtr Translator::passSelectStatement(const Node *ast)
     if (fromClause)
     {
         //First of all joins,scan or nested query will be translated and used
-        result = passJoins(fromClause);
+        result = passJoins(fromClause, depthOperator+1);
 
         //Next WHERE clause
         const Node *filterClause = ast->get(selectArrayArgFilterClause);
         if (filterClause)
         {
-            result = passFilterClause(filterClause, result);
+            result = passFilterClause(filterClause, result, depthOperator+1);
         }
 
         const Node *orderByClause = ast->get(selectArrayArgOrderByClause);
         if (orderByClause)
         {
-            result = passOrderByClause(orderByClause, result);
+            result = passOrderByClause(orderByClause, result, depthOperator+1);
         }
 
-        result = passSelectList(result, selectList, grwClause);
+        result = passSelectList(result, selectList, grwClause, depthOperator+1);
     }
     else
     {
@@ -1313,9 +1516,14 @@ LQPNPtr Translator::passSelectStatement(const Node *ast)
 
         switch (funcParams->get(listArg0)->getType())
         {
-            case reference:         aggInput = passImplicitScan(funcParams->get(listArg0));   break;
-            case selectArray:   aggInput = passSelectStatement(funcParams->get(listArg0));break;
-            default:                fail(SYNTAX(SCIDB_LE_WRONG_AGGREGATE_ARGUMENT2,funcParams->get(listArg0)));
+            case reference:
+                aggInput = passImplicitScan(funcParams->get(listArg0), depthOperator+1);
+                break;
+            case selectArray:
+                aggInput = passSelectStatement(funcParams->get(listArg0), depthOperator+1);
+                break;
+            default:
+                fail(SYNTAX(SCIDB_LE_WRONG_AGGREGATE_ARGUMENT2,funcParams->get(listArg0)));
         }
 
         // First of all try to convert it as select agg(*) from A group by x as G
@@ -1338,7 +1546,7 @@ LQPNPtr Translator::passSelectStatement(const Node *ast)
         }
 
         const ArrayDesc &aggInputSchema = aggInput->inferTypes(_qry);
-        shared_ptr<OperatorParamAggregateCall> aggCallParam;
+        std::shared_ptr<OperatorParamAggregateCall> aggCallParam;
 
         if (asteriskSupported)
         {
@@ -1373,14 +1581,16 @@ LQPNPtr Translator::passSelectStatement(const Node *ast)
 
     if (const Node* intoClause = ast->get(selectArrayArgIntoClause))
     {
-        result = passIntoClause(intoClause,result);
+        result = passIntoClause(intoClause,result, depthOperator+1);
     }
 
     return result;
 }
 
-LQPNPtr Translator::passJoins(const Node *ast)
+LQPNPtr Translator::passJoins(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     // Left part holding result of join constantly but initially it empty
     LQPNPtr left;
 
@@ -1388,7 +1598,7 @@ LQPNPtr Translator::passJoins(const Node *ast)
     // empty nodes. Right part will be joined to left on every iteration.
     BOOST_FOREACH(Node *joinItem, ast->getList())
     {
-        LQPNPtr right = passJoinItem(joinItem);
+        LQPNPtr right = passJoinItem(joinItem, depthOperator+1);
 
         // If we on first iteration - right part turning into left, otherwise left and right parts
         // joining and left part turning into join result.
@@ -1420,21 +1630,24 @@ LQPNPtr Translator::passJoins(const Node *ast)
     return left;
 }
 
-LQPNPtr Translator::passGeneralizedJoin(const Node* ast)
+LQPNPtr Translator::passGeneralizedJoin(const Node* ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LOG4CXX_TRACE(logger, "Translating JOIN-ON clause...");
 
-    LQPNPtr left = passJoinItem(ast->get(joinClauseArgLeft));
-    LQPNPtr right = passJoinItem(ast->get(joinClauseArgRight));
+    LQPNPtr left = passJoinItem(ast->get(joinClauseArgLeft), depthOperator+1);
+    LQPNPtr right = passJoinItem(ast->get(joinClauseArgRight), depthOperator+1);
 
     vector<ArrayDesc> inputSchemas;
     inputSchemas.push_back(left->inferTypes(_qry));
     inputSchemas.push_back(right->inferTypes(_qry));
 
-    vector<shared_ptr<OperatorParamReference> > opParams;
+    vector<std::shared_ptr<OperatorParamReference> > opParams;
     // Checking JOIN-ON clause for pure DD join
     Node* joinOnAst = ast->get(joinClauseArgExpr);
-    bool pureDDJoin = passGeneralizedJoinOnClause(opParams, joinOnAst);
+    const size_t depthExpression = 0;
+    bool pureDDJoin = passGeneralizedJoinOnClause(opParams, joinOnAst, depthExpression);
 
     // Well it looks like DD-join but there is a probability that we have attributes or
     // duplicates in expression. Let's check it.
@@ -1448,10 +1661,10 @@ LQPNPtr Translator::passGeneralizedJoin(const Node* ast)
         bool isRightDimension = resolveParamDimensionReference(inputSchemas, opParams[i + 1], false);
         bool isRightAttribute = resolveParamAttributeReference(inputSchemas, opParams[i + 1], false);
 
-        const string leftFullName = str(format("%s%s") % (opParams[i]->getArrayName() != "" ?
+        const string leftFullName = str(boost::format("%s%s") % (opParams[i]->getArrayName() != "" ?
                 opParams[i]->getArrayName() + "." : "") % opParams[i]->getObjectName() );
 
-        const string rightFullName = str(format("%s%s") % (opParams[i + 1]->getArrayName() != "" ?
+        const string rightFullName = str(boost::format("%s%s") % (opParams[i + 1]->getArrayName() != "" ?
                 opParams[i + 1]->getArrayName() + "." : "") % opParams[i + 1]->getObjectName() );
 
         // Generic checks on existing and ambiguity first of all
@@ -1486,7 +1699,7 @@ LQPNPtr Translator::passGeneralizedJoin(const Node* ast)
         {
             LOG4CXX_TRACE(logger, "Swapping couple of dimensions");
 
-            shared_ptr<OperatorParamReference> newRight = opParams[i];
+            std::shared_ptr<OperatorParamReference> newRight = opParams[i];
             opParams[i] = opParams[i+1];
             opParams[i+1] = newRight;
 
@@ -1507,7 +1720,7 @@ LQPNPtr Translator::passGeneralizedJoin(const Node* ast)
 
         crossJoinNode->addChild(left);
         crossJoinNode->addChild(right);
-        crossJoinNode->getLogicalOperator()->setParameters(vector<shared_ptr<OperatorParam> >(opParams.begin(), opParams.end()));
+        crossJoinNode->getLogicalOperator()->setParameters(vector<std::shared_ptr<OperatorParam> >(opParams.begin(), opParams.end()));
 
         return crossJoinNode;
     }
@@ -1523,7 +1736,7 @@ LQPNPtr Translator::passGeneralizedJoin(const Node* ast)
         crossNode->addChild(right);
 
         LOG4CXX_TRACE(logger, "Inserting FILTER");
-        vector<shared_ptr<OperatorParam> > filterParams(1);
+        vector<std::shared_ptr<OperatorParam> > filterParams(1);
         filterParams[0] = make_shared<OperatorParamLogicalExpression>(
                             newParsingContext(joinOnAst),
                             AstToLogicalExpression(joinOnAst),
@@ -1533,8 +1746,13 @@ LQPNPtr Translator::passGeneralizedJoin(const Node* ast)
     }
 }
 
-bool Translator::passGeneralizedJoinOnClause(vector<shared_ptr<OperatorParamReference> > &params,const Node *ast)
+bool Translator::passGeneralizedJoinOnClause(
+        vector<std::shared_ptr<OperatorParamReference> > &params,
+        const Node *ast,
+        size_t depthExpression)
 {
+    checkDepthExpression(depthExpression);
+
     if (ast->is(application))
     {
         const string funcName  = getStringApplicationArgName(ast);
@@ -1542,8 +1760,8 @@ bool Translator::passGeneralizedJoinOnClause(vector<shared_ptr<OperatorParamRefe
 
         if (funcName == "and")
         {
-            return passGeneralizedJoinOnClause(params,funcParams->get(listArg0))
-                && passGeneralizedJoinOnClause(params,funcParams->get(listArg1));
+            return passGeneralizedJoinOnClause(params,funcParams->get(listArg0), depthExpression+1)
+                && passGeneralizedJoinOnClause(params,funcParams->get(listArg1), depthExpression+1);
         }
         else if (funcName == "=")
         {
@@ -1589,10 +1807,12 @@ bool Translator::passGeneralizedJoinOnClause(vector<shared_ptr<OperatorParamRefe
     }
 }
 
-LQPNPtr Translator::passCrossJoin(const Node *ast)
+LQPNPtr Translator::passCrossJoin(const Node *ast, size_t depthOperator)
 {
-    LQPNPtr left  = passJoinItem(ast->get(joinClauseArgLeft));
-    LQPNPtr right = passJoinItem(ast->get(joinClauseArgRight));
+    checkDepthOperator(depthOperator);
+
+    LQPNPtr left  = passJoinItem(ast->get(joinClauseArgLeft), depthOperator+1);
+    LQPNPtr right = passJoinItem(ast->get(joinClauseArgRight), depthOperator+1);
     LQPNPtr node  = make_shared<LogicalQueryPlanNode>(newParsingContext(ast),OperatorLibrary::getInstance()->createLogicalOperator("Cross_Join"));
     node->addChild(left);
     node->addChild(right);
@@ -1600,8 +1820,10 @@ LQPNPtr Translator::passCrossJoin(const Node *ast)
     return node;
 }
 
-LQPNPtr Translator::passJoinItem(const Node *ast)
+LQPNPtr Translator::passJoinItem(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     switch (ast->getType())
     {
         case namedExpr:
@@ -1615,7 +1837,7 @@ LQPNPtr Translator::passJoinItem(const Node *ast)
                 fail(SYNTAX(SCIDB_LE_INPUT_EXPECTED,expr));
             }
 
-            LQPNPtr result(AstToLogicalPlan(expr));
+            LQPNPtr result(AstToLogicalPlan(expr, depthOperator+1));
             prohibitDdl(result);
             prohibitNesting(result);
 
@@ -1631,33 +1853,37 @@ LQPNPtr Translator::passJoinItem(const Node *ast)
         case joinClause:
             if (ast->has(joinClauseArgExpr))
             {
-                return passGeneralizedJoin(ast);
+                return passGeneralizedJoin(ast, depthOperator+1);
             }
             else
             {
-                return passCrossJoin(ast);
+                return passCrossJoin(ast, depthOperator+1);
             }
 
-        case thinClause:    return passThinClause(ast);
+        case thinClause:    return passThinClause(ast, depthOperator+1);
         default:            SCIDB_UNREACHABLE();
                             return LQPNPtr();
     }
 }
 
-LQPNPtr Translator::passImplicitScan(const Node *ast)
+LQPNPtr Translator::passImplicitScan(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     assert(ast->is(reference));
     LogicalOperator::Parameters scanParams;
-    shared_ptr<OperatorParamArrayReference> ref = createArrayReferenceParam(ast, true);
+    std::shared_ptr<OperatorParamArrayReference> ref = createArrayReferenceParam(ast, true);
     scanParams.push_back(ref);
-    shared_ptr<LogicalOperator> scanOp = OperatorLibrary::getInstance()->createLogicalOperator(
+    std::shared_ptr<LogicalOperator> scanOp = OperatorLibrary::getInstance()->createLogicalOperator(
         (ref->getVersion() == ALL_VERSIONS) ? "allversions" : "scan" , getString(ast,referenceArgAlias));
     scanOp->setParameters(scanParams);
     return make_shared<LogicalQueryPlanNode>(newParsingContext(ast), scanOp);
 }
 
-LQPNPtr Translator::passFilterClause(const Node* ast, const LQPNPtr &input)
+LQPNPtr Translator::passFilterClause(const Node* ast, const LQPNPtr &input, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LogicalOperator::Parameters filterParams;
     const ArrayDesc &inputSchema = input->inferTypes(_qry);
 
@@ -1668,7 +1894,7 @@ LQPNPtr Translator::passFilterClause(const Node* ast, const LQPNPtr &input)
     filterParams.push_back(make_shared<OperatorParamLogicalExpression>(newParsingContext(ast),
         lExpr, TypeLibrary::getType(TID_BOOL)));
 
-    shared_ptr<LogicalOperator> filterOp = OperatorLibrary::getInstance()->createLogicalOperator("filter");
+    std::shared_ptr<LogicalOperator> filterOp = OperatorLibrary::getInstance()->createLogicalOperator("filter");
     filterOp->setParameters(filterParams);
 
     LQPNPtr result = make_shared<LogicalQueryPlanNode>(newParsingContext(ast), filterOp);
@@ -1676,14 +1902,16 @@ LQPNPtr Translator::passFilterClause(const Node* ast, const LQPNPtr &input)
     return result;
 }
 
-LQPNPtr Translator::passOrderByClause(const Node* ast, const LQPNPtr &input)
+LQPNPtr Translator::passOrderByClause(const Node* ast, const LQPNPtr &input, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LogicalOperator::Parameters sortParams;sortParams.reserve(ast->getSize());
     const ArrayDesc &inputSchema = input->inferTypes(_qry);
 
     BOOST_FOREACH(const Node* sortAttributeAst,ast->getList())
     {
-        shared_ptr<OperatorParamAttributeReference> sortParam = make_shared<OperatorParamAttributeReference>(
+        std::shared_ptr<OperatorParamAttributeReference> sortParam = make_shared<OperatorParamAttributeReference>(
             newParsingContext(sortAttributeAst),
             getStringReferenceArgArrayName(sortAttributeAst),
             getStringReferenceArgName(sortAttributeAst),
@@ -1691,7 +1919,7 @@ LQPNPtr Translator::passOrderByClause(const Node* ast, const LQPNPtr &input)
 
         sortParam->setSortAscent(getInteger(sortAttributeAst,referenceArgOrder,ascending) == ascending);
 
-        resolveParamAttributeReference(vector<ArrayDesc>(1, inputSchema), (shared_ptr<OperatorParamReference>&) sortParam, true);
+        resolveParamAttributeReference(vector<ArrayDesc>(1, inputSchema), (std::shared_ptr<OperatorParamReference>&) sortParam, true);
 
         sortParams.push_back(sortParam);
     }
@@ -1701,8 +1929,10 @@ LQPNPtr Translator::passOrderByClause(const Node* ast, const LQPNPtr &input)
     return result;
 }
 
-LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input)
+LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LOG4CXX_TRACE(logger, "Translating INTO clause...");
 
     const ArrayDesc   inputSchema    = input->inferTypes(_qry);
@@ -1712,11 +1942,17 @@ LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input)
     LQPNPtr result;
 
     LogicalOperator::Parameters targetParams(1,make_shared<OperatorParamArrayReference>(parsingContext,"",targetName,true));
-    shared_ptr<LogicalOperator> storeOp;
+    std::shared_ptr<LogicalOperator> storeOp;
 
-    if (!SystemCatalog::getInstance()->containsArray(targetName))
+    assert(_qry);
+    assert(ArrayDesc::isNameUnversioned(targetName));
+
+    ArrayDesc destinationSchema;
+    if (!getArrayDesc(  targetName,
+                        _qry->getCatalogVersion(targetName),
+                        destinationSchema, false))
     {
-        LOG4CXX_TRACE(logger, str(format("Target array '%s' not existing so inserting STORE") % targetName));
+        LOG4CXX_TRACE(logger, str(boost::format("Target array '%s' not existing so inserting STORE") % targetName));
         storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
         storeOp->setParameters(targetParams);
         result = make_shared<LogicalQueryPlanNode>(parsingContext, storeOp);
@@ -1724,11 +1960,7 @@ LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input)
     }
     else
     {
-        LOG4CXX_TRACE(logger, str(format("Target array '%s' existing.") % targetName));
-
-        ArrayDesc destinationSchema;
-        SystemCatalog::getInstance()->getArrayDesc(targetName, destinationSchema);
-
+        LOG4CXX_TRACE(logger, str(boost::format("Target array '%s' existing.") % targetName));
         /*
          * Let's check if input can fit somehow into destination array. If names differ we can insert
          * CAST. If array partitioning differ we can insert REPART. Also we can force input to be empty
@@ -1771,7 +2003,7 @@ LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input)
             LOG4CXX_TRACE(logger, "Trying to wrap with STORE(REDIMENSION(...))");
 
             {
-            shared_ptr<LogicalOperator> redimOp = OperatorLibrary::getInstance()->createLogicalOperator("redimension");
+            std::shared_ptr<LogicalOperator> redimOp = OperatorLibrary::getInstance()->createLogicalOperator("redimension");
             redimOp->setParameters(LogicalOperator::Parameters(1,make_shared<OperatorParamSchema>(parsingContext, destinationSchema)));
             result = make_shared<LogicalQueryPlanNode>(parsingContext, redimOp);
             result->addChild(input);
@@ -1779,7 +2011,7 @@ LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input)
             }
 
             {
-            shared_ptr<LogicalOperator> storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
+            std::shared_ptr<LogicalOperator> storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
             storeOp->setParameters(targetParams);
             LQPNPtr storeNode = make_shared<LogicalQueryPlanNode>(parsingContext, storeOp);
             storeNode->addChild(result);
@@ -1803,15 +2035,20 @@ LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input)
     return result;
 }
 
-LQPNPtr Translator::passUpdateStatement(const Node *ast)
+LQPNPtr Translator::passUpdateStatement(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     Node *arrayRef = ast->get(updateArrayArgArrayRef);
-    LQPNPtr result = passImplicitScan(arrayRef);
+    LQPNPtr result = passImplicitScan(arrayRef, depthOperator+1);
 
     const string arrayName = getStringReferenceArgName(arrayRef);
 
     ArrayDesc arrayDesc;
-    SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
+    assert(_qry);
+    getArrayDesc(   arrayName,
+                    _qry->getCatalogVersion(arrayName),
+                    arrayDesc);
     const Node *updateList = ast->get(updateArrayArgUpdateList);
 
     map<string,string> substMap;
@@ -1890,7 +2127,7 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
     LogicalOperator::Parameters projectParams;
     BOOST_FOREACH(const AttributeDesc &att, arrayDesc.getAttributes())
     {
-        shared_ptr<OperatorParamReference> newAtt;
+        std::shared_ptr<OperatorParamReference> newAtt;
         if (substMap[att.getName()] != "")
         {
             newAtt = make_shared<OperatorParamAttributeReference>(newParsingContext(updateList),
@@ -1905,7 +2142,7 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
         projectParams.push_back(newAtt);
     }
 
-    shared_ptr<LogicalOperator> projectOp = OperatorLibrary::getInstance()->createLogicalOperator("project");
+    std::shared_ptr<LogicalOperator> projectOp = OperatorLibrary::getInstance()->createLogicalOperator("project");
     projectOp->setParameters(projectParams);
 
     LQPNPtr projectNode = make_shared<LogicalQueryPlanNode>(newParsingContext(updateList), projectOp);
@@ -1918,7 +2155,7 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
     storeParams.push_back(make_shared<OperatorParamArrayReference>(
             newParsingContext(getReferenceArgName(arrayRef)), "", arrayName, true));
 
-    shared_ptr<LogicalOperator> storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
+    std::shared_ptr<LogicalOperator> storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
     storeOp->setParameters(storeParams);
 
     LQPNPtr storeNode = make_shared<LogicalQueryPlanNode>(newParsingContext(ast), storeOp);
@@ -1928,8 +2165,10 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast)
     return result;
 }
 
-LQPNPtr Translator::passInsertIntoStatement(const Node *ast)
+LQPNPtr Translator::passInsertIntoStatement(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     assert(ast->is(insertArray));
     LOG4CXX_TRACE(logger, "Translating INSERT INTO");
 
@@ -1939,19 +2178,20 @@ LQPNPtr Translator::passInsertIntoStatement(const Node *ast)
     string dstName = dstAst->getString();
     LogicalOperator::Parameters dstOpParams;
     dstOpParams.push_back(make_shared<OperatorParamArrayReference>(newParsingContext(dstAst), "", dstName, true));
-    if (!SystemCatalog::getInstance()->containsArray(dstName))
-    {
-        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST, dstAst) << dstName);
-    }
 
     ArrayDesc dstSchema;
-    SystemCatalog::getInstance()->getArrayDesc(dstName, dstSchema);
+    assert(_qry);
+    if (!getArrayDesc(  dstName,
+                        _qry->getCatalogVersion(dstName),
+                        dstSchema, false)) {
+        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST, dstAst) << dstName);
+    }
 
     LQPNPtr srcNode;
     if (srcAst->is(selectArray))
     {
         LOG4CXX_TRACE(logger, "Source of INSERT INTO is SELECT");
-        srcNode = passSelectStatement(srcAst);
+        srcNode = passSelectStatement(srcAst, depthOperator+1);
     }
     else if (srcAst->is(cstring))
     {
@@ -1997,7 +2237,7 @@ void Translator::checkLogicalExpression(const vector<ArrayDesc> &inputSchemas, c
 {
     if (typeid(*expr) == typeid(AttributeReference))
     {
-        const shared_ptr<AttributeReference> &ref = static_pointer_cast<AttributeReference>(expr);
+        const std::shared_ptr<AttributeReference> &ref = static_pointer_cast<AttributeReference>(expr);
 
         //We don't know exactly what type this reference, so check both attribute and dimension,
         //and if we eventually found both, so throw ambiguous exception
@@ -2011,7 +2251,7 @@ void Translator::checkLogicalExpression(const vector<ArrayDesc> &inputSchemas, c
         // or not.
         if (foundAttrIn && foundDimIn)
         {
-            const string fullName = str(format("%s%s") % (ref->getArrayName() != "" ? ref->getArrayName() + "." : "") % ref->getAttributeName() );
+            const string fullName = str(boost::format("%s%s") % (ref->getArrayName() != "" ? ref->getArrayName() + "." : "") % ref->getAttributeName() );
             fail(SYNTAX(SCIDB_LE_AMBIGUOUS_ATTRIBUTE_OR_DIMENSION,ref) << fullName);
         }
         // If we can't find references in input schema, checking output schema.
@@ -2020,16 +2260,25 @@ void Translator::checkLogicalExpression(const vector<ArrayDesc> &inputSchemas, c
             // Same as for input: checking ambiguity in output schema.
             if (foundAttrOut && foundDimOut)
             {
-                const string fullName = str(format("%s%s") % (ref->getArrayName() != "" ? ref->getArrayName() + "." : "") % ref->getAttributeName() );
+                const string fullName = str(boost::format("%s%s") % (ref->getArrayName() != "" ? ref->getArrayName() + "." : "") % ref->getAttributeName() );
                 fail(SYNTAX(SCIDB_LE_AMBIGUOUS_ATTRIBUTE_OR_DIMENSION,ref) << fullName);
             }
             // If we can't find reference even in output schema, finally throw error
             else if (!(foundAttrOut || foundDimOut))
             {
                 ArrayDesc schema;
-                if (ref->getArrayName() != "" || !SystemCatalog::getInstance()->getArrayDesc(ref->getAttributeName(), schema, false) || schema.getAttributes(true).size() != 1 || schema.getDimensions().size() != 1 || schema.getDimensions()[0].getLength() != 1)
+                assert(_qry);
+                if (ref->getArrayName() != "" ||
+                    !getArrayDesc(  ref->getAttributeName(),
+                                    _qry->getCatalogVersion(ref->getAttributeName()),
+                                    schema, false) ||
+                    schema.getAttributes(true).size() != 1 ||
+                    schema.getDimensions().size() != 1 ||
+                    schema.getDimensions()[0].getLength() != 1)
                 {
-                    const string fullName = str(format("%s%s") % (ref->getArrayName() != "" ? ref->getArrayName() + "." : "") % ref->getAttributeName() );
+                    const string fullName = str(boost::format("%s%s") % (ref->getArrayName() != "" ?
+                                                                  ref->getArrayName() + "." :
+                                                                  "") % ref->getAttributeName() );
                     fail(SYNTAX(SCIDB_LE_UNKNOWN_ATTRIBUTE_OR_DIMENSION,ref) << fullName);
                 }
             }
@@ -2038,7 +2287,7 @@ void Translator::checkLogicalExpression(const vector<ArrayDesc> &inputSchemas, c
     }
     else if (typeid(*expr) == typeid(Function))
     {
-        const shared_ptr<Function> &func = static_pointer_cast<Function>(expr);
+        const std::shared_ptr<Function> &func = static_pointer_cast<Function>(expr);
         BOOST_FOREACH(const LEPtr &funcArg, func->getArgs())
         {
             checkLogicalExpression(inputSchemas, outputSchema, funcArg);
@@ -2060,7 +2309,7 @@ bool Translator::checkAttribute(const vector<ArrayDesc> &inputSchemas,const stri
             {
                 if (found)
                 {
-                    const string fullName = str(format("%s%s") % (aliasName != "" ? aliasName + "." : "") % attributeName);
+                    const string fullName = str(boost::format("%s%s") % (aliasName != "" ? aliasName + "." : "") % attributeName);
                     fail(SYNTAX(SCIDB_LE_AMBIGUOUS_ATTRIBUTE, ctxt) << fullName);
                 }
                 found = true;
@@ -2085,7 +2334,7 @@ bool Translator::checkDimension(const vector<ArrayDesc> &inputSchemas, const str
             {
                 if (found)
                 {
-                    const string fullName = str(format("%s%s") % (aliasName != "" ? aliasName + "." : "") % dimensionName);
+                    const string fullName = str(boost::format("%s%s") % (aliasName != "" ? aliasName + "." : "") % dimensionName);
                     fail(SYNTAX(SCIDB_LE_AMBIGUOUS_DIMENSION, ctxt) << fullName);
                 }
                 found = true;
@@ -2183,7 +2432,7 @@ Node* Translator::decomposeExpression(
 
             if (isAggregate && isScalar)
             {
-                shared_ptr<Expression> pExpr = make_shared<Expression>();
+                std::shared_ptr<Expression> pExpr = make_shared<Expression>();
                 try
                 {
                     ArrayDesc outputSchema;
@@ -2378,8 +2627,11 @@ Node* Translator::decomposeExpression(
 LQPNPtr Translator::passSelectList(
     LQPNPtr &input,
     const Node *const selectList,
-    const Node *const grwAsClause)
+    const Node *const grwAsClause,
+    size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LOG4CXX_TRACE(logger, "Translating SELECT list");
     const ArrayDesc& inputSchema = input->inferTypes(_qry);
     const vector<ArrayDesc> inputSchemas(1, inputSchema);
@@ -2500,7 +2752,7 @@ LQPNPtr Translator::passSelectList(
                         joinOrigin = true;
                     }
 
-                    shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
+                    std::shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
                         newParsingContext(selItem),
                         getStringReferenceArgArrayName(refNode),
                         getStringReferenceArgName(refNode),
@@ -2612,7 +2864,7 @@ LQPNPtr Translator::passSelectList(
                 // Otherwise prepare parameters for project
                 BOOST_FOREACH(const AttributeDesc &att, inputSchema.getAttributes(true))
                 {
-                    shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
+                    std::shared_ptr<OperatorParamReference> param = make_shared<OperatorParamAttributeReference>(
                         newParsingContext(selItem),
                         "",
                         att.getName(),
@@ -2642,14 +2894,14 @@ LQPNPtr Translator::passSelectList(
             assert(namedExprNode->is(namedExpr));
 
             // This is internal output reference which will be used for aggregation
-            shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamAttributeReference>(
+            std::shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamAttributeReference>(
                 newParsingContext(namedExprNode->get(namedExprArgName)),
                 "", namedExprNode->get(namedExprArgName)->getString(), false);
 
             // This is expression which will be used as APPLY expression
             LEPtr lExpr = AstToLogicalExpression(namedExprNode->get(namedExprArgExpr));
             checkLogicalExpression(inputSchemas, ArrayDesc(), lExpr);
-            shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
+            std::shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
                 newParsingContext(namedExprNode->get(namedExprArgExpr)),
                 lExpr, TypeLibrary::getType(TID_VOID));
 
@@ -2703,7 +2955,7 @@ LQPNPtr Translator::passSelectList(
                             if (variableWindow)
                             {
                                 LOG4CXX_TRACE(logger, "This is variable_window so append dimension name");
-                                shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamDimensionReference>(
+                                std::shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamDimensionReference>(
                                                         newParsingContext(dimNameClause),
                                                         dimAlias,
                                                         dimName,
@@ -2900,7 +3152,7 @@ LQPNPtr Translator::passSelectList(
                     passDimensions(grwAsClause->get(listArg0), redimensionDims, "", usedNames);
 
                     //Ok. Adding schema parameter
-                    ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims, 0);
+                    ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims, defaultPartitioning(), 0);
                     LOG4CXX_TRACE(logger, "Schema for redimension " <<  redimensionSchema);
                     aggregateParams[""] = make_pair("redimension",
                         LogicalOperator::Parameters(1,
@@ -2957,7 +3209,7 @@ LQPNPtr Translator::passSelectList(
                     fail(SYNTAX(SCIDB_LE_REFERENCE_EXPECTED,groupByItem));
                 }
 
-                shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamDimensionReference>(
+                std::shared_ptr<OperatorParamReference> refParam = make_shared<OperatorParamDimensionReference>(
                                         newParsingContext(getReferenceArgName(groupByItem)),
                                         getStringReferenceArgArrayName(groupByItem),
                                         getStringReferenceArgName(groupByItem),
@@ -3022,7 +3274,7 @@ LQPNPtr Translator::passSelectList(
             // This is expression which will be used as APPLY expression
             LEPtr lExpr = AstToLogicalExpression(namedExprNode->get(namedExprArgExpr));
             checkLogicalExpression(aggInputSchemas, ArrayDesc(), lExpr);
-            shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
+            std::shared_ptr<OperatorParam> exprParam = make_shared<OperatorParamLogicalExpression>(
                 newParsingContext(namedExprNode->get(namedExprArgExpr)),
                 lExpr, TypeLibrary::getType(TID_VOID));
 
@@ -3036,9 +3288,9 @@ LQPNPtr Translator::passSelectList(
 
     if (projectParams.size() > 0)
     {
-        BOOST_FOREACH(shared_ptr<OperatorParam> &param, projectParams)
+        BOOST_FOREACH(std::shared_ptr<OperatorParam> &param, projectParams)
         {
-            resolveParamAttributeReference(postEvalInputSchemas, (shared_ptr<OperatorParamReference>&) param);
+            resolveParamAttributeReference(postEvalInputSchemas, (std::shared_ptr<OperatorParamReference>&) param);
         }
 
         result = appendOperator(result, "project", projectParams, newParsingContext(selectList));
@@ -3057,7 +3309,7 @@ string Translator::genUniqueObjectName(const string& prefix, unsigned int &initi
 
         if (initialCounter == 0)
         {
-            name = str(format("%s%s%s")
+            name = str(boost::format("%s%s%s")
                 % (internal ? "$" : "")
                 % prefix
                 % (internal ? "$" : "")
@@ -3066,7 +3318,7 @@ string Translator::genUniqueObjectName(const string& prefix, unsigned int &initi
         }
         else
         {
-            name = str(format("%s%s_%d%s")
+            name = str(boost::format("%s%s_%d%s")
                 % (internal ? "$" : "")
                 % prefix
                 % initialCounter
@@ -3102,14 +3354,16 @@ string Translator::genUniqueObjectName(const string& prefix, unsigned int &initi
     return name;
 }
 
-LQPNPtr Translator::passThinClause(const Node *ast)
+LQPNPtr Translator::passThinClause(const Node *ast, size_t depthOperator)
 {
+    checkDepthOperator(depthOperator);
+
     LOG4CXX_TRACE(logger, "Translating THIN clause");
     typedef pair<Node*,Node*>   PairOfNodes;
 
     const Node* arrayRef = ast->get(thinClauseArgArrayReference);
 
-    LQPNPtr result = AstToLogicalPlan(arrayRef);
+    LQPNPtr result = AstToLogicalPlan(arrayRef, depthOperator+1);
 
     prohibitDdl    (result);
     prohibitNesting(result);
@@ -3216,12 +3470,12 @@ LQPNPtr Translator::fitInput(LQPNPtr &input,const ArrayDesc& destinationSchema)
     if (!inputSchema.getEmptyBitmapAttribute()
         && destinationSchema.getEmptyBitmapAttribute())
     {
-        vector<shared_ptr<OperatorParam> > betweenParams;
+        vector<std::shared_ptr<OperatorParam> > betweenParams;
         for (size_t i=0, n=destinationSchema.getDimensions().size(); i<n; ++i)
         {
             Value bval(TypeLibrary::getType(TID_INT64));
             bval.setNull();
-            shared_ptr<OperatorParamLogicalExpression> param = make_shared<OperatorParamLogicalExpression>(
+            std::shared_ptr<OperatorParamLogicalExpression> param = make_shared<OperatorParamLogicalExpression>(
                 input->getParsingContext(),
                 make_shared<Constant>(input->getParsingContext(), bval, TID_INT64),
                 TypeLibrary::getType(TID_INT64), true);
@@ -3298,7 +3552,7 @@ LQPNPtr Translator::fitInput(LQPNPtr &input,const ArrayDesc& destinationSchema)
     {
         if (needRepart)
         {
-            shared_ptr<LogicalOperator> repartOp;
+            std::shared_ptr<LogicalOperator> repartOp;
             LOG4CXX_TRACE(logger, "Inserting REPART operator");
             repartOp = OperatorLibrary::getInstance()->createLogicalOperator("repart");
 
@@ -3314,7 +3568,7 @@ LQPNPtr Translator::fitInput(LQPNPtr &input,const ArrayDesc& destinationSchema)
 
         if (needCast)
         {
-            shared_ptr<LogicalOperator> castOp;
+            std::shared_ptr<LogicalOperator> castOp;
             LOG4CXX_TRACE(logger, "Inserting CAST operator");
             castOp = OperatorLibrary::getInstance()->createLogicalOperator("cast");
 
@@ -3364,7 +3618,7 @@ LQPNPtr Translator::canonicalizeTypes(const LQPNPtr &input)
     }
 
     ContextPtr pc = input->getParsingContext();
-    vector<shared_ptr<OperatorParam> > castParams(1);
+    vector<std::shared_ptr<OperatorParam> > castParams(1);
 
     Attributes attrs;
     BOOST_FOREACH(const AttributeDesc& att, inputSchema.getAttributes())
@@ -3396,6 +3650,7 @@ LQPNPtr Translator::canonicalizeTypes(const LQPNPtr &input)
             inputSchema.getName(),
             attrs,
             inputSchema.getDimensions(),
+            defaultPartitioning(),
             inputSchema.getFlags());
 
     castParams[0] = make_shared<OperatorParamSchema>(pc, castSchema);
@@ -3406,8 +3661,10 @@ LQPNPtr Translator::canonicalizeTypes(const LQPNPtr &input)
 /****************************************************************************/
 /* Expressions */
 
-LEPtr Translator::AstToLogicalExpression(const Node* ast)
+LEPtr Translator::AstToLogicalExpression(const Node* ast, size_t depthExpression)
 {
+    checkDepthExpression(depthExpression);
+
     switch (ast->getType())
     {
         case cnull:             return onNull(ast);
@@ -3415,7 +3672,7 @@ LEPtr Translator::AstToLogicalExpression(const Node* ast)
         case cstring:           return onString(ast);
         case cboolean:          return onBoolean(ast);
         case cinteger:          return onInteger(ast);
-        case application:       return onScalarFunction(ast);
+        case application:       return onScalarFunction(ast, depthExpression);
         case reference:         return onAttributeReference(ast);
         case olapAggregate:     fail(SYNTAX(SCIDB_LE_WRONG_OVER_USAGE,ast));
         case asterisk:          fail(SYNTAX(SCIDB_LE_WRONG_ASTERISK_USAGE,ast));
@@ -3476,8 +3733,10 @@ LEPtr Translator::onInteger(const Node* ast)
     return make_shared<Constant>(newParsingContext(ast),c,TID_INT64);
 }
 
-LEPtr Translator::onScalarFunction(const Node* ast)
+LEPtr Translator::onScalarFunction(const Node* ast, size_t depthExpression)
 {
+    checkDepthExpression(depthExpression);
+
     assert(ast->is(application));
 
     chars         name(getStringApplicationArgName(ast));
@@ -3490,7 +3749,7 @@ LEPtr Translator::onScalarFunction(const Node* ast)
 
     BOOST_FOREACH (const Node* a,ast->getList(applicationArgOperands))
     {
-        args.push_back(AstToLogicalExpression(a));
+        args.push_back(AstToLogicalExpression(a, depthExpression+1));
     }
 
     return make_shared<Function>(newParsingContext(ast),name,args);
@@ -3516,16 +3775,30 @@ LEPtr Translator::onAttributeReference(const Node* ast)
             getStringReferenceArgName(ast));
 }
 
-/****************************************************************************/
-
-LEPtr translate(Factory& f,Log& l,const StringPtr& s,Node* n)
+void Translator::checkDepthExpression(size_t depthExpression)
 {
-    return Translator(f,l,s).AstToLogicalExpression(n);
+    if (depthExpression >= MAX_DEPTH_EXPRESSION) {
+        throw USER_EXCEPTION(SCIDB_SE_PARSER, SCIDB_LE_EXPRESSION_HAS_TOO_MANY_OPERANDS);
+    }
 }
 
-LQPNPtr translate(Factory& f,Log& l,const StringPtr& s,Node* n,const QueryPtr& q)
+void Translator::checkDepthOperator(size_t depthOperator)
 {
-    return Translator(f,l,s,q).AstToLogicalPlan(n,true);
+    if (depthOperator >= MAX_DEPTH_OPERATOR) {
+        throw USER_EXCEPTION(SCIDB_SE_PARSER, SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS);
+    }
+}
+
+/****************************************************************************/
+LEPtr translateExp(Factory& f,Log& l,const StringPtr& s,Node* n,const QueryPtr& q)
+{
+    return Translator(f,l,s,q).AstToLogicalExpression(n);
+}
+
+LQPNPtr translatePlan(Factory& f,Log& l,const StringPtr& s,Node* n,const QueryPtr& q)
+{
+    const size_t depthOperator = 0;
+    return Translator(f,l,s,q).AstToLogicalPlan(n, depthOperator, true);
 }
 
 /****************************************************************************/

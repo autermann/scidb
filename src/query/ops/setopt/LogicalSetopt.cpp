@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -78,30 +78,30 @@ public:
     	ADD_PARAM_VARIES()
 	}
 
-	std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+	std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
 	{
-		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+		std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
 		res.push_back(END_OF_VARIES_PARAMS());
 		if (_parameters.size() == 1)
 			res.push_back(PARAM_CONSTANT("string"));
 		return res;
 	}
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
 	{
         assert(schemas.size() == 0);
         assert(_parameters.size() >= 1 && _parameters.size() <= 2);
 
         vector<AttributeDesc> attributes;
         attributes.push_back( AttributeDesc((AttributeID)0, "old",  TID_STRING, 0, 0));
-        if (_parameters.size() == 2) { 
+        if (_parameters.size() == 2) {
             attributes.push_back(AttributeDesc((AttributeID)1, "new",  TID_STRING, 0, 0));
         }
         vector<DimensionDesc> dimensions(1);
         const size_t nInstances = query->getInstancesCount();
         const size_t end = nInstances>0 ? nInstances-1 : 0;
         dimensions[0] = DimensionDesc("No", 0, 0, end, end, 1, 0);
-        return ArrayDesc("Option", attributes, dimensions);
+        return ArrayDesc("Option", attributes, dimensions, defaultPartitioning());
 	}
 };
 

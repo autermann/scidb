@@ -2,8 +2,8 @@
 
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -37,7 +37,7 @@ def datetime_as_str(the_datetime = None, format = '%Y-%m-%d %H:%M:%S'):
 
 def timedelta_total_seconds(timedelta):
     """Get total_seconds out of a timedelta object.
-    
+
     @param timedelta  an object of type datatime.timedelta.
     @return total_seconds.
     @note timedelta.total_seconds() is supported since Python 2.7.

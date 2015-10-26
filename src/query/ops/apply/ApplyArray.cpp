@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -343,9 +343,9 @@ DelegateChunk* ApplyArray::createChunk(DelegateArrayIterator const* iterator, At
 }
 
 ApplyArray::ApplyArray(ArrayDesc const& desc,
-                       boost::shared_ptr<Array> const& array,
-                       vector<shared_ptr<Expression> > expressions,
-                       const boost::shared_ptr<Query>& query,
+                       std::shared_ptr<Array> const& array,
+                       vector<std::shared_ptr<Expression> > expressions,
+                       const std::shared_ptr<Query>& query,
                        bool tile) :
    DelegateArray(desc, array),
    _expressions(expressions),

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,8 +29,7 @@
 #include <time.h>
 
 // de-facto standards
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 #include <log4cxx/logger.h>
 
@@ -107,12 +106,12 @@ public:
         // and an exception about results that could not be guaranteed accurate were discarded.
         // There is no known work-around by the user.
     }
-    shared_ptr<Array> invokeMPI(std::vector< shared_ptr<Array> >& inputArrays,
-                                shared_ptr<Query>& query,
+    std::shared_ptr<Array> invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays,
+                                std::shared_ptr<Query>& query,
                                 std::string& whichMatrix,
                                 ArrayDesc& outSchema);
 
-    virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
+    virtual std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query);
 
 private:
     bool        producesU(std::string& whichMatrix) const {
@@ -135,8 +134,8 @@ slpp::int_t upToMultiple(slpp::int_t size, slpp::int_t blocksize)
     return (size+blocksize-1)/blocksize * blocksize;
 }
 
-shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inputArrays,
-                                          shared_ptr<Query>& query,
+std::shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays,
+                                          std::shared_ptr<Query>& query,
                                           std::string& whichMatrix,
                                           ArrayDesc& outSchema)
 {
@@ -163,13 +162,14 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     //
     // Initialize the (emulated) BLACS and get the proces grid info
     //
-    bool isParticipatingInScaLAPACK = doBlacsInit(inputArrays, query, "SVDPhysical");
-    slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    blacs::context_t blacsContext = doBlacsInit(inputArrays, query, "SVDPhysical");
+    bool isParticipatingInScaLAPACK = blacsContext.isParticipating();
     if (isParticipatingInScaLAPACK) {
-        checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "SVDPhysical");
+        checkBlacsInfo(query, blacsContext, "SVDPhysical");
     }
 
+    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+    scidb_blacs_gridinfo_(blacsContext, NPROW, NPCOL, MYPROW, MYPCOL);
     LOG4CXX_TRACE(logger, "SVDPhysical::invokeMPI() NPROW="<<NPROW<<", NPCOL="<<NPCOL);
 
     //
@@ -192,10 +192,10 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
         LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): not participating in MPI");
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
            make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "SVDPhysical"), firstChunkSize);
 
-        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "SVDPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "SVDPhysical");
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
             SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
@@ -206,7 +206,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
         tmpRedistedInput.reset();
 
         unlaunchMPISlavesNonParticipating();
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     // REFACTOR: this is a pattern in DLAs
@@ -214,7 +214,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     // get dimension information about the input arrays
     //
     if(DBG) std::cerr << "invokeMPI get dim info" << std::endl ;
-    boost::shared_ptr<Array> arrayA = inputArrays[0];
+    std::shared_ptr<Array> arrayA = inputArrays[0];
 
     std::ostringstream tmp;
     arrayA->getArrayDesc().getDimensions()[0].toString(tmp) ;
@@ -273,7 +273,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
 
     slpp::desc_t DESC_A;
-    scidb_descinit_(DESC_A,  M, N,      MB, NB, 0, 0, ICTXT, LLD_A, descinitINFO);
+    scidb_descinit_(DESC_A,  M, N,      MB, NB, 0, 0, blacsContext, LLD_A, descinitINFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_A) failed, INFO " << descinitINFO
                                                                             << " DESC_A " << DESC_A);
@@ -282,7 +282,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_A=" << DESC_A);
 
     slpp::desc_t DESC_U;
-    scidb_descinit_(DESC_U,  M, MIN_MN, MB, NB, 0, 0, ICTXT, LLD_U, descinitINFO);
+    scidb_descinit_(DESC_U,  M, MIN_MN, MB, NB, 0, 0, blacsContext, LLD_U, descinitINFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_U) failed, INFO " << descinitINFO
                                                                             << " DESC_U " << DESC_U);
@@ -291,7 +291,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_U=" << DESC_U);
 
     slpp::desc_t DESC_VT;
-    scidb_descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, ICTXT, LLD_VT, descinitINFO);
+    scidb_descinit_(DESC_VT, MIN_MN, N, MB, NB, 0, 0, blacsContext, LLD_VT, descinitINFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_VT) failed, INFO " << descinitINFO
                                                                             << " DESC_VT " << DESC_VT);
@@ -300,7 +300,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): DESC_VT=" << DESC_VT);
 
     slpp::desc_t DESC_S; // S is different: global, not distributed, so its LLD(S) == LEN(S) == MIN(M,N)
-    scidb_descinit_(DESC_S,  MIN_MN, 1, MB, NB, 0, 0, ICTXT, MIN_MN, descinitINFO);
+    scidb_descinit_(DESC_S,  MIN_MN, 1, MB, NB, 0, 0, blacsContext, MIN_MN, descinitINFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "SVDPhysical::invokeMPI: scidb_descinit(DESC_S) failed, INFO " << descinitINFO
                                                                             << " DESC_S " << DESC_S);
@@ -389,10 +389,10 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     double* VT = reinterpret_cast<double*>(shmIpc[BUF_MAT_VT]->get());shmSharedPtr_t VTx(shmIpc[BUF_MAT_VT]);
 
     procRowCol_t firstChunkSize = { chunkRow(arrayA), chunkCol(arrayA) };
-    shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "SVDPhysical"), firstChunkSize);
 
-    shared_ptr<Array> tmpRedistedInput = redistributeInputArray(arrayA, schemeData, query, "SVDPhysical");
+    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(arrayA, schemeData, query, "SVDPhysical");
 
     bool wasConverted = (tmpRedistedInput != arrayA) ;  // only when redistribute was actually done (sometimes optimized away)
 
@@ -435,7 +435,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     //.... Call PDGESVD to compute the SVD of A .............................
     //
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI: calling pdgesvdMaster M,N " << M << "," << N << "MB,NB:" << MB << "," << NB);
-    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+    std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
     slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-to-1 between instanceID and MPI rank
     slpp::int_t INFO = DEFAULT_BAD_INFO ;
     pdgesvdMaster(query.get(), _ctx, slave, _ipcName, argsBuf,
@@ -473,7 +473,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
     boost::shared_array<char> resPtrDummy(reinterpret_cast<char*>(NULL));
     typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
 
-    shared_ptr<Array> result;
+    std::shared_ptr<Array> result;
     size_t resultShmIpcIndx = shmIpc.size(); // by default, we will not hold onto any ShmIpc for a result,
                                              // modify this if we determine we have output data, below.
     if (producesSigma(whichMatrix))
@@ -489,7 +489,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
         // this means checking for non-zeros in S or some other
         // indicator from the pdgesvd
         // if (myLen == 0)
-        //     return shared_ptr<Array>(new MemArray(outSchema));
+        //     return std::shared_ptr<Array>(new MemArray(outSchema));
         //
 
         // NOTE:
@@ -541,8 +541,9 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
             iterDelta[0] = NPROW * dimsS[0].getChunkInterval();
 
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(S): Creating OpArray from "<<first[0]<<" to "<<last[0]<<" delta "<<iterDelta[0]);
-            reformatOp_t      pdelgetOp(Sx, DESC_S, dimsS[0].getStartMin(), 0, /*isGlobal*/true);
-            result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+            reformatOp_t      pdelgetOp(Sx, DESC_S, dimsS[0].getStartMin(), 0,
+                                        NPROW, NPCOL, MYPROW, MYPCOL, /*isGlobal*/true);
+            result = std::shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
                                                                  first, last, iterDelta, query));
             resultShmIpcIndx = BUF_MAT_S; // this ShmIpc memory cannot be released at the end of the method
         } else {
@@ -552,7 +553,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
             // (note that these nodes still participated in the global generation of the S vector, it is merely that
             //  the ScaLAPACK algorithm produces replicas of it due to the way the algorithm works).
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(SIGMA): at process grid ("<<MYPROW<<","<<MYPCOL<<") Creating empty MemArray");
-            result = shared_ptr<Array>(new MemArray(outSchema,query)); // empty array to return
+            result = std::shared_ptr<Array>(new MemArray(outSchema,query)); // empty array to return
             assert(resultShmIpcIndx == shmIpc.size());
         }
     }
@@ -593,13 +594,14 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
             iterDelta[0] = NPROW * dimsU[0].getChunkInterval();
             iterDelta[1] = NPCOL * dimsU[1].getChunkInterval();
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(U): Creating OpArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]);
-            reformatOp_t      pdelgetOp(Ux, DESC_U, dimsU[0].getStartMin(), dimsU[1].getStartMin());
-            result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+            reformatOp_t      pdelgetOp(Ux, DESC_U, dimsU[0].getStartMin(), dimsU[1].getStartMin(),
+                                        NPROW, NPCOL, MYPROW, MYPCOL);
+            result = std::shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
                                                                  first, last, iterDelta, query));
             resultShmIpcIndx = BUF_MAT_U;  // this ShmIpc memory cannot be released at the end of the method
         } else {
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(U): participated, but not in output array, creating empty output array: first ("<<first[0]<<","<<first[1]<<"), last(" << last[0] <<"," <<last[1]<<")");
-            result = shared_ptr<Array>(new MemArray(outSchema,query));   // empty array to return
+            result = std::shared_ptr<Array>(new MemArray(outSchema,query));   // empty array to return
             assert(resultShmIpcIndx == shmIpc.size());
         }
     }
@@ -633,13 +635,14 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
             iterDelta[0] = NPROW * dimsVT[0].getChunkInterval();
             iterDelta[1] = NPCOL * dimsVT[1].getChunkInterval();
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(VT): Creating OpArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]);
-            reformatOp_t    pdelgetOp(VTx, DESC_VT, dimsVT[0].getStartMin(), dimsVT[1].getStartMin());
-            result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+            reformatOp_t    pdelgetOp(VTx, DESC_VT, dimsVT[0].getStartMin(), dimsVT[1].getStartMin(),
+                                      NPROW, NPCOL, MYPROW, MYPCOL);
+            result = std::shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
                                                                  first, last, iterDelta, query));
             resultShmIpcIndx = BUF_MAT_VT; // this ShmIpc memory cannot be released at the end of the method
         } else {
             LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(VT): participated, but not in output array, creating empty output array: first ("<<first[0]<<","<<first[1]<<"), last(" << last[0] <<"," <<last[1]<<")");
-            result = shared_ptr<Array>(new MemArray(outSchema,query));   // empty array to return
+            result = std::shared_ptr<Array>(new MemArray(outSchema,query));   // empty array to return
             assert(resultShmIpcIndx == shmIpc.size());
         }
     }
@@ -652,7 +655,7 @@ shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inpu
 }
 
 
-shared_ptr<Array> SVDPhysical::execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+std::shared_ptr<Array> SVDPhysical::execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
 {
     //
     // + converts inputArrays to psScaLAPACK distribution
@@ -684,23 +687,24 @@ shared_ptr<Array> SVDPhysical::execute(std::vector< shared_ptr<Array> >& inputAr
                            << " chunksize (" << inputArrays[0]->getArrayDesc().getDimensions()[0].getChunkInterval()
                            << ", "           << inputArrays[0]->getArrayDesc().getDimensions()[1].getChunkInterval()
                            << ")");
+
     //
     // invokeMPI()
     //
-    string whichMatrix = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+    string whichMatrix = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 
     // invokeMPI does not manage an empty bitmap yet, but it is specified in _schema.
     // so to make it compatible, we first create a copy of _schema without the empty tag attribute
     Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
-    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions());
+    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions(), defaultPartitioning());
 
     // and now invokeMPI produces an array without empty bitmap except when it is not participating
-    shared_ptr<Array> arrayNoEmptyTag = invokeMPI(inputArrays, query, whichMatrix, schemaNoEmptyTag);
+    std::shared_ptr<Array> arrayNoEmptyTag = invokeMPI(inputArrays, query, whichMatrix, schemaNoEmptyTag);
 
     // now we place a wrapper array around arrayNoEmptyTag, that adds a fake emptyTag (true everywhere)
     // but otherwise passes through requests for iterators on the other attributes.
     // And yes, the class name is the complete opposite of what it shold be.
-    shared_ptr<Array> result;
+    std::shared_ptr<Array> result;
     if (arrayNoEmptyTag->getArrayDesc().getEmptyBitmapAttribute() == NULL) {
         result = make_shared<NonEmptyableArray>(arrayNoEmptyTag);
     } else {

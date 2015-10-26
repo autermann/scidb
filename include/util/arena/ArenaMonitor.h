@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,8 +20,8 @@
 * END_COPYRIGHT
 */
 
-#ifndef UTIL_ARENA_MONITOR_H_
-#define UTIL_ARENA_MONITOR_H_
+#ifndef UTIL_ARENA_ARENA_MONITOR_H_
+#define UTIL_ARENA_ARENA_MONITOR_H_
 
 /****************************************************************************/
 
@@ -41,6 +41,9 @@ namespace scidb { namespace arena {
  */
 class Monitor : boost::noncopyable
 {
+ public:                   // Construction
+    virtual                  ~Monitor(){}
+
  public:                   // Singleton Access
     static  Monitor&          getInstance();
 

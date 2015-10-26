@@ -34,10 +34,10 @@ aggregate(versions(foo_shadow),count(*))
 --igdata "scan(foo6_shadow)"
 aggregate(versions(foo6_shadow),count(*))
 
-load(foo5, 'foo.out', -2, '(int32,dummy(4),string)')
+load(foo5, 'foo.out', -2, '(int32,skip(4),string)')
 save(foo5, 'foo.out', -2, '(float,string(10))')
 load(foo5, 'foo.out', -2, '(float,string(10))')
-save(foo,  'foo.out', -2, '(double,int64,dummy)')
+save(foo,  'foo.out', -2, '(double,int64,skip)')
 load(foo5, 'foo.out', -2, '(double,int64)')
 
 --start-igdata

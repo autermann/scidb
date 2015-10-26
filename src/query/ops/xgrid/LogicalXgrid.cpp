@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,7 +51,7 @@ inline ArrayDesc createXgridDesc(ArrayDesc const& desc, vector<int> const& grid)
                                    srcDim.getStartMin() + srcDim.getLength()*grid[i] - 1,
                                    srcDim.getChunkInterval()*grid[i], 0);
     }
-        return ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
+        return ArrayDesc(desc.getName(), desc.getAttributes(), newDims, defaultPartitioning());
 }
 
 /**
@@ -115,9 +115,9 @@ class LogicalXgrid: public  LogicalOperator
         ADD_PARAM_VARIES()
         }
 
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
         {
-                std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+                std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
                 if (_parameters.size() == schemas[0].getDimensions().size())
                         res.push_back(END_OF_VARIES_PARAMS());
                 else
@@ -125,7 +125,7 @@ class LogicalXgrid: public  LogicalOperator
                 return res;
         }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         assert(_parameters.size() == schemas[0].getDimensions().size());
@@ -136,9 +136,9 @@ class LogicalXgrid: public  LogicalOperator
         vector<int> grid(nDims);
         for (size_t i = 0; i < nDims; i++)
         {
-            if (desc.getDimensions()[i].getLength() == INFINITE_LENGTH)
+            if (desc.getDimensions()[i].isMaxStar())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_XGRID_ERROR1);
-            grid[i] = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
+            grid[i] = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(),
                                query, TID_INT32).getInt32();
             if (grid[i] <= 0)
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_XGRID_ERROR2);

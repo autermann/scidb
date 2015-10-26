@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -79,9 +79,9 @@ public:
     	_usage = "show(<array name | anonymous schema | query string [, 'aql' | 'afl']>)";
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         if (_parameters.size() == 0)
         {
 			res.push_back(PARAM_SCHEMA());
@@ -102,14 +102,14 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(vector<ArrayDesc> inputSchemas, shared_ptr<Query> query)
+    ArrayDesc inferSchema(vector<ArrayDesc> inputSchemas, std::shared_ptr<Query> query)
     {
         assert(inputSchemas.size() == 0);
 
         if (_parameters.size() == 2)
         {
 			string lang = evaluate(
-					((boost::shared_ptr<OperatorParamLogicalExpression>&) _parameters[1])->getExpression(),
+					((std::shared_ptr<OperatorParamLogicalExpression>&) _parameters[1])->getExpression(),
 					query, TID_STRING).getString();
 			std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
 			if (lang != "aql" && lang != "afl")
@@ -125,7 +125,7 @@ public:
 		Dimensions dims(1);
 		dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
 
-		return ArrayDesc("", atts, dims);
+		return ArrayDesc("", atts, dims, defaultPartitioning());
     }
 
 };

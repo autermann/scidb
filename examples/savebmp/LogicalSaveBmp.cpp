@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -57,7 +57,7 @@ class LogicalSaveBmp: public LogicalOperator
     /**
      * Checks to make sure that the input schema and infers a sample single-cell result schema.
      */
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
 
@@ -67,10 +67,10 @@ class LogicalSaveBmp: public LogicalOperator
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION) << "Input to savebmp must be two-dimensional";
         }
 
-        if(input.getDimensions()[0].getLength() == INFINITE_LENGTH ||
-           input.getDimensions()[1].getLength() == INFINITE_LENGTH)
+        if(input.getDimensions()[0].isMaxStar() ||
+           input.getDimensions()[1].isMaxStar())
         {
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION) << "Input to savebmp must not be unbounded";
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION) << "Input to savebmp must be within valid range";
         }
 
         if(input.getAttributes().size() < 3)
@@ -94,7 +94,7 @@ class LogicalSaveBmp: public LogicalOperator
         Dimensions outputDims;
         outputDims.push_back(DimensionDesc("i", 0, 0, 0, 0, 1, 0));
 
-        return ArrayDesc("savbmp_output", outputAttrs, outputDims);
+        return ArrayDesc("savbmp_output", outputAttrs, outputDims, defaultPartitioning());
     }
 };
 

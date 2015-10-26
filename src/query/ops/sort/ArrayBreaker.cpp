@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,13 +35,13 @@ using namespace std;
 
 namespace scidb
 {
-typedef vector<shared_ptr<ArrayIterator> > ArrayIterators;
-typedef vector<shared_ptr<ChunkIterator> > ChunkIterators;
+typedef vector<std::shared_ptr<ArrayIterator> > ArrayIterators;
+typedef vector<std::shared_ptr<ChunkIterator> > ChunkIterators;
 
 void breakOneArrayIntoMultiple(
-        boost::shared_ptr<Array> const& inputArray,
-        std::vector<boost::shared_ptr<Array> >& outputArrays,
-        boost::shared_ptr<Query>& query,
+        std::shared_ptr<Array> const& inputArray,
+        std::vector<std::shared_ptr<Array> >& outputArrays,
+        std::shared_ptr<Query>& query,
         BreakerOnCoordinates breaker,
         bool isBreakerConsecutive,
         void* additionalInfo)
@@ -50,7 +50,7 @@ void breakOneArrayIntoMultiple(
     size_t nOutputArrays = outputArrays.size();
 
     // Get nAttrs input array iterators.
-    vector<shared_ptr<ConstArrayIterator> > inputArrayIterators(schemaUtils._nAttrsWithET);
+    vector<std::shared_ptr<ConstArrayIterator> > inputArrayIterators(schemaUtils._nAttrsWithET);
     for (size_t attr=0; attr<schemaUtils._nAttrsWithET; ++attr) {
         inputArrayIterators[attr] = inputArray->getConstIterator(attr);
     }
@@ -84,8 +84,8 @@ void breakOneArrayIntoMultiple(
             which = instForLastCell;
             for (size_t attr = 0; attr < schemaUtils._nAttrsWithET; attr++)
             {
-                boost::shared_ptr<ArrayIterator> dst = outputArrayIterators[which][attr];
-                boost::shared_ptr<ConstArrayIterator> src = inputArrayIterators[attr];
+                std::shared_ptr<ArrayIterator> dst = outputArrayIterators[which][attr];
+                std::shared_ptr<ConstArrayIterator> src = inputArrayIterators[attr];
                 dst->copyChunk(src->getChunk());
                 ++(*src);
             }
@@ -93,7 +93,7 @@ void breakOneArrayIntoMultiple(
         }
 
         // Input chunk iterators.
-        vector<shared_ptr<ConstChunkIterator> > inputChunkIterators(schemaUtils._nAttrsWithET);
+        vector<std::shared_ptr<ConstChunkIterator> > inputChunkIterators(schemaUtils._nAttrsWithET);
         for (size_t attr=0; attr<schemaUtils._nAttrsWithET; ++attr) {
             inputChunkIterators[attr] = inputArrayIterators[attr]->getChunk().getConstIterator();
         }

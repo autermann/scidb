@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,9 +25,6 @@
 
 /****************************************************************************/
 
-#include <cppunit/TestFixture.h>
-#include <cppunit/extensions/HelperMacros.h>
-#include <util/PointerRange.h>
 #include <util/arena/String.h>
 #include <util/arena/Vector.h>
 #include <util/arena/Deque.h>
@@ -36,6 +33,7 @@
 #include <util/arena/Map.h>
 #include <util/arena/UnorderedSet.h>
 #include <util/arena/UnorderedMap.h>
+#include <util/arena/ArenaMonitor.h>
 
 /****************************************************************************/
 namespace scidb { namespace arena {
@@ -44,12 +42,14 @@ namespace scidb { namespace arena {
 /**
  *  Implements a suite of unit tests for the arena custom allocator library.
  */
-struct ArenaTests : public CppUnit::TestFixture
+struct ArenaTests : CppUnit::TestFixture
 {
     struct Custom             {~Custom() throw()   {}};
     struct Throws1            {Throws1() throw(int){throw 1;}};
     struct Throws2:Allocated  {Throws2() throw(int){throw 2;}};
     struct Throws3:Throws2    {};
+
+                              ArenaTests()               {Monitor::getInstance();}
 
                     void      setUp();
                     void      tearDown();
@@ -66,6 +66,7 @@ struct ArenaTests : public CppUnit::TestFixture
                     void      testLimiting();
                     void      testStringConcat();
                     void      testManualAuto();
+                    void      testMemoryLimit();
                     void      anExample();
 
                     void      arena     (Arena&);
@@ -84,21 +85,23 @@ struct ArenaTests : public CppUnit::TestFixture
     template<class> void      destroy0  (Arena&);
 
     static          void      custom(void*){}
+                    size_t    _allocations;
 
     CPPUNIT_TEST_SUITE(ArenaTests);
-    CPPUNIT_TEST      (test);
-    CPPUNIT_TEST      (testOptions);
-    CPPUNIT_TEST      (testFinalizer);
-    CPPUNIT_TEST      (testGlobalNew);
-    CPPUNIT_TEST      (testRootArena);
-    CPPUNIT_TEST      (testLimitedArena);
-    CPPUNIT_TEST      (testScopedArena);
-    CPPUNIT_TEST      (testLeaArena);
-    CPPUNIT_TEST      (testSharedPtr);
-    CPPUNIT_TEST      (testLimiting);
-    CPPUNIT_TEST      (testStringConcat);
-    CPPUNIT_TEST      (testManualAuto);
-    CPPUNIT_TEST      (anExample);
+    CPPUNIT_TEST(test);
+    CPPUNIT_TEST(testOptions);
+    CPPUNIT_TEST(testFinalizer);
+    CPPUNIT_TEST(testGlobalNew);
+    CPPUNIT_TEST(testRootArena);
+    CPPUNIT_TEST(testLimitedArena);
+    CPPUNIT_TEST(testScopedArena);
+    CPPUNIT_TEST(testLeaArena);
+    CPPUNIT_TEST(testSharedPtr);
+    CPPUNIT_TEST(testLimiting);
+    CPPUNIT_TEST(testStringConcat);
+    CPPUNIT_TEST(testManualAuto);
+    CPPUNIT_TEST(testMemoryLimit);
+    CPPUNIT_TEST(anExample);
     CPPUNIT_TEST_SUITE_END();
 };
 
@@ -114,8 +117,12 @@ void ArenaTests::test()
  */
 void ArenaTests::testOptions()
 {
-    cout << Options("A").pagesize(1*KiB).threading(false) << endl;
-    cout << Options("B").resetting(true).threading(true)  << endl;
+    cout << Options("A").pagesize(1*KiB).threading(0) << endl;
+    cout << Options("B").resetting(true).threading(1) << endl;
+    cout << Options("C").limited(getArena(),10*KiB)   << endl;
+    cout << Options("D").scoped (getArena())          << endl;
+    cout << Options("E").lea    (getArena())          << endl;
+    cout << Options("F").oneshot(getArena(),64*MiB)   << endl;
 }
 
 /**
@@ -209,8 +216,8 @@ void ArenaTests::testScopedArena()
     arena(*newArena(Options("scoped 1").resetting(true)));
     arena(*newArena(Options("scoped 2").resetting(true).pagesize(0)));
     arena(*newArena(Options("scoped 3").resetting(true).pagesize(0) .debugging(true)));
-    arena(*newArena(Options("scoped 4").resetting(true).pagesize(96)                .threading(true)));
-    arena(*newArena(Options("scoped 5").resetting(true).pagesize(96).debugging(true).threading(true)));
+    arena(*newArena(Options("scoped 4").resetting(true).pagesize(96)                .threading(0)));
+    arena(*newArena(Options("scoped 5").resetting(true).pagesize(96).debugging(true).threading(0)));
 }
 
 /**
@@ -544,13 +551,13 @@ void ArenaTests::testSharedPtr()
     ArenaPtr a(getArena());                              // The current arena
 
  /* A number of ways of saying essentially the same thing. Note that the first
-    two calls bind to boost::allocate_shared() while the last two bind instead
+    two calls bind to std::allocate_shared() while the last two bind instead
     to arena::allocate_shared(). Guess which variation we prefer...*/
 
-    shared_ptr<int> w(allocate_shared<int,Allocator<int> >(a,78));   // theirs
-    shared_ptr<int> x(boost::allocate_shared<int>         (Allocator<int>(a),78));
-    shared_ptr<int> y(arena::allocate_shared<int>         (*a,78));  // ours
-    shared_ptr<int> z(allocate_shared<int>                (*a,78));  // ours
+    std::shared_ptr<int> w(std::allocate_shared<int,Allocator<int> >(a,78));   // theirs
+    std::shared_ptr<int> x(std::allocate_shared<int>         (Allocator<int>(a),78));
+    std::shared_ptr<int> y(arena::allocate_shared<int>         (*a,78));  // ours
+    std::shared_ptr<int> z(arena::allocate_shared<int>         (*a,78));  // ours
 
     cout << *z << ": extensive testing shows that allocate_shared() is AOK.\n";
 }
@@ -569,7 +576,7 @@ void ArenaTests::testLimiting()
     }
     catch (arena::Exhausted& e)
     {
-        cout << e << endl;                               // ...and jumps here
+        CPPUNIT_ASSERT(true);                            // ...and jumps here
     }
 
     a->recycle(a->allocate(10));                         // This succeeds too
@@ -598,15 +605,13 @@ void ArenaTests::testStringConcat()
 /**
  *  Test the ability of newScalar() and newVector() to optionally register (or
  *  skip registration of) a finalizer that will be automatically applied to an
- *  allocation when it is ventually destroyed.
+ *  allocation when it is eventually destroyed.
  */
 void ArenaTests::testManualAuto()
 {
     using std::string;                                   // For string object
 
-    ArenaPtr A(getArena());                              // The current arena
-    Arena&   a(*A);                                      // A reference to it
-    size_t   n(a.allocated());                           // Record allocations
+    Arena& a(*getArena());                               // The current arena
 
     destroy(a,newScalar<int>    (a, 3           )  );    // Default = automatic
     destroy(a,newVector<int>    (a, 3           )  );    // Default = automatic
@@ -624,15 +629,19 @@ void ArenaTests::testManualAuto()
     try{newVector<Throws2>(a,3,manual);}    catch(int){} //
     try{newVector<Throws1>(a,3,automatic);} catch(int){} //
     try{newVector<Throws2>(a,3,automatic);} catch(int){} //
-
-    CPPUNIT_ASSERT(a.allocated() == n);                  // We cleaned up ok?
 }
 
 /**
+ *  Record the number of allocations live in the default arena before we run a
+ *  test; we will compare this with the number after running the test to check
+ *  for leaks.
+ *
  *  Print a line on entry to each test case to make the output more readable.
  */
 void ArenaTests::setUp()
 {
+    _allocations = getArena()->allocations();            // Record allocations
+
     cout << endl;                                        // Print a blank line
 }
 
@@ -642,16 +651,39 @@ void ArenaTests::setUp()
  */
 void ArenaTests::tearDown()
 {
-    ArenaPtr a(getArena());                              // The current arena
-
-    if (a->allocations() != 0)                           // Live allocations?
+    if (getArena()->allocations() != _allocations)       // Live allocations?
     {
-        ostringstream s;                                 // ...message buffer
+        std::ostringstream s;                                 // ...message buffer
 
-        s << "leaks detected in arena " << *a;           // ...format message
+        s << "leaks detected in arena " << *getArena();  // ...format message
 
         CPPUNIT_FAIL(s.str());                           // ...sound the alarm
     }
+}
+
+/**
+ *  Test the root arena/global operator new memory limiting mechanism.
+ */
+void ArenaTests::testMemoryLimit()
+{
+    extern size_t getMemoryLimit();                      // Our backdoor API
+    extern bool   setMemoryLimit(size_t);                //  to memory limit
+
+    ArenaPtr const a(getArena());                        // Get current arena
+    size_t   const l(getMemoryLimit());                  // The current limit
+
+    CPPUNIT_ASSERT(setMemoryLimit(1*GiB));               // Change the limit
+
+    try                                                  // Expecting to fail
+    {
+        a->allocate(1*GiB + 1);                          // ...try allocating
+    }
+    catch (arena::Exhausted& e)
+    {
+        CPPUNIT_ASSERT(true);                            // ...test passed ok
+    }
+
+    CPPUNIT_ASSERT(setMemoryLimit(l));                   // Restore the limit
 }
 
 /**
@@ -669,7 +701,7 @@ void ArenaTests::anExample()
  /* Imagine that we are at the top of the main entry point for some operator
     'Foo'.
 
-    ...PhysicalFoo::execute( ... boost::shared_ptr<Query> const& query) {
+    ...PhysicalFoo::execute( ... std::shared_ptr<Query> const& query) {
 
     In practice, 'parent' would either be passed into the execute() function
     via the query context, for example:
@@ -698,7 +730,7 @@ void ArenaTests::anExample()
     containers. By and large, the managed containers have identical interfaces
     to their standard library counterparts...*/
     {
-        set<int> u(A);                                   // Allocates from A
+        arena::managed::set<int> u(A);                                   // Allocates from A
 
         u.insert(7);
 
@@ -707,7 +739,7 @@ void ArenaTests::anExample()
 
         u.emplace(8);
 
-        vector<string> v(A,3);                           // Allocates from A
+        arena::managed::vector<string> v(A,3);                           // Allocates from A
 
         v[0] = "alex";
         v[1] = "tigor";
@@ -724,23 +756,31 @@ void ArenaTests::anExample()
 
      /* There's some magic going on here behind the scenes that makes this all
         'just work'. Where we wrote 'vector' above, we could just as well have
-        chosen a list, deque, set, multiset, map, multimap, or string.  Sadly,
-        however, the boost unordered containers are not yet in on the game...*/
+        chosen a list, deque, set, multiset, map, multimap, or string.
 
-        unordered_map<int,double> m(A);                  // Fine, no problem
+        [Note from Donghui Z. while switching to C++14:]
+        Before we switched to C++14 in May 2015, we were using boost version of unordered_map.
+        With that version, allocator the container uses is not inherited by the elements stored in the container.
+        But after switching to std::unordered_map, it works as well as other standard containers.
+        */
+
+        arena::managed::unordered_map<int,double> m(A);                  // Fine, no problem
 
         m[0] = 7.0;
         m[1] = 7.8;
 
-        unordered_map<int,string> n(A);                  // Rather Less fine...
+        arena::managed::unordered_map<int,string> n(A);                  // Rather Less fine...
 
         n[0] = "marilyn";
         n[1] = "james";
 
-        assert(n[0].get_allocator() != A);               // Argh!!!
-        assert(n[1].get_allocator() == getArena());      // In the root!
+        assert(n[0].get_allocator() == A);      // This good behavior was not there with the boost version of unordered_map.
+        assert(n[1].get_allocator() == A);
 
-     /* As you can see,  the unordered containers have not yet been taught how
+     /* [The workaround for the boost version of unordered_map and its comment were both from Jonathon B.:]
+        [They are no longer needed after switching to std::unordered_map; but Donghui will keep it here.]
+
+        As you can see,  the unordered containers have not yet been taught how
         to propagate their allocators on down into their elements recursively;
         rather, the element strings are relying on the fact that their default
         constructors are grabbing the default, global,root arena. It's not the
@@ -750,14 +790,12 @@ void ArenaTests::anExample()
         n.emplace(std::make_pair(2,string(A,"paul")));   // Specify explicitly
 
         assert(n[2].get_allocator() == A);               // Ah, that's better!
-
-     /* Pretty it ain't; i'm currently looking into other alternatives...*/
     }
 
  /* The other code path allocates from 'B', and we might perhaps want to wrap
     this with a try block...*/
     {
-        vector<double> v(B);                             // Allocates from B
+        arena::managed::vector<double> v(B);                             // Allocates from B
 
         try
         {
@@ -810,7 +848,7 @@ void ArenaTests::anExample()
         {
          /* Answer: a recoverable exception is thrown...*/
 
-            cout << e << endl;                           // ...so, recover...
+            CPPUNIT_ASSERT(true);                        // ...so, recover...
         }
     }
 
@@ -823,7 +861,7 @@ void ArenaTests::anExample()
     {
         ArenaPtr C(newArena(Options("C").resetting(true)));
 
-        map<int,int> m(C);
+        arena::managed::map<int,int> m(C);
 
         m[1] = 2; m[2] = 3; m[3] = 4;
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,25 +54,33 @@ namespace scidb
 /**
  * Insert operator.
  */
-class PhysicalInsert: public PhysicalOperator
+class PhysicalInsert: public PhysicalUpdate
 {
 private:
-    /**
-     * Lock over the target array.
-     */
-    shared_ptr<SystemCatalog::LockDesc> _lock;
-
     /**
      * Descriptor of previous version. Not initialized if not applicable.
      */
     ArrayDesc _previousVersionDesc;
 
+    static const string& getArrayName(const Parameters& parameters)
+    {
+        SCIDB_ASSERT(!parameters.empty());
+        return ((std::shared_ptr<OperatorParamReference>&)parameters[0])->getObjectName();
+    }
+
 public:
     /**
     * Vanilla. Same as most operators.
     */
-    PhysicalInsert(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalInsert(const string& logicalName,
+                   const string& physicalName,
+                   const Parameters& parameters,
+                   const ArrayDesc& schema):
+    PhysicalUpdate(logicalName,
+                   physicalName,
+                   parameters,
+                   schema,
+                   getArrayName(parameters))
     {}
 
     /**
@@ -81,19 +89,26 @@ public:
     */
     void fillPreviousDesc(ArrayDesc& placeholder) const
     {
-       string arrayName = ((shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-       if(_schema.getId() == 0) //new version (our version) was not created yet
+        //XXX TODO: avoid these catalog calls by getting the latest version in LogicalInsert
+       const string& arrayName = getArrayName(_parameters);
+       if(_schema.getId() == _schema.getUAId()) //new version (our version) was not created yet
        {
-           SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, placeholder, true);
+           SystemCatalog::getInstance()->getArrayDesc(arrayName,
+                                                      SystemCatalog::ANY_VERSION,
+                                                      LAST_VERSION,
+                                                      placeholder, true);
        }
        else //new version was already created; locate the previous
        {
+           assert(_schema.getId() > _schema.getUAId());
            VersionID ver = _schema.getVersionId() - 1;
            if (ver == 0)
            {
                return;
            }
-           SystemCatalog::getInstance()->getArrayDesc(arrayName, ver, placeholder, true);
+           SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
+                                                      ver, placeholder, true);
+           assert(placeholder.getId() < _schema.getId());
        }
     }
 
@@ -117,93 +132,11 @@ public:
     }
 
     /**
-     * Record the array 't' in the transient array cache. Implements a callback
-     * that is suitable for use as a query finalizer.
-     */
-    static void recordTransient(const MemArrayPtr& t,const QueryPtr& query)
-    {
-        if (query->wasCommitted())                       // Was committed ok?
-        {
-            transient::record(t);                        // ...record in cache
-        }
-    }
-
-    /**
-    * Take necessary locks and perform catalog changes. Initialize the internal _schema field to
-    * the proper descriptor of the target array.
-    * @param query the query context
-    */
-    void preSingleExecute(shared_ptr<Query> query)
-    {
-       shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-       assert(membership);
-       if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-           (membership->getInstances().size() != query->getInstancesCount()))
-       {
-           throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-       }
-
-       _lock = make_shared<SystemCatalog::LockDesc>(_schema.getName(),
-                                                   query->getQueryID(),
-                                                   Cluster::getInstance()->getLocalInstanceId(),
-                                                   SystemCatalog::LockDesc::COORD,
-                                                   SystemCatalog::LockDesc::WR);
-
-       shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
-       query->pushErrorHandler(ptr);
-
-       ArrayDesc parentDesc;
-       SystemCatalog::getInstance()->getArrayDesc(_schema.getName(), parentDesc, false); //Must exist, checked at logical phase
-
-       if (parentDesc.isTransient())
-       {
-           _schema.setIds(parentDesc.getId(),parentDesc.getUAId(),0);
-           _lock->setArrayId       (parentDesc.getUAId());
-           _lock->setArrayVersion  (0);
-           _lock->setArrayVersionId(parentDesc.getId());
-           BOOST_VERIFY(SystemCatalog::getInstance()->updateArrayLock(_lock));
-           return;
-       }
-
-       VersionID newVersion = SystemCatalog::getInstance()->getLastVersion(parentDesc.getId()) + 1;
-
-       _lock->setArrayId(parentDesc.getUAId());
-       _lock->setArrayVersion(newVersion);
-       bool rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
-       SCIDB_ASSERT(rc);
-
-       //Cookalacka: this pattern is another "marvelous invention" that's been adapted from operators store() and redimension_store().
-       //It does many marvelous things - it creates the target array name entry in the catalog
-       //It also mutates the _schema field! After this, _schema's name changes to a versioned string and _schema's IDs are set.
-       //Note also that this is called BEFORE the plan is sent to remote nodes. So in fact THIS is how remote instances find out what the
-       //new array ID and name is!
-       _schema = ArrayDesc(ArrayDesc::makeVersionedName(_schema.getName(), newVersion), parentDesc.getAttributes(), parentDesc.getDimensions());
-       SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
-       _lock->setArrayVersionId(_schema.getId());
-       rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
-       SCIDB_ASSERT(rc);
-    }
-
-    /**
-     * Add entry about newly created version to the catalog.
-     * @param query the query context.
-     */
-    virtual void postSingleExecute(shared_ptr<Query> query)
-    {
-        assert(_lock);
-
-        if (!_schema.isTransient())
-        {
-            SystemCatalog::getInstance()->createNewVersion(_schema.getUAId(), _schema.getId());
-        }
-    }
-
-    /**
      * Get the estimated upper bound of the output array for the optimizer.
      * @param inputBoundaries the boundaries of the input arrays
      * @param inputSchemas the shapes of the input arrays
      * @return inputBoundaries[0] if we're inserting into version 1, else
-     *         an intersection of inputBoudnaries[0] with the boundaries of the previous version.
+     *         a union of inputBoundaries[0] with the boundaries of the previous version.
      */
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                    const std::vector< ArrayDesc> & inputSchemas) const
@@ -216,21 +149,49 @@ public:
         }
         else
         {
-            Coordinates currentLo = SystemCatalog::getInstance()->getLowBoundary(prevVersionDesc.getId());
-            Coordinates currentHi = SystemCatalog::getInstance()->getHighBoundary(prevVersionDesc.getId());
+            Coordinates currentLo = prevVersionDesc.getLowBoundary();
+            Coordinates currentHi = prevVersionDesc.getHighBoundary();
             PhysicalBoundaries currentBoundaries(currentLo, currentHi);
             return currentBoundaries.unionWith(inputBoundaries[0]);
         }
     }
 
     /**
+     * If chunk sizes or overlaps differ, repartition the input array to match the target.
+     */
+    virtual void requiresRedimensionOrRepartition(
+        vector<ArrayDesc> const&   inputSchemas,
+        vector<ArrayDesc const*>&  modifiedPtrs) const
+    {
+        SCIDB_ASSERT(inputSchemas.size() == 1);
+        SCIDB_ASSERT(modifiedPtrs.size() == 1);
+
+        // If input matches target array schema, no problem.
+        if (_schema.samePartitioning(inputSchemas[0])) {
+            modifiedPtrs.clear();
+            return;
+        }
+
+        // If input was manually repartitioned, we're not allowed to
+        // override it, so you're scrod.
+        //
+        if (modifiedPtrs[0] != NULL) {
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_REPART_FORBIDDEN)
+                << getLogicalName();
+        }
+
+        // Request a repartition to the target array's schema.
+        modifiedPtrs[0] = &_schema;
+    }
+
+    /**
      * Get the distribution requirement.
-     * @return round-robin
+     * @return a DistributionRquirement requiring defaultPartitioning()
      */
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
-        vector<ArrayDistribution> requiredDistribution;
-        requiredDistribution.push_back(ArrayDistribution(psHashPartitioned));
+        vector<RedistributeContext> requiredDistribution;
+        requiredDistribution.push_back(RedistributeContext(defaultPartitioning()));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -241,7 +202,9 @@ public:
      * @param pos the position where to write the element
      * @param flag variable that is set to true after writing
      */
-    void writeFrom(shared_ptr<ConstChunkIterator>& sourceIter, shared_ptr<ChunkIterator>& outputIter, Coordinates const* pos, bool& flag)
+    void writeFrom(std::shared_ptr<ConstChunkIterator>& sourceIter,
+                   std::shared_ptr<ChunkIterator>& outputIter,
+                   Coordinates const* pos, bool& flag)
     {
         outputIter->setPosition(*pos);
         outputIter->writeItem(sourceIter->getItem());
@@ -256,15 +219,18 @@ public:
      * @param newChunk the newly created blank chunk to be written
      * @param nDims the number of dimensions
      */
-    void insertMergeChunk(shared_ptr<Query>& query,
+    void insertMergeChunk(std::shared_ptr<Query>& query,
                           ConstChunk* materializedInputChunk,
                           ConstChunk const& existingChunk,
                           Chunk& newChunk,
                           size_t nDims)
     {
-        shared_ptr<ConstChunkIterator> inputCIter = materializedInputChunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
-        shared_ptr<ConstChunkIterator> existingCIter = existingChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
-        shared_ptr<ChunkIterator> outputCIter = newChunk.getIterator(query, ChunkIterator::NO_EMPTY_CHECK | ChunkIterator::SEQUENTIAL_WRITE);
+        std::shared_ptr<ConstChunkIterator> inputCIter =
+            materializedInputChunk->getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+        std::shared_ptr<ConstChunkIterator> existingCIter =
+            existingChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+        std::shared_ptr<ChunkIterator> outputCIter =
+            newChunk.getIterator(query, ChunkIterator::NO_EMPTY_CHECK | ChunkIterator::SEQUENTIAL_WRITE);
 
         Coordinates const* inputPos = inputCIter->end() ? NULL : &inputCIter->getPosition();
         Coordinates const* existingPos = existingCIter->end() ? NULL : &existingCIter->getPosition();
@@ -313,19 +279,20 @@ public:
     }
 
     /**
-     * Insert inputArray into a nev version based on _schema, update catalog boundaries.
-     * @param inputArray the input to insert.
+     * Insert inputArray into a new version based on _schema, update catalog boundaries.
+     * @param inputArray the input to insert
      * @param query the query context
      * @param currentLowBound the current lower-bound coordinates of the data in the previous version
      * @param currentHiBound the current hi-bound coordinates of the data in the previous version
      */
-    shared_ptr<Array> performInsertion(shared_ptr<Array>& inputArray, shared_ptr<Query>& query,
-                                       Coordinates const& currentLowBound, Coordinates const& currentHiBound,
+    std::shared_ptr<Array> performInsertion(std::shared_ptr<Array>& inputArray,
+                                       std::shared_ptr<Query>& query,
+                                       Coordinates const& currentLowBound,
+                                       Coordinates const& currentHiBound,
                                        size_t const nDims)
     {
-        size_t nAttrs = _schema.getAttributes().size();
-
-        shared_ptr<Array> dstArray;
+        const size_t nAttrs = _schema.getAttributes().size();
+        std::shared_ptr<Array> dstArray;
 
         if (_schema.isTransient())
         {
@@ -333,14 +300,16 @@ public:
 
             transient::remove(_schema);
 
-            query->pushFinalizer(bind(&recordTransient,static_pointer_cast<MemArray>(dstArray),_1));
+            query->pushFinalizer(boost::bind(&PhysicalUpdate::recordTransient, this,
+                                             static_pointer_cast<MemArray>(dstArray),_1));
         }
         else
         {
-            dstArray = DBArray::newDBArray(_schema.getName(), query);
+            dstArray = DBArray::newDBArray(_schema, query);
         }
 
-        SCIDB_ASSERT(dstArray->getArrayDesc().getAttributes(true).size() == inputArray->getArrayDesc().getAttributes(true).size());
+        SCIDB_ASSERT(dstArray->getArrayDesc().getAttributes(true).size() ==
+                     inputArray->getArrayDesc().getAttributes(true).size());
         assert(dstArray->getArrayDesc().getId()   == _schema.getId());
         assert(dstArray->getArrayDesc().getUAId() == _schema.getUAId());
 
@@ -352,9 +321,10 @@ public:
             inputArray = make_shared<NonEmptyableArray>(inputArray);
         }
 
-        vector<shared_ptr<ConstArrayIterator> > inputIters(nAttrs);    //iterators over the input array
-        vector<shared_ptr<ConstArrayIterator> > existingIters(nAttrs); //iterators over the data already in the output array
-        vector<shared_ptr<ArrayIterator> > outputIters(nAttrs);        //write-iterators into the output array
+        vector<std::shared_ptr<ConstArrayIterator> > inputIters(nAttrs);    //iterators over the input array
+        vector<std::shared_ptr<ConstArrayIterator> > existingIters(nAttrs); //iterators over the data already in the
+                                                                       // output array
+        vector<std::shared_ptr<ArrayIterator> > outputIters(nAttrs);        //write-iterators into the output array
 
         for(AttributeID i = 0; i < nAttrs; i++)
         {
@@ -366,6 +336,12 @@ public:
         while(!inputIters[0]->end())
         {
             Coordinates const& pos = inputIters[0]->getPosition();
+            if (!_schema.contains(pos))
+            {
+                throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES)
+                    << CoordsToStr(pos) << _schema.getDimensions();
+            }
+
             bool haveExistingChunk = existingIters[0]->setPosition(pos);
             for(AttributeID i = 0; i < nAttrs; i++)
             {
@@ -404,7 +380,8 @@ public:
             }
         }
 
-        SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
+        // Update boundaries
+        updateSchemaBoundaries(_schema, bounds, query);
 
         if (!_schema.isTransient())
         {
@@ -418,7 +395,7 @@ public:
 
     Chunk&
     getNewChunk(const Coordinates& chunkPos,
-                const shared_ptr<ArrayIterator> & outputIter)
+                const std::shared_ptr<ArrayIterator> & outputIter)
     {
         Chunk* chunk = NULL;
         try {
@@ -442,48 +419,57 @@ public:
      * @param inputArrays one-sized list containing the input
      * @param query the query context
      */
-    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        assert(inputArrays.size() == 1);
+        SCIDB_ASSERT(inputArrays.size() == 1);
         VersionID version = _schema.getVersionId();
-        string baseArrayName = ArrayDesc::makeUnversionedName(_schema.getName());
+        SCIDB_ASSERT(version == ArrayDesc::getVersionFromName (_schema.getName()));
+        const string& unvArrayName = getArrayName(_parameters);
+        SCIDB_ASSERT(unvArrayName == ArrayDesc::makeUnversionedName(_schema.getName()));
 
         if (_schema.isTransient())
         {
-            inputArrays[0].reset(new MemArray(inputArrays[0],query));
+            inputArrays[0] = make_shared<MemArray>(inputArrays[0],query);
         }
 
-        if (!_lock && !_schema.isTransient())
+        if (!_lock)
         {
-           _lock = shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(baseArrayName,
-                                                                                   query->getQueryID(),
-                                                                                   Cluster::getInstance()->getLocalInstanceId(),
-                                                                                   SystemCatalog::LockDesc::WORKER,
-                                                                                   SystemCatalog::LockDesc::WR));
-           _lock->setArrayVersion(version);
-           shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
-           query->pushErrorHandler(ptr);
-           Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock,  _lock, _1);
+            SCIDB_ASSERT(!query->isCoordinator());
+            const SystemCatalog::LockDesc::LockMode lockMode =
+                _schema.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
+
+            _lock = std::shared_ptr<SystemCatalog::LockDesc>(make_shared<SystemCatalog::LockDesc>(
+                                                           unvArrayName,
+                                                           query->getQueryID(),
+                                                           Cluster::getInstance()->getLocalInstanceId(),
+                                                           SystemCatalog::LockDesc::WORKER,
+                                                           lockMode));
+            if (lockMode == SystemCatalog::LockDesc::WR) {
+                SCIDB_ASSERT(!_schema.isTransient());
+                _lock->setArrayVersion(version);
+                std::shared_ptr<Query::ErrorHandler> ptr(make_shared<UpdateErrorHandler>(_lock));
+                query->pushErrorHandler(ptr);
+            }
+
+           Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock,_lock,_1);
            query->pushFinalizer(f);
-           SystemCatalog::ErrorChecker errorChecker = bind(&Query::validate, query);
-           bool rc = SystemCatalog::getInstance()->lockArray(_lock, errorChecker);
-           if (!rc)
-           {
-              throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK) << baseArrayName;
+           SystemCatalog::ErrorChecker errorChecker(bind(&Query::validate, query));
+           if (!SystemCatalog::getInstance()->lockArray(_lock, errorChecker)) {
+               throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK)<< _lock->toString();
            }
         }
 
         size_t nDims = _schema.getDimensions().size();
-        Coordinates currentLo(nDims, MAX_COORDINATE);
-        Coordinates currentHi(nDims, MIN_COORDINATE);
+        Coordinates currentLo(nDims, CoordinateBounds::getMax());
+        Coordinates currentHi(nDims, CoordinateBounds::getMin());
 
         if (const ArrayDesc* previousDesc = getPreviousDesc())
         {
-            currentLo = SystemCatalog::getInstance()->getLowBoundary(previousDesc->getId());
-            currentHi = SystemCatalog::getInstance()->getHighBoundary(previousDesc->getId());
+            currentLo = previousDesc->getLowBoundary();
+            currentHi = previousDesc->getHighBoundary();
         }
 
-        shared_ptr<Array> dstArray =  performInsertion(inputArrays[0], query, currentLo, currentHi, nDims);
+        std::shared_ptr<Array> dstArray =  performInsertion(inputArrays[0], query, currentLo, currentHi, nDims);
 
         getInjectedErrorListener().check();
         return dstArray;

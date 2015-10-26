@@ -17,10 +17,10 @@ create array schema4 <v:double> [row=0:111,32,0, col=0:111,32,0]
 
 --test
 # output for all must be the row-major ordering beginning with 0
-splitarraytest(schema1)
-splitarraytest(schema2)
-splitarraytest(schema3)
-splitarraytest(schema4) 
+_splitarraytest(schema1)
+_splitarraytest(schema2)
+_splitarraytest(schema3)
+_splitarraytest(schema4) 
 
 --cleanup
 remove(schema1)

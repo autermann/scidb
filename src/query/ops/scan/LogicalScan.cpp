@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,10 +26,11 @@
  *  Created on: Mar 9, 2010
  *      Author: Emad
  */
-#include "query/Operator.h"
-#include "system/SystemCatalog.h"
-#include "system/Exceptions.h"
+#include <query/Operator.h>
+#include <system/SystemCatalog.h>
+#include <system/Exceptions.h>
 
+using namespace std;
 
 namespace scidb
 {
@@ -83,9 +84,9 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() == 1) {
             res.push_back(PARAM_CONSTANT(TID_BOOL));
@@ -93,45 +94,41 @@ public:
         return res;
     }
 
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
 
         assert(!_parameters.empty());
         assert(_parameters.front()->getParamType() == PARAM_ARRAY_REF);
 
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters.front())->getObjectName();
+        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters.front())->getObjectName();
 
         assert(arrayName.find('@') == std::string::npos);
 
         ArrayDesc srcDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName,srcDesc);
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION, srcDesc);
         if (srcDesc.isTransient())
         {
-            boost::shared_ptr<SystemCatalog::LockDesc> lock(boost::make_shared<SystemCatalog::LockDesc>(arrayName,
-                                                                                         query->getQueryID(),
-                                                                                         Cluster::getInstance()->getLocalInstanceId(),
-                                                                                         SystemCatalog::LockDesc::COORD,
-                                                                                         SystemCatalog::LockDesc::WR));
-            boost::shared_ptr<SystemCatalog::LockDesc> resLock(query->requestLock(lock));
+            std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(arrayName,
+                                                                                          query->getQueryID(),
+                                                                                          Cluster::getInstance()->getLocalInstanceId(),
+                                                                                          SystemCatalog::LockDesc::COORD,
+                                                                                          SystemCatalog::LockDesc::XCL));
+            std::shared_ptr<SystemCatalog::LockDesc> resLock(query->requestLock(lock));
 
-            assert(resLock);
-            assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
-        }
-        else
-        {
-            LogicalOperator::inferArrayAccess(query); // take read lock as per usual
+            SCIDB_ASSERT(resLock);
+            SCIDB_ASSERT(resLock->getLockMode() == SystemCatalog::LockDesc::XCL);
         }
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 1 || _parameters.size() == 2);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        shared_ptr<OperatorParamArrayReference>& arrayRef = (shared_ptr<OperatorParamArrayReference>&)_parameters[0];
+        std::shared_ptr<OperatorParamArrayReference>& arrayRef = (std::shared_ptr<OperatorParamArrayReference>&)_parameters[0];
         assert(arrayRef->getArrayName().find('@') == string::npos);
-        assert(arrayRef->getObjectName().find('@') == string::npos);
+        assert(ArrayDesc::isNameUnversioned(arrayRef->getObjectName()));
 
         if (arrayRef->getVersion() == ALL_VERSIONS) {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ASTERISK_USAGE2, _parameters[0]->getParsingContext());
@@ -139,7 +136,10 @@ public:
         ArrayDesc schema;
         SystemCatalog* systemCatalog = SystemCatalog::getInstance();
 
-        systemCatalog->getArrayDesc(arrayRef->getObjectName(), arrayRef->getVersion(), schema);
+        systemCatalog->getArrayDesc(arrayRef->getObjectName(),
+                                    query->getCatalogVersion(arrayRef->getObjectName()),
+                                    arrayRef->getVersion(),
+                                    schema);
 
         schema.addAlias(arrayRef->getObjectName());
 
@@ -147,7 +147,7 @@ public:
         if (_parameters.size() == 2 // the user provided a true/false clause
             &&                       // and it's true
             evaluate(
-                    ((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+                    ((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                     query,
                     TID_BOOL
                     ).getBool()
@@ -163,6 +163,8 @@ public:
             schema.setName("");
         }
 
+        SCIDB_ASSERT(schema.getPartitioningSchema() != psUninitialized);
+        SCIDB_ASSERT(schema.getPartitioningSchema() != psUndefined);
         return schema;
     }
 };

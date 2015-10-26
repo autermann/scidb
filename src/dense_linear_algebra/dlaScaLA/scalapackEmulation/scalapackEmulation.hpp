@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -67,9 +67,9 @@ extern "C" {
     void scidb_descinit_(slpp::desc_t& desc,
                    const slpp::int_t& m, const slpp::int_t& n,
                    const slpp::int_t& mb, const slpp::int_t& nb,
-                   const slpp::int_t& irSrc, const slpp::int_t& icSrc, const slpp::int_t& icTxt,
+                   const slpp::int_t& irSrc, const slpp::int_t& icSrc, const blacs::context_t& cTxt,
                    const slpp::int_t& lld, slpp::int_t& info);
-   
+
     // a local-only operation (even in its ScaLAPACK incarnation), giving exact sizes (partial block at right and bottom)
     slpp::int_t scidb_numroc_(const slpp::int_t&, const slpp::int_t&, const slpp::int_t&, const slpp::int_t&, const slpp::int_t&);
 
@@ -97,13 +97,15 @@ extern "C" {
 
     // scidb_ version only returns exactly what was set by "scidb_set_blacs_gridinfo_" below
     // it is actually implemented as an "extern C" function written in C++
-    void scidb_blacs_gridinfo_(const blacs::int_t&, const blacs::int_t&,
+    // note that blacsContext is an integer index in real ScaLAPACK, referring to an allocated context.
+    // our emulation is so much simpler, the context is just the four integers of the grid information
+    void scidb_blacs_gridinfo_(const blacs::context_t&, const blacs::int_t&,
                                const blacs::int_t&, blacs::int_t&, blacs::int_t&);
-    
-    // This one does not even exist in ScaLAPACK it is only used to modify the behavior of 
+
+    // This one does not even exist in ScaLAPACK it is only used to modify the behavior of
     // the above, which works differently than in ScaLAPACK (where there is a stack of ictxts)
     // it is actually implemented as an "extern C" function written in C++
-    void scidb_set_blacs_gridinfo_(const blacs::int_t& ictxt,
+    void scidb_set_blacs_gridinfo_(blacs::context_t& blacsContext,
                                    const blacs::int_t& nprow, const blacs::int_t& npcol,
                                    const blacs::int_t& myprow, const blacs::int_t& mypcol);
 

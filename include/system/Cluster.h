@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,7 +33,8 @@
 
 #include <vector>
 #include <set>
-#include <boost/shared_ptr.hpp>
+#include <memory>
+
 #include <util/Singleton.h>
 #include <array/Metadata.h>
 #include <util/Notification.h>
@@ -50,7 +51,7 @@ class InstanceMembership
  public:
    InstanceMembership(ViewID viewId) : _viewId(viewId){}
    InstanceMembership(ViewID viewId,
-                      boost::shared_ptr<const Instances>& instances)
+                      std::shared_ptr<const Instances>& instances)
    : _viewId(viewId), _instanceConfigs(instances)
    {
        assert(instances);
@@ -66,7 +67,7 @@ class InstanceMembership
     * Get configuration information for all registered instances
     */
    const Instances& getInstanceConfigs() const { return *_instanceConfigs; }
-   
+
    bool isEqual(const InstanceMembership& other) const
    {
       return ((_viewId == other._viewId) &&
@@ -75,9 +76,9 @@ class InstanceMembership
  private:
    InstanceMembership(const InstanceMembership&);
    InstanceMembership& operator=(const InstanceMembership&);
-   
+
    ViewID _viewId;
-   boost::shared_ptr<const scidb::Instances> _instanceConfigs;
+   std::shared_ptr<const scidb::Instances> _instanceConfigs;
    std::set<InstanceID> _instances;
 };
 
@@ -87,7 +88,7 @@ class InstanceMembership
  * For example, over the lifetime of a given membership with a given view ID there might be many
  * livenesses corresponding to the membership (via the view ID).
  */
- 
+
  class InstanceLivenessEntry
  {
    public:
@@ -129,28 +130,28 @@ class InstanceMembership
 
 }  // namespace scidb
 
-namespace boost
+namespace std
 {
-   bool operator< (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
-                   boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
+   bool operator< (std::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                   std::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
-   bool operator== (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
-                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
+   bool operator== (std::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                    std::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
-   bool operator!= (boost::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
-                    boost::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
+   bool operator!= (std::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
+                    std::shared_ptr<const scidb::InstanceLivenessEntry> const& r);
 
-} // namespace boost
+} // namespace std
 
 namespace std
 {
    template<>
-   struct less<boost::shared_ptr<const scidb::InstanceLivenessEntry> > :
-   binary_function <const boost::shared_ptr<const scidb::InstanceLivenessEntry>,
-                    const boost::shared_ptr<const scidb::InstanceLivenessEntry>,bool>
+   struct less<std::shared_ptr<const scidb::InstanceLivenessEntry> > :
+   binary_function <const std::shared_ptr<const scidb::InstanceLivenessEntry>,
+                    const std::shared_ptr<const scidb::InstanceLivenessEntry>,bool>
    {
-      bool operator() (const boost::shared_ptr<const scidb::InstanceLivenessEntry>& l,
-                       const boost::shared_ptr<const scidb::InstanceLivenessEntry>& r) const ;
+      bool operator() (const std::shared_ptr<const scidb::InstanceLivenessEntry>& l,
+                       const std::shared_ptr<const scidb::InstanceLivenessEntry>& r) const ;
    };
 } // namespace std
 
@@ -159,7 +160,7 @@ namespace scidb
 class InstanceLiveness
 {
  public:
-   typedef boost::shared_ptr<const InstanceLivenessEntry> InstancePtr;
+   typedef std::shared_ptr<const InstanceLivenessEntry> InstancePtr;
    typedef std::set<InstancePtr> DeadInstances;
    typedef std::set<InstancePtr> LiveInstances;
 
@@ -169,7 +170,7 @@ class InstanceLiveness
    const DeadInstances& getDeadInstances() const { return _deadInstances; }
    ViewID   getViewId()  const { return _viewId; }
    uint64_t getVersion() const { return _version; }
-   bool     isDead(const InstanceID& id) const { return find(_deadInstances, id); }
+   bool     isDead(const InstanceID& id) const { return find(_deadInstances, id).get() != nullptr; }
    size_t   getNumDead()  const { return _deadInstances.size(); }
    size_t   getNumLive()  const { return _liveInstances.size(); }
    size_t   getNumInstances() const { return getNumDead()+getNumLive(); }
@@ -237,23 +238,23 @@ class InstanceLiveness
    InstanceEntries _liveInstances;
    InstanceEntries _deadInstances;
 };
-   
+
 typedef Notification<InstanceLiveness> InstanceLivenessNotification;
- 
+
 class Cluster: public Singleton<Cluster>
 {
 public:
    /**
     * Get cluster membership
     * @return current membership
-    */ 
-   boost::shared_ptr<const InstanceMembership> getInstanceMembership();
+    */
+   std::shared_ptr<const InstanceMembership> getInstanceMembership();
 
    /**
     * Get cluster liveness
     * @return current liveness
-    */ 
-   boost::shared_ptr<const InstanceLiveness> getInstanceLiveness();
+    */
+   std::shared_ptr<const InstanceLiveness> getInstanceLiveness();
 
    /**
     * Get this instances' ID
@@ -265,7 +266,7 @@ public:
 
 private:
     friend class Singleton<Cluster>;
-    boost::shared_ptr<const InstanceMembership> _lastMembership;
+    std::shared_ptr<const InstanceMembership> _lastMembership;
     std::string _uuid;
     Mutex _mutex;
 };

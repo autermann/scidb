@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -232,9 +232,9 @@ namespace scidb
         }
     }
 
-    // 
+    //
     // We use this to check to see if a partition is already sorted.
-    // 
+    //
     template<class Elem, class Comparator>
     inline int sorted(Elem* array, size_t nmemb, Comparator& compare)
     {
@@ -249,9 +249,9 @@ namespace scidb
         return 1;
     }
 
-    // 
+    //
     // We use this to check to see if a partition is already reverse-sorted.
-    // 
+    //
     template<class Elem, class Comparator>
     inline int rev_sorted(Elem* array, size_t nmemb, Comparator& compare)
     {
@@ -266,9 +266,9 @@ namespace scidb
         return 1;
     }
 
-    // 
+    //
     // We use this to reverse a reverse-sorted partition.
-    // 
+    //
 
     template<class Elem>
     inline void rev_array(Elem* array, size_t nmemb)
@@ -349,11 +349,11 @@ namespace scidb
         insertion_sort(array, nmemb, compare);
     }
 
-    // 
+    //
     // Introspective quick sort algorithm user entry point.
     // You do not need to directly call any other sorting template.
     // This sort will perform very well under all circumstances.
-    // 
+    //
     template<class Elem, class Comparator>
     inline void iqsort(Elem* array, size_t nmemb, Comparator& compare)
     {

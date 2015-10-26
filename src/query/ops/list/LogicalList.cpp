@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,9 @@
 #include <util/PluginManager.h>
 #include <smgr/io/Storage.h>
 #include <util/DataStore.h>
-#include "ListArrayBuilder.h"
+#include "ListArrayBuilders.h"
+#include <usr_namespace/NamespaceDesc.h>
+#include <usr_namespace/UserDesc.h>
 
 /****************************************************************************/
 namespace scidb {
@@ -58,7 +60,6 @@ using namespace boost;
  *   - types: show all the datatypes that SciDB supports.
  *   - queries: show all the active queries.
  *   - datastores: show information about each datastore
- *   - meminfo: (undocumented) dump per instance malloc statistics
  *   - counters: (undocumented) dump info from performance counters
  *
  * @par Input:
@@ -91,9 +92,10 @@ struct LogicalList : LogicalOperator
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
+    nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() == 0)
             res.push_back(PARAM_CONSTANT(TID_STRING));
@@ -102,33 +104,55 @@ struct LogicalList : LogicalOperator
         return res;
     }
 
-    string getMainParameter(boost::shared_ptr<Query> query) const
+    string getMainParameter(std::shared_ptr<Query> query) const
     {
         if (_parameters.empty())
         {
             return "arrays";
         }
 
-        return evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(),query,TID_STRING).getString();
+        return evaluate(
+                ((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(),
+                query,
+                TID_STRING).getString();
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc>, boost::shared_ptr<Query> query)
+    bool getShowSysParameter(std::shared_ptr<Query> query) const
+    {
+        if (_parameters.size() < 2)
+        {
+            return false;
+        }
+
+        return evaluate(
+                ((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+                query,
+                TID_BOOL).getBool();
+    }
+
+    ArrayDesc inferSchema(std::vector<ArrayDesc>, std::shared_ptr<Query> query)
     {
         vector<AttributeDesc> attributes(1,AttributeDesc(0,"name",TID_STRING,0,0));
 
         string const what = getMainParameter(query);
         size_t       size = 0;
+        bool         showSys = getShowSysParameter(query);
 
         if (what == "aggregates") {
-            size = AggregateLibrary::getInstance()->getNumAggregates();
+            ListAggregatesArrayBuilder builder(
+                AggregateLibrary::getInstance()->getNumAggregates());
+            return builder.getSchema(query);
         } else if (what == "arrays") {
             ListArraysArrayBuilder builder;
             return builder.getSchema(query);
         } else if (what == "operators") {
             vector<string> names;
-            OperatorLibrary::getInstance()->getLogicalNames(names);
+            OperatorLibrary::getInstance()->getLogicalNames(names, showSys);
             size = names.size();
             attributes.push_back(AttributeDesc(1,"library",TID_STRING,0,0));
+            if (showSys) {
+                attributes.push_back(AttributeDesc(2,"internal",TID_BOOL,0,0));
+            }
         } else if (what == "types") {
             size =  TypeLibrary::typesCount();
             attributes.push_back(AttributeDesc(1,"library",TID_STRING,0,0));
@@ -148,7 +172,7 @@ struct LogicalList : LogicalOperator
             ListQueriesArrayBuilder builder;
             return builder.getSchema(query);
         } else if (what == "instances") {
-            boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
+            std::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
             size = queryLiveness->getNumInstances();
             attributes.reserve(5);
             attributes.push_back(AttributeDesc(1, "port",         TID_UINT16,0,0));
@@ -163,18 +187,30 @@ struct LogicalList : LogicalOperator
             return ListLibrariesArrayBuilder().getSchema(query);
         } else if (what == "datastores") {
             return ListDataStoresArrayBuilder().getSchema(query);
-        } else if (what == "meminfo") {
-            return ListMeminfoArrayBuilder().getSchema(query);
         } else if (what == "counters") {
             return ListCounterArrayBuilder().getSchema(query);
-        }
-        else {
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_LIST_ERROR1, _parameters[0]->getParsingContext());
+        } else if (what == "users") {
+            // There is already a name field.
+            std::vector<UserDesc> users;
+            SystemCatalog::getInstance()->getUsers(users);
+            size=users.size();
+        } else if (what == "namespaces") {
+            // There is already a name field.
+            std::vector<NamespaceDesc> namespaces;
+            SystemCatalog::getInstance()->getNamespaces(namespaces);
+            size=namespaces.size();
+        } else {
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
+                                       SCIDB_LE_LIST_ERROR1,
+                                       _parameters[0]->getParsingContext());
         }
 
         size_t const chunkInterval = size>0 ? size : 1;
 
-        return ArrayDesc(what,attributes,vector<DimensionDesc>(1,DimensionDesc("No",0,0,chunkInterval-1,chunkInterval-1,chunkInterval,0)));
+        return ArrayDesc(what, attributes,
+                         vector<DimensionDesc>(1, DimensionDesc("No", 0, 0, chunkInterval-1,
+                                                                chunkInterval-1, chunkInterval, 0)),
+                         defaultPartitioning());
     }
 };
 

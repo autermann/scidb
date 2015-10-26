@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,14 +32,14 @@
 
 #include <string>
 #include <vector>
-#include "array/DelegateArray.h"
-#include "array/Metadata.h"
+
+#include <array/DelegateArray.h>
+#include <array/Metadata.h>
 
 namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class MergeArray;
 class MergeArrayIterator;
@@ -47,34 +47,34 @@ class MergeChunkIterator;
 
 
 class MergeChunkIterator : public DelegateChunkIterator
-{    
+{
   public:
     virtual bool end();
     virtual bool isEmpty();
-    virtual  Value& getItem();
+    virtual Value const& getItem();
     virtual void operator ++();
     virtual void reset();
 	virtual bool setPosition(Coordinates const& pos);
 	virtual Coordinates const& getPosition();
 
-    MergeChunkIterator(vector< ConstChunk const* > const& inputChunks, DelegateChunk const* chunk, int iterationMode);
-    
+    MergeChunkIterator(std::vector< ConstChunk const* > const& inputChunks, DelegateChunk const* chunk, int iterationMode);
+
   private:
     int currIterator;
     int mode;
-    vector< boost::shared_ptr<ConstChunkIterator> > iterators;
+    std::vector< std::shared_ptr<ConstChunkIterator> > iterators;
 };
 
 class MergeChunk : public DelegateChunk
 {
   public:
-    vector< ConstChunk const* > inputChunks;
+    std::vector< ConstChunk const* > inputChunks;
 
-    MergeChunk(DelegateArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID) 
-    : DelegateChunk(array, iterator, attrID, false) {}    
-};   
+    MergeChunk(DelegateArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID)
+    : DelegateChunk(array, iterator, attrID, false) {}
+};
 
-   
+
 class MergeArrayIterator : public DelegateArrayIterator
 {
   public:
@@ -88,7 +88,7 @@ class MergeArrayIterator : public DelegateArrayIterator
 
   private:
     MergeChunk chunk;
-    vector< boost::shared_ptr<ConstArrayIterator> > iterators;
+    std::vector< std::shared_ptr<ConstArrayIterator> > iterators;
     int currIterator;
     bool isEmptyable;
     ConstChunk const* currentChunk;
@@ -120,10 +120,10 @@ class MergeArray : public DelegateArray
         return minimum;
     }
 
-    MergeArray(ArrayDesc const& desc, vector< boost::shared_ptr<Array> > const& inputArrays);
+    MergeArray(ArrayDesc const& desc, std::vector< std::shared_ptr<Array> > const& inputArrays);
 
   private:
-    vector< boost::shared_ptr<Array> > inputArrays;
+    std::vector< std::shared_ptr<Array> > inputArrays;
 };
 
 }

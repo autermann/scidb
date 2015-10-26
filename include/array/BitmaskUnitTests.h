@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,10 +33,11 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <iostream>
 
-#include "array/RLE.h"
+#include <array/RLE.h>
 
 
 using namespace scidb;
+
 
 class BitmaskTests: public CppUnit::TestFixture
 {
@@ -47,7 +48,6 @@ CPPUNIT_TEST(testCopy);
 CPPUNIT_TEST(testBoolPayload);
 CPPUNIT_TEST(testAppender);
 CPPUNIT_TEST_SUITE_END();
-
 
 public:
     std::ostringstream stream;
@@ -62,17 +62,20 @@ public:
         bitmaskOne.clear();
 
         RLEEmptyBitmap::Segment seg;
+
         seg._lPosition = 3;
         seg._pPosition = 5;
-        seg._length=5;
+        seg._length    = 5;
         bitmaskOne.addSegment(seg);
+
         seg._lPosition = 10;
         seg._pPosition = 11;
-        seg._length=1;
+        seg._length    = 1;
         bitmaskOne.addSegment(seg);
+
         seg._lPosition = 13;
         seg._pPosition = 14;
-        seg._length=3;
+        seg._length    = 3;
         bitmaskOne.addSegment(seg);
     }
 
@@ -317,7 +320,9 @@ public:
 
     void testAppender()
     {
-        RLEPayloadAppender a1(8*sizeof(int32_t));
+        // Append nothing and all should be well.
+        RLEPayload payload1(8 * sizeof(int32_t));
+        RLEPayload::append_iterator a1(&payload1);
         a1.finalize();
 
         RLEPayload const* p1 = a1.getPayload();
@@ -326,6 +331,7 @@ public:
         ConstRLEPayload::iterator iter = p1->getIterator();
         CPPUNIT_ASSERT(iter.end());
 
+        // OK, this time we'll append some stuff.
         Value null0;
         null0.setNull(0);
         Value null1;
@@ -334,7 +340,8 @@ public:
         Value v;
         v.setInt32(0);
 
-        RLEPayloadAppender a2(8*sizeof(int32_t));
+        RLEPayload payload2(8 * sizeof(int32_t));
+        RLEPayload::append_iterator a2(&payload2);
         a2.append(v);
         a2.append(v);
         a2.append(null0);
@@ -411,8 +418,6 @@ public:
         CPPUNIT_ASSERT(iter.end());
    }
 };
-
-
 
 CPPUNIT_TEST_SUITE_REGISTRATION(BitmaskTests);
 

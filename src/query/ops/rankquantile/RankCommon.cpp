@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,6 +37,7 @@ namespace scidb
 void GroupbyRankChunkIterator::operator++() {
     ++(*_rcIterator);
     ++(*inputIterator);
+    assert(doIteratorsMatch());
 }
 
 /**
@@ -52,8 +53,10 @@ void GroupbyRankChunkIterator::operator++() {
  *
  */
 bool GroupbyRankChunkIterator::setPosition(const Coordinates& pos) {
+    assert(doIteratorsMatch());
+
     // Did some one call setPosition at the current position?
-    if (coordinatesCompare(pos, getPosition()) == 0) {
+    if (!end() && coordinatesCompare(pos, getPosition()) == 0) {
         return true;
     }
 
@@ -62,7 +65,11 @@ bool GroupbyRankChunkIterator::setPosition(const Coordinates& pos) {
         _validPosToLocInRow = true;
 
         // store a copy of the inputIterator's current pos
-        Coordinates posInInput = inputIterator->getPosition();
+        bool isEnd = inputIterator->end();
+        Coordinates posInInput;
+        if (!isEnd) {
+            posInInput = inputIterator->getPosition();
+        }
 
         // Scan inputIterator and build the map _posToLocInRow
         inputIterator->reset();
@@ -74,13 +81,16 @@ bool GroupbyRankChunkIterator::setPosition(const Coordinates& pos) {
         }
 
         // restore inputIterator's current pos
-        inputIterator->setPosition(posInInput);
+        if (!isEnd) {
+            inputIterator->setPosition(posInInput);
+        }
+        assert(doIteratorsMatch());
     }
 
     // call RowIterator::setPosition()
-    boost::unordered_map<Coordinates, size_t>::const_iterator it = _posToLocInRow.find(pos);
+    std::unordered_map<Coordinates, size_t, CoordinatesHash>::const_iterator it = _posToLocInRow.find(pos);
     if ( it == _posToLocInRow.end()) {
-        assert(! inputIterator->setPosition(pos));
+        assert(doIteratorsMatch());
         return false;
     }
 
@@ -92,13 +102,14 @@ bool GroupbyRankChunkIterator::setPosition(const Coordinates& pos) {
     bool ret2 = inputIterator->setPosition(pos);
 
     ASSERT_EXCEPTION(ret1 == ret2, "The two iterators in GroupbyRankChunkIterator::setPosition() do not match.");
+    assert(doIteratorsMatch());
     return ret1;
 }
 
-shared_ptr<SharedBuffer> rMapToBuffer( CountsMap const& input, size_t nCoords)
+std::shared_ptr<SharedBuffer> rMapToBuffer( CountsMap const& input, size_t nCoords)
 {
     size_t totalSize = input.size() * (nCoords * sizeof(Coordinate) + sizeof(uint64_t));
-    shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, totalSize));
+    std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, totalSize));
     Coordinate *dst = (Coordinate*) buf->getData();
     BOOST_FOREACH (CountsMap::value_type bucket, input)
     {
@@ -118,7 +129,7 @@ shared_ptr<SharedBuffer> rMapToBuffer( CountsMap const& input, size_t nCoords)
     return buf;
 }
 
-void updateRmap(CountsMap& input, shared_ptr<SharedBuffer> buf, size_t nCoords)
+void updateRmap(CountsMap& input, std::shared_ptr<SharedBuffer> buf, size_t nCoords)
 {
     if (buf.get() == 0)
     {
@@ -205,18 +216,18 @@ ArrayDesc getRankingSchema(ArrayDesc const& inputSchema,
                                    0);
     }
 
-    return ArrayDesc(inputSchema.getName(), outputAttrs, outDims);
+    return ArrayDesc(inputSchema.getName(), outputAttrs, outDims, defaultPartitioning());
 }
 
 
-static shared_ptr<PreSortMap>
-makePreSortMap(shared_ptr<Array>& ary, AttributeID aId, Dimensions const& dims)
+static std::shared_ptr<PreSortMap>
+makePreSortMap(std::shared_ptr<Array>& ary, AttributeID aId, Dimensions const& dims)
 {
     const ArrayDesc& desc = ary->getArrayDesc();
     TypeEnum type = typeId2TypeEnum(desc.getAttributes()[aId].getType(),
                                     true/*noThrow*/);
 
-    shared_ptr<PreSortMap> preSortMap;
+    std::shared_ptr<PreSortMap> preSortMap;
     switch (type) {
     case TE_DOUBLE:
         preSortMap.reset(new PrimitivePreSortMap<double>(ary, aId, dims));
@@ -266,18 +277,18 @@ makePreSortMap(shared_ptr<Array>& ary, AttributeID aId, Dimensions const& dims)
 }
 
 //inputArray must be distributed round-robin
-shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
+std::shared_ptr<Array> buildRankArray(std::shared_ptr<Array>& inputArray,
                                  AttributeID rankedAttributeID,
                                  Dimensions const& groupedDimensions,
-                                 shared_ptr<Query>& query,
-                                 shared_ptr<RankingStats> rstats)
+                                 std::shared_ptr<Query>& query,
+                                 std::shared_ptr<RankingStats> rstats)
 {
-    shared_ptr<PreSortMap> preSortMap =
+    std::shared_ptr<PreSortMap> preSortMap =
         makePreSortMap(inputArray, rankedAttributeID, groupedDimensions);
 
     const ArrayDesc& input = inputArray->getArrayDesc();
     ArrayDesc outputSchema = getRankingSchema(input,rankedAttributeID);
-    shared_ptr<Array> runningRank(new RankArray(outputSchema,
+    std::shared_ptr<Array> runningRank(new RankArray(outputSchema,
                                                 inputArray,
                                                 preSortMap,
                                                 rankedAttributeID,
@@ -290,11 +301,11 @@ shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
         LOG4CXX_DEBUG(logger, "Performing rotation "<<i);
         runningRank = redistributeToRandomAccess(runningRank, query, psHashPartitioned,
                                                  ALL_INSTANCE_MASK,
-                                                 boost::shared_ptr<DistributionMapper>(),
+                                                 std::shared_ptr<CoordinateTranslator>(),
                                                  i,
-                                                 boost::shared_ptr<PartitioningSchemaData>());
+                                                 std::shared_ptr<PartitioningSchemaData>());
 
-        runningRank = shared_ptr<Array>(new RankArray(outputSchema, runningRank,
+        runningRank = std::shared_ptr<Array>(new RankArray(outputSchema, runningRank,
                                                       preSortMap, 0, true, rstats));
     }
 
@@ -302,18 +313,18 @@ shared_ptr<Array> buildRankArray(shared_ptr<Array>& inputArray,
 }
 
 //inputArray must be distributed round-robin
-shared_ptr<Array> buildDualRankArray(shared_ptr<Array>& inputArray,
+std::shared_ptr<Array> buildDualRankArray(std::shared_ptr<Array>& inputArray,
                                      AttributeID rankedAttributeID,
                                      Dimensions const& groupedDimensions,
-                                     shared_ptr<Query>& query,
-                                     shared_ptr<RankingStats> rstats)
+                                     std::shared_ptr<Query>& query,
+                                     std::shared_ptr<RankingStats> rstats)
 {
-    shared_ptr<PreSortMap> preSortMap =
+    std::shared_ptr<PreSortMap> preSortMap =
         makePreSortMap(inputArray, rankedAttributeID, groupedDimensions);
 
     const ArrayDesc& input = inputArray->getArrayDesc();
     ArrayDesc dualRankSchema = getRankingSchema(input,rankedAttributeID, true);
-    shared_ptr<Array> runningRank(new DualRankArray(dualRankSchema,
+    std::shared_ptr<Array> runningRank(new DualRankArray(dualRankSchema,
                                                     inputArray,
                                                     preSortMap,
                                                     rankedAttributeID,
@@ -326,15 +337,15 @@ shared_ptr<Array> buildDualRankArray(shared_ptr<Array>& inputArray,
         LOG4CXX_DEBUG(logger, "Performing rotation "<<i);
         runningRank = redistributeToRandomAccess(runningRank, query, psHashPartitioned,
                                                  ALL_INSTANCE_MASK,
-                                                 boost::shared_ptr<DistributionMapper>(),
+                                                 std::shared_ptr<CoordinateTranslator>(),
                                                  i,
-                                                 boost::shared_ptr<PartitioningSchemaData>());
-        runningRank = shared_ptr<Array>(new DualRankArray(dualRankSchema, runningRank,
+                                                 std::shared_ptr<PartitioningSchemaData>());
+        runningRank = std::shared_ptr<Array>(new DualRankArray(dualRankSchema, runningRank,
                                                           preSortMap, 0, true, rstats));
     }
 
     ArrayDesc outputSchema = getRankingSchema(input,rankedAttributeID);
-    return shared_ptr<Array> (new AvgRankArray(outputSchema, runningRank));
+    return std::shared_ptr<Array> (new AvgRankArray(outputSchema, runningRank));
 }
 
 }

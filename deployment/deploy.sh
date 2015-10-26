@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -43,9 +43,9 @@ Preparing remote machines:
                                 <network/mask>
                                 <scidb-coordinator-host>
 Building packages:
-  deploy.sh build       {Debug|RelWithDebInfo|Release} <packages_path>
-  deploy.sh build_fast  <packages_path>
-  deploy.sh build_deps  <packages_path>
+  deploy.sh build       {Debug|RelWithDebInfo|Release} <packages_path> [<package_name>]
+  deploy.sh build_fast  <packages_path> [<package_name>]
+  deploy.sh build_deps  <packages_path> [<package_name>]
 
 SciDB control on remote machines:
   deploy.sh scidb_install    {<packages_path>|<ScidbVersion>} <coordinator-host> [host ...]
@@ -446,9 +446,9 @@ function build_scidb_packages ()
     configure_package_manager "127.0.0.1" 0
     local packages_path=`readlink -f ${1}`
     local way="${2}"
-    rm -rf ${packages_path}
+    local pkgname="${3}"
     revision ${source_path}
-    (cd ${build_path}; ${source_path}/utils/make_packages.sh ${kind} ${way} ${packages_path} ${target})
+    (cd ${build_path}; ${source_path}/utils/make_packages.sh ${kind} ${way} ${packages_path} ${target} ${pkgname})
 }
 
 # Setup ccache on remote host
@@ -523,7 +523,7 @@ function prepare_chroot ()
     echo "Prepare for build SciDB packages in chroot on ${hostname}"
     register_3rdparty_scidb_repository "${hostname}"
     remote root "" ${hostname} "./prepare_chroot.sh ${username}"
-    remote "${username}" "${password}" ${hostname} "./chroot_build.sh" "${source_path}/utils/chroot_build.py"
+    remote "${username}" "${password}" ${hostname} "./chroot_build.sh" "${source_path}/utils/chroot_build.py ${source_path}/utils/centos-6-x86_64.cfg"
 }
 
 # Get package names from filenames
@@ -565,9 +565,17 @@ function scidb_install()
     local packages_path=`readlink -f ${1}`
     local packages
     if [ "1" == "${with_coordinator}" ]; then
-	packages="$(ls ${packages_path}/*.${kind} | xargs)"
+	if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
+	    packages="$(ls ${packages_path}/scidb-*.${kind} | xargs)"
+	else
+	    packages="$(ls ${packages_path}/scidb-*.${kind} | grep ${SCIDB_BUILD_REVISION} | xargs)"
+	fi
     else
-	packages="$(ls ${packages_path}/*.${kind} | grep -v coord | xargs)"
+	if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
+	    packages="$(ls ${packages_path}/scidb-*.${kind} | grep -v coord | xargs)"
+	else
+	    packages="$(ls ${packages_path}/scidb-*.${kind} | grep ${SCIDB_BUILD_REVISION} | grep -v coord | xargs)"
+	fi
     fi;
     remote root "" "${hostname}" "./scidb_install.sh" "${packages}"
 }
@@ -586,14 +594,13 @@ function scidb_install_release()
 function scidb_config ()
 {
 local username="${1}"
-local password="${2}"
-local database="${3}"
-local base_path="${4}"
-local instance_count="${5}"
-local no_watchdog="${6}"
-local redundancy="${7}"
-local coordinator="${8}"
-shift 8
+local database="${2}"
+local base_path="${3}"
+local instance_count="${4}"
+local no_watchdog="${5}"
+local redundancy="${6}"
+local coordinator="${7}"
+shift 7
 echo "[${database}]"
 local coordinator_instance_count=${instance_count}
 let coordinator_instance_count--
@@ -605,7 +612,6 @@ for hostname in $@; do
     let node_number++
 done;
 echo "db_user=${username}"
-echo "db_passwd=${password}"
 if [ "${no_watchdog}" != "default" ]; then
     echo "no-watchdog=${no_watchdog}"
 fi;
@@ -626,8 +632,17 @@ function scidb_prepare_node ()
     local username="${1}"
     local password="${2}"
     local hostname=${3}
+    local dbhost=${4}
+    local dbname=${5}
+    local dbuser=${6}
+    local dbpass=${7}
     remote "${username}" "${password}" ${hostname} "./scidb_prepare.sh ${SCIDB_VER}"
     remote root "" ${hostname} "cat config.ini > /opt/scidb/${SCIDB_VER}/etc/config.ini && chown ${username} /opt/scidb/${SCIDB_VER}/etc/config.ini" `readlink -f ./config.ini`
+    # Sadly these crude remote execution commands don't let the remote command read stdin,
+    # so we have to send the password as a command line argument.  Mumble.
+    remote "${username}" "${password}" ${hostname} \
+        "./pgpass_updater.py --update -H ${dbhost} -d ${dbname} -u ${dbuser} -p ${dbpass}" \
+        "${source_path}/utils/scidblib/pgpass_updater.py"
 }
 
 # Prepare SciDB cluster
@@ -649,18 +664,20 @@ function scidb_prepare ()
     local coordinator_key=`remote_no_password "${username}" "${password}" "${coordinator}" "${SSH} ${username}@${coordinator}  \"cat ~/.ssh/id_rsa.pub\"" | tail -1`
 
     # generate config.ini locally
-    scidb_config ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${coordinator} "$@" | tee ./config.ini
+    scidb_config ${db_user} ${database} ${base_path} ${instance_count} \
+        ${no_watchdog} ${redundancy} ${coordinator} "$@" | tee ./config.ini
 
     # deposit config.ini to coordinator
 
     local hostname
     for hostname in ${coordinator} $@; do
         # generate scidb environment for username
-	scidb_prepare_node "${username}" "${password}" ${hostname} # not ideal to modify the environment
+	scidb_prepare_node "${username}" "${password}" ${hostname} \
+            "${coordinator}" "${database}" "${db_user}" "${db_passwd}"
 	provide_password_less_ssh_access ${username} "${password}" "${coordinator_key}" ${hostname}
     done;
     rm -f ./config.ini
-    remote root "" ${coordinator} "./scidb_prepare_coordinator.sh ${username} ${database} ${SCIDB_VER}"
+    remote root "" ${coordinator} "./scidb_prepare_coordinator.sh ${username} ${database} ${SCIDB_VER} ${db_passwd}"
 }
 
 # Start SciDB
@@ -823,25 +840,28 @@ case ${1} in
 	install_and_configure_postgresql ${username} "${password}" ${network} ${hostname}
 	;;
     build)
-	if [ $# -ne 3 ]; then
+	if [ $# -lt 3 ]; then
 	    print_usage_exit 1
 	fi
 	package_build_type=${2}
 	packages_path=${3}
-	build_scidb_packages "${packages_path}" "chroot ${package_build_type}"
+	package_name=${4:-"scidb"}
+	build_scidb_packages "${packages_path}" "chroot ${package_build_type}" "${package_name}"
 	;;
     build_fast)
-	if [ $# -ne 2 ]; then
+	if [ $# -lt 2 ]; then
 	    print_usage_exit 1
 	fi
 	packages_path=${2}
-	build_scidb_packages "${packages_path}" "insource"
+	package_name=${3:-"scidb"}
+	build_scidb_packages "${packages_path}" "insource" "${package_name}"
 	;;
     build_deps)
-	if [ $# -ne 2 ]; then
+	if [ $# -lt 2 ]; then
 	    print_usage_exit 1
 	fi
 	packages_path=${2}
+	package_name=${3:-"scidb"}
 	echo "TODO build SciDB dependencies packages"
 	;;
     scidb_install)

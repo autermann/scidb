@@ -22,7 +22,7 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A,'${TEST_DATA_D
 {7} 3,3,32
 {8} 3,3,32
 
-SCIDB QUERY : <store(redimension(A, A_rand), A_rand)>
+SCIDB QUERY : <store(redimension(A, A_rand, false), A_rand)>
 {i,j} v
 {1,1} 8
 {1,2} 12

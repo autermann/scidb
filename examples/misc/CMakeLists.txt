@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -32,10 +32,17 @@ set (misc_src
     ../../src/util/UnitTestFileIOPhysical.cpp
     ../../src/util/UnitTestDataStoreLogical.cpp
     ../../src/util/UnitTestDataStorePhysical.cpp
+    ../../src/util/UnitTestRootArena.cpp
     ../../src/array/UnitTestChunkLimitLogical.cpp
     ../../src/array/UnitTestChunkLimitPhysical.cpp
     ../../src/array/UnitTestMemArrayLogical.cpp
     ../../src/array/UnitTestMemArrayPhysical.cpp
+    ../../src/query/ops/redimension/UnitTestChunkIdMapsLogical.cpp
+    ../../src/query/ops/redimension/UnitTestChunkIdMapsPhysical.cpp
+    ../../src/query/UnitTestBuiltinAggregatesLogical.cpp
+    ../../src/query/UnitTestBuiltinAggregatesPhysical.cpp
+    ../../src/query/ops/sg/test/LogicalTestSG.cpp
+    ../../src/query/ops/sg/test/PhysicalTestSG.cpp
 )
 
 file(GLOB misc_include "*.h")

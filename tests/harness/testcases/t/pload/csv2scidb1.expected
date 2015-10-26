@@ -1,7 +1,7 @@
 SCIDB QUERY : <CREATE array Raw_CSVLoad_1 < symbl : string, time : string, price : double, qty : int64 > [ Offset=0:*,10,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.txt' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_1.csv', 0, 'csv')>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <sort( Raw_CSVLoad_1,symbl )>
@@ -60,5 +60,5 @@ SCIDB QUERY : <sort( Raw_CSVLoad_1,symbl )>
 SCIDB QUERY : <remove ( Raw_CSVLoad_1 )>
 Query was executed successfully
 
-SCIDB QUERY : <rm -rf /tmp/csv2scidb_test_1.txt>
+SCIDB QUERY : <rm -rf /tmp/csv2scidb_1.csv>
 

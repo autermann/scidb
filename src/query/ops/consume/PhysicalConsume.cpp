@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,7 +48,7 @@ public:
     {
     }
 
-    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size() <= 1);
@@ -58,10 +58,10 @@ public:
         */
         uint64_t attrStrideSize =
             (_parameters.size() == 1)
-            ? ((shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getUint64()
+            ? ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getUint64()
             : 1;
 
-        shared_ptr<Array>& array = inputArrays[0];
+        std::shared_ptr<Array>& array = inputArrays[0];
 
         /* Scan through the array in vertical slices of width "attrStrideSize"
          */
@@ -76,7 +76,7 @@ public:
             /* Get iterators for this vertical slice
              */
             size_t sliceSize = std::min(numRealAttrs - baseAttr,attrStrideSize);
-            std::vector<shared_ptr<ConstIterator> > arrayIters(sliceSize);
+            std::vector<std::shared_ptr<ConstIterator> > arrayIters(sliceSize);
 
             for (size_t i = baseAttr;
                  i < (baseAttr + sliceSize);
@@ -98,7 +98,7 @@ public:
                 multiIters.getIDsAtMinPosition(minIds);
                 for (size_t i = 0; i < minIds.size(); i++)  {
 
-                    shared_ptr<ConstArrayIterator> currentIter =
+                    std::shared_ptr<ConstArrayIterator> currentIter =
                        static_pointer_cast<ConstArrayIterator, ConstIterator > (arrayIters[ minIds[i] ] );
                     if (isDebug()) {
                         currentIter->getChunk(); // to catch some bugs like #3656
@@ -107,7 +107,7 @@ public:
 
                     int configTileSize = Config::getInstance()->getOption<int>(CONFIG_TILE_SIZE);
                     int iterMode = ConstChunkIterator::INTENDED_TILE_MODE;
-                    shared_ptr<ConstChunkIterator> chunkIter =
+                    std::shared_ptr<ConstChunkIterator> chunkIter =
                     chunk.getConstIterator(iterMode |
                                            ConstChunkIterator::IGNORE_EMPTY_CELLS);
                     iterMode = chunkIter->getMode();
@@ -117,16 +117,16 @@ public:
                         if (chunkIter->end()) {
                             continue;
                         }
-                        chunkIter = boost::make_shared<
+                        chunkIter = std::make_shared<
                            TileConstChunkIterator<
-                              boost::shared_ptr<ConstChunkIterator> > >(chunkIter, query);
+                              std::shared_ptr<ConstChunkIterator> > >(chunkIter, query);
                         assert(configTileSize>0);
                         consumeTiledChunk(chunkIter, size_t(configTileSize));
                         continue;
                     }
 
                     while (!chunkIter->end()) {
-                        Value& v = chunkIter->getItem();
+                        Value const& v = chunkIter->getItem();
 
                         if (ConstRLEPayload* tile = v.getTile()) {
                             // old tile mode
@@ -153,9 +153,9 @@ public:
              */
             baseAttr += sliceSize;
         }
-        return shared_ptr<Array>();
+        return std::shared_ptr<Array>();
     }
-    void consumeTiledChunk(boost::shared_ptr<ConstChunkIterator>& chunkIter, size_t tileSize)
+    void consumeTiledChunk(std::shared_ptr<ConstChunkIterator>& chunkIter, size_t tileSize)
     {
         ASSERT_EXCEPTION( ! chunkIter->end(), "consumeTiledChunk must be called with a valid chunkIter" );
         Value v;
@@ -163,8 +163,8 @@ public:
         position_t nextPosition = chunkIter->getLogicalPosition();
         assert(nextPosition >= 0);
         while(nextPosition >= 0) {
-            boost::shared_ptr<BaseTile> tile;
-            boost::shared_ptr<BaseTile> cTile;
+            std::shared_ptr<BaseTile> tile;
+            std::shared_ptr<BaseTile> cTile;
             nextPosition = chunkIter->getData(nextPosition, tileSize, tile, cTile);
             if (tile) {
                 assert(cTile);

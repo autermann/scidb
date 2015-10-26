@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,14 +33,15 @@
 #define ARRAY_H_
 
 #include <set>
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
+#include <memory>
 #include <boost/noncopyable.hpp>
+
 #include <util/CoordinatesMapper.h>
 #include <array/Metadata.h>
 #include <array/TileInterface.h>
 #include <query/TypeSystem.h>
 #include <query/Statistics.h>
+#include <log4cxx/logger.h>
 
 namespace scidb
 {
@@ -112,14 +113,17 @@ public:
     virtual void unPin() const = 0;
 };
 
+/**
+ * An implementation of SharedBuffer using 'new char[]' to allocate memory.
+ */
 class MemoryBuffer : public SharedBuffer
 {
-  private:
+private:
     char*  data;
     size_t size;
     bool   copied;
 
-  public:
+public:
     void* getData() const
     {
         return data;
@@ -170,16 +174,17 @@ class MemoryBuffer : public SharedBuffer
 };
 
 /**
- * Buffer with compressed data
+ * Buffer with compressed data.
  */
 class CompressedBuffer : public SharedBuffer
 {
-  private:
+private:
     size_t compressedSize;
     size_t decompressedSize;
     void*  data;
     int    compressionMethod;
-  public:
+
+public:
     virtual void* getData() const;
     virtual size_t getSize() const;
     virtual void allocate(size_t size);
@@ -198,7 +203,6 @@ class CompressedBuffer : public SharedBuffer
     CompressedBuffer();
     ~CompressedBuffer();
 };
-
 
 /**
  * Macro to set coordinate in ChunkIterator::moveNext mask
@@ -243,7 +247,6 @@ public:
     virtual void reset() = 0;
 
     virtual ~ConstIterator();
-
 };
 
 
@@ -257,7 +260,7 @@ public:
  */
 class ConstChunkIterator : public ConstIterator
 {
-  public:
+public:
     /**
      * Constants used to specify iteration mode mask
      */
@@ -311,17 +314,17 @@ class ConstChunkIterator : public ConstIterator
     /**
      * Get current iteration mode
      */
-    virtual int getMode() = 0;
+    virtual int getMode() const = 0;
 
     /**
      * Get current element value
      */
-    virtual Value& getItem() = 0;
+    virtual Value const& getItem() = 0;
 
     /**
      * Check if current array cell is empty (if iteration mode allows visiting of empty cells)
      */
-    virtual bool isEmpty() = 0;
+    virtual bool isEmpty() const = 0;
 
     /**
      * Move forward in the specified direction
@@ -376,8 +379,8 @@ class ConstChunkIterator : public ConstIterator
     virtual const Coordinates&
     getData(scidb::Coordinates& offset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData,
-            boost::shared_ptr<BaseTile>& tileCoords)
+            std::shared_ptr<BaseTile>& tileData,
+            std::shared_ptr<BaseTile>& tileCoords)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
         << "ConstChunkIterator::getData(const Coordinates)";
@@ -400,8 +403,8 @@ class ConstChunkIterator : public ConstIterator
     virtual position_t
     getData(position_t logicalOffset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData,
-            boost::shared_ptr<BaseTile>& tileCoords)
+            std::shared_ptr<BaseTile>& tileData,
+            std::shared_ptr<BaseTile>& tileCoords)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
         << "ConstChunkIterator::getData(positon_t)";
@@ -424,7 +427,7 @@ class ConstChunkIterator : public ConstIterator
     virtual const Coordinates&
     getData(scidb::Coordinates& offset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData)
+            std::shared_ptr<BaseTile>& tileData)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
         << "ConstChunkIterator::getData(const Coordinates, data)";
@@ -446,7 +449,7 @@ class ConstChunkIterator : public ConstIterator
     virtual position_t
     getData(position_t logicalOffset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData)
+            std::shared_ptr<BaseTile>& tileData)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
         << "ConstChunkIterator::getData(positon_t,data)";
@@ -456,11 +459,14 @@ class ConstChunkIterator : public ConstIterator
      * @return a mapper capable of converting logical positions to/from array coordinates
      *         assuming row-major serialization order
      * @note a reference implementation is provided to avoid breaking (or rather fixing) all existing child implementations
+     * @example usage of this operator:
+     *   std::shared_ptr<ConstChunkIterator> ci = ...;
+     *   const CoordinatesMapper* cm = (*ci);
      */
     virtual operator const CoordinatesMapper* () const
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
-        << "ConstChunkIterator::operator()(CoordinatesMapper*)";
+        << "ConstChunkIterator::operator const CoordinatesMapper* () const";
     }
 
     /**
@@ -490,7 +496,7 @@ class ConstChunkIterator : public ConstIterator
 
 
 /**
- * The volatile iterator can also write items to the array
+ * The volatile iterator can also write items to the array.
  */
 class ChunkIterator : public ConstChunkIterator
 {
@@ -506,7 +512,7 @@ public:
     virtual void flush() = 0;
 
     /// Query context for this iterator
-    virtual boost::shared_ptr<Query> getQuery() = 0;
+    virtual std::shared_ptr<Query> getQuery() = 0;
 };
 
 /**
@@ -523,7 +529,7 @@ public:
  */
 class ConstChunk : public SharedBuffer
 {
-  public:
+public:
     /**
      * Check if this is MemChunk.
      */
@@ -581,15 +587,11 @@ class ConstChunk : public SharedBuffer
 
    bool contains(Coordinates const& pos, bool withOverlap) const;
 
-   virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const = 0;
-   ConstChunkIterator* getConstIteratorPtr(int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) {
-      // TODO JHM ; temporary bridge to support concurrent development, to be removed by the end of RQ
-#ifndef NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_SHARED_PTRS
+   virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const = 0;
+
+   ConstChunkIterator* getConstIteratorPtr(int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS)
+   {
       return getConstIterator(iterationMode).operator->();
-#else
-      assert(false);
-      return NULL;
-#endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_SHARED_PTRS
    }
 
    virtual int getCompressionMethod() const = 0;
@@ -598,7 +600,7 @@ class ConstChunk : public SharedBuffer
     * Compress chunk data info the specified buffer.
     * @param buf buffer where compressed data will be placed. It is intended to be initialized using default constructor and will be filled by this method.
     */
-    virtual void compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
+    virtual void compress(CompressedBuffer& buf, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
 
     virtual void* getData() const;
     virtual size_t getSize() const;
@@ -607,9 +609,9 @@ class ConstChunk : public SharedBuffer
 
     virtual Array const& getArray() const = 0;
 
-    void makeClosure(Chunk& closure, boost::shared_ptr<ConstRLEEmptyBitmap> const& emptyBitmap) const;
+    void makeClosure(Chunk& closure, std::shared_ptr<ConstRLEEmptyBitmap> const& emptyBitmap) const;
 
-    virtual boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
+    virtual std::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
     virtual ConstChunk const* getBitmapChunk() const;
 
     /**
@@ -621,21 +623,28 @@ class ConstChunk : public SharedBuffer
     virtual void overrideTileMode(bool) {}
 
     /**
-     * @retun true if the chunk has no cells
+     * @return true if the chunk has no cells
      * @param withOverlap true if the overlap region(s) should be included (default)
      */
-    bool isEmpty(bool withOverlap=true) const
+    virtual bool isEmpty(bool withOverlap=true) const
     {
         int iterationMode = ConstChunkIterator::IGNORE_EMPTY_CELLS;
         if (!withOverlap) {
             iterationMode |= ConstChunkIterator::IGNORE_OVERLAPS;
         }
-        boost::shared_ptr<ConstChunkIterator> ci = getConstIterator(iterationMode);
+        std::shared_ptr<ConstChunkIterator> ci = getConstIterator(iterationMode);
         assert(ci);
         return (ci->end());
     }
 
- protected:
+    virtual void showEmptyBitmap(
+        const std::string & strPrefix) const;
+
+    virtual void showInfo(
+        log4cxx::LoggerPtr const &logger,
+        std::string const &prefix) const;
+
+protected:
     ConstChunk();
     virtual ~ConstChunk();
 
@@ -644,7 +653,7 @@ class ConstChunk : public SharedBuffer
      * Note that not all subclasses use this field. Note also that PersistentChunk objects can exist indefinitely without being destroyed.
      */
     MemChunk* materializedChunk;
-    boost::shared_ptr<ConstArrayIterator> emptyIterator;
+    std::shared_ptr<ConstArrayIterator> emptyIterator;
 };
 
 /**
@@ -665,7 +674,7 @@ public:
     * Allocate and memcpy from a raw byte array.
     */
    virtual void allocateAndCopy(char const* input, size_t byteSize, size_t count,
-                                const boost::shared_ptr<Query>& query) {
+                                const std::shared_ptr<Query>& query) {
        assert(getData()==NULL);
        assert(input!=NULL);
 
@@ -700,10 +709,10 @@ public:
     */
    virtual void decompress(const CompressedBuffer& buf);
 
-   virtual boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
+   virtual std::shared_ptr<ChunkIterator> getIterator(std::shared_ptr<Query> const& query,
                                                         int iterationMode = ChunkIterator::NO_EMPTY_CHECK) = 0;
 
-   virtual void merge(ConstChunk const& with, boost::shared_ptr<Query> const& query);
+   virtual void merge(ConstChunk const& with, std::shared_ptr<Query> const& query);
 
    /**
     * This function merges at the cell level. SLOW!
@@ -712,7 +721,7 @@ public:
     *
     * @note The caller should call merge(), instead of directly calling this.
     */
-   virtual void shallowMerge(ConstChunk const& with, boost::shared_ptr<Query> const& query);
+   virtual void shallowMerge(ConstChunk const& with, std::shared_ptr<Query> const& query);
 
    /**
     * This function tries to merge at the segment level. FAST!
@@ -726,7 +735,7 @@ public:
     * @pre The chunks must be MemChunks.
     * @pre The chunks must be in RLE format.
     */
-   virtual void deepMerge(ConstChunk const& with, boost::shared_ptr<Query> const& query);
+   virtual void deepMerge(ConstChunk const& with, std::shared_ptr<Query> const& query);
 
    /**
     * Perform a generic aggregate-merge of this with another chunk.
@@ -736,8 +745,8 @@ public:
     * @param[in] query the query context
     */
    virtual void aggregateMerge(ConstChunk const& with,
-                               boost::shared_ptr<Aggregate> const& aggregate,
-                               boost::shared_ptr<Query> const& query);
+                               std::shared_ptr<Aggregate> const& aggregate,
+                               std::shared_ptr<Query> const& query);
 
    /**
     * Perform an aggregate-merge of this with another chunk.
@@ -749,10 +758,10 @@ public:
     * @param[in] query the query context
     */
    virtual void nonEmptyableAggregateMerge(ConstChunk const& with,
-                                           boost::shared_ptr<Aggregate> const& aggregate,
-                                           boost::shared_ptr<Query> const& query);
+                                           std::shared_ptr<Aggregate> const& aggregate,
+                                           std::shared_ptr<Query> const& query);
 
-   virtual void write(const boost::shared_ptr<Query>& query) = 0;
+   virtual void write(const std::shared_ptr<Query>& query) = 0;
    virtual void truncate(Coordinate lastCoord);
    virtual void setCount(size_t count);
 
@@ -816,17 +825,17 @@ public:
      * Copy chunk
      * @param srcChunk source chunk
      */
-    virtual Chunk& copyChunk(ConstChunk const& srcChunk, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap);
+    virtual Chunk& copyChunk(ConstChunk const& srcChunk, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap);
 
     virtual Chunk& copyChunk(ConstChunk const& srcChunk) {
-        boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+        std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
         return copyChunk(srcChunk, emptyBitmap);
     }
 
     virtual void deleteChunk(Chunk& chunk);
 
     /// Query context for this iterator
-    virtual boost::shared_ptr<Query> getQuery() = 0;
+    virtual std::shared_ptr<Query> getQuery() = 0;
 };
 
 class Array;
@@ -837,10 +846,10 @@ class Array;
  */
 class ConstItemIterator : public ConstChunkIterator
 {
-  public:
-    virtual int getMode();
-    virtual  Value& getItem();
-    virtual bool isEmpty();
+public:
+    virtual int getMode() const;
+    virtual Value const& getItem();
+    virtual bool isEmpty() const;
     virtual ConstChunk const& getChunk() ;
     virtual bool end();
     virtual void operator ++();
@@ -850,9 +859,9 @@ class ConstItemIterator : public ConstChunkIterator
 
     ConstItemIterator(Array const& array, AttributeID attrID, int iterationMode);
 
-  private:
-    boost::shared_ptr<ConstArrayIterator> arrayIterator;
-    boost::shared_ptr<ConstChunkIterator> chunkIterator;
+private:
+    std::shared_ptr<ConstArrayIterator> arrayIterator;
+    std::shared_ptr<ConstChunkIterator> chunkIterator;
     int iterationMode;
 };
 
@@ -862,13 +871,7 @@ class ConstItemIterator : public ConstChunkIterator
  * To access the data in the array, a constant (read-only) iterator can be requested, or a
  * volatile iterator can be used.
  */
-class Array :
-// TODO JHM ; temporary bridge to support concurrent development, to be removed by the end of RQ
-#ifndef NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_PROTECTED_BASE_CLASSES
-    public SelfStatistics
-#else
-    protected SelfStatistics
-#endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_ACCEPT_PROTECTED_BASE_CLASSES
+class Array : public SelfStatistics
 {
 public:
 
@@ -930,7 +933,7 @@ public:
      * Build and return a list of the chunk positions. Only callable if hasChunkPositions() returns true, throws otherwise.
      * @return the sorted set of coordinates, containing the first coordinate of every chunk present in the array
      */
-    virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const;
+    virtual std::shared_ptr<CoordinateSet> getChunkPositions() const;
 
     /**
      * If hasChunkPositions() is true, return getChunkPositions(); otherwise build a list of chunk positions manually
@@ -939,7 +942,7 @@ public:
      * at least MULTI_PASS.
      * @return the sorted set of coordinates, containing the first coordinate of every chunk present in the array
      */
-    virtual boost::shared_ptr<CoordinateSet> findChunkPositions() const;
+    virtual std::shared_ptr<CoordinateSet> findChunkPositions() const;
 
     /**
      * Determine if the array is materialized; which means all chunks are populated either memory or on disk, and available on request.
@@ -963,10 +966,10 @@ public:
     }
 
     /**
-     * Extract subarray between specified coordinates in the buffer.
+     * Extract subarray between specified coordinates into the buffer.
      * @param attrID extracted attribute of the array (should be fixed size)
      * @param buf buffer preallocated by caller which should be preallocated by called and be large enough
-     * to fit all data.
+     *        to fit all data.
      * @param first minimal coordinates of extract box
      * @param last maximal coordinates of extract box
      * @param init EXTRACT_INIT_ZERO or EXTRACT_INIT_NAN
@@ -992,7 +995,7 @@ public:
      *            If false - append the first chunk for all attributes, then the second chunk...
      * @param[out] newChunkCoordinates if set - the method shall insert the coordinates of all appended chunks into the set pointed to.
      */
-    virtual void append(boost::shared_ptr<Array>& input, bool const vertical = true,  std::set<Coordinates, CoordinatesLess>* newChunkCoordinates = NULL);
+    virtual void append(const std::shared_ptr<Array>& input, bool const vertical = true,  CoordinateSet* newChunkCoordinates = NULL);
 
     /**
      * Get array descriptor
@@ -1004,23 +1007,18 @@ public:
      * @param attr attribute ID
      * @return iterator through chunks of spcified attribute
      */
-    virtual boost::shared_ptr<ArrayIterator> getIterator(AttributeID attr);
+    virtual std::shared_ptr<ArrayIterator> getIterator(AttributeID attr);
 
     /**
      * Get read-only iterator
      * @param attr attribute ID
      * @return read-only iterator through chunks of spcified attribute
      */
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const = 0;
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const = 0;
 
-    ConstArrayIterator* getConstIteratorPtr(AttributeID attr) const {
-// TODO JHM ; temporary bridge to support concurrent development, to be removed by the end of RQ
-#ifndef NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_SHARED_PTRS
+    ConstArrayIterator* getConstIteratorPtr(AttributeID attr) const
+    {
         return getConstIterator(attr).operator->();
-#else
-        assert(false);
-        return NULL;
-#endif // NO_SUPPPORT_FOR_SWIG_TARGETS_THAT_CANT_HANDLE_SHARED_PTRS
     }
 
     /**
@@ -1028,7 +1026,7 @@ public:
      * @param attr attribute ID
      * @param iterationMode chunk iteration mode
      */
-    virtual boost::shared_ptr<ConstItemIterator> getItemIterator(AttributeID attr, int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const;
+    virtual std::shared_ptr<ConstItemIterator> getItemIterator(AttributeID attr, int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS) const;
 
     /**
      * Scan entire array and print contents to logger
@@ -1036,8 +1034,7 @@ public:
      */
     void printArrayToLogger() const;
 
-    void setQuery(boost::shared_ptr<Query> const& query) {_query = query;}
-
+    void setQuery(std::shared_ptr<Query> const& query) {_query = query;}
 
     /**
      * If count() can return its result in O(1) [or O(nExistingChunks) time if from a
@@ -1060,16 +1057,22 @@ public:
      */
     virtual size_t count() const; // logically const, even if an result is cached.
 
- protected:
+protected:
     /// The query context for this array
-    boost::weak_ptr<Query> _query;
+    std::weak_ptr<Query> _query;
 };
 
-class PinBuffer {
+/**
+ * A class that auto-unpins a given SharedBuffer in its destructor.
+ */
+class PinBuffer
+{
     SharedBuffer const& buffer;
     bool pinned;
-  public:
-    PinBuffer(SharedBuffer const& buf) : buffer(buf) {
+
+public:
+    PinBuffer(SharedBuffer const& buf) : buffer(buf)
+    {
         pinned = buffer.pin();
     }
 
@@ -1088,7 +1091,7 @@ typedef PinBuffer Pinner;
 
 /**
  * Constructed around a chunk pointer to automatically unpin the chunk on destruction.
- * May be initially constructed with NULL pointer, in which case the poiter may (or may not) be reset
+ * May be initially constructed with NULL pointer, in which case the pointer may (or may not) be reset
  * to a valid chunk pointer.
  */
 class UnPinner : public boost::noncopyable
@@ -1127,7 +1130,5 @@ public:
     }
 };
 
-
-}
-
+} // namespace
 #endif /* ARRAY_H_ */

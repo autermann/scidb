@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,9 +27,9 @@
  *      Author: Knizhnik
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
 
 
 using namespace std;
@@ -64,33 +64,35 @@ namespace scidb {
 class LogicalRemove: public LogicalOperator
 {
 public:
-	LogicalRemove(const string& logicalName, const std::string& alias):
-	    LogicalOperator(logicalName, alias)
-	{
-		ADD_PARAM_IN_ARRAY_NAME()
-	    _properties.exclusive = true;
-		_properties.ddl = true;
-	}
+    LogicalRemove(const string& logicalName, const std::string& alias):
+    LogicalOperator(logicalName, alias)
+    {
+        ADD_PARAM_IN_ARRAY_NAME()
+        _properties.exclusive = true;
+        _properties.ddl = true;
+    }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
-	{
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
+    {
         assert(schemas.size() == 0);
-        return ArrayDesc();
-	}
+        ArrayDesc arrDesc;
+        arrDesc.setPartitioningSchema(defaultPartitioning());
+        return arrDesc;
+    }
 
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
         assert(_parameters.size() == 1);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         assert(arrayName.find('@') == std::string::npos);
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
                                                                                      query->getQueryID(),
                                                                                      Cluster::getInstance()->getLocalInstanceId(),
                                                                                      SystemCatalog::LockDesc::COORD,
                                                                                      SystemCatalog::LockDesc::RM));
-        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         assert(resLock);
         assert(resLock->getLockMode() >= SystemCatalog::LockDesc::RM);
     }

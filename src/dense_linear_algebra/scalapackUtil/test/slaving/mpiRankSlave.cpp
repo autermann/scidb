@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 namespace scidb
 {
-    
+
 slpp::int_t mpirankSlave(void* bufs[], size_t sizes[], unsigned count)
 {
     enum dummy  {BUF_ARGS=0, BUF_IN, BUF_OUT, NUM_BUFS };
@@ -65,7 +65,7 @@ slpp::int_t mpirankSlave(void* bufs[], size_t sizes[], unsigned count)
 
     // call scalapack tools routine to initialize a scalapack grid and give us its
     // context
-    sl_init_(ICTXT/*out*/, args.NPROW/*in*/, args.NPCOL/*in*/); 
+    sl_init_(ICTXT/*out*/, args.NPROW/*in*/, args.NPCOL/*in*/);
 
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1, MYPCOL=-1, MYPNUM=-1; // illegal vals
     getSlaveBLACSInfo(ICTXT/*in*/, NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM);
@@ -125,7 +125,7 @@ slpp::int_t mpirankSlave(void* bufs[], size_t sizes[], unsigned count)
     for(int ii=0; ii < SIZE_IN; ii++) {
         if(IN[ii] != MYPNUM) {
             std::cerr << "MYPNUM:" << MYPNUM << " @ (" << MYPROW << "," << MYPCOL << ")"
-                      << " IN["<<ii<<"] = " << IN[ii] << " != MYPNUM" << std::endl;  
+                      << " IN["<<ii<<"] = " << IN[ii] << " != MYPNUM" << std::endl;
             assert(false); // TODO: need correct way to fail, and not just in debug mode
             ::exit(99); // something that does not look like a signal
             break;

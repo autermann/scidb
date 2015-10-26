@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -195,7 +195,7 @@ void UserException::format()
 
 Exception::Pointer UserException::copy() const
 {
-    shared_ptr<UserException> e = shared_ptr<UserException>(
+    std::shared_ptr<UserException> e = std::shared_ptr<UserException>(
         new UserException(_file.c_str(), _function.c_str(), _line, _errors_namespace.c_str(),
             _short_error_code, _long_error_code, _stringified_short_error_code.c_str(),
             _stringified_long_error_code.c_str(), _query_id));
@@ -217,7 +217,7 @@ void UserException::raise() const
 UserQueryException::UserQueryException(const char* file, const char* function, int32_t line,
     const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
     const char* stringified_short_error_code, const char* stringified_long_error_code,
-    const boost::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id):
+    const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id):
         UserException(file, function, line, errors_namespace, short_error_code, long_error_code,
             stringified_short_error_code, stringified_long_error_code, query_id),
         _parsingContext(parsingContext)
@@ -228,7 +228,7 @@ UserQueryException::UserQueryException(const char* file, const char* function, i
 UserQueryException::UserQueryException(const char* file, const char* function, int32_t line,
     const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
     const char* stringified_short_error_code, const char* stringified_long_error_code,
-    const boost::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id):
+    const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id):
         UserException(file, function, line, errors_namespace, short_error_code, long_error_code,
             stringified_short_error_code, stringified_long_error_code, query_id),
         _parsingContext(parsingContext)
@@ -276,14 +276,14 @@ void UserQueryException::format()
     _what_str = ss.str();
 }
 
-boost::shared_ptr<ParsingContext> UserQueryException::getParsingContext() const
+std::shared_ptr<ParsingContext> UserQueryException::getParsingContext() const
 {
     return _parsingContext;
 }
 
 Exception::Pointer UserQueryException::copy() const
 {
-    shared_ptr<UserQueryException> e = shared_ptr<UserQueryException>(
+    std::shared_ptr<UserQueryException> e = std::shared_ptr<UserQueryException>(
         new UserQueryException(_file.c_str(), _function.c_str(),
             _line, _errors_namespace.c_str(), _short_error_code, _long_error_code,
             _stringified_short_error_code.c_str(), _stringified_long_error_code.c_str(),
@@ -337,7 +337,7 @@ void SystemException::format()
 
 Exception::Pointer SystemException::copy() const
 {
-    shared_ptr<SystemException> e = shared_ptr<SystemException>(new SystemException(_file.c_str(),
+    std::shared_ptr<SystemException> e = std::shared_ptr<SystemException>(new SystemException(_file.c_str(),
         _function.c_str(), _line, _errors_namespace.c_str(), _short_error_code, _long_error_code,
         _stringified_short_error_code.c_str(), _stringified_long_error_code.c_str(), _query_id));
 

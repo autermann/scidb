@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,9 +37,9 @@ chunk_skew() =
         iid, int64(inst),
         aid, int64(arrid)),
        <nchunks   : uint64 null,
-        min_ccnt  : uint32 null,
+        min_ccnt  : uint64 null,
         avg_ccnt  : double null,
-        max_ccnt  : uint32 null,
+        max_ccnt  : uint64 null,
         total_cnt : uint64 null>
         [iid = 0:*,1000,0,aid= 0:*,1000,0],
        count(*)   as nchunks,

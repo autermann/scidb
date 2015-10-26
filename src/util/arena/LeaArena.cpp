@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,6 +22,7 @@
 
 /****************************************************************************/
 
+#include <system/Constants.h>                            // For KiB, MiB, etc.
 #include <util/arena/LimitedArena.h>                     // For LimitedArena
 #include <boost/array.hpp>                               // For boost::array
 #include <bitset>                                        // For std::bitset
@@ -867,136 +868,138 @@ bool LeaArena::consistent() const
  *  using performance data taken from a run of the system in order to optimize
  *  the distribution of blocks amongst the bins.
  */
-const size_t LeaArena::_size[] =
+const size_t LeaArena::_size[128] =
 {
-    asWords(       24),  //    0
-    asWords(       32),  //    1
-    asWords(       40),  //    2
-    asWords(       48),  //    3
-    asWords(       56),  //    4
-    asWords(       64),  //    5
-    asWords(       72),  //    6
-    asWords(       80),  //    7
-    asWords(       88),  //    8
-    asWords(       96),  //    9
-    asWords(      104),  //   10
-    asWords(      112),  //   11
-    asWords(      120),  //   12
-    asWords(      128),  //   13
-    asWords(      136),  //   14
-    asWords(      144),  //   15
-    asWords(      152),  //   16
-    asWords(      160),  //   17
-    asWords(      168),  //   18
-    asWords(      176),  //   19
-    asWords(      184),  //   20
-    asWords(      192),  //   21
-    asWords(      200),  //   22
-    asWords(      208),  //   23
-    asWords(      216),  //   24
-    asWords(      224),  //   25
-    asWords(      232),  //   26
-    asWords(      240),  //   27
-    asWords(      248),  //   28
-    asWords(      256),  //   29
-    asWords(      264),  //   30
-    asWords(      272),  //   31
-    asWords(      280),  //   32
-    asWords(      288),  //   33
-    asWords(      296),  //   34
-    asWords(      304),  //   35
-    asWords(      312),  //   36
-    asWords(      320),  //   27
-    asWords(      328),  //   38
-    asWords(      336),  //   39
-    asWords(      344),  //   40
-    asWords(      352),  //   41
-    asWords(      360),  //   42
-    asWords(      368),  //   43
-    asWords(      376),  //   44
-    asWords(      384),  //   45
-    asWords(      392),  //   46
-    asWords(      400),  //   47
-    asWords(      408),  //   48
-    asWords(      416),  //   49
-    asWords(      424),  //   50
-    asWords(      432),  //   51
-    asWords(      440),  //   52
-    asWords(      448),  //   53
-    asWords(      456),  //   54
-    asWords(      464),  //   55
-    asWords(      472),  //   56
-    asWords(      480),  //   57
-    asWords(      488),  //   58
-    asWords(      496),  //   59
-    asWords(      504),  //   60
-    asWords(      512),  //   61
-    asWords(      520),  //   62
-    asWords(      528),  //   63
-    asWords(      576),  //   64
-    asWords(      640),  //   65
-    asWords(      704),  //   66
-    asWords(      768),  //   67
-    asWords(      832),  //   68
-    asWords(      896),  //   69
-    asWords(      960),  //   70
-    asWords(     1024),  //   71   2^10      1KiB
-    asWords(     1088),  //   72
-    asWords(     1152),  //   73
-    asWords(     1216),  //   74
-    asWords(     1280),  //   75
-    asWords(     1344),  //   76
-    asWords(     1408),  //   77
-    asWords(     1472),  //   78
-    asWords(     1536),  //   79
-    asWords(     1600),  //   80
-    asWords(     1664),  //   81
-    asWords(     1728),  //   82
-    asWords(     1792),  //   83
-    asWords(     1856),  //   84
-    asWords(     1920),  //   85
-    asWords(     1984),  //   96
-    asWords(     2048),  //   87   2^11     2KiB
-    asWords(     2112),  //   88
-    asWords(     2560),  //   89
-    asWords(     3072),  //   90
-    asWords(     3584),  //   91
-    asWords(     4096),  //   92   2^12     4KiB
-    asWords(     4608),  //   93
-    asWords(     5120),  //   94            5KiB
-    asWords(     5632),  //   95
-    asWords(     6144),  //   96            6KiB
-    asWords(     6656),  //   97
-    asWords(     7168),  //   98            7KiB
-    asWords(     7680),  //   99
-    asWords(     8192),  //  100   2^13     8KiB
-    asWords(     8704),  //  101
-    asWords(     9216),  //  102            9KiB
-    asWords(     9728),  //  103
-    asWords(    10240),  //  104           10KiB
-    asWords(    10752),  //  105
-    asWords(    12288),  //  106           12KiB
-    asWords(    16384),  //  107   2^14    16KiB
-    asWords(    20480),  //  108           20KiB
-    asWords(    24576),  //  109           24KiB
-    asWords(    28672),  //  110           28KiB
-    asWords(    32768),  //  111   2^15    32KiB
-    asWords(    36864),  //  112           34KiB
-    asWords(    40960),  //  113           40KiB
-    asWords(    65536),  //  114   2^16    64KiB
-    asWords(    98304),  //  115           96KiB
-    asWords(   131072),  //  116   2^17   128KiB
-    asWords(   163840),  //  117          160KiB
-    asWords(   262144),  //  118   2^18   256KiB
-    asWords(   524288),  //  119   2^19   512KiB
-    asWords(  1048576),  //  120   2^20     1MiB
-    asWords(  2097152),  //  121   2^21     2MiB
-    asWords(  4194304),  //  122   2^22     4MiB
-    asWords(  8388608),  //  123   2^23     8MiB
-    asWords( 16777216),  //  124   2^24    16MiB
-    asWords( 33554432),  //  125   2^25    32MiB
-    asWords( 67108864),  //  126   2^26    64MiB
-    asWords(134217728),  //  127   2^27   128MiB
+#define bin(bin,     bytes)  (asWords(bytes) + Live::overhead())
+        bin(  0,        16),
+        bin(  1,        24),
+        bin(  2,        32),
+        bin(  3,        40),
+        bin(  4,        48),
+        bin(  5,        56),
+        bin(  6,        64),
+        bin(  7,        72),
+        bin(  8,        80),
+        bin(  9,        88),
+        bin( 10,        96),
+        bin( 11,       104),
+        bin( 12,       112),
+        bin( 13,       120),
+        bin( 14,       128),
+        bin( 15,       136),
+        bin( 16,       144),
+        bin( 17,       152),
+        bin( 18,       160),
+        bin( 19,       168),
+        bin( 20,       176),
+        bin( 21,       184),
+        bin( 22,       192),
+        bin( 23,       200),
+        bin( 24,       208),
+        bin( 25,       216),
+        bin( 26,       224),
+        bin( 27,       232),
+        bin( 28,       240),
+        bin( 29,       248),
+        bin( 30,       256),
+        bin( 31,       264),
+        bin( 32,       272),
+        bin( 33,       280),
+        bin( 34,       288),
+        bin( 35,       296),
+        bin( 36,       304),
+        bin( 27,       312),
+        bin( 38,       320),
+        bin( 39,       328),
+        bin( 40,       336),
+        bin( 41,       344),
+        bin( 42,       352),
+        bin( 43,       360),
+        bin( 44,       368),
+        bin( 45,       376),
+        bin( 46,       384),
+        bin( 47,       392),
+        bin( 48,       400),
+        bin( 49,       408),
+        bin( 50,       416),
+        bin( 51,       424),
+        bin( 52,       432),
+        bin( 53,       440),
+        bin( 54,       448),
+        bin( 55,       456),
+        bin( 56,       464),
+        bin( 57,       472),
+        bin( 58,       480),
+        bin( 59,       488),
+        bin( 60,       496),
+        bin( 61,       504),
+        bin( 62,       512),
+        bin( 63,       520),
+        bin( 64,       576),
+        bin( 65,       640),
+        bin( 66,       704),
+        bin( 67,       768),
+        bin( 68,       832),
+        bin( 69,       896),
+        bin( 70,       960),
+        bin( 71,      1024),
+        bin( 72,      1088),
+        bin( 73,      1152),
+        bin( 74,      1216),
+        bin( 75,      1280),
+        bin( 76,      1344),
+        bin( 77,      1408),
+        bin( 78,      1472),
+        bin( 79,      1536),
+        bin( 80,      1600),
+        bin( 81,      1664),
+        bin( 82,      1728),
+        bin( 83,      1792),
+        bin( 84,      1856),
+        bin( 85,      1920),
+        bin( 96,      1984),
+        bin( 87,   2.0*KiB),
+        bin( 88,   2.2*KiB),
+        bin( 89,   2.5*KiB),
+        bin( 90,   3.0*KiB),
+        bin( 91,   3.5*KiB),
+        bin( 92,   4.0*KiB),
+        bin( 93,   4.5*KiB),
+        bin( 94,   5.0*KiB),
+        bin( 95,   5.5*KiB),
+        bin( 96,   6.0*KiB),
+        bin( 97,   6.5*KiB),
+        bin( 98,   7.0*KiB),
+        bin( 99,   7.5*KiB),
+        bin(100,   8.0*KiB),
+        bin(101,   8.5*KiB),
+        bin(102,   9.0*KiB),
+        bin(103,   9.5*KiB),
+        bin(104,  10.0*KiB),
+        bin(105,  10.5*KiB),
+        bin(106,  12.0*KiB),
+        bin(107,  16.0*KiB),
+        bin(108,  20.0*KiB),
+        bin(109,  24.0*KiB),
+        bin(110,  28.0*KiB),
+        bin(111,  32.0*KiB),
+        bin(112,  36.0*KiB),
+        bin(113,  40.0*KiB),
+        bin(114,  64.0*KiB),
+        bin(115,  96.0*KiB),
+        bin(116, 128.0*KiB),
+        bin(117, 160.0*KiB),
+        bin(118, 256.0*KiB),
+        bin(119, 512.0*KiB),
+        bin(120,   1.0*MiB),
+        bin(121,   2.0*MiB),
+        bin(122,   4.0*MiB),
+        bin(123,   8.0*MiB),
+        bin(124,  16.0*MiB),
+        bin(125,  32.0*MiB),
+        bin(126,  64.0*MiB),
+        bin(127, 128.0*MiB),
+#undef  bin
 };
 
 /**
@@ -1007,7 +1010,7 @@ const size_t LeaArena::_size[] =
  */
 ArenaPtr newLeaArena(const Options& o)
 {
-    return boost::make_shared<LeaArena>(o);              // Allocate new arena
+    return std::make_shared<LeaArena>(o);              // Allocate new arena
 }
 
 /****************************************************************************/

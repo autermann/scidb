@@ -3,8 +3,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,7 +28,7 @@
  *      Author: Knizhnik
  */
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "query/Operator.h"
 #include "system/Exceptions.h"
@@ -96,13 +96,13 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    virtual bool compileParamInTileMode(size_t paramNo) { 
+    virtual bool compileParamInTileMode(size_t paramNo) {
         return (paramNo % 2) == 1;
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() % 2 == 0)
         {   res.push_back(PARAM_OUT_ATTRIBUTE_NAME("void")); }
@@ -111,7 +111,7 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         assert(_parameters[0]->getParamType() == PARAM_ATTRIBUTE_REF);
@@ -146,13 +146,13 @@ public:
         size_t k;
         for (k=0; k<_parameters.size(); k+=2)
         {
-            const string &attributeName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[k])->getObjectName();
+            const string &attributeName = ((std::shared_ptr<OperatorParamReference>&)_parameters[k])->getObjectName();
             Expression expr;
-            expr.compile(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
+            expr.compile(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
             if (_properties.tile && expr.isConstant()) {
                 // TODO: it's not good to switch off tiles if we have constant. See #1587 for more details.
                 _properties.tile = false;
-                expr.compile(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
+                expr.compile(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
             }
             int flags = 0;
             if (expr.isNullable())
@@ -199,7 +199,7 @@ public:
                                               emptyTag->getVarSize()));
         }
 
-        return ArrayDesc(schemas[0].getName(), outAttrs, schemas[0].getDimensions());
+        return ArrayDesc(schemas[0].getName(), outAttrs, schemas[0].getDimensions(), defaultPartitioning());
     }
 };
 

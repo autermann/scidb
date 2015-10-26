@@ -4,7 +4,7 @@ load_library('dense_linear_algebra')
 
 --test
 mpi_init()
-join(mpi_test(), mpi_test())
+join(_mpi_test(), _mpi_test())
 --shell --store --command "ls /dev/shm/SciDB* 2>/dev/null || true"
 
 --cleanup

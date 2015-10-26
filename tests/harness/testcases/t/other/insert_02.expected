@@ -230,7 +230,7 @@ SCIDB QUERY : <insert(apply(build(ZZ,x*y+10),b, x),BB)>
 [An error expected at this place for the query "insert(apply(build(ZZ,x*y+10),b, x),BB)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_WRONG_ATTRIBUTE_TYPE.]
 
 SCIDB QUERY : <insert(build(ZZ,x*y+10),BB)>
-[An error expected at this place for the query "insert(build(ZZ,x*y+10),BB)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ILLEGAL_OPERATION. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ILLEGAL_OPERATION.]
+[An error expected at this place for the query "insert(build(ZZ,x*y+10),BB)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_ARRAYS_NOT_CONFORMANT.]
 
 SCIDB QUERY : <insert(apply(build(ZZ,x*y+10),b,'SciDB'+a),BB)>
 {x,y} a,b
@@ -251,43 +251,9 @@ SCIDB QUERY : <insert(apply(build(ZZ,x*y+10),b,'SciDB'+a),BB)>
 {3,2} '16','SciDB16'
 {3,3} '19','SciDB19'
 
-SCIDB QUERY : <insert(concat(ZZ,ZZ),AA)>
-{x,y} a
-{0,0} '3amigos!1-insert '
-{0,2} '5amigos!2-insert '
-{0,3} ''
-{1,2} ''
-{1,3} ''
-{2,2} '5amigos'
-{2,3} '6amigos'
-{3,2} ''
-{3,3} ''
-{4,2} '5amigos!2-insert '
-
-SCIDB QUERY : <insert(between(concat(ZZ,ZZ),1,1,2,2),AA)>
-{x,y} a
-{0,0} '3amigos!1-insert '
-{0,2} '5amigos!2-insert '
-{0,3} ''
-{1,2} ''
-{1,3} ''
-{2,2} '5amigos'
-{2,3} '6amigos'
-{3,2} ''
-{3,3} ''
-{4,2} '5amigos!2-insert '
-
-SCIDB QUERY : <insert(subarray(insert(between(concat(ZZ,ZZ),1,1,2,2),AA),2,2,4,4),TT)>
-{x,y} a
-{0,0} '5amigos'
-{0,1} '6amigos'
-{1,0} ''
-{1,1} ''
-{2,0} '5amigos!2-insert '
-
 SCIDB QUERY : <aggregate(versions(AA),count(*))>
 {i} count
-{0} 6
+{0} 3
 
 SCIDB QUERY : <aggregate(versions(BB),count(*))>
 {i} count
@@ -299,7 +265,7 @@ SCIDB QUERY : <aggregate(versions(ZZ),count(*))>
 
 SCIDB QUERY : <aggregate(versions(TT),count(*))>
 {i} count
-{0} 1
+{0} 0
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -92,7 +92,7 @@ public:
          * _localCounts[i] stores the number of records from instance i that are less than the splitter.
          * @note the sum of _localCounts[i] is equal to _globalCount.
          */
-        vector<size_t> _localCounts;
+        std::vector<size_t> _localCounts;
 
         SplitterAndCounts():_globalCount(0), _splitter(NULL)
         {}
@@ -107,8 +107,8 @@ public:
      * @param timing                 a reference to an ElapsedMilliSeconds object, to print timing info to scidb.log.
      */
     DistributedSort(
-            shared_ptr<Query> query,
-            shared_ptr<MemArray> const& sortedLocalData,
+            std::shared_ptr<Query> query,
+            std::shared_ptr<MemArray> const& sortedLocalData,
             ArrayDesc const& expandedSchema,
             arena::ArenaPtr arena,
             SortingAttributeInfos const& sortingAttributeInfos,
@@ -121,18 +121,18 @@ public:
     /**
      * This is the main sort routine.
      */
-    boost::shared_ptr<MemArray> sort();
+    std::shared_ptr<MemArray> sort();
 
 protected: // data members
     /**
      * Query context.
      */
-    boost::shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
 
     /**
      * Sorted local data.
      */
-    boost::shared_ptr<MemArray> _sortedLocalData;
+    std::shared_ptr<MemArray> _sortedLocalData;
 
     /**
      * Some info about the sorted local data.
@@ -155,7 +155,7 @@ protected: // data members
      *       (for attributes in the sorting key) MUST remain valid and must point to the same chunkPos, until the sort completes.
      *       This protocol saves the time to check and assign array iterators.
      */
-    std::vector<boost::shared_ptr<ConstArrayIterator> > _sortedLocalDataArrayIterators;
+    std::vector<std::shared_ptr<ConstArrayIterator> > _sortedLocalDataArrayIterators;
 
     /**
      * Chunk iterators for sorted local array.
@@ -165,7 +165,7 @@ protected: // data members
      * @note For chunk iterators, the guarantee is: if for one of the sorting attributes the chunk iterator is valid, then
      *       the other chunk iterators (for other attributes in the sorting key) must be valid and must point to the same cellPos.
      */
-    std::vector<boost::shared_ptr<ConstChunkIterator> > _sortedLocalDataChunkIterators;
+    std::vector<std::shared_ptr<ConstChunkIterator> > _sortedLocalDataChunkIterators;
 
     /**
      * The memory arena to be used to allocate memory from.
@@ -182,7 +182,7 @@ protected: // data members
      * A TupleComparator object used to compare two Splitter objects.
      * MergeSortArray needs this version.
      */
-    boost::shared_ptr<TupleComparator> _tupleComparator;
+    std::shared_ptr<TupleComparator> _tupleComparator;
 
     /**
      * A TupleLessThan object used to compare two Splitter objects.
@@ -205,7 +205,7 @@ protected: // data members
      * @note The goal of the anchors-finding phase is to fill in _anchors, such that
      *       _anchors[k]->_globalCount = _desiredCounts[k].
      */
-    vector<size_t> _desiredCounts;
+    std::vector<size_t> _desiredCounts;
 
     /**
      * A vector of splitters, from the first record in each local chunk.
@@ -251,7 +251,7 @@ protected: // Member functions that may be overloaded, to implement other versio
      * @note Before calling this function, _desiredCounts and _anchors must have been filled already.
      * @note By default, all anchorIDs (where a perfect anchor has not been found yet) will be returned.
      */
-    virtual void pickAnchorIDsToGenerateNewSplitters(vector<size_t>& anchorIDs) const;
+    virtual void pickAnchorIDsToGenerateNewSplitters(std::vector<size_t>& anchorIDs) const;
 
     /**
      * An optional optimization is to remove the splitters from _setOfSplitterAndCounts,
@@ -277,10 +277,10 @@ protected: // Member functions that may be overloaded, to implement other versio
      *
      * By default, we use exactly splitting, and this function is not called.
      */
-    virtual shared_ptr<MemArray> redistributeToAdjustBoundaries(shared_ptr<MemArray> const& arrayBeforeAdjusting)
+    virtual std::shared_ptr<MemArray> redistributeToAdjustBoundaries(std::shared_ptr<MemArray> const& arrayBeforeAdjusting)
     {
         assert(false);
-        return shared_ptr<MemArray>();
+        return std::shared_ptr<MemArray>();
     }
 
 private: // private member functions.
@@ -365,7 +365,7 @@ private: // private member functions.
      * Distribute the local-sorted array based on _anchors.
      * @return the distributed array.
      */
-    shared_ptr<MemArray> distributeBasedOnAnchors();
+    std::shared_ptr<MemArray> distributeBasedOnAnchors();
 
     /**
      * @return an arbitrary attributeID that is part of the sorting key.

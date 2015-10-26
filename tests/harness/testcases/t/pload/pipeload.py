@@ -1,4 +1,24 @@
 #!/usr/bin/python
+#
+# BEGIN_COPYRIGHT
+#
+# Copyright (C) 2014-2015 SciDB, Inc.
+# All Rights Reserved.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+#
 
 """
 Streaming load smoke test.
@@ -27,7 +47,6 @@ _args = None
 _LOAD_ATTRS = "<rowNum:int32,i:int32,odd:int32,piMult:double,twoI:int32>"
 _LOAD_DIMS = "[k=0:*,10,0]"
 _LOAD_SCHEMA = ''.join((_LOAD_ATTRS, _LOAD_DIMS))
-_LOAD_PATTERN = "NNNNN"
 
 _TARGET_ATTRS = "<i:int32,odd:int32,piMult:double>"
 _TARGET_DIMS = "[rowNum=0:*,10,0,twoI=0:*,10,0]"
@@ -57,7 +76,9 @@ def verify_result():
     try:
         with open(fname) as F:
             rdr = csv.reader(F)
-            rdr.next()          # skip header
+            if 1:
+                # 14.3 compatibility, soon to be deprecated
+                rdr.next()      # skip header
             row_num = 0         # scope to 'with' stmt, not 'for' stmt
             for row_num, row in enumerate(rdr):
                 if row_num != int(row[0]):
@@ -239,13 +260,11 @@ class Worker(threading.Thread):
                              _args.burst_size,
                              _args.max_sleep)
 
-        load_cmd = ['loadpipe.py']
-        load_cmd.extend(['--batch-lines',
-                               str(burst_to_batch(_args.burst_size))])
-        load_cmd.extend([ '--',
-                                '-t', _LOAD_PATTERN,
-                                '-s', _LOAD_SCHEMA,
-                                '-A', _TARGET ])
+        load_cmd = ['loadpipe.py',
+                    '--batch-lines', str(burst_to_batch(_args.burst_size)),
+                    '--format=csv',
+                    '-s', _LOAD_SCHEMA,
+                    '-A', _TARGET ]
         commands = [
             ['cat', '-'],       # See Pipeline.communicate
             load_cmd
@@ -305,7 +324,7 @@ def main(argv=None):
         th.join()
 
     # Make sure all the data got into the array.
-    ok = verify_result() 
+    ok = verify_result()
     if ok:
         print "%s test: PASS" % os.path.basename(argv[0])
     else:

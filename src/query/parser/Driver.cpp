@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,20 +38,20 @@ namespace scidb { namespace parser { namespace {
 
 log4cxx::LoggerPtr log(log4cxx::Logger::getLogger("scidb.qproc.driver"));
 
-typedef shared_ptr<LogicalExpression>    LEPtr;
-typedef shared_ptr<LogicalQueryPlanNode> LQPtr;
+typedef std::shared_ptr<LogicalExpression>    LEPtr;
+typedef std::shared_ptr<LogicalQueryPlanNode> LQPtr;
 
 /****************************************************************************/
 
 class Driver : public Log, boost::noncopyable
 {
  public:                   // Construction
-                              Driver(const string&);
+                              Driver(const string&, const QueryPtr&);
 
  public:                   // Operations
             Node*             process(syntax);
-            LEPtr             translate(Node*);
-            LQPtr             translate(Node*,const QueryPtr&);
+            LEPtr             translateExp(Node*);
+            LQPtr             translatePlan(Node*);
 
  private:                  // From class Log
     virtual void              fail(const UserException&);
@@ -62,12 +62,14 @@ class Driver : public Log, boost::noncopyable
             StringPtr   const _text;
             ScopedArena       _arena;
             Factory           _fact;
+            QueryPtr          _qry;
 };
 
-    Driver::Driver(const string& text)
+          Driver::Driver(const string& text, const QueryPtr& qry)
           : _text (make_shared<string>(text)),
             _arena("parser::Driver"),
-            _fact (_arena)
+            _fact (_arena),
+            _qry(qry)
 {}
 
 Node* Driver::process(syntax syntax)
@@ -87,7 +89,7 @@ Node* Driver::process(syntax syntax)
 
     LOG4CXX_DEBUG(log,"Driver::process(1)\n" << tree);
 
-    desugar (_fact,*this,tree);
+    desugar (_fact,*this,tree, _qry);
 
     LOG4CXX_DEBUG(log,"Driver::process(2)\n" << tree);
 
@@ -99,14 +101,14 @@ Node* Driver::process(syntax syntax)
     return tree;
 }
 
-LEPtr Driver::translate(Node* n)
+LEPtr Driver::translateExp(Node* n)
 {
-    return parser::translate(_fact,*this,_text,n);
+    return parser::translateExp(_fact,*this,_text,n,_qry);
 }
 
-LQPtr Driver::translate(Node* n,const QueryPtr& q)
+LQPtr Driver::translatePlan(Node* n)
 {
-    return parser::translate(_fact,*this,_text,n,q);
+    return parser::translatePlan(_fact,*this,_text,n,_qry);
 }
 
 /****************************************************************************/
@@ -135,7 +137,7 @@ void Driver::fail(error e,const Node& n,const char* s)
 
 void Driver::fail(error e,const location& w,const char* s)
 {
-    shared_ptr<ParsingContext> c(make_shared<ParsingContext>(_text,w));
+    std::shared_ptr<ParsingContext> c(make_shared<ParsingContext>(_text,w));
 
 /* Translate error code 'e' into an exception object: unfortunately these can
    only be created via macros at the moment, hence the ugly 'switch'. hoping
@@ -191,7 +193,8 @@ string read(const string& path)
 void load(const string& text)
 {
     Module m(Module::write);                             // Lock for writing
-    Driver d(text);                                      // Create the driver
+    QueryPtr emptyQuery;
+    Driver d(text,emptyQuery);                           // Create the driver
     Node*  n(d.process(aflModule));                      // Parse and desugar
 
     m.load(d,n);                                         // Install the module
@@ -215,10 +218,11 @@ using namespace parser;
 LEPtr parseExpression(const string& text)
 {
     Module m(Module::read);                              // Lock for reading
-    Driver d(text);                                      // Create the driver
+    QueryPtr emptyQuery;
+    Driver d(text, emptyQuery);                          // Create the driver
     Node*  n(d.process(aflExpression));                  // Parse and desugar
 
-    return d.translate(n);                               // Return translation
+    return d.translateExp(n);                            // Return translation
 }
 
 /**
@@ -228,10 +232,10 @@ LEPtr parseExpression(const string& text)
 LQPtr parseStatement(const QueryPtr& query,bool afl)
 {
     Module m(Module::read);                              // Lock for reading
-    Driver d(query->queryString);                        // Create the driver
+    Driver d(query->queryString, query);                 // Create the driver
     Node*  n(d.process(afl ? aflStatement:aqlStatement));// Parse and desugar
 
-    return d.translate(n,query);                         // Return translation
+    return d.translatePlan(n);                           // Return translation
 }
 
 /**

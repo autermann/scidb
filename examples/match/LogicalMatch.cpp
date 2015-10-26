@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -49,7 +49,7 @@ class LogicalMatch: public LogicalOperator
         ADD_PARAM_CONSTANT("int64");
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 2);
 
@@ -75,9 +75,10 @@ class LogicalMatch: public LogicalOperator
                   && catalogDimensions[i].getChunkInterval() == resultDimensions[i].getChunkInterval()
                   && catalogDimensions[i].getChunkOverlap() == resultDimensions[i].getChunkOverlap()))
             {
-                // XXX To do: implement requiresRepart() method, remove interval/overlap checks
-                // above, use SCIDB_LE_START_INDEX_MISMATCH here.
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+                // XXX To do: implement requiresRedimensionOrRepartition() method, remove
+                // interval/overlap checks above, use SCIDB_LE_START_INDEX_MISMATCH here.
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+                << "Dimensions do not match";
             }
         }
 
@@ -99,13 +100,13 @@ class LogicalMatch: public LogicalOperator
         }
         matchAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
 
-        int64_t maxCollisions = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+        int64_t maxCollisions = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                                           query, TID_INT64).getInt64();
-        if (maxCollisions <= 0 || (int32_t)maxCollisions != maxCollisions)  { 
+        if (maxCollisions <= 0 || (int32_t)maxCollisions != maxCollisions)  {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_OPERATOR_ARGUMENT2) << "positive";
         }
         resultDimensions.push_back(DimensionDesc("collision", 0, 0, maxCollisions-1, maxCollisions-1, (uint32_t)maxCollisions, 0));
-        return ArrayDesc("match", matchAttributes, resultDimensions);
+        return ArrayDesc("match", matchAttributes, resultDimensions, defaultPartitioning());
     }
 };
 

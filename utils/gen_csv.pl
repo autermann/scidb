@@ -10,7 +10,7 @@ sub random_int
   my $lower_bound=shift;
   my $upper_bound=shift;
   if ( $lower_bound == $upper_bound )
-  { 
+  {
     return $lower_bound;
   }
   return round ( (rand ( $upper_bound - $lower_bound )) + $lower_bound );
@@ -19,7 +19,7 @@ sub random_int
 sub throw_error
 {
   print "ERROR: ";
-  while ( my $arg = shift ) 
+  while ( my $arg = shift )
   {
     print $arg;
   }
@@ -33,7 +33,7 @@ $OPCODE_TYPE_INT=2;
 
 sub print_ops
 {
-  for $i ( 0 .. $#ops ) 
+  for $i ( 0 .. $#ops )
   {
      print "OP: ";
 
@@ -45,7 +45,7 @@ sub print_ops
      {
         print "int", $ops[$i][1], "n", ($ops[$i][2] * 100), "\n";
      }
-  
+
      else
      {
         throw_error "Unknown opcode ", $ops[$i][0];
@@ -84,12 +84,12 @@ sub execute_ops
           }
        }
        elsif ($ops[$i][0] == $OPCODE_TYPE_INT)
-       {     
+       {
           if ( $ops[$i][2] == 0 || rand >= $ops[$i][2] )
           {
              print random_int 0, $ops[$i][1];
           }
-       } 
+       }
        else
        {
           throw_error "Unknown opcode ", $ops[$i][0];
@@ -106,12 +106,12 @@ $numRows=-1;
 foreach (1..$nArgs)
 {
   my $arg = shift;
-  
+
   if ( $arg =~ /^\d+$/ )
   {
     if ( $numRows != -1 )
     {
-      throw_error "extraneous argument ", $arg, "; the number of rows is already specified as $numRows";  
+      throw_error "extraneous argument ", $arg, "; the number of rows is already specified as $numRows";
     }
     $numRows = $arg;
   }
@@ -133,7 +133,7 @@ foreach (1..$nArgs)
       else
       {
 	 throw_error "cannot parse opcode ", $arg, "; expecting strxxuyynzz where xx,yy,zz are integers for lower bound, upper bound and null percentage"
-      } 
+      }
     }
     elsif ( $opcode eq "int" )
     {
@@ -152,12 +152,12 @@ foreach (1..$nArgs)
     else
     {
       throw_error "unknown opcode ", $opcode;
-    }    
+    }
   }
 }
 
 if ($numRows == -1 )
-{ 
+{
   throw_error "You did not set the desired number of rows. Please provide an integer.\n", $example ;
 }
 

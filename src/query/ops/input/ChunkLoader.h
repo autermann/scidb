@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include <smgr/io/TemplateParser.h>
 #include <util/CsvParser.h>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -61,7 +61,7 @@ namespace scidb {
         virtual ~ChunkLoader();
 
         /// Set parent backpointer and initialize based on parent and query.
-        void    bind(InputArray* parent, boost::shared_ptr<Query>& query);
+        void    bind(InputArray* parent, std::shared_ptr<Query>& query);
         bool    isBound() const { return _inArray != 0; }
 
         /// Open the file, return the resulting errno.
@@ -89,7 +89,7 @@ namespace scidb {
         void            nextImplicitChunkPosition(WhoseChunk);
         MemChunk&       getLookaheadChunk(AttributeID attr, size_t chunkIndex);
 
-        virtual bool    loadChunk(boost::shared_ptr<Query>& query,
+        virtual bool    loadChunk(std::shared_ptr<Query>& query,
                                   size_t chunkIndex) = 0;
 
         /**
@@ -100,12 +100,6 @@ namespace scidb {
          * @return 0 <= n < 128 if field is a null.  'n' is the "missing reason" code.
          */
         static int8_t   parseNullField(const char*s);
-
-        /// Fast check to see if it's worth calling #parseNullField .
-        static bool     mightBeNull(const char* s)
-        {
-            return s && (*s == '\\' || *s == '?' || *s == 'n');
-        }
 
     protected:
         ChunkLoader();
@@ -131,7 +125,7 @@ namespace scidb {
         InputArray*             array() { return _inArray; }
         ArrayDesc const&        schema() const;
         FILE*                   fp() { return _fp; }
-        boost::shared_ptr<Query> query();
+        std::shared_ptr<Query> query();
         size_t                  numInstances() const { return _numInstances; }
         InstanceID              myInstance() const { return _myInstance; }
         AttributeID             emptyTagAttrId() const {return _emptyTagAttrId;}
@@ -185,7 +179,7 @@ namespace scidb {
         TextChunkLoader()
             : _where(W_Start), _coordVal(TypeLibrary::getType(TID_INT64)) {}
 
-        virtual bool loadChunk(boost::shared_ptr<Query>& query,
+        virtual bool loadChunk(std::shared_ptr<Query>& query,
                                size_t chunkIndex);
 
         virtual off_t       getFileOffset() const   { return _scanner.getPosition(); }
@@ -210,7 +204,7 @@ namespace scidb {
     {
     public:
         virtual bool isBinary() { return true; }
-        virtual bool loadChunk(boost::shared_ptr<Query>& query,
+        virtual bool loadChunk(std::shared_ptr<Query>& query,
                                size_t chunkIndex
                                /* inout params */);
     protected:
@@ -225,7 +219,7 @@ namespace scidb {
     public:
         BinaryChunkLoader(std::string const& format);
         virtual bool isBinary() { return true; }
-        virtual bool loadChunk(boost::shared_ptr<Query>& query,
+        virtual bool loadChunk(std::shared_ptr<Query>& query,
                                size_t chunkIndex
                                /* inout params */);
     protected:
@@ -241,7 +235,7 @@ namespace scidb {
     public:
         TsvChunkLoader();
         virtual ~TsvChunkLoader();
-        virtual bool loadChunk(boost::shared_ptr<Query>& query,
+        virtual bool loadChunk(std::shared_ptr<Query>& query,
                                size_t chunkIndex);
         virtual off_t getFileOffset() const { return _errorOffset; }
     protected:
@@ -258,7 +252,7 @@ namespace scidb {
     public:
         CsvChunkLoader();
         virtual ~CsvChunkLoader();
-        virtual bool loadChunk(boost::shared_ptr<Query>& query,
+        virtual bool loadChunk(std::shared_ptr<Query>& query,
                                size_t chunkIndex);
     protected:
         virtual void            openHook();
@@ -266,6 +260,7 @@ namespace scidb {
     private:
         CsvParser   _csvParser;
         bool        _tooManyWarning;
+        void        skipPastEol();
     };
 }
 

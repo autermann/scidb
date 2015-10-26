@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -19,12 +19,17 @@
 #
 # END_COPYRIGHT
 #
-export DB_HOST=localhost
+
+# Note: Prefer "127.0.0.1" to "localhost" because the former is used
+# to generate the default config.ini, and ~/.pgpass Postgres auth
+# requires an exact string match.
+
+export DB_HOST=${SCIDB_HOST:=127.0.0.1}
 export DB_PORT=5432
 export DB_NAME=${SCIDB_NAME:=mydb}
 export DB_USER=${SCIDB_DB_USER:=mydb}
 export DB_PASSWD=${SCIDB_DB_PASSWD:=mydb}
-export IQUERY_HOST=${SCIDB_HOST:=localhost}
+export IQUERY_HOST=${SCIDB_HOST:=127.0.0.1}
 export IQUERY_PORT=${SCIDB_PORT:=1239}
 export SCIDB_CLUSTER_NAME=$DB_NAME
 

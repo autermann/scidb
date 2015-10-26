@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,7 +33,7 @@ namespace scidb {
 /// Scalapack arrays are described by a 9-value descriptor of type slpp::desc_t.
 /// most routines also accept an (I,J) offset for the starting point into that
 /// array in order to describe a sub-array.
-/// ScalapackArrayArgs is a "smart struct" that captures those 11 values 
+/// ScalapackArrayArgs is a "smart struct" that captures those 11 values
 class ScalapackArrayArgs {
 public:
     friend std::ostream& operator<<(std::ostream& os, const ScalapackArrayArgs& a);

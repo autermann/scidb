@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -76,7 +76,7 @@ void CsvChunkLoader::bindHook()
     }
 }
 
-bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkIndex)
+bool CsvChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 {
     // Must do EOF check *before* nextImplicitChunkPosition() call, or
     // we risk stepping out of bounds.
@@ -95,7 +95,7 @@ bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
     // Initialize a chunk and chunk iterator for each attribute.
     Attributes const& attrs = schema().getAttributes();
     size_t nAttrs = attrs.size();
-    vector< boost::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
+    vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
     for (size_t i = 0; i < nAttrs; i++) {
         Address addr(i, _chunkPos);
         MemChunk& chunk = getLookaheadChunk(i, chunkIndex);
@@ -110,16 +110,18 @@ bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
     bool sawData = false;
     bool sawEof = false;
 
-    while (!chunkIterators[0]->end()) {
+    while (!sawEof && !chunkIterators[0]->end()) {
 
+        _line += 1;
         _column = 0;
         array()->countCell();
-        
+        bool sawEol = false;
+
         // Parse and write out a line's worth of fields.  NB if you
         // have to 'continue;' after a writeItem() call, make sure the
         // iterator (and possibly the _column) gets incremented.
         //
-        for (size_t i = 0; i < nAttrs; ++i) {
+        for (AttributeID i = 0; i < nAttrs; ++i) {
             try {
                 // Handle empty tag...
                 if (i == emptyTagAttrId()) {
@@ -127,6 +129,13 @@ bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
                     chunkIterators[i]->writeItem(attrVal(i));
                     ++(*chunkIterators[i]); // ...but don't increment _column.
                     continue;
+                }
+
+                // Make end-of-line "sticky" for the rest of the cell (as the TsvChunkLoader
+                // does automatically).
+                if (sawEol) {
+                    throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_OP_INPUT_TOO_FEW_FIELDS)
+                        << _csvParser.getFileOffset() << _csvParser.getRecordNumber() << _column;
                 }
 
                 // Parse out next input field.
@@ -137,28 +146,25 @@ bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
                 }
                 if (rc == CsvParser::END_OF_RECORD) {
                     // Got record terminator, but we have more attributes!
+                    sawEol = true;
                     throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_OP_INPUT_TOO_FEW_FIELDS)
                         << _csvParser.getFileOffset() << _csvParser.getRecordNumber() << _column;
-                }
-                if (rc > 0) {
-                    // So long as we never call _csvParser.setStrict(true), we should never see this.
-                    throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_CSV_PARSE_ERROR)
-                        << _csvParser.getFileOffset() << _csvParser.getRecordNumber()
-                        << _column << csv_strerror(rc);
                 }
                 SCIDB_ASSERT(rc == CsvParser::OK);
                 SCIDB_ASSERT(field);
                 sawData = true;
 
                 // Process input field.
-                if (mightBeNull(field) && attrs[i].isNullable()) {
-                    int8_t missingReason = parseNullField(field);
-                    if (missingReason >= 0) {
+                int8_t missingReason = parseNullField(field);
+                if (missingReason >= 0) {
+                    if (attrs[i].isNullable()) {
                         attrVal(i).setNull(missingReason);
                         chunkIterators[i]->writeItem(attrVal(i));
                         ++(*chunkIterators[i]);
                         _column += 1;
                         continue;
+                    } else {
+                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
                     }
                 }
                 if (converter(i)) {
@@ -194,19 +200,8 @@ bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
             ++(*chunkIterators[i]);
         }
 
-        if (sawEof) {
-            break;
-        }
-
-        // We should be at EOL now, otherwise there are too many fields on this line.  Post a
-        // warning: it seems useful not to complain too loudly about this or to abort the load, but
-        // we do want to mention it.
-        //
-        rc = _csvParser.getField(field);
-        if (!_tooManyWarning && (rc != CsvParser::END_OF_RECORD)) {
-            _tooManyWarning = true;
-            query->postWarning(SCIDB_WARNING(SCIDB_LE_OP_INPUT_TOO_MANY_FIELDS)
-                               << _csvParser.getFileOffset() << _csvParser.getRecordNumber() << _column);
+        if (!sawEof && !sawEol) {
+            skipPastEol();
         }
 
         array()->completeShadowArrayRow(); // done with cell/record
@@ -219,6 +214,48 @@ bool CsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
     }
 
     return sawData;
+}
+
+
+/**
+ * We should see EOL now, otherwise there are too many fields on this line.
+ *
+ * @description Read past the END_OF_RECORD mark.  If this means reading past data fields, post
+ * a warning.  (It seems useful not to complain too loudly about this or to abort the load, but
+ * we do want to mention it.)
+ */
+void CsvChunkLoader::skipPastEol()
+{
+    // Loop needed in case of parser reset in one of these getField() calls.  A reset should
+    // always bring us to EOL or EOF, which is what we expect as the precondition of the code
+    // below.  (In loadChunk() above we didn't need to worry about calling willReset(), because
+    // the @c sawEol flag will make sure that the iterators get resynchronized.)
+    char const* field = 0;
+    do {
+        try {
+            int rc = _csvParser.getField(field);
+            if (rc == CsvParser::OK) {
+                if (!_tooManyWarning) {
+                    _tooManyWarning = true;
+                    query()->postWarning(SCIDB_WARNING(SCIDB_LE_OP_INPUT_TOO_MANY_FIELDS)
+                                         << _csvParser.getFileOffset()
+                                         << _csvParser.getRecordNumber()
+                                         << _column);
+                }
+
+                // Must discard until we find EOL or EOF, otherwise the parser will be out of sync
+                // with our position in the array.
+                do {
+                    rc = _csvParser.getField(field);
+                } while (rc == CsvParser::OK);
+            }
+        }
+        catch (Exception& ex) {
+            LOG4CXX_WARN(logger, "Error parsing excess fields at record " <<
+                         _csvParser.getRecordNumber() << " in CSV input: "
+                         << ex.what() << " (ignored)");
+        }
+    } while (_csvParser.willReset());
 }
 
 } // namespace

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -66,10 +66,10 @@ private:
     pthread_mutex_t _mutex;
 
   public:
-    void checkForDeadlock() { 
+    void checkForDeadlock() {
         assert(_mutex.__data.__count == 1);
     }
-    
+
     Mutex()
     {
         pthread_mutexattr_t __attr;
@@ -122,7 +122,7 @@ public:
 	{
 		_mutex.lock();
 	}
-	
+
 	~ScopedMutexLock()
 	{
 		_mutex.unlock();

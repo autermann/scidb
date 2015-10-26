@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -22,4 +22,4 @@
 
 export X=`pwd`;echo ${X};sed "s:CWD:"$X":g" test1.csv > test1.input
 export PYTHONPATH=$PYTHONPATH:/opt/scidb/1.0/lib
-python pythonsample5.py `pwd`/test1.input  /opt/scidb/1.0/lib 
+python pythonsample5.py `pwd`/test1.input  /opt/scidb/1.0/lib

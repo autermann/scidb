@@ -16,47 +16,43 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(B, '${TEST_DATA_
 {5000,5000} 55010
 
 SCIDB QUERY : <aggregate(A,approxdc(num))>
-i,num_ApproxDC
-0,3
-
-SCIDB QUERY : <aggregate(concat(A,A),approxdc(num))>
-i,num_ApproxDC
+i,num_approxdc
 0,3
 
 SCIDB QUERY : <aggregate(join(A as A1,A),approxdc(A1.num))>
-i,num_ApproxDC
+i,num_approxdc
 0,3
 
 SCIDB QUERY : <aggregate(A,ApproxDC(num))>
-i,num_ApproxDC
+i,num_approxdc
 0,3
 
 SCIDB QUERY : <aggregate(A,ApproxDC(num),sum(num))>
-i,num_ApproxDC,num_sum
+i,num_approxdc,num_sum
 0,3,nan
 
 SCIDB QUERY : <aggregate(A,ApproxDC(num),sum(num),min(num),max(num),count(num))>
-i,num_ApproxDC,num_sum,num_min,num_max,num_count
+i,num_approxdc,num_sum,num_min,num_max,num_count
 0,3,nan,nan,nan,3
 
 SCIDB QUERY : <aggregate(B,approxdc(val))>
-i,val_ApproxDC
+i,val_approxdc
 0,2
 
 SCIDB QUERY : <aggregate(join(B as B1,B),approxdc(B1.val))>
-i,val_ApproxDC
+i,val_approxdc
 0,2
 
 SCIDB QUERY : <aggregate(B,ApproxDC(val))>
-i,val_ApproxDC
+i,val_approxdc
 0,2
 
 SCIDB QUERY : <aggregate(B,ApproxDC(val),sum(val),min(val),max(val),count(val))>
-i,val_ApproxDC,val_sum,val_min,val_max,val_count
+i,val_approxdc,val_sum,val_min,val_max,val_count
 0,2,55020,10,55010,2
 
 SCIDB QUERY : <select ApproxDC(A)>
-i,num_ApproxDC
+i,num_approxdc
 0,3
 
 SCIDB QUERY : <select ApproxDC(num) from A>
@@ -85,7 +81,7 @@ y,expr,ApproxDC
 500000,500000,1
 
 SCIDB QUERY : <select ApproxDC(B)>
-i,val_ApproxDC
+i,val_approxdc
 0,2
 
 SCIDB QUERY : <select ApproxDC(val) from B>

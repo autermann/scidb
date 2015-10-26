@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,6 +36,8 @@
 #include "pdgesvdMasterSlave.hpp"
 #include "slaveTools.h"
 
+using namespace std;
+
 namespace scidb
 {
 #if !defined(NDEBUG) && defined(SCALAPACK_DEBUG)
@@ -58,7 +60,7 @@ scidb::PdgesvdArgs  pdgesvdGenTestArgs(slpp::int_t ICTXT, slpp::int_t NPROW, slp
 ///
 ///
 /// for a given context ICTXT, return the parameters of the ScaLAPACK
-/// 
+///
 /// This is slated to be re-worked during Cheshire m4.  It will probably
 /// become a method on ScaLAPACK operator.
 ///
@@ -216,7 +218,7 @@ slpp::int_t pdgesvdSlave2(const slpp::int_t ICTXT, PdgesvdArgs args, void* bufs[
     // debug that the input is readable and show its contents
     if(DBG) {
         for(int ii=0; ii < SIZE_A; ii++) {
-            std::cerr << "("<< MYPROW << "," << MYPCOL << ") A["<<ii<<"] = " << A[ii] << std::endl;  
+            std::cerr << "("<< MYPROW << "," << MYPCOL << ") A["<<ii<<"] = " << A[ii] << std::endl;
         }
     }
 

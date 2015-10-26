@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -22,6 +22,7 @@
 set (array_src
     Metadata.cpp
     Array.cpp
+    ArrayDistribution.cpp
     Tile.cpp
     MemArray.cpp
     MemChunk.cpp
@@ -37,11 +38,13 @@ set (array_src
     TransientCache.cpp
     SpatialRangesChunkPosIterator.cpp
     Coordinate.cpp
+    ListArrayBuilder.cpp
 )
 
 file(GLOB array_include "*.h")
 
+include_directories(${CityHash_INCLUDE_DIR})
 add_library(array_lib STATIC ${array_src} ${array_include})
-target_link_libraries(array_lib catalog_lib json_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES})
+target_link_libraries(array_lib catalog_lib json_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES} ${CityHash_LIBRARY})
 add_dependencies(array_lib scidb_msg_lib)
 

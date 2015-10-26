@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,8 +34,7 @@
 #ifndef CLIENTMESSAGEHANDLEJOB_H_
 #define CLIENTMESSAGEHANDLEJOB_H_
 
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 #include <boost/asio.hpp>
 #include <stdint.h>
 
@@ -45,6 +44,7 @@
 #include <query/QueryProcessor.h>
 #include "Connection.h"
 #include "MessageHandleJob.h"
+#include <usr_namespace/SecurityCommunicator.h>
 
 namespace scidb
 {
@@ -58,16 +58,17 @@ class Connection;
 class ClientMessageHandleJob : public MessageHandleJob
 {
  public:
-    ClientMessageHandleJob(boost::shared_ptr< Connection > connection,
-                           const boost::shared_ptr<MessageDesc>& messageDesc);
+    ClientMessageHandleJob(
+        const std::shared_ptr< Connection > &connection,
+        const std::shared_ptr<MessageDesc>& messageDesc);
     /**
      * Based on its contents this message is prepared and scheduled to run
      * on an appropriate queue.
      * @param requestQueue a system queue for running jobs that may block waiting for events from other jobs
      * @param workQueue a system queue for running jobs that are guaranteed to make progress
      */
-    virtual void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
-                          boost::shared_ptr<WorkQueue>& workQueue);
+    virtual void dispatch(std::shared_ptr<WorkQueue>& requestQueue,
+                          std::shared_ptr<WorkQueue>& workQueue);
 
  protected:
 
@@ -76,9 +77,15 @@ class ClientMessageHandleJob : public MessageHandleJob
     virtual void run();
 
  private:
-    boost::shared_ptr<Connection> _connection;
+    std::shared_ptr<Connection> _connection;
 
-    std::string getProgramOptions(const string &programOptions) const;
+    std::string getProgramOptions(const std::string &programOptions) const;
+
+    /**
+     * Retrieve the combined user-name stored in the
+     * session as a string.
+     */
+    std::string getUserName() const;
 
     /**
      *  This method processes message mtPrepareQuery containing client query string.
@@ -125,18 +132,18 @@ class ClientMessageHandleJob : public MessageHandleJob
      * to be sent to the client. It never waits, but reschedules and re-executes itself
      * until a complete chunk is ready or the query is aborted.
      */
-    void fetchMergedChunk(boost::shared_ptr<RemoteMergedArray>& fetchArray, AttributeID attributeId,
+    void fetchMergedChunk(std::shared_ptr<RemoteMergedArray>& fetchArray, AttributeID attributeId,
                           Notification<scidb::Exception>::ListenerID queryErrorListenerID);
     /// Helper to construct an mtChunk message for the client
     void populateClientChunk(const std::string& arrayName,
                              AttributeID attributeId,
                              const ConstChunk* chunk,
-                             boost::shared_ptr<MessageDesc>& chunkMsg);
+                             std::shared_ptr<MessageDesc>& chunkMsg);
     /**
      * Used to re-schedule fetchMergedChunk()
      */
-    void executeSerially(boost::shared_ptr<WorkQueue>& serialQueue,
-                         boost::weak_ptr<WorkQueue>& initialQueue,
+    void executeSerially(std::shared_ptr<WorkQueue>& serialQueue,
+                         std::weak_ptr<WorkQueue>& initialQueue,
                          const scidb::Exception* error);
     /**
      * Functor used for re-scheduling fetchMergedChunk() in response to various events (e.g. partial chunk arrival)
@@ -146,7 +153,7 @@ class ClientMessageHandleJob : public MessageHandleJob
      * Generate a RescheduleCallback functor
      * @param serialQueue [out] the serial work queue where fetchMergedChunk() is to be executed
      */
-    RescheduleCallback getSerializeCallback(boost::shared_ptr<WorkQueue>& serialQueue);
+    RescheduleCallback getSerializeCallback(std::shared_ptr<WorkQueue>& serialQueue);
     /**
      * Query error event handler
      */
@@ -168,9 +175,12 @@ class ClientMessageHandleJob : public MessageHandleJob
       void raise() const { throw *this; }
       virtual Exception::Pointer copy() const
       {
-          Exception::Pointer ep(boost::make_shared<CancelChunkFetchException>(_file.c_str(),
-                                                                      _function.c_str(),
-                                                                      _line));
+          std::shared_ptr<CancelChunkFetchException> ep =
+             std::make_shared<CancelChunkFetchException>(_file.c_str(),
+                                                           _function.c_str(),
+                                                           _line);
+          ep->_what_str = _what_str;
+          ep->_formatter = _formatter;
           return ep;
       }
    };
@@ -190,14 +200,28 @@ class ClientMessageHandleJob : public MessageHandleJob
                                      const scidb::QueryResult& queryResult,
                                      const scidb::SciDB& scidb);
 
+    /// Helper to deal with exceptions in prepare/executeClientQuery()
+    void reportErrorToClient(const Exception& err);
+
     /// Helper for scheduling this message on a given queue
-    void enqueue(boost::shared_ptr<WorkQueue>& q);
+    void enqueue(std::shared_ptr<WorkQueue>& q);
 
     /// Helper for scheduling this message on the error queue of the query
     void enqueueOnErrorQueue(QueryID queryID);
 
     /// Helper to send a message to the client on _connection
-    void sendMessageToClient(boost::shared_ptr<MessageDesc>& msg);
+    void sendMessageToClient(std::shared_ptr<MessageDesc>& msg);
+
+    /// Send the newClientComplete message to the client
+    void sendNewClientCompleteToClient(
+        bool authenticated );
+
+    /// Handle the newClientStart message from the client
+    void handleNewClientStart();
+
+    /// This message handles the response from the client to a security
+    /// message of type "SecurityMessage" in scidb_msg.proto
+    void handleSecurityMessageResponse();
 };
 
 } // namespace

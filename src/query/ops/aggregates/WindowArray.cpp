@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -71,7 +71,7 @@ namespace scidb
     /**
      * @see ConstChunkIterator::getMode()
      */
-    int MaterializedWindowChunkIterator::getMode()
+    int MaterializedWindowChunkIterator::getMode() const
     {
         return _iterationMode;
     }
@@ -163,7 +163,7 @@ namespace scidb
     /**
      * @see ConstChunkIterator::getItem()
      */
-    Value& MaterializedWindowChunkIterator::getItem()
+    Value const& MaterializedWindowChunkIterator::getItem()
     {
         if (end())
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -215,7 +215,7 @@ namespace scidb
     /**
      *  @see ConstChunkIterator::isEmpty()
      */
-    bool MaterializedWindowChunkIterator::isEmpty()
+    bool MaterializedWindowChunkIterator::isEmpty() const
     {
         return false;
     }
@@ -327,7 +327,7 @@ namespace scidb
     /**
      * @see ConstChunkIterator::getMode()
      */
-    int WindowChunkIterator::getMode()
+    int WindowChunkIterator::getMode() const
     {
         return _iterationMode;
     }
@@ -367,7 +367,7 @@ namespace scidb
 
             if (_inputIterator->setPosition(currGridPos))
             {
-                Value& v = _inputIterator->getItem();
+                Value const& v = _inputIterator->getItem();
                 _aggregate->accumulateIfNeeded(state, v);
             }
         }
@@ -376,7 +376,7 @@ namespace scidb
     /**
      * @see ConstChunkIterator::getItem()
      */
-    Value& WindowChunkIterator::getItem()
+    Value const& WindowChunkIterator::getItem()
     {
         if (!_hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -426,7 +426,7 @@ namespace scidb
     /**
      *  @see ConstChunkIterator::isEmpty()
      */
-    bool WindowChunkIterator::isEmpty()
+    bool WindowChunkIterator::isEmpty() const
     {
         return false;
     }
@@ -568,7 +568,7 @@ namespace scidb
     /**
      * @see ConstChunk::getConstIterator()
      */
-    boost::shared_ptr<ConstChunkIterator> WindowChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> WindowChunk::getConstIterator(int iterationMode) const
     {
         SCIDB_ASSERT(( NULL != _arrayIterator ));
         ConstChunk const& inputChunk = _arrayIterator->iterator->getChunk();
@@ -579,10 +579,10 @@ namespace scidb
 
         if (isMaterialized())
         {
-            return boost::shared_ptr<ConstChunkIterator>(new MaterializedWindowChunkIterator(*_arrayIterator, *this, iterationMode));
+            return std::shared_ptr<ConstChunkIterator>(new MaterializedWindowChunkIterator(*_arrayIterator, *this, iterationMode));
         }
 
-        return boost::shared_ptr<ConstChunkIterator>(new WindowChunkIterator(*_arrayIterator, *this, iterationMode));
+        return std::shared_ptr<ConstChunkIterator>(new WindowChunkIterator(*_arrayIterator, *this, iterationMode));
     }
 
     /**
@@ -643,7 +643,7 @@ namespace scidb
 
             //
             // Initialize the coordinate mapper
-            _mapper = shared_ptr<CoordinatesMapper> (new CoordinatesMapper(chunk));
+            _mapper = std::shared_ptr<CoordinatesMapper> (new CoordinatesMapper(chunk));
 
             //
             // Get the number of logical elements in the chunk, excluding the
@@ -664,7 +664,7 @@ namespace scidb
             // FIXME: Having two of these state data structures is wasteful.
             //  Better to use a single data structure.
             //
-            shared_ptr<ConstChunkIterator> chunkIter = chunk.getConstIterator(iterMode);
+            std::shared_ptr<ConstChunkIterator> chunkIter = chunk.getConstIterator(iterMode);
             while(!chunkIter->end())
             {
                 Coordinates const& currPos = chunkIter->getPosition();
@@ -915,7 +915,7 @@ namespace scidb
     const std::string WindowArray::PROBE="probe";
     const std::string WindowArray::MATERIALIZE="materialize";
 
-    WindowArray::WindowArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& inputArray,
+    WindowArray::WindowArray(ArrayDesc const& desc, std::shared_ptr<Array> const& inputArray,
                              vector<WindowBoundaries> const& window, vector<AttributeID> const& inputAttrIDs, vector<AggregatePtr> const& aggregates, string const& method):
       _desc(desc),
       _inputDesc(inputArray->getArrayDesc()),
@@ -939,13 +939,13 @@ namespace scidb
     /**
      * @see Array::getConstIterator()
      */
-    boost::shared_ptr<ConstArrayIterator> WindowArray::getConstIterator(AttributeID attr) const
+    std::shared_ptr<ConstArrayIterator> WindowArray::getConstIterator(AttributeID attr) const
     {
         if (_desc.getEmptyBitmapAttribute() && attr == _desc.getEmptyBitmapAttribute()->getId())
         {
-            return boost::shared_ptr<ConstArrayIterator>(new WindowArrayIterator(*this, attr, _inputArray->getArrayDesc().getEmptyBitmapAttribute()->getId(), _method));
+            return std::shared_ptr<ConstArrayIterator>(new WindowArrayIterator(*this, attr, _inputArray->getArrayDesc().getEmptyBitmapAttribute()->getId(), _method));
         }
 
-        return boost::shared_ptr<ConstArrayIterator>(new WindowArrayIterator(*this, attr, _inputAttrIDs[attr], _method ));
+        return std::shared_ptr<ConstArrayIterator>(new WindowArrayIterator(*this, attr, _inputAttrIDs[attr], _method ));
     }
 }

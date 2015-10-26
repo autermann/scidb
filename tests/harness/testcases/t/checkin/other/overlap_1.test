@@ -7,8 +7,7 @@ create array B <a:int32 null> [x=0:3,2,1]
 
 
 --test
-#--aql load A from '${TEST_DATA_DIR}/null_8.txt'
---shell  --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A from '../tests/harness/testcases/data/null_8.txt'""
+--shell  --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A from '${TEST_DATA_DIR}/null_8.txt'""
 --aql select * into B from repart(A,B)
 
 --cleanup

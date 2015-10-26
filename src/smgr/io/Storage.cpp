@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,23 +30,22 @@
  * @author sfridella@paradigm4.com
  */
 
-
 #include <sys/time.h>
 #include <inttypes.h>
+#include <limits>
 #include <map>
-#include <boost/unordered_set.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <boost/tuple/tuple_comparison.hpp>
+#include <unordered_set>
 #include <log4cxx/logger.h>
 #include <network/NetworkManager.h>
 #include <network/BaseConnection.h>
 #include <network/MessageUtils.h>
 #include <array/Metadata.h>
+#include <array/ArrayDistribution.h>
 #include <query/Statistics.h>
 #include <query/Operator.h>
-#include <boost/make_shared.hpp>
+#include <memory>
+
 #include <util/FileIO.h>
-#include <query/ops/list/ListArrayBuilder.h>
 #include <system/Cluster.h>
 #include <system/Utils.h>
 #include <system/Config.h>
@@ -68,6 +67,8 @@ using namespace std;
 ///////////////////////////////////////////////////////////////////
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.smgr"));
+static log4cxx::LoggerPtr chunkLogger(log4cxx::Logger::getLogger("scidb.smgr.chunk"));
+
 
 const size_t DEFAULT_TRANS_LOG_LIMIT = 1024; // default limit of transaction log file (in mebibytes)
 const size_t MAX_CFG_LINE_LENGTH = 1*KiB;
@@ -120,7 +121,7 @@ inline static double getTimeSecs()
     return (((double) tv.tv_sec) * 1000000 + ((double) tv.tv_usec)) / 1000000;
 }
 
-static void collectArraysToRollback(boost::shared_ptr<std::map<ArrayID, VersionID> >& arrsToRollback, const VersionID& lastVersion,
+static void collectArraysToRollback(std::shared_ptr<std::map<ArrayID, VersionID> >& arrsToRollback, const VersionID& lastVersion,
                                     const ArrayID& baseArrayId, const ArrayID& newArrayId)
 {
     assert(arrsToRollback);
@@ -149,16 +150,6 @@ CachedStorage::ChunkInitializer::~ChunkInitializer()
 CachedStorage::CachedStorage() :
     _replicationManager(NULL)
 {}
-
-/* Types needed to track overlapping chunks
- */
-typedef tuple<DataStore::Guid, uint64_t> CloneOffset;
-struct CloneHash {
-    size_t operator() (const CloneOffset clof) const {
-        hash<uint64_t> myhash;
-        return myhash(clof.get<0>()) + myhash(clof.get<1>());
-    }
-};
 
 /* Initialize/read the Storage Description file on startup
  */
@@ -211,6 +202,186 @@ CachedStorage::initStorageDescriptionFile(const std::string& storageDescriptorFi
     fclose(f);
 }
 
+/* Record an extent in the extent map
+ */
+void
+CachedStorage::recordExtent(Extents& extents,
+                            std::shared_ptr<PersistentChunk>& chunk)
+{
+    if (_skipChunkmapIntegrityCheck)
+    {
+        return;
+    }
+
+    ChunkExtent ext;
+    const ChunkHeader& hdr = chunk->getHeader();
+
+    ext = std::make_tuple(hdr.pos.dsGuid,
+                          hdr.pos.offs,
+                          hdr.allocatedSize,
+                          hdr.pos.hdrPos);
+    if (!extents.insert(ext).second)
+    {
+        assert(false);
+    }
+}
+
+/* Erase an extent from the extent map
+ */
+void
+CachedStorage::eraseExtent(Extents& extents,
+                           std::shared_ptr<PersistentChunk>& chunk)
+{
+    if (_skipChunkmapIntegrityCheck)
+    {
+        return;
+    }
+
+    ChunkExtent ext;
+    const ChunkHeader& hdr = chunk->getHeader();
+
+    ext = std::make_tuple(hdr.pos.dsGuid,
+                          hdr.pos.offs,
+                          hdr.allocatedSize,
+                          hdr.pos.hdrPos);
+    extents.erase(ext);
+}
+
+/* Check extent map for overlaps on disk.  If in "recovery mode"
+   replace overlapping chunks with tombstones.  If not in "recovery
+   mode" throw exception.  Delete extent map when done.
+ */
+void
+CachedStorage::checkExtentsForOverlaps(Extents& extents)
+{
+    if (_skipChunkmapIntegrityCheck)
+    {
+        return;
+    }
+
+    Extents::iterator ext_it = extents.begin();
+    bool hasCurrent = false;
+    ChunkExtent currExt;
+    set<uint64_t> overlaps;
+
+    /* Process the extents and check for overlaps
+     */
+    while (ext_it != extents.end())
+    {
+        if (!hasCurrent)
+        {
+            /* Starting a new extent
+             */
+            currExt = *ext_it;
+            hasCurrent = true;
+            extents.erase(ext_it);
+            ext_it = extents.begin();
+        }
+        else
+        {
+            /* Still working on an extent
+             */
+            DataStore::Guid currGuid = std::get<0>(currExt);
+            DataStore::Guid extGuid = std::get<0>(*ext_it);
+            off_t currOff = std::get<1>(currExt);
+            off_t extOff = std::get<1>(*ext_it);
+            size_t currLen = std::get<2>(currExt);
+            size_t extLen = std::get<2>(*ext_it);
+
+            if (currGuid != extGuid ||
+                extOff >= currOff + (off_t)currLen)
+            {
+                /* Found a new extent
+                 */
+                hasCurrent = false;
+            }
+            else
+            {
+                /* Found an overlap
+                 */
+                overlaps.insert(std::get<3>(currExt));
+                overlaps.insert(std::get<3>(*ext_it));
+                if (currOff + currLen < extOff + extLen)
+                {
+                    currExt = *ext_it;
+                }
+                extents.erase(ext_it);
+                ext_it = extents.begin();
+            }
+        }
+    }
+
+    /* If overlaps were present log them and decide what to do
+     */
+    if (overlaps.size())
+    {
+        LOG4CXX_ERROR(logger, "smgr open:  found overlapping chunks in chunkmap: ");
+
+        set<uint64_t>::iterator over_it;
+        for (over_it = overlaps.begin();
+             over_it != overlaps.end();
+             ++over_it)
+        {
+            ChunkDescriptor desc;
+            std::stringstream ss;
+
+            size_t rc = _hd->read(&desc, sizeof(ChunkDescriptor), *over_it);
+            assert(rc == sizeof(ChunkDescriptor));
+
+            ss<< "    [dsguid=" << desc.hdr.pos.dsGuid <<
+                "] [offset=" << desc.hdr.pos.offs <<
+                "] [hdrpos=" << desc.hdr.pos.hdrPos <<
+                "] [len=" << desc.hdr.allocatedSize <<
+                "] [arrayid=" << desc.hdr.arrId <<
+                "] [attrid=" << desc.hdr.attId <<
+                "] [coords=";
+            for (uint16_t i=0;
+                 (i < desc.hdr.nCoordinates) &&
+                 (i < MAX_NUM_DIMS_SUPPORTED);
+                 ++i)
+            {
+                ss << desc.coords[i] << " ";
+            }
+            ss << "]";
+            LOG4CXX_ERROR(logger, ss.str());
+
+            if (_enableChunkmapRecovery)
+            {
+                /* In reovery mode, mark all attribute chunks at this position
+                   as a tombstone
+                 */
+                LOG4CXX_ERROR(logger,
+                    "    marking position for overlapping chunk as tombstone.");
+
+                ChunkMap::iterator cmiter = _chunkMap.find(desc.hdr.pos.dsGuid);
+                ASSERT_EXCEPTION((cmiter != _chunkMap.end()),
+                                 "Attempt to create tombstone for unkown array");
+                std::shared_ptr<InnerChunkMap> inner = cmiter->second;
+                InnerChunkMap::iterator mapiter;
+                StorageAddress addr;
+
+                desc.getAddress(addr);
+
+                for (addr.attId = 0;
+                     (mapiter = inner->find(addr)) != inner->end();
+                     addr.attId++)
+                {
+                    mapiter->second.getChunk().reset();
+                    mapiter->second.setTombstonePos(InnerChunkMapEntry::INVALID,
+                                                    desc.hdr.pos.hdrPos);
+                }
+            }
+        }
+
+        if (!_enableChunkmapRecovery)
+        {
+            assert(false);
+            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
+                                   SCIDB_LE_DATABASE_HEADER_CORRUPTED);
+        }
+    }
+}
+
 /* Initialize the chunk map from on-disk store
  */
 void
@@ -218,18 +389,22 @@ CachedStorage::initChunkMap()
 {
     LOG4CXX_TRACE(logger, "smgr open:  reading chunk map, nchunks " << _hdr.nChunks);
 
-    _redundancy = Config::getInstance()->getOption<int> (CONFIG_REDUNDANCY);
+    _redundancy = Config::getInstance()->getOption<size_t> (CONFIG_REDUNDANCY);
     _syncReplication = !Config::getInstance()->getOption<bool> (CONFIG_ASYNC_REPLICATION);
+    _enableChunkmapRecovery =
+        Config::getInstance()->getOption<bool> (CONFIG_ENABLE_CHUNKMAP_RECOVERY);
+    _skipChunkmapIntegrityCheck =
+        Config::getInstance()->getOption<bool> (CONFIG_SKIP_CHUNKMAP_INTEGRITY_CHECK);
 
     ChunkDescriptor desc;
     uint64_t chunkPos = HEADER_SIZE;
     StorageAddress addr;
-    unordered_set<CloneOffset, CloneHash> clones;
     set<ArrayID> removedArrays;
     typedef map<ArrayID, ArrayID> ArrayMap;
     ArrayMap oldestVersions;
-    typedef map<ArrayID, boost::shared_ptr<ArrayDesc> > ArrayDescCache;
+    typedef map<ArrayID, std::shared_ptr<ArrayDesc> > ArrayDescCache;
     ArrayDescCache existentArrays;
+    Extents extents;
 
     for (size_t i = 0; i < _hdr.nChunks; i++, chunkPos += sizeof(ChunkDescriptor))
     {
@@ -258,9 +433,9 @@ CachedStorage::initChunkMap()
         {
             assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
 
-            LOG4CXX_TRACE(logger, "smgr open:  found chunk desc " << desc.toString());
-
-            if (desc.hdr.arrId != 0)
+            LOG4CXX_TRACE(chunkLogger,"chunkl: initchunkmap: found chunk desc " << desc.toString());
+            
+	if (desc.hdr.arrId != 0)
             {
                 /* Check if unversioned array exists
                  */
@@ -271,7 +446,7 @@ CachedStorage::initChunkMap()
                     {
                         try
                         {
-                            boost::shared_ptr<ArrayDesc> ad =
+                            std::shared_ptr<ArrayDesc> ad =
                                 SystemCatalog::getInstance()->getArrayDesc(desc.hdr.pos.dsGuid);
                             it = existentArrays.insert(
                                 ArrayDescCache::value_type(desc.hdr.pos.dsGuid, ad)
@@ -281,10 +456,6 @@ CachedStorage::initChunkMap()
                         {
                             if (x.getLongErrorCode() == SCIDB_LE_ARRAYID_DOESNT_EXIST)
                             {
-                                /* Try to remove the datastore if it is there
-                                 */
-                                _datastores.closeDataStore(desc.hdr.pos.dsGuid,
-                                                           true /* remove from disk */);
                                 removedArrays.insert(desc.hdr.pos.dsGuid);
                             }
                             else
@@ -300,8 +471,8 @@ CachedStorage::initChunkMap()
                 if (it == existentArrays.end())
                 {
                     desc.hdr.arrId = 0;
-                    LOG4CXX_TRACE(logger, "ChunkDesc: Remove chunk descriptor for non-existent "
-                                  << "array at position " << chunkPos);
+                    LOG4CXX_TRACE(chunkLogger,"chunkl: initchunkmap: remove chunk desc "<< "for non-existant array at position " << chunkPos); 
+
                     _hd->writeAll(&desc.hdr, sizeof(ChunkHeader), chunkPos);
                     assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
                     _freeHeaders.insert(chunkPos);
@@ -325,7 +496,7 @@ CachedStorage::initChunkMap()
                         iter = _chunkMap.insert(make_pair(adesc.getUAId(),
                                                           make_shared <InnerChunkMap> ())).first;
                     }
-                    shared_ptr<InnerChunkMap>& innerMap = iter->second;
+                    std::shared_ptr<InnerChunkMap>& innerMap = iter->second;
 
                     /* Find the oldest version of array, and the storage address
                        of the chunk currently in use by this version
@@ -361,27 +532,23 @@ CachedStorage::initChunkMap()
                     {
                         /* Chunk is live, put it in the map
                          */
-                        shared_ptr<PersistentChunk>& chunk =(*innerMap)[addr].getChunk();
+                        LOG4CXX_TRACE(chunkLogger,
+                                    "chunkl: initchunkmap: add live chunk to map for pos "
+                                     << chunkPos); 
+
+			std::shared_ptr<PersistentChunk>& chunk =(*innerMap)[addr].getChunk();
                         ASSERT_EXCEPTION((!chunk), "smgr open: NOT unique chunk");
                         if (!desc.hdr.is<ChunkHeader::TOMBSTONE>())
                         {
                             chunk.reset(new PersistentChunk());
                             chunk->setAddress(adesc, desc);
-                            bool isUnique =
-                                clones.insert(make_tuple(chunk->_hdr.pos.dsGuid,
-                                                         chunk->_hdr.pos.offs)).second;
-                            if (!isUnique) {
-                                LOG4CXX_ERROR(logger, "smgr open: NOT unique chunk adesc= " << adesc
-                                              << ", desc="<<desc.toString()
-                                              << ", _hdr.pos="<<chunk->_hdr.pos.toString());
-                                assert(false);
-                                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
-                                                       SCIDB_LE_DATABASE_HEADER_CORRUPTED);
-                            }
+                            recordExtent(extents, chunk);
                         }
                         else
                         {
-                            (*innerMap)[addr].setTombstonePos(desc.hdr.pos.hdrPos);
+                            (*innerMap)[addr].setTombstonePos(
+                                InnerChunkMapEntry::TOMBSTONE,
+                                desc.hdr.pos.hdrPos);
                         }
 
                         /* Now check if by inserting this chunk we made the previous one dead...
@@ -391,8 +558,13 @@ CachedStorage::initChunkMap()
                         {
                             /* The oldestLiveChunk is now dead... wipe it out
                              */
-                            shared_ptr<DataStore> ds =
+                            std::shared_ptr<DataStore> ds =
                                 _datastores.getDataStore(desc.hdr.pos.dsGuid);
+                            if (!oldestLiveChunk->second.isTombstone())
+                            {
+                                eraseExtent(extents,
+                                            oldestLiveChunk->second.getChunk());
+                            }
                             markChunkAsFree(oldestLiveChunk->second, ds);
                             innerMap->erase(oldestLiveChunk);
                         }
@@ -401,11 +573,13 @@ CachedStorage::initChunkMap()
                     {
                         /* Chunk is dead, wipe it out
                          */
-                        shared_ptr<DataStore> ds =
+                        std::shared_ptr<DataStore> ds =
                             _datastores.getDataStore(desc.hdr.pos.dsGuid);
                         desc.hdr.arrId = 0;
-                        LOG4CXX_TRACE(logger, "ChunkDesc: Remove chunk descriptor for non-existent "
-                                      << "array at position " << chunkPos);
+                        LOG4CXX_TRACE(chunkLogger, "chunkl: initchunkmap: "
+                                      << "remove dead chunk desc for non-existent "
+ 	                              << "array version at position " << chunkPos); 
+
                         _hd->writeAll(&desc.hdr, sizeof(ChunkHeader), chunkPos);
                         assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
                         _freeHeaders.insert(chunkPos);
@@ -420,15 +594,27 @@ CachedStorage::initChunkMap()
         }
     }
 
+    /* Perform some simple validation for storage header
+     */
     if (chunkPos != _hdr.currPos)
     {
         LOG4CXX_ERROR(logger, "Storage header is not consistent: " << chunkPos << " vs. " << _hdr.currPos);
-        // throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_DATABASE_HEADER_CORRUPTED);
-        if (chunkPos > _hdr.currPos)
-        {
-            _hdr.currPos = chunkPos;
-        }
+        _hdr.currPos = chunkPos;
     }
+
+    /* Run through removed arrays and try to remove the datastores (if they
+       exist)
+     */
+    set<ArrayID>::iterator remit = removedArrays.begin();
+    while (remit != removedArrays.end())
+    {
+        _datastores.closeDataStore(*remit, true /* remove from disk */);
+        ++remit;
+    }
+
+    /* Check chunkmap for overlaps...
+     */
+    checkExtentsForOverlaps(extents);
 }
 
 /* Read the storage description file to find path for chunk map file.
@@ -520,7 +706,7 @@ CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSizeByt
     }
     else
     {
-        LOG4CXX_TRACE(logger, "smgr open:  openinging storage header");
+        LOG4CXX_TRACE(logger, "smgr open:  opening storage header");
 
         /* Check for corrupted metadata file
          */
@@ -571,7 +757,7 @@ CachedStorage::close()
 
     for (ChunkMap::iterator i = _chunkMap.begin(); i != _chunkMap.end(); ++i)
     {
-        shared_ptr<InnerChunkMap> & innerMap = i->second;
+        std::shared_ptr<InnerChunkMap> & innerMap = i->second;
         for (InnerChunkMap::iterator j = innerMap->begin(); j != innerMap->end(); ++j)
         {
             if (j->second.getChunk() && j->second.getChunk()->_accessCount != 0)
@@ -647,18 +833,18 @@ void CachedStorage::addChunkToCache(PersistentChunk& chunk)
     _cacheUsed += chunk.getSize();
 }
 
-boost::shared_ptr<PersistentChunk>
+std::shared_ptr<PersistentChunk>
 CachedStorage::lookupChunk(ArrayDesc const& desc, StorageAddress const& addr)
 {
     ScopedMutexLock cs(_mutex);
     ChunkMap::iterator iter = _chunkMap.find(desc.getUAId());
     if (iter != _chunkMap.end())
     {
-        shared_ptr<InnerChunkMap>& innerMap = iter->second;
+        std::shared_ptr<InnerChunkMap>& innerMap = iter->second;
         InnerChunkMap::iterator innerIter = innerMap->find(addr);
         if (innerIter != innerMap->end())
         {
-            shared_ptr<PersistentChunk>& chunk = innerIter->second.getChunk();
+            std::shared_ptr<PersistentChunk>& chunk = innerIter->second.getChunk();
             if (chunk)
             {
                 chunk->beginAccess();
@@ -666,7 +852,7 @@ CachedStorage::lookupChunk(ArrayDesc const& desc, StorageAddress const& addr)
             }
         }
     }
-    boost::shared_ptr<PersistentChunk> emptyChunk;
+    std::shared_ptr<PersistentChunk> emptyChunk;
     return emptyChunk;
 }
 
@@ -690,7 +876,7 @@ void CachedStorage::compressChunk(ArrayDesc const& desc, PersistentChunk const* 
 {
     assert(aChunk);
     PersistentChunk& chunk = *const_cast<PersistentChunk*>(aChunk);
-    shared_ptr<DataStore> ds = _datastores.getDataStore(desc.getUAId());
+    std::shared_ptr<DataStore> ds = _datastores.getDataStore(desc.getUAId());
     int compressionMethod = chunk.getCompressionMethod();
     if (compressionMethod < 0) {
         throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_COMPRESS_METHOD_NOT_DEFINED);
@@ -729,7 +915,7 @@ void CachedStorage::compressChunk(ArrayDesc const& desc, PersistentChunk const* 
 
 inline bool CachedStorage::isResponsibleFor(ArrayDesc const& desc,
                                             PersistentChunk const& chunk,
-                                            boost::shared_ptr<Query> const& query)
+                                            std::shared_ptr<Query> const& query)
 {
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
@@ -749,7 +935,7 @@ inline bool CachedStorage::isResponsibleFor(ArrayDesc const& desc,
     }
     InstanceID replicas[MAX_REDUNDANCY + 1];
     getReplicasInstanceId(replicas, desc, chunk.getAddress());
-    for (int i = 1; i <= _redundancy; i++)
+    for (size_t i = 1; i <= _redundancy; i++)
     {
         if (replicas[i] == _hdr.instanceId)
         {
@@ -764,10 +950,10 @@ inline bool CachedStorage::isResponsibleFor(ArrayDesc const& desc,
     return false;
 }
 
-boost::shared_ptr<PersistentChunk> CachedStorage::createChunk(ArrayDesc const& desc,
+std::shared_ptr<PersistentChunk> CachedStorage::createChunk(ArrayDesc const& desc,
                                                               StorageAddress const& addr,
                                                               int compressionMethod,
-                                                              const boost::shared_ptr<Query>& query)
+                                                              const std::shared_ptr<Query>& query)
 {
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
@@ -784,10 +970,13 @@ boost::shared_ptr<PersistentChunk> CachedStorage::createChunk(ArrayDesc const& d
         << CoordsToStr(addr.coords);
     }
 
-    shared_ptr<PersistentChunk>& chunk = (*(iter->second))[addr].getChunk();
+    std::shared_ptr<PersistentChunk>& chunk = (*(iter->second))[addr].getChunk();
     chunk.reset(new PersistentChunk());
     chunk->setAddress(desc, addr, compressionMethod);
-    LOG4CXX_TRACE(logger, "CachedStorage::createChunk =" << chunk.get() << ", accessCount = "<<chunk->_accessCount);
+    LOG4CXX_TRACE(chunkLogger, "chunkl: createchunk: chunk created for addr "
+                   << "[attrid=" << addr.attId << "][arrid=" << addr.arrId
+                   << "]" << CoordsToStr(addr.coords)); 
+
     chunk->_accessCount = 1; // newly created chunk is pinned
     chunk->_timestamp = ++_timestamp;
     return chunk;
@@ -832,15 +1021,17 @@ void CachedStorage::internalFreeChunk(PersistentChunk& victim)
     victim.free();
 }
 
-/* Remove all versions prior to arrId from the unversioned array uaId.
-   If arrId is zero, remove everything
- */
+/*
+ Remove all versions prior to lastLiveArrId from the unversioned
+ array uaId in the storage. If lastLiveArrId is 0, removes all
+ versions. Does nothing if the specified array is not present.
+*/
 void CachedStorage::removeVersions(QueryID queryId,
                                    ArrayUAID uaId,
                                    ArrayID lastLiveArrId)
 {
     ScopedMutexLock cs(_mutex);
-    shared_ptr<InnerChunkMap> innerMap;
+    std::shared_ptr<InnerChunkMap> innerMap;
     ChunkMap::const_iterator iter = _chunkMap.find(uaId);
     if (iter == _chunkMap.end())
     {
@@ -848,7 +1039,7 @@ void CachedStorage::removeVersions(QueryID queryId,
     }
     innerMap = iter->second;
 
-    shared_ptr<DataStore> ds = _datastores.getDataStore(uaId);
+    std::shared_ptr<DataStore> ds = _datastores.getDataStore(uaId);
     set<StorageAddress> victims;
     StorageAddress currentChunkAddr;
     bool currentChunkIsLive = true;
@@ -920,7 +1111,7 @@ void CachedStorage::removeVersions(QueryID queryId,
 void CachedStorage::removeVersionFromMemory(ArrayUAID uaId, ArrayID arrId)
 {
     ScopedMutexLock cs(_mutex);
-    shared_ptr<InnerChunkMap> innerMap;
+    std::shared_ptr<InnerChunkMap> innerMap;
     ChunkMap::const_iterator iter = _chunkMap.find(uaId);
     if (iter == _chunkMap.end())
     {
@@ -955,13 +1146,13 @@ InstanceID CachedStorage::getPrimaryInstanceId(ArrayDesc const& desc, StorageAdd
 {
     //in this context we have to be careful to use nInstances which was set at the beginning of system lifetime
     //this method must return the same value regardless of whether or not there were failures
-    return desc.getHashedChunkNumber(address.coords) % _nInstances;
+    return desc.getPrimaryInstanceId(address.coords, _nInstances);
 }
 
 void CachedStorage::getReplicasInstanceId(InstanceID* replicas, ArrayDesc const& desc, StorageAddress const& address) const
 {
     replicas[0] = getPrimaryInstanceId(desc, address);
-    for (int i = 0; i < _redundancy; i++)
+    for (size_t i = 0; i < _redundancy; i++)
     {
         // A prime number can be used to smear the replicas as follows
         // InstanceID instanceId = (chunk.getArrayDesc().getHashedChunkNumber(chunk.addr.coords) + (i+1)) % PRIME_NUMBER % nInstances;
@@ -970,9 +1161,15 @@ void CachedStorage::getReplicasInstanceId(InstanceID* replicas, ArrayDesc const&
 
         const uint64_t nReplicas = (_redundancy + 1);
         const uint64_t currReplica = (i + 1);
-        const uint64_t chunkId = desc.getHashedChunkNumber(address.coords) * (nReplicas) + currReplica;
+        //XXX TODO: each array/distribution should implement the replica mapping function
+        //XXX TODO: for now hard-wire psHashPartitioned mapping
+        //XXX TODO: this implies that the replicas are NOT distributed with the distribution of the primary chunks
+        const static size_t infinity(std::numeric_limits<size_t>::max());
+        Dimensions const& dims = desc.getDimensions();
+        const uint64_t chunkId =
+            getPrimaryInstanceForChunk(psHashPartitioned, address.coords, dims, infinity) * (nReplicas) + currReplica;
         InstanceID instanceId = fibHash64(chunkId, MAX_INSTANCE_BITS) % _nInstances;
-        for (int j = 0; j <= i; j++)
+        for (size_t j = 0; j <= i; j++)
         {
             if (replicas[j] == instanceId)
             {
@@ -990,8 +1187,8 @@ void CachedStorage::replicate(ArrayDesc const& desc,
                               void const* data,
                               size_t compressedSize,
                               size_t decompressedSize,
-                              shared_ptr<Query> const& query,
-                              vector<shared_ptr<ReplicationManager::Item> >& replicasVec)
+                              std::shared_ptr<Query> const& query,
+                              vector<std::shared_ptr<ReplicationManager::Item> >& replicasVec)
 {
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
@@ -1006,20 +1203,20 @@ void CachedStorage::replicate(ArrayDesc const& desc,
 
     QueryID queryId = query->getQueryID();
     assert(queryId != 0);
-    boost::shared_ptr<MessageDesc> chunkMsg;
+    std::shared_ptr<MessageDesc> chunkMsg;
     if (chunk && data)
     {
-        boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
+        std::shared_ptr<CompressedBuffer> buffer = std::make_shared<CompressedBuffer>();
         buffer->allocate(compressedSize);
         memcpy(buffer->getData(), data, compressedSize);
-        chunkMsg = boost::make_shared<MessageDesc>(mtChunkReplica, buffer);
+        chunkMsg = std::make_shared<MessageDesc>(mtChunkReplica, buffer);
     }
     else
     {
-        chunkMsg = boost::make_shared<MessageDesc>(mtChunkReplica);
+        chunkMsg = std::make_shared<MessageDesc>(mtChunkReplica);
     }
     chunkMsg->setQueryID(queryId);
-    boost::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk> ();
+    std::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk> ();
     chunkRecord->set_attribute_id(addr.attId);
     chunkRecord->set_array_id(addr.arrId);
     for (size_t k = 0; k < addr.coords.size(); k++)
@@ -1041,33 +1238,33 @@ void CachedStorage::replicate(ArrayDesc const& desc,
         chunkRecord->set_tombstone(true);
     }
 
-    for (int i = 1; i <= _redundancy; i++)
+    for (size_t i = 1; i <= _redundancy; i++)
     {
-        boost::shared_ptr<ReplicationManager::Item> item = make_shared <ReplicationManager::Item>(replicas[i], chunkMsg, query);
+        std::shared_ptr<ReplicationManager::Item> item = make_shared <ReplicationManager::Item>(replicas[i], chunkMsg, query);
         assert(_replicationManager);
         _replicationManager->send(item);
         replicasVec.push_back(item);
     }
 }
 
-void CachedStorage::abortReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >* replicasVec)
+void CachedStorage::abortReplicas(vector<std::shared_ptr<ReplicationManager::Item> >* replicasVec)
 {
     assert(replicasVec);
     for (size_t i = 0; i < replicasVec->size(); ++i)
     {
-        const boost::shared_ptr<ReplicationManager::Item>& item = (*replicasVec)[i];
+        const std::shared_ptr<ReplicationManager::Item>& item = (*replicasVec)[i];
         assert(_replicationManager);
         _replicationManager->abort(item);
         assert(item->isDone());
     }
 }
 
-void CachedStorage::waitForReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >& replicasVec)
+void CachedStorage::waitForReplicas(vector<std::shared_ptr<ReplicationManager::Item> >& replicasVec)
 {
     // _mutex must NOT be locked
     for (size_t i = 0; i < replicasVec.size(); ++i)
     {
-        const boost::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
+        const std::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
         assert(_replicationManager);
         _replicationManager->wait(item);
         assert(item->isDone());
@@ -1089,7 +1286,7 @@ CachedStorage::writeBytesToDataStore(DiskPos const& pos,
                                      size_t allocated)
 {
     double t0 = 0, t1 = 0, writeTime = 0;
-    shared_ptr<DataStore> ds = _datastores.getDataStore(pos.dsGuid);
+    std::shared_ptr<DataStore> ds = _datastores.getDataStore(pos.dsGuid);
 
     if (!ds)
     {
@@ -1169,7 +1366,7 @@ RWLock& CachedStorage::getChunkLatch(PersistentChunk* chunk)
     return _latches[(size_t) chunk->_hdr.pos.offs % N_LATCHES];
 }
 
-void CachedStorage::getChunkPositions(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, CoordinateSet& chunkPositions)
+void CachedStorage::getChunkPositions(ArrayDesc const& desc, std::shared_ptr<Query> const& query, CoordinateSet& chunkPositions)
 {
     StorageAddress readAddress (desc.getId(), 0, Coordinates());
     while(findNextChunk(desc, query, readAddress))
@@ -1179,7 +1376,7 @@ void CachedStorage::getChunkPositions(ArrayDesc const& desc, boost::shared_ptr<Q
 }
 
 bool CachedStorage::findNextChunk(ArrayDesc const& desc,
-                                  boost::shared_ptr<Query> const& query,
+                                  std::shared_ptr<Query> const& query,
                                   StorageAddress& address)
 {
     ScopedMutexLock cs(_mutex);
@@ -1192,7 +1389,7 @@ bool CachedStorage::findNextChunk(ArrayDesc const& desc,
         address.coords.clear();
         return false;
     }
-    shared_ptr<InnerChunkMap> const& innerMap = iter->second;
+    std::shared_ptr<InnerChunkMap> const& innerMap = iter->second;
     if(address.coords.size())
     {
         address.coords[address.coords.size()-1] += desc.getDimensions()[desc.getDimensions().size() - 1].getChunkInterval();
@@ -1229,7 +1426,7 @@ bool CachedStorage::findNextChunk(ArrayDesc const& desc,
     }
 }
 
-bool CachedStorage::findChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address)
+bool CachedStorage::findChunk(ArrayDesc const& desc, std::shared_ptr<Query> const& query, StorageAddress& address)
 {
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
@@ -1240,7 +1437,7 @@ bool CachedStorage::findChunk(ArrayDesc const& desc, boost::shared_ptr<Query> co
         address.coords.clear();
         return false;
     }
-    shared_ptr<InnerChunkMap> const& innerMap = iter->second;
+    std::shared_ptr<InnerChunkMap> const& innerMap = iter->second;
     address.arrId = desc.getId();
     InnerChunkMap::iterator innerIter = innerMap->lower_bound(address);
     if (innerIter == innerMap->end() || innerIter->first.coords != address.coords || innerIter->first.attId != address.attId)
@@ -1283,7 +1480,7 @@ void CachedStorage::cleanChunk(PersistentChunk* chunk)
 void
 CachedStorage::writeChunk(ArrayDesc const& adesc,
                           PersistentChunk* newChunk,
-                          const boost::shared_ptr<Query>& query)
+                          const std::shared_ptr<Query>& query)
 {
     /* XXX TODO: consider locking mutex here to avoid writing replica chunks for a rolled-back query
      */
@@ -1333,7 +1530,7 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
 
     /* Replicate chunk data to other instances
      */
-    vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
+    vector<std::shared_ptr<ReplicationManager::Item> > replicasVec;
     func = boost::bind(&CachedStorage::abortReplicas, this, &replicasVec);
     Destructor<boost::function<void()> > replicasCleaner(func);
     func.clear();
@@ -1346,7 +1543,7 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
         ScopedMutexLock cs(_mutex);
         assert(chunk.isRaw()); // new chunk is raw
         Query::validateQueryPtr(query);
-        shared_ptr<DataStore> ds = _datastores.getDataStore(adesc.getUAId());
+        std::shared_ptr<DataStore> ds = _datastores.getDataStore(adesc.getUAId());
 
         /* Fill in the chunk descriptor
          */
@@ -1392,7 +1589,8 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
                 _logSize = 0;
                 _currLog ^= 1;
             }
-            LOG4CXX_TRACE(logger, "ChunkDesc: Write in log chunk header " << transLogRecord->hdr.pos.offs << " at position " << _logSize);
+           LOG4CXX_TRACE(logger, "CachedStorage::writeChunk: write log entry chunk pos "
+ 	                 << transLogRecord->hdr.pos.offs << " at log pos " << _logSize); 
 
             /* Write the transaction... log is opened O_SYNC so no flush is necessary
              */
@@ -1415,9 +1613,11 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
         }
         assert(chunk._hdr.pos.hdrPos != 0);
 
-        LOG4CXX_TRACE(logger, "ChunkDesc: Write chunk descriptor at position " << chunk._hdr.pos.hdrPos);
-        LOG4CXX_TRACE(logger, "Chunk descriptor to write: " << cdesc.toString());
-
+        LOG4CXX_TRACE(chunkLogger, "chunkl: writechunk: write chunk desc at pos "
+ 	            << chunk._hdr.pos.hdrPos);
+ 	LOG4CXX_TRACE(chunkLogger, "chunkl: writechunk: desc: "
+ 	            << cdesc.toString());   
+        
         _hd->writeAll(&cdesc, sizeof(ChunkDescriptor), chunk._hdr.pos.hdrPos);
 
         /* Update storage header (for nchunks field)
@@ -1443,10 +1643,10 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
 /* Mark a chunk as free in the on-disk and in-memory chunk map.  Also mark it as free
    in the datastore.
  */
-void CachedStorage::markChunkAsFree(InnerChunkMapEntry& entry, shared_ptr<DataStore>& ds)
+void CachedStorage::markChunkAsFree(InnerChunkMapEntry& entry, std::shared_ptr<DataStore>& ds)
 {
     ChunkHeader header;
-    shared_ptr<PersistentChunk>& chunk = entry.getChunk();
+    std::shared_ptr<PersistentChunk>& chunk = entry.getChunk();
 
     if (!chunk)
     {
@@ -1471,7 +1671,10 @@ void CachedStorage::markChunkAsFree(InnerChunkMapEntry& entry, shared_ptr<DataSt
     /* Update header as free and write back to storage header file
      */
     header.arrId = 0;
-    LOG4CXX_TRACE(logger, "ChunkDesc: Free chunk descriptor at position " << header.pos.hdrPos);
+    LOG4CXX_TRACE(chunkLogger,
+ 	         "chunkl: markchunkasfree: free chunk descriptor at position "
+ 	         << header.pos.hdrPos);
+
     _hd->writeAll(&header, sizeof(ChunkHeader), header.pos.hdrPos);
     assert(header.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
     _freeHeaders.insert(header.pos.hdrPos);
@@ -1479,7 +1682,7 @@ void CachedStorage::markChunkAsFree(InnerChunkMapEntry& entry, shared_ptr<DataSt
 
 void CachedStorage::removeDeadChunks(ArrayDesc const& arrayDesc,
                                      set<Coordinates, CoordinatesLess> const& liveChunks,
-                                     boost::shared_ptr<Query> const& query)
+                                     std::shared_ptr<Query> const& query)
 {
     typedef set<Coordinates, CoordinatesLess> DeadChunks;
     DeadChunks deadChunks;
@@ -1506,9 +1709,9 @@ void CachedStorage::removeDeadChunks(ArrayDesc const& arrayDesc,
 
 void CachedStorage::removeChunkVersion(ArrayDesc const& arrayDesc,
                                        Coordinates const& coords,
-                                       shared_ptr<Query> const& query)
+                                       std::shared_ptr<Query> const& query)
 {
-    vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
+    vector<std::shared_ptr<ReplicationManager::Item> > replicasVec;
     boost::function<void()> f = boost::bind(&CachedStorage::abortReplicas, this, &replicasVec);
     Destructor<boost::function<void()> > replicasCleaner(f);
     StorageAddress addr(arrayDesc.getId(), 0, coords);
@@ -1520,7 +1723,7 @@ void CachedStorage::removeChunkVersion(ArrayDesc const& arrayDesc,
 
 void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
                                             Coordinates const& coords,
-                                            shared_ptr<Query> const& query)
+                                            std::shared_ptr<Query> const& query)
 {
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
@@ -1560,7 +1763,7 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Attempt to create tombstone for unexistent array";
     }
-    shared_ptr<InnerChunkMap> inner = iter->second;
+    std::shared_ptr<InnerChunkMap> inner = iter->second;
     for (AttributeID i =0; i<arrayDesc.getAttributes().size(); i++)
     {
         query->validate();
@@ -1585,7 +1788,8 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
             assert( tombstoneDesc.hdr.pos.hdrPos != 0);
             _freeHeaders.erase(i);
         }
-        (*inner)[addr].setTombstonePos(tombstoneDesc.hdr.pos.hdrPos);
+        (*inner)[addr].setTombstonePos(InnerChunkMapEntry::TOMBSTONE,
+                                       tombstoneDesc.hdr.pos.hdrPos);
         transLogRecord->hdr = tombstoneDesc.hdr;
         transLogRecord->hdrCRC = calculateCRC32(transLogRecord, sizeof(TransLogRecordHeader));
         if (_logSize + sizeof(TransLogRecord) > _logSizeLimit)
@@ -1599,9 +1803,11 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
         _log[_currLog]->writeAll(transLogRecord, sizeof(TransLogRecord) * 2, _logSize);
         _logSize += sizeof(TransLogRecord);
 
-        LOG4CXX_TRACE(logger, "ChunkDesc: Write chunk tombstone descriptor at position " <<  tombstoneDesc.hdr.pos.hdrPos);
-        LOG4CXX_TRACE(logger, "Chunk tombstone descriptor to write: " << tombstoneDesc.toString());
-
+        LOG4CXX_TRACE(chunkLogger, "chunkl: removelocalchunkversion: "
+             << "write chunk tombstone at pos " <<  tombstoneDesc.hdr.pos.hdrPos);
+        LOG4CXX_TRACE(chunkLogger, "chunkl: removelocalchunkversion: "
+ 	     << "tombstone to write: " << tombstoneDesc.toString());
+        
         _hd->writeAll(&tombstoneDesc, sizeof(ChunkDescriptor), tombstoneDesc.hdr.pos.hdrPos);
     }
     _hd->writeAll(&_hdr, HEADER_SIZE, 0);
@@ -1648,8 +1854,10 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
 
                 transLogRecord.hdr.arrId = 0; // mark chunk as free
                 assert(transLogRecord.hdr.pos.hdrPos != 0);
-                LOG4CXX_TRACE(logger, "ChunkDesc: Undo chunk descriptor creation at position "
-                              << transLogRecord.hdr.pos.hdrPos);
+                LOG4CXX_TRACE(chunkLogger, "chunkl: rollback: undo chunk descriptor creation at position "
+                             << transLogRecord.hdr.pos.hdrPos); 
+                LOG4CXX_TRACE(chunkLogger, "chunkl: rollback: hdr: "
+ 	                     << transLogRecord.hdr.toString()); 
                 _hd->writeAll(&transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
                 _freeHeaders.insert(transLogRecord.hdr.pos.hdrPos);
 
@@ -1658,7 +1866,7 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
                 if (!transLogRecord.hdr.is<ChunkHeader::TOMBSTONE>() &&
                     lastVersionID > 0)
                 {
-                    shared_ptr<DataStore> ds =
+                    std::shared_ptr<DataStore> ds =
                         _datastores.getDataStore(transLogRecord.hdr.pos.dsGuid);
                     ds->freeChunk(transLogRecord.hdr.pos.offs,
                                   transLogRecord.hdr.allocatedSize);
@@ -1687,37 +1895,42 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
 
 void CachedStorage::doTxnRecoveryOnStartup()
 {
-    list<shared_ptr<SystemCatalog::LockDesc> > coordLocks;
-    list<shared_ptr<SystemCatalog::LockDesc> > workerLocks;
+    list<std::shared_ptr<SystemCatalog::LockDesc> > coordLocks;
+    list<std::shared_ptr<SystemCatalog::LockDesc> > workerLocks;
 
     SystemCatalog::getInstance()->readArrayLocks(getInstanceId(), coordLocks, workerLocks);
-    shared_ptr<map<ArrayID, VersionID> > arraysToRollback = make_shared <map<ArrayID, VersionID> > ();
+    std::shared_ptr<map<ArrayID, VersionID> > arraysToRollback = make_shared <map<ArrayID, VersionID> > ();
     UpdateErrorHandler::RollbackWork collector = bind(&collectArraysToRollback, arraysToRollback, _1, _2, _3);
 
     { // Deal with the  SystemCatalog::LockDesc::COORD type locks first
 
-        for (list<shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = coordLocks.begin(); iter != coordLocks.end(); ++iter)
+        for (list<std::shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = coordLocks.begin(); iter != coordLocks.end(); ++iter)
         {
-            const shared_ptr<SystemCatalog::LockDesc>& lock = *iter;
+            const std::shared_ptr<SystemCatalog::LockDesc>& lock = *iter;
 
             if (lock->getLockMode() == SystemCatalog::LockDesc::RM)
             {
                 const bool checkLock = false;
                 RemoveErrorHandler::handleRemoveLock(lock, checkLock);
             }
-            else if (lock->getLockMode() == SystemCatalog::LockDesc::CRT || lock->getLockMode() == SystemCatalog::LockDesc::WR)
+            else if (lock->getLockMode() == SystemCatalog::LockDesc::CRT ||
+                     lock->getLockMode() == SystemCatalog::LockDesc::WR)
             {
                 UpdateErrorHandler::handleErrorOnCoordinator(lock, collector);
             }
             else
             {
-                assert(lock->getLockMode() == SystemCatalog::LockDesc::RNF ||
-                       lock->getLockMode() == SystemCatalog::LockDesc::RD);
+                ASSERT_EXCEPTION((lock->getLockMode() == SystemCatalog::LockDesc::RNF ||
+                                  lock->getLockMode() == SystemCatalog::LockDesc::XCL ||
+                                  lock->getLockMode() == SystemCatalog::LockDesc::RD),
+                                 string("Unrecognized array lock on recovery: ")+lock->toString());
             }
         }
 
         // Do the rollback
         rollback(*arraysToRollback.get());
+
+        // NOTE: All transient arrays are invalidated on (re)start in the catalog
 
         SystemCatalog::getInstance()->deleteCoordArrayLocks(getInstanceId());
     }
@@ -1726,23 +1939,28 @@ void CachedStorage::doTxnRecoveryOnStartup()
 
         arraysToRollback->clear();
 
-        for (list<shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = workerLocks.begin(); iter != workerLocks.end(); ++iter)
+        for (list<std::shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = workerLocks.begin();
+             iter != workerLocks.end(); ++iter)
         {
-            const shared_ptr<SystemCatalog::LockDesc>& lock = *iter;
+            const std::shared_ptr<SystemCatalog::LockDesc>& lock = *iter;
 
-            if (lock->getLockMode() == SystemCatalog::LockDesc::CRT || lock->getLockMode() == SystemCatalog::LockDesc::WR)
+            if (lock->getLockMode() == SystemCatalog::LockDesc::CRT ||
+                lock->getLockMode() == SystemCatalog::LockDesc::WR)
             {
                 const bool checkCoordinatorLock = true;
                 UpdateErrorHandler::handleErrorOnWorker(lock, checkCoordinatorLock, collector);
             }
             else
             {
-                assert(lock->getLockMode() == SystemCatalog::LockDesc::RNF);
+                ASSERT_EXCEPTION(lock->getLockMode() == SystemCatalog::LockDesc::XCL,
+                                 string("Unrecognized array lock on recovery: ")+lock->toString());
             }
         }
 
         // Do the rollback
         rollback(*arraysToRollback.get());
+
+        // NOTE: All transient arrays are invalidated on (re)start in the catalog
 
         SystemCatalog::getInstance()->deleteWorkerArrayLocks(getInstanceId());
     }
@@ -1769,7 +1987,7 @@ CachedStorage::flush(ArrayUAID uaId)
      */
     if (uaId != INVALID_ARRAY_ID)
     {
-        shared_ptr<DataStore> ds = _datastores.getDataStore(uaId);
+        std::shared_ptr<DataStore> ds = _datastores.getDataStore(uaId);
         ds->flush();
     }
     else
@@ -1778,24 +1996,24 @@ CachedStorage::flush(ArrayUAID uaId)
     }
 }
 
-boost::shared_ptr<ArrayIterator> CachedStorage::getArrayIterator(boost::shared_ptr<const Array>& arr,
+std::shared_ptr<ArrayIterator> CachedStorage::getArrayIterator(std::shared_ptr<const Array>& arr,
                                                                  AttributeID attId,
-                                                                 boost::shared_ptr<Query>& query)
+                                                                 std::shared_ptr<Query>& query)
 {
-    return boost::shared_ptr<ArrayIterator>(new DBArrayIterator(this, arr, attId, query, true));
+    return std::shared_ptr<ArrayIterator>(new DBArrayIterator(this, arr, attId, query, true));
 }
 
-boost::shared_ptr<ConstArrayIterator> CachedStorage::getConstArrayIterator(boost::shared_ptr<const Array>& arr,
+std::shared_ptr<ConstArrayIterator> CachedStorage::getConstArrayIterator(std::shared_ptr<const Array>& arr,
                                                                            AttributeID attId,
-                                                                           boost::shared_ptr<Query>& query)
+                                                                           std::shared_ptr<Query>& query)
 {
-    return boost::shared_ptr<ConstArrayIterator>(new DBArrayIterator(this, arr, attId, query, false));
+    return std::shared_ptr<ConstArrayIterator>(new DBArrayIterator(this, arr, attId, query, false));
 }
 
 void CachedStorage::fetchChunk(ArrayDesc const& desc, PersistentChunk& chunk)
 {
     ChunkInitializer guard(this, chunk);
-    shared_ptr<DataStore> ds = _datastores.getDataStore(desc.getUAId());
+    std::shared_ptr<DataStore> ds = _datastores.getDataStore(desc.getUAId());
     if (chunk._hdr.pos.hdrPos == 0)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
@@ -1841,7 +2059,7 @@ void CachedStorage::loadChunk(ArrayDesc const& desc, PersistentChunk* aChunk)
             {
                 chunk._waiting = true;
                 Semaphore::ErrorChecker ec;
-                boost::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false);
+                std::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false);
                 if (query)
                 {
                     ec = bind(&Query::validate, query);
@@ -1871,12 +2089,12 @@ void CachedStorage::loadChunk(ArrayDesc const& desc, PersistentChunk* aChunk)
     }
 }
 
-boost::shared_ptr<PersistentChunk>
+std::shared_ptr<PersistentChunk>
 CachedStorage::readChunk(ArrayDesc const& desc,
                          StorageAddress const& addr,
-                         const boost::shared_ptr<Query>& query)
+                         const std::shared_ptr<Query>& query)
 {
-    boost::shared_ptr<PersistentChunk> chunk = CachedStorage::lookupChunk(desc, addr);
+    std::shared_ptr<PersistentChunk> chunk = CachedStorage::lookupChunk(desc, addr);
     if (!chunk) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_NOT_FOUND);
     }
@@ -1905,28 +2123,36 @@ void CachedStorage::getDiskInfo(DiskInfo& info)
     ::memset(&info, 0, sizeof info);
 }
 
-void CachedStorage::listChunkDescriptors(ListChunkDescriptorsArrayBuilder& builder)
+void CachedStorage::visitChunkDescriptors(const ChunkDescriptorVisitor& visit) const
 {
     ScopedMutexLock cs(_mutex);
-    pair<ChunkDescriptor, bool> element;
+    ChunkDescriptor cd;
     uint64_t chunkPos = HEADER_SIZE;
     for (size_t i = 0; i < _hdr.nChunks; i++, chunkPos += sizeof(ChunkDescriptor))
     {
-        _hd->readAll(&element.first, sizeof(ChunkDescriptor), chunkPos);
-        element.second = _freeHeaders.count(chunkPos);
-        builder.listElement(element);
+        _hd->readAll(&cd, sizeof(ChunkDescriptor), chunkPos);
+        visit(cd, _freeHeaders.count(chunkPos));
     }
 }
 
-void CachedStorage::listChunkMap(ListChunkMapArrayBuilder& builder)
+void CachedStorage::visitChunkMap(const ChunkMapVisitor& visit) const
 {
     ScopedMutexLock cs(_mutex);
-    for (ChunkMap::iterator i = _chunkMap.begin(); i != _chunkMap.end(); ++i)
+    for (ChunkMap::const_iterator i = _chunkMap.begin(); i != _chunkMap.end(); ++i)
     {
-        ArrayUAID uaid = i->first;
-        for (InnerChunkMap::iterator j = i->second->begin(); j != i->second->end(); ++j)
+        for (InnerChunkMap::const_iterator j = i->second->begin(); j != i->second->end(); ++j)
         {
-            builder.listElement(ChunkMapEntry(uaid, j->first, j->second.getChunk().get()));
+            uint64_t tombstonePos = 0;
+
+            if (j->second.isTombstone())
+            {
+                tombstonePos = j->second.getTombstonePos();
+            }
+            visit(i->first,
+                  j->first,
+                  j->second.getChunk().get(),
+                  tombstonePos,
+                  j->second.isValid());
         }
     }
 }
@@ -1936,8 +2162,8 @@ void CachedStorage::listChunkMap(ListChunkMapArrayBuilder& builder)
 ///////////////////////////////////////////////////////////////////
 
 CachedStorage::DBArrayIterator::DBArrayIterator(CachedStorage* storage,
-                                                shared_ptr<const Array>& array,
-                                                AttributeID attId, boost::shared_ptr<Query>& query,
+                                                std::shared_ptr<const Array>& array,
+                                                AttributeID attId, std::shared_ptr<Query>& query,
                                                 bool writeMode)
   : _currChunk(NULL),
     _storage(storage),
@@ -1954,12 +2180,12 @@ CachedStorage::DBArrayIterator::DBArrayIterator(CachedStorage* storage,
 CachedStorage::DBArrayIterator::~DBArrayIterator()
 {}
 
-CachedStorage::DBArrayChunk* CachedStorage::DBArrayIterator::getDBArrayChunk(boost::shared_ptr<PersistentChunk>& dbChunk)
+CachedStorage::DBArrayChunk* CachedStorage::DBArrayIterator::getDBArrayChunk(std::shared_ptr<PersistentChunk>& dbChunk)
 {
     assert(dbChunk);
     DBArrayMap::iterator iter = _dbChunks.find(dbChunk);
     if (iter == _dbChunks.end()) {
-        shared_ptr<DBArrayChunk> dbac(new DBArrayChunk(*this, dbChunk.get()));
+        std::shared_ptr<DBArrayChunk> dbac(new DBArrayChunk(*this, dbChunk.get()));
         std::pair<DBArrayMap::iterator, bool> res = _dbChunks.insert(DBArrayMap::value_type(dbChunk, dbac));
         assert(res.second);
         iter = res.first;
@@ -1984,7 +2210,7 @@ ConstChunk const& CachedStorage::DBArrayIterator::getChunk()
     }
     if (_currChunk == NULL)
     {
-        shared_ptr<PersistentChunk> chunk = _storage->lookupChunk(getArrayDesc(), _address);
+        std::shared_ptr<PersistentChunk> chunk = _storage->lookupChunk(getArrayDesc(), _address);
         if (!chunk) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_NOT_FOUND);
         }
@@ -2003,7 +2229,7 @@ bool CachedStorage::DBArrayIterator::end()
 
 void CachedStorage::DBArrayIterator::operator ++()
 {
-    shared_ptr<Query> query = getQuery();
+    std::shared_ptr<Query> query = getQuery();
     _currChunk = NULL;
     if (end())
     {
@@ -2030,7 +2256,7 @@ Coordinates const& CachedStorage::DBArrayIterator::getPosition()
 
 bool CachedStorage::DBArrayIterator::setPosition(Coordinates const& pos)
 {
-    shared_ptr<Query> query = getQuery();
+    std::shared_ptr<Query> query = getQuery();
     _currChunk = NULL;
     _address.coords = pos;
     getArrayDesc().getChunkPositionFor(_address.coords);
@@ -2046,7 +2272,7 @@ bool CachedStorage::DBArrayIterator::setPosition(Coordinates const& pos)
 
 void CachedStorage::DBArrayIterator::reset()
 {
-    shared_ptr<Query> query = getQuery();
+    std::shared_ptr<Query> query = getQuery();
     _currChunk = NULL;
     _address.coords.clear();
 
@@ -2070,13 +2296,14 @@ Chunk& CachedStorage::DBArrayIterator::newChunk(Coordinates const& pos)
     assert(_writeMode);
 
     int compressionMethod = getAttributeDesc().getDefaultCompressionMethod();
-    shared_ptr<Query> query = getQuery();
+    std::shared_ptr<Query> query = getQuery();
     _currChunk = NULL;
     _address.coords = pos;
     if (!getArrayDesc().contains(_address.coords))
     {
         _address.coords.clear();
-        throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES);
+        throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES)
+            << CoordsToStr(pos) << getArrayDesc().getDimensions();
     }
     getArrayDesc().getChunkPositionFor(_address.coords);
 
@@ -2091,7 +2318,7 @@ Chunk& CachedStorage::DBArrayIterator::newChunk(Coordinates const& pos)
     _address.arrId = getArrayDesc().getId();
     _address.coords = pos;
     getArrayDesc().getChunkPositionFor(_address.coords);
-    shared_ptr<PersistentChunk> chunk =
+    std::shared_ptr<PersistentChunk> chunk =
         _storage->createChunk(getArrayDesc(), _address, compressionMethod, query);
     assert(chunk);
     DBArrayChunk *dbChunk = getDBArrayChunk(chunk);
@@ -2117,10 +2344,11 @@ void CachedStorage::DBArrayIterator::deleteChunk(Chunk& chunk) //XXX TODO: consi
     _dbChunks.erase(dbChunk->shared_from_this());
 }
 
-Chunk& CachedStorage::DBArrayIterator::copyChunk(ConstChunk const& srcChunk, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap)
+Chunk& CachedStorage::DBArrayIterator::copyChunk(ConstChunk const& srcChunk,
+                                                 std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap)
 {
     assert(_writeMode);
-    shared_ptr<Query> query = getQuery();
+    std::shared_ptr<Query> query = getQuery();
     _address.coords = srcChunk.getFirstPosition(false);
     if(getArrayDesc().getVersionId() > 1)
     {
@@ -2136,7 +2364,7 @@ Chunk& CachedStorage::DBArrayIterator::copyChunk(ConstChunk const& srcChunk, boo
             else
             {
                 assert(_address.arrId < getArrayDesc().getId());
-                shared_ptr<PersistentChunk> dstChunk = _storage->lookupChunk(getArrayDesc(), _address);
+                std::shared_ptr<PersistentChunk> dstChunk = _storage->lookupChunk(getArrayDesc(), _address);
                 if (!dstChunk) {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CHUNK_NOT_FOUND);
                 }
@@ -2154,7 +2382,7 @@ Chunk& CachedStorage::DBArrayIterator::copyChunk(ConstChunk const& srcChunk, boo
             }
         }
     }
-    boost::shared_ptr<ConstRLEEmptyBitmap> nullEmptyBitmap; // to avoid attaching EBM to the chunk
+    std::shared_ptr<ConstRLEEmptyBitmap> nullEmptyBitmap; // to avoid attaching EBM to the chunk
     _currChunk = &ArrayIterator::copyChunk(srcChunk, nullEmptyBitmap);
 
     assert(dynamic_cast<DBArrayChunk*>(_currChunk));
@@ -2238,23 +2466,23 @@ Coordinates const& CachedStorage::DBArrayChunkBase::getLastPosition(bool withOve
     return _inputChunk->getLastPosition(withOverlap);
 }
 
-boost::shared_ptr<ConstChunkIterator> CachedStorage::DBArrayChunkBase::getConstIterator(int iterationMode) const
+std::shared_ptr<ConstChunkIterator> CachedStorage::DBArrayChunkBase::getConstIterator(int iterationMode) const
 {
     ASSERT_EXCEPTION_FALSE("DBArrayChunkBase::getConstIterator");
 }
 
-boost::shared_ptr<ConstChunkIterator> CachedStorage::DBArrayChunk::getConstIterator(int iterationMode) const
+std::shared_ptr<ConstChunkIterator> CachedStorage::DBArrayChunk::getConstIterator(int iterationMode) const
 {
     const AttributeDesc* bitmapAttr = getArrayDesc().getEmptyBitmapAttribute();
     Chunk* bitmap(NULL);
     PersistentChunk::UnPinner bitmapScope(NULL);
-    shared_ptr<Query> query(_arrayIter.getQuery());
+    std::shared_ptr<Query> query(_arrayIter.getQuery());
 
     if (bitmapAttr != NULL && bitmapAttr->getId() != DBArrayChunkBase::getAttributeId())
     {
         StorageAddress bitmapAddr(getArrayDesc().getId(), bitmapAttr->getId(), DBArrayChunkBase::getCoordinates());
         _arrayIter._storage->findChunk(getArrayDesc(), query, bitmapAddr);
-        shared_ptr<PersistentChunk> bitmapChunk = _arrayIter._storage->readChunk(getArrayDesc(), bitmapAddr, query);
+        std::shared_ptr<PersistentChunk> bitmapChunk = _arrayIter._storage->readChunk(getArrayDesc(), bitmapAddr, query);
         bitmapScope.set(bitmapChunk.get());
 
         DBArrayChunk *dbChunk = _arrayIter.getDBArrayChunk(bitmapChunk);
@@ -2274,38 +2502,38 @@ boost::shared_ptr<ConstChunkIterator> CachedStorage::DBArrayChunk::getConstItera
 
     _arrayIter._storage->loadChunk(getArrayDesc(), dbChunk);
     if (getAttributeDesc().isEmptyIndicator()) {
-        return boost::make_shared<RLEBitmapChunkIterator>(getArrayDesc(),
+        return std::make_shared<RLEBitmapChunkIterator>(getArrayDesc(),
                                                           DBArrayChunkBase::getAttributeId(),
                                                           (Chunk*) this, bitmap, iterationMode, query);
     } else if ((iterationMode & ConstChunkIterator::INTENDED_TILE_MODE) ||
                (iterationMode & ConstChunkIterator::TILE_MODE)) { //old tile mode
 
-        return boost::make_shared<RLEConstChunkIterator>(getArrayDesc(),
+        return std::make_shared<RLEConstChunkIterator>(getArrayDesc(),
                                                          DBArrayChunkBase::getAttributeId(),
                                                          (Chunk*) this, bitmap, iterationMode, query);
     }
 
     // non-tile mode, but using the new tiles for read-ahead buffering
-    boost::shared_ptr<RLETileConstChunkIterator> tiledIter =
-        boost::make_shared<RLETileConstChunkIterator>(getArrayDesc(),
+    std::shared_ptr<RLETileConstChunkIterator> tiledIter =
+        std::make_shared<RLETileConstChunkIterator>(getArrayDesc(),
                                                       DBArrayChunkBase::getAttributeId(),
                                                       (Chunk*) this,
                                                       bitmap,
                                                       iterationMode,
                                                       query);
-    return boost::make_shared< BufferedConstChunkIterator< boost::shared_ptr<RLETileConstChunkIterator> > >(tiledIter, query);
+    return std::make_shared< BufferedConstChunkIterator< std::shared_ptr<RLETileConstChunkIterator> > >(tiledIter, query);
     // deprecated formats
 }
 
-boost::shared_ptr<ChunkIterator>
-CachedStorage::DBArrayChunkBase::getIterator(boost::shared_ptr<Query> const& query,
+std::shared_ptr<ChunkIterator>
+CachedStorage::DBArrayChunkBase::getIterator(std::shared_ptr<Query> const& query,
                                              int iterationMode)
 {
     ASSERT_EXCEPTION_FALSE("DBArrayChunkBase::getIterator");
 }
 
-boost::shared_ptr<ChunkIterator>
-CachedStorage::DBArrayChunk::getIterator(boost::shared_ptr<Query> const& query,
+std::shared_ptr<ChunkIterator>
+CachedStorage::DBArrayChunk::getIterator(std::shared_ptr<Query> const& query,
                                          int iterationMode)
 {
     if (query != _arrayIter.getQuery()) {
@@ -2318,7 +2546,7 @@ CachedStorage::DBArrayChunk::getIterator(boost::shared_ptr<Query> const& query,
         && !(iterationMode & ConstChunkIterator::NO_EMPTY_CHECK))
     {
         StorageAddress bitmapAddr(getArrayDesc().getId(), bitmapAttr->getId(),  DBArrayChunkBase::getCoordinates());
-        shared_ptr<PersistentChunk> bitmapChunk = _arrayIter._storage->createChunk(getArrayDesc(),
+        std::shared_ptr<PersistentChunk> bitmapChunk = _arrayIter._storage->createChunk(getArrayDesc(),
                                                                                    bitmapAddr,
                                                                                    bitmapAttr->getDefaultCompressionMethod(),query);
         assert(bitmapChunk);
@@ -2334,31 +2562,81 @@ CachedStorage::DBArrayChunk::getIterator(boost::shared_ptr<Query> const& query,
     // there are operators that
     // still generate sparse chunks
 
-    boost::shared_ptr<ChunkIterator> iterator =
-        boost::shared_ptr<ChunkIterator>(new RLEChunkIterator(getArrayDesc(),
+    std::shared_ptr<ChunkIterator> iterator =
+        std::shared_ptr<ChunkIterator>(new RLEChunkIterator(getArrayDesc(),
                                          DBArrayChunkBase::getAttributeId(),
                                                               this, bitmap,
                                                               iterationMode, query));
     return iterator;
 }
 
-boost::shared_ptr<ConstRLEEmptyBitmap> CachedStorage::DBArrayChunkBase::getEmptyBitmap() const
+std::shared_ptr<ConstRLEEmptyBitmap> CachedStorage::DBArrayChunkBase::getEmptyBitmap() const
 {
     ASSERT_EXCEPTION_FALSE("DBArrayChunkBase::getEmptyBitmap");
 }
 
-boost::shared_ptr<ConstRLEEmptyBitmap> CachedStorage::DBArrayChunk::getEmptyBitmap() const
+void CachedStorage::DBArrayChunk::showEmptyBitmap(const std::string & strPrefix) const
+{
+#ifndef NDEBUG
+    const AttributeDesc* bitmapAttr = getArrayDesc().getEmptyBitmapAttribute();
+    if (bitmapAttr != NULL && bitmapAttr->getId() == DBArrayChunkBase::getAttributeId())
+    {
+        StorageAddress bitmapAddr(getArrayDesc().getId(), bitmapAttr->getId(), DBArrayChunkBase::getCoordinates());
+
+        std::shared_ptr<Query> query(_arrayIter.getQuery());
+
+        _arrayIter._storage->findChunk(getArrayDesc(), query, bitmapAddr);
+        std::shared_ptr<scidb::PersistentChunk> bitmapChunk = _arrayIter._storage->readChunk(getArrayDesc(), bitmapAddr, query);
+
+        PersistentChunk::UnPinner scope(bitmapChunk.get());
+
+        DBArrayChunk *dbChunk = _arrayIter.getDBArrayChunk(bitmapChunk);
+        assert(dbChunk);
+
+        if(dbChunk->pin()) {
+            char const* src = (char const*)dbChunk->getConstData();
+            if (src != NULL) {
+                ConstRLEEmptyBitmap::Header const* hdr = (ConstRLEEmptyBitmap::Header const*)src;
+                assert(hdr->_magic == RLE_EMPTY_BITMAP_MAGIC);
+
+                // uint64_t nNonEmptyElements = hdr->_nNonEmptyElements;
+                size_t nSegs = hdr->_nSegs;
+                ConstRLEEmptyBitmap::Segment const* seg = (ConstRLEEmptyBitmap::Segment const*)(hdr+1);
+
+                for(size_t k = 0;  k < nSegs; k++)
+                {
+
+                    stringstream ss;
+                    ss  << strPrefix
+                        << " " << getArrayDesc().getName()
+                        << " segment["
+                        << "  _lPosition="   << seg[k]._lPosition
+                        << "  _length="      << seg[k]._length
+                        << "  _pPosition="   << seg[k]._pPosition
+                        << "]";
+
+                    LOG4CXX_DEBUG(logger, ss.str());
+                }
+            }
+
+            dbChunk->unPin();
+        }
+    }
+#endif
+}
+
+std::shared_ptr<ConstRLEEmptyBitmap> CachedStorage::DBArrayChunk::getEmptyBitmap() const
 {
     const AttributeDesc* bitmapAttr = getArrayDesc().getEmptyBitmapAttribute();
-    boost::shared_ptr<ConstRLEEmptyBitmap> bitmap;
+    std::shared_ptr<ConstRLEEmptyBitmap> bitmap;
     if (bitmapAttr != NULL && bitmapAttr->getId() != DBArrayChunkBase::getAttributeId())
     {
         StorageAddress bitmapAddr(getArrayDesc().getId(), bitmapAttr->getId(), DBArrayChunkBase::getCoordinates());
 
-        shared_ptr<Query> query(_arrayIter.getQuery());
+        std::shared_ptr<Query> query(_arrayIter.getQuery());
 
         _arrayIter._storage->findChunk(getArrayDesc(), query, bitmapAddr);
-        shared_ptr<scidb::PersistentChunk> bitmapChunk = _arrayIter._storage->readChunk(getArrayDesc(), bitmapAddr, query);
+        std::shared_ptr<scidb::PersistentChunk> bitmapChunk = _arrayIter._storage->readChunk(getArrayDesc(), bitmapAddr, query);
 
         PersistentChunk::UnPinner scope(bitmapChunk.get());
 
@@ -2410,7 +2688,7 @@ void CachedStorage::DBArrayChunkBase::truncate(Coordinate lastCoord)
     _inputChunk->truncate(lastCoord);
 }
 
-void CachedStorage::DBArrayChunkBase::merge(ConstChunk const& with, boost::shared_ptr<Query>& query)
+void CachedStorage::DBArrayChunkBase::merge(ConstChunk const& with, std::shared_ptr<Query>& query)
 {
     /* Trying to merge into a DB Chunk indicates an error
      */
@@ -2420,7 +2698,7 @@ void CachedStorage::DBArrayChunkBase::merge(ConstChunk const& with, boost::share
 
 void CachedStorage::DBArrayChunkBase::aggregateMerge(ConstChunk const& with,
                                                      AggregatePtr const& aggregate,
-                                                     boost::shared_ptr<Query>& query)
+                                                     std::shared_ptr<Query>& query)
 {
     /* Trying to merge into a DB Chunk indicates an error
      */
@@ -2430,7 +2708,7 @@ void CachedStorage::DBArrayChunkBase::aggregateMerge(ConstChunk const& with,
 
 void CachedStorage::DBArrayChunkBase::nonEmptyableAggregateMerge(ConstChunk const& with,
                                                                  AggregatePtr const& aggregate,
-                                                                 boost::shared_ptr<Query>& query)
+                                                                 std::shared_ptr<Query>& query)
 {
     /* Trying to merge into a DB Chunk indicates an error
      */
@@ -2438,12 +2716,12 @@ void CachedStorage::DBArrayChunkBase::nonEmptyableAggregateMerge(ConstChunk cons
         << CoordsToStr(getFirstPosition(false));
 }
 
-void CachedStorage::DBArrayChunkBase::write(const boost::shared_ptr<Query>& query)
+void CachedStorage::DBArrayChunkBase::write(const std::shared_ptr<Query>& query)
 {
     ASSERT_EXCEPTION_FALSE("DBArrayChunkBase::write");
 }
 
-void CachedStorage::DBArrayChunk::write(const boost::shared_ptr<Query>& query)
+void CachedStorage::DBArrayChunk::write(const std::shared_ptr<Query>& query)
 {
     if (query != _arrayIter.getQuery()) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "invalid query");
@@ -2503,13 +2781,13 @@ void CachedStorage::DBArrayChunkBase::free()
 }
 
 void CachedStorage::DBArrayChunkBase::compress(CompressedBuffer& buf,
-                                               boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+                                               std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
 {
     ASSERT_EXCEPTION_FALSE("DBArrayChunkBase::compress");
 }
 
 void CachedStorage::DBArrayChunk::compress(CompressedBuffer& buf,
-                                           boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+                                           std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
 {
     if (emptyBitmap)
     {
@@ -2538,6 +2816,18 @@ void CachedStorage::DBArrayChunk::decompress(CompressedBuffer const& buf)
     assert(dbChunk->getAddress().coords == DBArrayChunkBase::getCoordinates());
 
     _arrayIter._storage->decompressChunk(getArrayDesc(), dbChunk, buf);
+}
+
+bool CachedStorage::isPrimaryReplica(PersistentChunk const* chunk)
+{
+    assert(chunk);
+    bool res = (chunk->getHeader().instanceId == _hdr.instanceId);
+    if (! (res || (_redundancy > 0) )) {
+        LOG4CXX_TRACE(logger, "isPrimaryReplica: chunk->getHeader().instanceId " << chunk->getHeader().instanceId );
+        LOG4CXX_TRACE(logger, "isPrimaryReplica: _hdr.instanceId " << _hdr.instanceId );
+    }
+    ASSERT_EXCEPTION((res || (_redundancy > 0)), "cannot store replica chunk when redundancy==0");
+    return res;
 }
 
 }

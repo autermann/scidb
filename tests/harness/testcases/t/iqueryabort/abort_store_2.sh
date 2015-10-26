@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -38,8 +38,8 @@ cleanup()
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "create array fooas2 <v:int64> [I=0:2000,100,0]"
 if [[ $? != 0 ]] ; then cleanup 1 1; fi
 
-uaid=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('arrays'),name='fooas2'),uaid)" | 
-         grep \{0\} | cut -d ' ' -f 2`
+uaid=`iquery -ocsv:l -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('arrays'),name='fooas2'),uaid)" |
+         sed 1d`
 
 # case 1 --- abort the store of the first version of an array.
 # Verify that no datastore is created.
@@ -56,8 +56,11 @@ if [[ $lines != 1 ]]; then echo lines = $lines; cleanup 1 3; fi
 # array did not increase
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "store (build (fooas2, I), fooas2)"
 if [[ $? != 0 ]] ; then cleanup 1 4; fi
-size=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), log_resv_bytes)" |
-       awk '{ sum+=$2} END {print sum}'`
+size=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), file_bytes)" | awk '{ sum+=$2} END {print sum}'`
+iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), file_bytes)"
+free=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), file_free_bytes)" | awk '{ sum+=$2} END {print sum}'`
+iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), file_free_bytes)"
+((used = size - free))
 
 ${TEST_UTILS_DIR}/killquery.sh -afl 2  2 'store (build (fooas2, I+1), fooas2)'
 if [[ $? != 0 ]]; then cleanup 1 5; fi
@@ -67,9 +70,10 @@ if [[ $lines != 2002 ]]; then echo lines = $lines; cleanup 1 6; fi
 
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "rename(fooas2, fooas2a)"
 iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "rename(fooas2a, fooas2)"
-size1=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), log_resv_bytes)" |
-        awk '{ sum+=$2} END {print sum}'`
-if [ $size != $size1 ]; then echo $size $size1; cleanup 1 7; fi
+size1=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), file_bytes)" | awk '{ sum+=$2} END {print sum}'`
+free1=`iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "project(filter(list('datastores'), uaid=$uaid), file_free_bytes)" | awk '{ sum+=$2} END {print sum}'`
+((used1 = size1 - free1))
+if [ $used != $used1 ]; then echo $used $used1; cleanup 1 7; fi
 
 # success
 cleanup 0 0

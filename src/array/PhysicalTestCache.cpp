@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -75,17 +75,17 @@ public:
     /**
      * Create a MemArray with a single attribute of numElements consecutive integers (to prevent RLE encoding).
      */
-    shared_ptr<Array> makeInt64Array(int64_t numElements, shared_ptr<Query>& query)
+    std::shared_ptr<Array> makeInt64Array(int64_t numElements, std::shared_ptr<Query>& query)
     {
         Attributes attrs;
         attrs.push_back(AttributeDesc(0, "att", TID_INT64, AttributeDesc::IS_NULLABLE, 0));
         Dimensions dims;
-        dims.push_back(DimensionDesc("i",0,MAX_COORDINATE,_defaultChunkSize,0));
-        ArrayDesc schema("arr", attrs, dims);
-        shared_ptr<Array> array(new MemArray(schema,query));
+        dims.push_back(DimensionDesc("i",0,CoordinateBounds::getMax(),_defaultChunkSize,0));
+        ArrayDesc schema("arr", attrs, dims, defaultPartitioning());
+        std::shared_ptr<Array> array(new MemArray(schema,query));
         Coordinates pos(1,0);
-        shared_ptr<ArrayIterator> aiter = array->getIterator(0);
-        shared_ptr<ChunkIterator> citer;
+        std::shared_ptr<ArrayIterator> aiter = array->getIterator(0);
+        std::shared_ptr<ChunkIterator> citer;
         Value v;
         while (pos[0] < numElements)
         {
@@ -112,12 +112,12 @@ public:
     /**
      * Add more consecutive integers to an existing arr. whereToStart must be a coordinate in the last filled chunk.
      */
-    void addToInt64Array(shared_ptr<Array>& array, size_t whereToStart, int64_t numElements, shared_ptr<Query>& query)
+    void addToInt64Array(std::shared_ptr<Array>& array, size_t whereToStart, int64_t numElements, std::shared_ptr<Query>& query)
     {
         Coordinates pos(1,whereToStart);
-        shared_ptr<ArrayIterator> aiter = array->getIterator(0);
+        std::shared_ptr<ArrayIterator> aiter = array->getIterator(0);
         aiter->setPosition(pos);
-        shared_ptr<ChunkIterator> citer = aiter->updateChunk().getIterator(query, ChunkIterator::NO_EMPTY_CHECK |
+        std::shared_ptr<ChunkIterator> citer = aiter->updateChunk().getIterator(query, ChunkIterator::NO_EMPTY_CHECK |
                                                                            ChunkIterator::APPEND_EMPTY_BITMAP |
                                                                            ChunkIterator::APPEND_CHUNK);
         Value v;
@@ -139,12 +139,12 @@ public:
     /**
      * Iterate over all chunks of an array and add what their getSize() says.
      */
-    size_t computeArraySize(shared_ptr<Array> &inputArray)
+    size_t computeArraySize(std::shared_ptr<Array> &inputArray)
     {
         size_t res =0;
         ArrayDesc const& schema = inputArray->getArrayDesc();
         size_t nAttrs = schema.getAttributes().size();
-        vector<shared_ptr<ConstArrayIterator> > arrayIters(nAttrs);
+        vector<std::shared_ptr<ConstArrayIterator> > arrayIters(nAttrs);
         for (AttributeID i=0; i<nAttrs; ++i)
         {
             arrayIters[i] = inputArray->getConstIterator(i);
@@ -163,12 +163,12 @@ public:
     /**
      * Iterate over all chunks of an array and pin/unpin them.
      */
-    void iterateOverArray(shared_ptr<Array> &inputArray)
+    void iterateOverArray(std::shared_ptr<Array> &inputArray)
     {
         ArrayDesc const& schema = inputArray->getArrayDesc();
         size_t nAttrs = schema.getAttributes().size();
-        vector<shared_ptr<ConstArrayIterator> > arrayIters(nAttrs);
-        vector<shared_ptr<ConstChunkIterator> > chunkIters(nAttrs);
+        vector<std::shared_ptr<ConstArrayIterator> > arrayIters(nAttrs);
+        vector<std::shared_ptr<ConstChunkIterator> > chunkIters(nAttrs);
         for (AttributeID i=0; i<nAttrs; ++i)
         {
             arrayIters[i] = inputArray->getConstIterator(i);
@@ -187,13 +187,13 @@ public:
         }
     }
 
-    shared_ptr< Array> execute(vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         size_t maxArraySize = SharedMemCache::getInstance().getMemThreshold();
 
         testLRUSize(0);
 
-        shared_ptr<Array> arr = makeInt64Array(2123456, query);
+        std::shared_ptr<Array> arr = makeInt64Array(2123456, query);
         size_t arraySize = computeArraySize(arr);
         if (arraySize > maxArraySize)
         {
@@ -201,7 +201,7 @@ public:
         }
         testLRUSize(arraySize);
 
-        shared_ptr<Array> arr2 = makeInt64Array(1123456, query);
+        std::shared_ptr<Array> arr2 = makeInt64Array(1123456, query);
         size_t arraySize2 = computeArraySize(arr2);
         if (arraySize2 > maxArraySize)
         {
@@ -244,11 +244,11 @@ public:
             SharedMemCache::getInstance().setMemThreshold(maxArraySize);
             throw;
         }
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalTestCache, "test_cache", "PhysicalTestCache");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalTestCache, "_test_cache", "PhysicalTestCache");
 
 
 } //namespace scidb

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,6 +35,8 @@
 // local
 #include "scalapackUtil/ScaLAPACKLogical.hpp"
 
+using namespace std;
+
 namespace scidb {
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.linear_algebra.ops.scalapack"));
@@ -44,7 +46,7 @@ inline bool hasSingleAttribute(ArrayDesc const& desc)
     return desc.getAttributes().size() == 1 || (desc.getAttributes().size() == 2 && desc.getAttributes()[1].isEmptyIndicator());
 }
 
-void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query,
+void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query,
                           size_t nMatsMin, size_t nMatsMax)
 {
     enum dummy  {ROW=0, COL=1};
@@ -89,8 +91,7 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
 
         // check: size is bounded
         const Dimensions& dims = schemas[iArray].getDimensions();
-        if (dims[ROW].getLength() == INFINITE_LENGTH ||
-            dims[COL].getLength() == INFINITE_LENGTH) {
+        if (dims[ROW].isMaxStar() || dims[COL].isMaxStar()) {
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR9);
         }
         // TODO: check: sizes are not larger than largest ScaLAPACK fortran INTEGER
@@ -149,7 +150,8 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
     const bool AUTO_REPART_WORKING = false ;  // #2032
     if( ! AUTO_REPART_WORKING ) {
         int64_t commonChunkSize = schemas[0].getDimensions()[ROW].getChunkInterval();
-        // TODO: remove these checks if #2023 is fixed and requiresRepart() is functioning correctly
+        // TODO: remove these checks if #2023 is fixed and requiresRedimensionOrRepartition()
+        // is functioning correctly
         for(size_t iArray=0; iArray < NUM_MATRICES; iArray++) {
             const Dimensions& dims = schemas[iArray].getDimensions();
             // arbitrarily take first mentioned chunksize as the one for all to share
@@ -177,8 +179,8 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, boost::shared_ptr<Quer
     //    Should we repart some of them to another size?  Or should we repart all of them
     //    to the optimial aize?  Unforunately, we don't have the information we would need
     //    to make an intelligent choice ...
-    //    Due to the api of LogicalOperator::requiresRepart() we can't tell which situation
-    //    it is, because it still only functions on the first input only.
+    //    Due to the api of PhysicalOperator::requiresRedimensionOrRepartition() we can't
+    //    tell which situation it is, because it still only functions on the first input only.
     //
     // TODO: after #2032 is fixed, have James fix note(4) above.
     //

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -52,7 +52,7 @@ ConstChunk const& TransposeArray::TransposeArrayIterator::getChunk()
     _inputArrayIterator->setPosition(inPos);
     SCIDB_ASSERT(_inputArrayIterator->getPosition() == inPos);
     ConstChunk const& inputChunk = _inputArrayIterator->getChunk();
-    shared_ptr<ConstChunkIterator> inputChunkIterator = inputChunk.getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS);
+    std::shared_ptr<ConstChunkIterator> inputChunkIterator = inputChunk.getConstIterator(ConstChunkIterator::IGNORE_EMPTY_CELLS);
     _outputChunk.initialize(_transposeArray, &_transposeArray->getArrayDesc(), addr, inputChunk.getCompressionMethod());
     if (_attributeID != _emptyTagID)
     {
@@ -61,15 +61,15 @@ ConstChunk const& TransposeArray::TransposeArrayIterator::getChunk()
         _emptyTagChunk.initialize(_transposeArray, &_transposeArray->getArrayDesc(), addr, inputChunk.getCompressionMethod());
         _outputChunk.setBitmapChunk(&_emptyTagChunk);
     }
-    shared_ptr<Query> localQueryPtr(Query::getValidQueryPtr(_query));
+    std::shared_ptr<Query> localQueryPtr(Query::getValidQueryPtr(_query));
 
     //
     // std::sort() is about twice as fast as letting the ch
     //
-    shared_ptr<ChunkIterator> outputChunkIterator = _outputChunk.getIterator(localQueryPtr, ConstChunkIterator::SEQUENTIAL_WRITE);
+    std::shared_ptr<ChunkIterator> outputChunkIterator = _outputChunk.getIterator(localQueryPtr, ConstChunkIterator::SEQUENTIAL_WRITE);
 
     //For each value in inputChunk, reorder its coordinates and place it into _outputChunk in the proper order
-    
+
     // vectors, with sufficent reservation to hold a copy of the elements
     std::vector<Coordinates> positions;
     std::vector<Value> values;

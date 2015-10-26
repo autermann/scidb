@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,7 @@
  *  Two versions of LRU are implemented.
  *
  *  The LRU class implements a least-recently used policy.
- *  The class stores a std::list of pushed objects, and a boost::unordered_map to quickly find an item in the list.
+ *  The class stores a std::list of pushed objects, and a std::unordered_map to quickly find an item in the list.
  *  To minimize space, the class smartly chooses between storing elements or storing pointers to the elements in the map.
  *  Like other STL containers, this class is not thread safe.
  *
@@ -42,7 +42,7 @@
 
 #include <list>
 #include <assert.h>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include "Hashing.h"
 
 namespace scidb
@@ -55,8 +55,8 @@ template<class T, class Hash = boost::hash<T>, class Equal_to = std::equal_to<T>
 class LRU {
 protected:
     typedef typename std::list<T>::iterator ListIterator;
-    typedef typename boost::unordered_map<const T*, ListIterator, hash_with_ptr<T, Hash>, equal_to_with_ptr<T, Equal_to> > MapBig;
-    typedef typename boost::unordered_map<T, ListIterator, Hash, Equal_to> MapSmall;
+    typedef typename std::unordered_map<const T*, ListIterator, hash_with_ptr<T, Hash>, equal_to_with_ptr<T, Equal_to> > MapBig;
+    typedef typename std::unordered_map<T, ListIterator, Hash, Equal_to> MapSmall;
     typedef typename MapBig::const_iterator MapBigIterator;
     typedef typename MapSmall::const_iterator MapSmallIterator;
 
@@ -244,7 +244,7 @@ public:
     }
 
     /**
-     * Check if there are some elements	
+     * Check if there are some elements
      */
     bool empty() const {
         return _list.empty();

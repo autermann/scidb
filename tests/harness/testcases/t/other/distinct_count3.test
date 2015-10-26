@@ -13,7 +13,6 @@ create array B <val:int64> [x=0:*,5000,0,y=0:*,5000,0]
 --test
 --set-format lcsv+
 aggregate(A,approxdc(num))
-aggregate(concat(A,A),approxdc(num))
 aggregate(join(A as A1,A),approxdc(A1.num))
 aggregate(A,ApproxDC(num))
 aggregate(A,ApproxDC(num),sum(num))

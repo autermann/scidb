@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,9 +36,9 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/shared_array.hpp>
 
-#include "query/TypeSystem.h"
-#include "array/Metadata.h"
-#include "query/FunctionLibrary.h"
+#include <query/TypeSystem.h>
+#include <array/Metadata.h>
+#include <query/FunctionLibrary.h>
 #include <query/Query.h>
 
 namespace scidb
@@ -133,8 +133,8 @@ public:
      *
      * @return a type of result
      */
-    void compile(boost::shared_ptr<LogicalExpression> expr,
-                 const boost::shared_ptr<Query>& query,
+    void compile(std::shared_ptr<LogicalExpression> expr,
+                 const std::shared_ptr<Query>& query,
                  bool tile,
                  TypeId expectedType =  TID_VOID,
                  const std::vector< ArrayDesc >& inputSchemas = std::vector< ArrayDesc >(),
@@ -242,7 +242,8 @@ private:
         size_t skipIndex; /**< Index where to look value to skip evaluation if it's equal skipValue */
         size_t stateSize;
 
-        CompiledFunction(): skipValue(false), skipIndex(0), stateSize(0) {
+        CompiledFunction(): skipValue(false), skipIndex(0), stateSize(0)
+        {
         }
 
         template<class Archive>
@@ -283,7 +284,9 @@ private:
             ar & isConstantFunction;
         }
     };
-    std::vector<ArgProp> _props; /**< a vector of argument properties for right compilation and optimizations */
+
+    /// a vector of argument properties for correct compilation and optimizations.
+    std::vector<ArgProp> _props;
 
     /**
      * The method resolves attribute or dimension reference
@@ -293,8 +296,8 @@ private:
      * @param query performing the operation
      * @return BindInfo structure with resolved IDs
      */
-    BindInfo resolveContext(const boost::shared_ptr<AttributeReference>& ref,
-                            const boost::shared_ptr<Query>& query);
+    BindInfo resolveContext(const std::shared_ptr<AttributeReference>& ref,
+                            const std::shared_ptr<Query>& query);
 
     /**
      * The method resolves attribute or dimension reference for given ArrayDesc
@@ -307,7 +310,7 @@ private:
      */
     BindInfo resolveContext(const ArrayDesc& arrayDesc, const std::string& arrayName,
                             const std::string& referenceName,
-                            const boost::shared_ptr<Query>& query);
+                            const std::shared_ptr<Query>& query);
 
     /**
      * swap arguments to provide commulative function call
@@ -320,8 +323,8 @@ private:
      * @param exp the logical expression to compile
      * @param query performing the operation
      */
-    const ArgProp& internalCompile(boost::shared_ptr<LogicalExpression> expr,
-                                   const boost::shared_ptr<Query>& query,
+    const ArgProp& internalCompile(std::shared_ptr<LogicalExpression> expr,
+                                   const std::shared_ptr<Query>& query,
                                    bool tile,
                                    size_t resultIndex, size_t skipIndex, bool skipValue);
 
@@ -392,8 +395,8 @@ public:
  * @param expectedType a type of result value if it's omitted the type will be inferred from expression
  * @param query performing the operation
  */
- Value evaluate(boost::shared_ptr<LogicalExpression> expr,
-                const boost::shared_ptr<Query>& query,
+Value evaluate(std::shared_ptr<LogicalExpression> expr,
+                const std::shared_ptr<Query>& query,
                 TypeId expectedType =  TID_VOID);
 
 
@@ -406,8 +409,8 @@ public:
  * @param expectedType a type of result value if it's omitted the type will be inferred from expression
  * @param query performing the operation
  */
- TypeId expressionType(boost::shared_ptr<LogicalExpression> expr,
-                       const boost::shared_ptr<Query>& query,
+TypeId expressionType(std::shared_ptr<LogicalExpression> expr,
+                       const std::shared_ptr<Query>& query,
                        const std::vector< ArrayDesc >& inputSchemas = std::vector< ArrayDesc >());
 
 } // namespace

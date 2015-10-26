@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -64,20 +64,20 @@ class PhysicalTranspose: public PhysicalOperator
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& inputDistributions,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
             std::vector< ArrayDesc> const& inputSchemas) const
     {
-        ArrayDistribution inputDistro = inputDistributions[0];
+        RedistributeContext inputDistro = inputDistributions[0];
 
-        if (inputDistro == ArrayDistribution(psByRow)) {
-            return ArrayDistribution(psByCol);
+        if (inputDistro == RedistributeContext(psByRow)) {
+            return RedistributeContext(psByCol);
         }
-        else if (inputDistro == ArrayDistribution(psByCol)) {
-            return ArrayDistribution(psByRow);
+        else if (inputDistro == RedistributeContext(psByCol)) {
+            return RedistributeContext(psByRow);
         } else {
             //TODO:OPTAPI mapper
-            return ArrayDistribution(psUndefined);
+            return RedistributeContext(psUndefined);
         }
     }
 
@@ -111,11 +111,11 @@ class PhysicalTranspose: public PhysicalOperator
     /**
      * @see PhysicalOperator::execute
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
-        shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
-        shared_ptr<CoordinateSet> inputChunkPositions = inputArray->findChunkPositions();
+        std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+        std::shared_ptr<CoordinateSet> inputChunkPositions = inputArray->findChunkPositions();
         return make_shared<TransposeArray>(_schema, inputArray, inputChunkPositions, query);
     }
 };

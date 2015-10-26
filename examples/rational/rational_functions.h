@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,27 +33,30 @@
 #ifndef RATIONAL_FUNCTIONS_H
 #define RATIONAL_FUNCTIONS_H
 
+//
+// Note that in this directory there is a small test harness that exercises
+// these functions, without  requiring that they be compiled and linked into
+// the engine. Having this kind of test harness is good practice. If only to
+// help us distinguish between faults in the extension, and faults in SciDB.
+//
+
+//
+// For this implementation, we will just make use of the boost::rational
+// template, and make it all work on pairs of 64 bit signed ints. Note
+// that we may well need to implement an arbitrary length integer at some
+// point, and doing so will require rennovations to this class.
+#include <boost/rational.hpp>
+#include <inttypes.h>
+
+using namespace scidb;
+
 enum
 {
     RATIONAL_E_CANT_CONVERT_TO_RATIONAL = SCIDB_USER_ERROR_CODE_START
 };
 
 //
-// Note that in this directory there is a small test harness that exercises 
-// these functions, without  requiring that they be compiled and linked into 
-// the engine. Having this kind of test harness is good practice. If only to 
-// help us distinguish between faults in the extension, and faults in SciDB.
-//
-
-//
-// For this implementation, we will just make use of the boost::rational
-// template, and make it all work on pairs of 64 bit signed ints. Note 
-// that we may well need to implement an arbitrary length integer at some
-// point, and doing so will require rennovations to this class. 
-#include <boost/rational.hpp>
-#include <inttypes.h>
-//
-// This is the struct used to store the data inside SciDB. 
+// This is the struct used to store the data inside SciDB.
 typedef struct _Rational
 {
 	int64_t num;
@@ -64,8 +67,8 @@ typedef struct _Rational
     /** C++ operators implementation for aggregating */
     _Rational operator*(const _Rational& b) const
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(b.num, b.denom);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(b.num, b.denom);
         ra *= rb;
         _Rational r;
         r.num = ra.numerator();
@@ -75,8 +78,8 @@ typedef struct _Rational
 
     _Rational operator*(uint64_t v) const
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(v);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(v);
         ra *= rb;
         _Rational r;
         r.num = ra.numerator();
@@ -86,8 +89,8 @@ typedef struct _Rational
 
     _Rational operator/(uint64_t v) const
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(v);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(v);
         ra /= rb;
         _Rational r;
         r.num = ra.numerator();
@@ -97,8 +100,8 @@ typedef struct _Rational
 
     _Rational operator-(const _Rational& b) const
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(b.num, b.denom);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(b.num, b.denom);
         ra -= rb;
         _Rational r;
         r.num = ra.numerator();
@@ -108,22 +111,22 @@ typedef struct _Rational
 
     bool operator>(const _Rational& b) const
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(b.num, b.denom);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(b.num, b.denom);
         return ra > rb;
     }
 
     bool operator<(const _Rational& b) const
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(b.num, b.denom);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(b.num, b.denom);
         return ra < rb;
     }
 
     _Rational& operator+=(const _Rational& b)
     {
-        rational<int64_t>ra(this->num, this->denom);
-        rational<int64_t>rb(b.num, b.denom);
+        boost::rational<int64_t>ra(this->num, this->denom);
+        boost::rational<int64_t>rb(b.num, b.denom);
         ra += rb;
         this->num = ra.numerator();
         this->denom = ra.denominator();
@@ -154,23 +157,23 @@ void construct_rational(const Value** args, Value* res, void*)
 }
 
 //
-// The type has three "constructor" functions: 
+// The type has three "constructor" functions:
 //	String -> Rational
 //	Int -> Rational
-//	Int, Int -> Rational 
+//	Int, Int -> Rational
 
 void str2Rational(const Value** args, Value* res, void*)
 {
 	int64_t n, d;
     SciDB_Rational* r = (SciDB_Rational*)res->data();
 
-    if (sscanf(args[0]->getString(), "(%"PRIi64"/%"PRIi64")", &n, &d) != 2)
+    if (sscanf(args[0]->getString(), "(%" PRIi64 "/%" PRIi64 ")", &n, &d) != 2)
         throw PLUGIN_USER_EXCEPTION("librational", SCIDB_SE_UDO, RATIONAL_E_CANT_CONVERT_TO_RATIONAL)
             << args[0]->getString();
 
 	if ((0 == d) && (0 == n))
 		d = 1;
-		
+
 	boost::rational<int64_t>rp0(n, d);
 	r->num   = rp0.numerator();
 	r->denom = rp0.denominator();
@@ -203,14 +206,14 @@ void ints2Rational(const Value** args, Value* res, void*)
 
 }
 //
-// To get the data out of the type, we proviode three UDFs. The first 
-// simply converts the internals of the type's data to a string. This 
-// will be the "lowest common denominator" (pardon the pun) converter. 
+// To get the data out of the type, we proviode three UDFs. The first
+// simply converts the internals of the type's data to a string. This
+// will be the "lowest common denominator" (pardon the pun) converter.
 void rational2Str(const Value** args, Value* res, void*)
 {
     SciDB_Rational* r = (SciDB_Rational*)args[0]->data();
 
-	stringstream ss;
+    std::stringstream ss;
 	ss << '(' << r->num << '/' << r->denom << ')';
 
     res->setString(ss.str().c_str());
@@ -218,7 +221,7 @@ void rational2Str(const Value** args, Value* res, void*)
 
 //
 // To get the numerator, and the denominator, we provide the following
-// pair of UDFs. 
+// pair of UDFs.
 void rationalGetNumerator(const Value** args, Value* res, void*)
 {
     SciDB_Rational * r = (SciDB_Rational*)args[0]->data();
@@ -232,18 +235,18 @@ void rationalGetDenominator(const Value** args, Value* res, void*)
 }
 
 //
-// Working with Rational numbers isn't complex, but it's as well to have 
-// some more widely used framework to exploit. In this case, Boost. 
+// Working with Rational numbers isn't complex, but it's as well to have
+// some more widely used framework to exploit. In this case, Boost.
 //
-// PGB: Inside SciDB, certain operations make assumptions about the 
-//	  nature of 'zero'. For example, the operations that 
-//	  implement sum() begin with a value that is set to 0 and 
+// PGB: Inside SciDB, certain operations make assumptions about the
+//	  nature of 'zero'. For example, the operations that
+//	  implement sum() begin with a value that is set to 0 and
 //	  add a succession of type instances to it using this '+'.
 //
-//	  The problem is that boost throws a trap when it encounters 
-//	  a rational with a denominator of '0'. So what we do here 
-//	  is to catch this case (as we would catch a divide by zero 
-//	  in doubles) and prevent it. 
+//	  The problem is that boost throws a trap when it encounters
+//	  a rational with a denominator of '0'. So what we do here
+//	  is to catch this case (as we would catch a divide by zero
+//	  in doubles) and prevent it.
 void rationalPlus(const Value** args, Value* res, void*)
 {
     SciDB_Rational* r0 = (SciDB_Rational*)args[0]->data();
@@ -345,7 +348,7 @@ void rationalLT(const Value** args, Value* res, void * v)
 	boost::rational<int64_t>rp0(r0->num, r0->denom);
 	boost::rational<int64_t>rp1(r1->num, r1->denom);
 
-	if ( rp0 < rp1 ) 
+	if ( rp0 < rp1 )
         res->setBool(true);
 	else
         res->setBool(false);
@@ -362,7 +365,7 @@ void rationalEQ(const Value** args, Value* res, void * v)
 	boost::rational<int64_t>rp0(r0->num, r0->denom);
 	boost::rational<int64_t>rp1(r1->num, r1->denom);
 
-	if ( rp0 == rp1 ) 
+	if ( rp0 == rp1 )
         res->setBool(true);
 	else
         res->setBool(false);
@@ -376,7 +379,7 @@ void rationalLTEQ(const Value** args, Value* res, void * v)
 	boost::rational<int64_t>rp0(r0->num, r0->denom);
 	boost::rational<int64_t>rp1(r1->num, r1->denom);
 
-	if ( rp0 <= rp1 ) 
+	if ( rp0 <= rp1 )
         res->setBool(true);
 	else
         res->setBool(false);
@@ -390,7 +393,7 @@ void rationalGT(const Value** args, Value* res, void * v)
 	boost::rational<int64_t>rp0(r0->num, r0->denom);
 	boost::rational<int64_t>rp1(r1->num, r1->denom);
 
-	if ( rp0 > rp1 ) 
+	if ( rp0 > rp1 )
         res->setBool(true);
 	else
         res->setBool(false);
@@ -404,7 +407,7 @@ void rationalGTEQ(const Value** args, Value* res, void * v)
 	boost::rational<int64_t>rp0(r0->num, r0->denom);
 	boost::rational<int64_t>rp1(r1->num, r1->denom);
 
-	if ( rp0 >= rp1 ) 
+	if ( rp0 >= rp1 )
         res->setBool(true);
 	else
         res->setBool(false);

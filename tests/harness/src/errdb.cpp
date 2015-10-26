@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,7 @@ namespace scidbtestharness
 namespace Exceptions
 {
 
-struct ConfigErrorDB config_errdb = 
+struct ConfigErrorDB config_errdb =
 {
 	ERR_CONFIG_UNKNOWN,
 	{
@@ -50,7 +50,7 @@ struct ConfigErrorDB config_errdb =
 	ERR_CONFIG_MAX
 };
 
-struct SystemErrorDB system_errdb = 
+struct SystemErrorDB system_errdb =
 {
 	ERR_SYSTEM_UNKNOWN,
 	{
@@ -61,7 +61,7 @@ struct SystemErrorDB system_errdb =
 	ERR_SYSTEM_MAX
 };
 
-struct ExecutorErrorDB executor_errdb = 
+struct ExecutorErrorDB executor_errdb =
 {
 	ERR_EXECUTOR_UNKNOWN,
 	{

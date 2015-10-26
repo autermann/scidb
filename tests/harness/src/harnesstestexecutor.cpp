@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -123,7 +123,7 @@ int HarnessTestExecutor :: prepareShellscript (void)
 			std::getline (f, line, LINE_FEED);
 
 			/* remove left and right hand side spaces.
-			 * a line containing only the spaces will be reduced to a blank line */ 
+			 * a line containing only the spaces will be reduced to a blank line */
 			boost::trim (line);
 
 			/* if blank line or a comment */
@@ -193,7 +193,7 @@ int HarnessTestExecutor :: prepareShellscript (void)
 void HarnessTestExecutor :: printExecutorEnvironment (void)
 {
 	LOG4CXX_INFO (_logger, "Printing executor Environment : ");
-	
+
 	LOG4CXX_INFO (_logger, "_ie.tcfile : "           << _ie.tcfile);
     LOG4CXX_INFO (_logger, "_ie.connectionString : " << _ie.connectionString);
 	LOG4CXX_INFO (_logger, "_ie.scidbPort : "        << _ie.scidbPort);
@@ -210,7 +210,9 @@ void HarnessTestExecutor :: printExecutorEnvironment (void)
 	LOG4CXX_INFO (_logger, "_ie.diff_file : "        << _ie.diff_file);
 	LOG4CXX_INFO (_logger, "_ie.log_file : "         << _ie.log_file);
 
-	LOG4CXX_INFO (_logger, "_ie.logger_name : "     << _ie.logger_name);
+	LOG4CXX_INFO (_logger, "_ie.logger_name : "      << _ie.logger_name);
+	LOG4CXX_INFO (_logger, "_ie.userName : "         << _ie.userName);
+	LOG4CXX_INFO (_logger, "_ie.userPassword : "     << "********");
 
 	LOG4CXX_INFO (_logger, "Done Printing executor Environment...");
 }
@@ -218,7 +220,7 @@ void HarnessTestExecutor :: printExecutorEnvironment (void)
 int HarnessTestExecutor :: createLogger (void)
 {
 	assert (_ie.log_file.length () > 0);
-	bfs::remove (_ie.log_file);	
+	bfs::remove (_ie.log_file);
 
 	log4cxx :: LayoutPtr layout (new log4cxx :: PatternLayout ("%d %p %x - %m%n"));
 	log4cxx :: FileAppenderPtr appender (new log4cxx :: FileAppender (layout, _ie.log_file, true));
@@ -249,7 +251,7 @@ int HarnessTestExecutor :: createLogger (void)
 int HarnessTestExecutor :: validateParameters (void)
 {
 	try
-	{ 
+	{
 		_ie.tcfile = getAbsolutePath (_ie.tcfile, false);
 		if (_ie.tcfile.empty ())
 			throw ConfigError (FILE_LINE_FUNCTION, ERR_CONFIG_TESTCASEFILENAME_EMPTY);
@@ -287,6 +289,8 @@ void HarnessTestExecutor :: copyToLocal (const InfoForExecutor &ir)
 	_ie.timerfile          = ir.timerfile;
 	_ie.log_file           = ir.log_file;
 	_ie.logger_name        = ir.logger_name;
+	_ie.userName           = ir.userName;
+	_ie.userPassword       = ir.userPassword;
 }
 
 int HarnessTestExecutor :: execute (InfoForExecutor &ir)

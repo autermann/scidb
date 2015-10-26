@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,8 +30,7 @@
 #ifndef MESSAGEHANDLEJOB_H_
 #define MESSAGEHANDLEJOB_H_
 
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 #include <stdint.h>
 #include <array/Metadata.h>
 #include <util/Job.h>
@@ -49,11 +48,11 @@ namespace scidb
      * The class created by network message handler for adding to queue to be processed
      * by thread pool and handle message from client.
      */
-    class MessageHandleJob: public Job, public boost::enable_shared_from_this<MessageHandleJob>
+    class MessageHandleJob: public Job, public std::enable_shared_from_this<MessageHandleJob>
     {
     public:
-        MessageHandleJob(const boost::shared_ptr<MessageDesc>& messageDesc)
-        : Job(boost::shared_ptr<Query>()),
+        MessageHandleJob(const std::shared_ptr<MessageDesc>& messageDesc)
+        : Job(std::shared_ptr<Query>()),
         _messageDesc(messageDesc)
         {
         }
@@ -63,11 +62,11 @@ namespace scidb
          * @param requestQueue a system queue for running jobs that may block waiting for events from other jobs
          * @param workQueue a system queue for running jobs that are guaranteed to make progress
          */
-        virtual void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
-                              boost::shared_ptr<WorkQueue>& workQueue) = 0;
+        virtual void dispatch(std::shared_ptr<WorkQueue>& requestQueue,
+                              std::shared_ptr<WorkQueue>& workQueue) = 0;
     protected:
-        boost::shared_ptr<MessageDesc> _messageDesc;
-        boost::shared_ptr<boost::asio::deadline_timer> _timer;
+        std::shared_ptr<MessageDesc> _messageDesc;
+        std::shared_ptr<boost::asio::deadline_timer> _timer;
 
         /// Reschedule this job if array locks are not taken
         void reschedule(uint64_t delayMicroSec);
@@ -90,17 +89,17 @@ namespace scidb
 
     private:
         /// Handler for for the array lock timeout. It reschedules the current job
-        static void handleRescheduleTimeout(boost::shared_ptr<Job>& job,
-                                            boost::shared_ptr<WorkQueue>& toQueue,
-                                            boost::shared_ptr<SerializationCtx>& sCtx,
-                                            boost::shared_ptr<boost::asio::deadline_timer>& timer,
+        static void handleRescheduleTimeout(std::shared_ptr<Job>& job,
+                                            std::shared_ptr<WorkQueue>& toQueue,
+                                            std::shared_ptr<SerializationCtx>& sCtx,
+                                            std::shared_ptr<boost::asio::deadline_timer>& timer,
                                             const boost::system::error_code& error);
     };
 
     class ServerMessageHandleJob : public MessageHandleJob
     {
     public:
-        ServerMessageHandleJob(const boost::shared_ptr<MessageDesc>& messageDesc);
+        ServerMessageHandleJob(const std::shared_ptr<MessageDesc>& messageDesc);
         virtual ~ServerMessageHandleJob();
 
         /**
@@ -109,8 +108,8 @@ namespace scidb
          * @param requestQueue a system queue for running jobs that may block waiting for events from other jobs
          * @param workQueue a system queue for running jobs that are guaranteed to make progress
          */
-        virtual void dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
-                              boost::shared_ptr<WorkQueue>& workQueue);
+        virtual void dispatch(std::shared_ptr<WorkQueue>& requestQueue,
+                              std::shared_ptr<WorkQueue>& workQueue);
 
     protected:
         /// Implementation of Job::run()
@@ -136,26 +135,6 @@ namespace scidb
         void handlePreparePhysicalPlan();
         void handleExecutePhysicalPlan();
         void handleQueryResult();
-
-        /**
-         * Helper to avoid duplicate code.
-         * When an empty-bitmap chunk is received, if RLE is true, the chunk is materialized, and getEmptyBitmap() is called on it.
-         * The returned shared_ptr<ConstRLEEmptyBitmap> will be stored in the SG context and
-         * will be used to process future chunks/aggregateChunks from the same sender.
-         * Note that an empty-bitmap attribute can never be of aggregate type.
-         */
-        void _handleChunkOrAggregateChunk(bool isAggregateChunk);
-
-        void handleChunk()
-        {
-            _handleChunkOrAggregateChunk(false);
-        }
-
-        void handleAggregateChunk()
-        {
-            _handleChunkOrAggregateChunk(true);
-        }
-
         void handleRemoteChunk();
         void handleFetchChunk();
         void handleSGFetchChunk();
@@ -173,6 +152,7 @@ namespace scidb
         void handleInvalidMessage();
         void handleAbortQuery();
         void handleCommitQuery();
+        void handleMessageSend();
         /**
          * Helper method to enqueue this job to a given queue
          * @param queue the WorkQueue for running this job
@@ -186,7 +166,7 @@ namespace scidb
          *       In most cases, you do not need to read/write after calling enqueue().
          *       But if you really do, protect ALL accesses to it with a mutex.
          */
-        void enqueue(boost::shared_ptr<WorkQueue>& queue, bool handleOverflow=true);
+        void enqueue(std::shared_ptr<WorkQueue>& queue, bool handleOverflow=true);
     };
 } // namespace
 

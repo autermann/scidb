@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,20 +31,20 @@ namespace scidb
   {
     uint8_t mask = 0;
     uint8_t i, start;
-    
+
     uint8_t rhsLength, lhsLength;
     int32_t getValue;
     dst = 0;
 
-    
+
     if(_bitsRead == 8)
       {
-	_bitsRead = 0; 
+	_bitsRead = 0;
 	getValue = _src->get(_bits);
-	if(getValue == -1) { return -1; } 
+	if(getValue == -1) { return -1; }
       }
     // all of it can be read from the current byte
-    if(bits + _bitsRead <= 8) 
+    if(bits + _bitsRead <= 8)
       {
 	// create a bitmask for this
 	for(i = 0; i < bits; ++i)
@@ -66,7 +66,7 @@ namespace scidb
       {
 	lhsLength = 8 - _bitsRead;
 	rhsLength = bits - lhsLength;
-	
+
 	for(i = 0; i < lhsLength; ++i)
 	  {
 	    mask = mask | (1 << i);
@@ -76,13 +76,13 @@ namespace scidb
 	dst = dst << rhsLength;
 
 	getValue = _src->get(_bits);
-	dst = dst | (_bits >> (8 - rhsLength)); 
+	dst = dst | (_bits >> (8 - rhsLength));
 	_bitsRead = rhsLength;
-	
-	return getValue;	
+
+	return getValue;
       }
 
   }
-    
-    
+
+
 }

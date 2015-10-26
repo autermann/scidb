@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@ showtime() {
     if [ ! -z "$TIME" ] ; then    # NOTE: this is an improvement over original
         echo '    real ' `cat $TMPTIME`
     else
-        true ; # echo 'timing off' # NOTE: chage from original 
+        true ; # echo 'timing off' # NOTE: chage from original
     fi
 }
 
@@ -77,7 +77,7 @@ eliminate() {
 # end was iqfuncs.bash
 ######################
 
-#set -x 
+#set -x
 
 BASE_SCRIPT_NAME=$(basename $0)
 
@@ -85,7 +85,7 @@ echo "$BASE_SCRIPT_NAME: begin ------------------------------------"
 
 # settings for iqfuncs above
 IQFUNCS_TRACE="y"  # debugging info
-TIME=""            # don't time the commands would make checkin tests fail 
+TIME=""            # don't time the commands would make checkin tests fail
 
 if [ -z "$SCRIPT_DIR" ] ; then
     SCRIPT_DIR="src/linear_algebra"
@@ -225,24 +225,24 @@ do
     iquery -aq "create array INPUT <v:double>[r=0:${MAXROW},${CSIZE},0 , c=0:${MAXCOL},${CSIZE},0]"  | grep -v 'Query was executed successfully'
 
     # TODO: Tigor, no need for this in Python version
-    if [ ${TEST} == "mpicopy" -o ${TEST} == "mpirank" ] ; then
+    if [ ${TEST} == "_mpicopy" -o ${TEST} == "_mpirank" ] ; then
         # hard-coded artificial limit on size of these tests, until limit is an argument
         if [ "$ORDER" -le "128" ] ; then # really for debugging, run enough just to keep this case working
-            # tests  using test functions:  mpicopy, mpirank
+            # tests  using test functions:  _mpicopy, _mpirank
             # drive them with cells containing their column-major numbering (good for debugging)
             echo -n "create test data for copy/rank" ; countOrPrint "store(build(INPUT,r*{NCOL}+c,INPUT)"
 
-            if [ "$TEST" == "mpicopy" ] ; then
+            if [ "$TEST" == "_mpicopy" ] ; then
                 echo "@@@@ $BASE_SCRIPT_NAME: -----------------------------------------------"     #|tee /dev/stderr
                 echo "@@@@ $BASE_SCRIPT_NAME: mpi(scalapack)copy , size ${ORDER}, csize ${CSIZE}"  #|tee /dev/stderr
                 # test that arrays written to ScaLAPACK memory and copied in the
                 # slave are then transferred from memory back to arrays correctly
                 eliminate IN_COPY
-                echo -n "mpicopy: " ; countOrPrint "mpicopy(INPUT)"
-                echo -n "store mpicopy: " ; countOrPrint "store(mpicopy(INPUT),IN_COPY)"
+                echo -n "_mpicopy: " ; countOrPrint "_mpicopy(INPUT)"
+                echo -n "store _mpicopy: " ; countOrPrint "store(_mpicopy(INPUT),IN_COPY)"
             fi
 
-            if [ "$TEST" == "mpirank" ] ; then
+            if [ "$TEST" == "_mpirank" ] ; then
                 # test that arrays written to ScaLAPACK memory goto and come from
                 # the mpi rank / ScaLAPACK grid coordinate that we expected
                 echo "@@@@ $BASE_SCRIPT_NAME: -----------------------------------------------"     #|tee /dev/stderr
@@ -257,8 +257,8 @@ do
                 # TODO: the above should make a nasty error if input doesn't match the destination rank
                 #       or if any input is missing
 
-                echo -n "mpirank: " ; countOrPrint "mpirank(INPUT)"
-                echo -n "mpirank: " ; countOrPrint "mpirank(mpirank(INPUT))"
+                echo -n "_mpirank: " ; countOrPrint "_mpirank(INPUT)"
+                echo -n "_mpirank: " ; countOrPrint "_mpirank(_mpirank(INPUT))"
             fi
         fi
     fi
@@ -283,7 +283,7 @@ do
         echo "$BASE_SCRIPT_NAME: building test matrix"
         nafl -q "store(${BUILD},INPUT)"
 
-        echo "$BASE_SCRIPT_NAME: compute 3 svd matrices: values, left, right, no metrics (too large):" 
+        echo "$BASE_SCRIPT_NAME: compute 3 svd matrices: values, left, right, no metrics (too large):"
         countOrPrint "gesvd(INPUT,'values')"   # will count at this size
         echo -n "." 1>&2
         countOrPrint "gesvd(INPUT,'left')"

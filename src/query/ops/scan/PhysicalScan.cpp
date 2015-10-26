@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,12 +26,15 @@
  *  Created on: Oct 28, 2010
  *      Author: knizhnik@garret.ru
  */
-#include <boost/make_shared.hpp>
-#include "query/Operator.h"
-#include "array/TransientCache.h"
-#include "array/DBArray.h"
-#include "array/Metadata.h"
-#include "system/SystemCatalog.h"
+#include <memory>
+
+#include <query/Operator.h>
+#include <array/TransientCache.h>
+#include <array/DBArray.h>
+#include <array/Metadata.h>
+#include <system/SystemCatalog.h>
+
+using namespace std;
 
 namespace scidb
 {
@@ -39,35 +42,43 @@ namespace scidb
 class PhysicalScan: public  PhysicalOperator
 {
   public:
-    PhysicalScan(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
+    PhysicalScan(const std::string& logicalName,
+                 const std::string& physicalName,
+                 const Parameters& parameters,
+                 const ArrayDesc& schema):
     PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
-        _arrayName = ((boost::shared_ptr<OperatorParamReference>&)parameters[0])->getObjectName();
+        _arrayName = dynamic_pointer_cast<OperatorParamReference>(parameters[0])->getObjectName();
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
+                                                    const std::vector< ArrayDesc> & inputSchemas) const
     {
-        SystemCatalog* systemCatalog = SystemCatalog::getInstance();
-        PartitioningSchema ps = systemCatalog->getPartitioningSchema(_schema.getId());
-        return ArrayDistribution(ps);
+        SCIDB_ASSERT(_schema.getPartitioningSchema()!=psUninitialized);
+        SCIDB_ASSERT(_schema.getPartitioningSchema()!=psUndefined);
+        std::shared_ptr<Query> query(_query);
+        SCIDB_ASSERT(query);
+        if (query->isDistributionDegraded(_schema)) {
+            // make sure PhysicalScan informs the optimizer that the distribution is unknown
+            return RedistributeContext(psUndefined);
+        }
+        return RedistributeContext(_schema.getPartitioningSchema());
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                    const std::vector< ArrayDesc> & inputSchemas) const
     {
-        SystemCatalog* systemCatalog = SystemCatalog::getInstance();
-        Coordinates lowBoundary = systemCatalog->getLowBoundary(_schema.getId());
-        Coordinates highBoundary = systemCatalog->getHighBoundary(_schema.getId());
+        Coordinates lowBoundary = _schema.getLowBoundary();
+        Coordinates highBoundary = _schema.getHighBoundary();
 
         return PhysicalBoundaries(lowBoundary, highBoundary);
     }
 
-    virtual void preSingleExecute(shared_ptr<Query> query)
+    virtual void preSingleExecute(std::shared_ptr<Query> query)
     {
         if (_schema.isTransient())
         {
-            shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
+            std::shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
 
             if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
                 (membership->getInstances().size() != query->getInstancesCount()))
@@ -77,26 +88,38 @@ class PhysicalScan: public  PhysicalOperator
          }
     }
 
-    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
-                                      boost::shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
+                                      std::shared_ptr<Query> query)
     {
+        SCIDB_ASSERT(!_arrayName.empty());
         if (_schema.isTransient())
         {
-            if (MemArrayPtr a = transient::lookup(_schema,query))
-            {
-                return a;                                   // ...temp array
+            if (!query->isCoordinator()) {
+
+                std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(_arrayName,
+                                                                                              query->getQueryID(),
+                                                                                              Cluster::getInstance()->getLocalInstanceId(),
+                                                                                              SystemCatalog::LockDesc::WORKER,
+                                                                                              SystemCatalog::LockDesc::XCL));
+
+                Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock, lock,_1);
+                query->pushFinalizer(f);
+                SystemCatalog::ErrorChecker errorChecker(bind(&Query::validate, query));
+                if (!SystemCatalog::getInstance()->lockArray(lock, errorChecker)) {
+                    throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK)<< lock->toString();
+                }
             }
-            else
-            {
-               return make_shared<MemArray>(_schema,query); // ...empty array
-            }
+            MemArrayPtr a = transient::lookup(_schema,query);
+            ASSERT_EXCEPTION(a.get()!=nullptr, string("Temp array ")+_schema.toString()+string(" not found"));
+            return a;                                   // ...temp array
         }
         else
         {
-            return boost::shared_ptr<Array>(DBArray::newDBArray(_schema, query));
+            assert(_schema.getId() != 0);
+            assert(_schema.getUAId() != 0);
+            return std::shared_ptr<Array>(DBArray::newDBArray(_schema, query));
         }
     }
-
 
   private:
     string _arrayName;

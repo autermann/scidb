@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -54,7 +54,7 @@ class TestCheckArgumenType(unittest.TestCase):
 
 #def full_compare_test(test, one, two, three, incompatible=None, incomparable=None):
 #    data= [one, two, three]
-#    
+#
 #    comb= list(combinations(data, 2))
 #    # test ==
 #    for item in data:
@@ -195,7 +195,7 @@ class TestCheckArgumenType(unittest.TestCase):
 #            Vector(item for item in [])
 #
 #    def test_create_invalid_none(self):
-#        with self.assertRaises(TypeError): 
+#        with self.assertRaises(TypeError):
 #            Vector()
 #
 #    def test_create_invalid_empty(self):
@@ -228,7 +228,7 @@ class TestCheckArgumenType(unittest.TestCase):
 #    def test_getitem(self):
 #        for index in xrange(0, len(self.vector())):
 #            self.assertEqual(self.vector()[index], self.cl[index])
-#            
+#
 #    def test_getitem_invalid(self):
 #        with self.assertRaises(IndexError):
 #            self.vector()[len(self.vector())]
@@ -354,11 +354,11 @@ class TestCheckArgumenType(unittest.TestCase):
 #
 #    def test_contains(self):
 #        self.assertTrue(self._min in Box(self._double_min, self._max))
-#        self.assertFalse(self._max in self.box()) 
+#        self.assertFalse(self._max in self.box())
 #        with self.assertRaises(TypeError):
 #            self._incompatible in self.box()
 #
-#    def test_equal(self): 
+#    def test_equal(self):
 #        self.assertEqual(self.box(), self.box())
 #        with self.assertRaises(TypeError):
 #            self.incompatible_box() == self.box()
@@ -401,7 +401,7 @@ class TestCheckArgumenType(unittest.TestCase):
 #
 #    def subbox(self):
 #        return [ (subbox, superbox) for (superbox, subbox) in self.superbox() ]
-#            
+#
 #
 #    def intersected(self):
 #        result= [ (subbox, superbox, subbox) for (subbox, superbox) in self.subbox()]
@@ -409,26 +409,26 @@ class TestCheckArgumenType(unittest.TestCase):
 #                  Box(self._min,        self._double_max),
 #                  Box(self._min,        self._max)))
 #        return result + [(s, f, r) for (f, s, r) in result]
-#    
+#
 #    def test_isdisjoint(self):
 #        for (left, right) in self.not_intersected():
-#            self.assertTrue(left.isdisjoint(right), 
+#            self.assertTrue(left.isdisjoint(right),
 #                            msg="%s.isdisjoint(%s)" % (str(left), str(right)))
 #        for (left, right, _) in self.intersected():
-#            self.assertFalse(left.isdisjoint(right), 
+#            self.assertFalse(left.isdisjoint(right),
 #                            msg="%s.isdisjoint(%s)" % (str(left), str(right)))
 #        with self.assertRaises(TypeError):
 #            self.incompatible_box().isdisjoint(self.box())
 #
 #    def test_intersection(self):
 #        for (left, right) in self.not_intersected():
-#            self.assertIsNone(left.intersection(right), 
+#            self.assertIsNone(left.intersection(right),
 #                              msg="%s.intersection(%s)" % (str(left), str(right)))
 #        for (left, right, result) in self.intersected():
 #            self.assertIsNotNone(left.intersection(right),
 #                                 msg="%s.intersection(%s)" % (str(left), str(right)))
 #            self.assertEqual(left.intersection(right), result,
-#                             msg="%s.intersection(%s) == %s" % 
+#                             msg="%s.intersection(%s) == %s" %
 #                             (str(left), str(right), str(result)))
 #        with self.assertRaises(TypeError):
 #            self.incompatible_box().intersection(self.box())

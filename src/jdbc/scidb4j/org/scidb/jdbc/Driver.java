@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -53,7 +53,7 @@ public class Driver implements java.sql.Driver
     @Override
     public java.sql.Connection connect(String url, Properties info) throws SQLException
     {
-        //Looke like bug in JDBC and this method never used in DriverManager: 
+        //Looks like a bug in JDBC and this method never used in DriverManager:
         //http://www.postgresql.org/message-id/4D95DDB8.2080809@ejurka.com
         //So we just call it before connection
         if (!acceptsURL(url))
@@ -75,7 +75,7 @@ public class Driver implements java.sql.Driver
             throw new SQLException("Wrong connection URL, it should be " + URL_PREFIX + "//hostname[:port][/]");
         }
     }
-    
+
     @Override
     public boolean acceptsURL(String url) throws SQLException
     {
@@ -86,6 +86,15 @@ public class Driver implements java.sql.Driver
     public boolean jdbcCompliant()
     {
         return false;
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException
+    {
+        throw new SQLFeatureNotSupportedException("The Java7 method Driver.getParentLogger() is not supported.");
     }
 
     static

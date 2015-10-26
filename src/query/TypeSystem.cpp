@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -340,35 +340,128 @@ const Value& TypeLibrary::_getDefaultValue(const TypeId& typeId)
     return _defaultValuesById[typeId] = _defaultValue;
 }
 
-/**
- * Quote a string as a TID_STRING ought to be quoted.
- *
- * @description
- * Copy a string to an output stream, inserting backslashes before
- * characters in the quoteThese string.
- *
- * @param os the output stream
- * @param s the string to copy out
- * @param quoteThese string of characters requiring backslashes
- */
-static void tidStringQuote(std::ostream& os, const char *s, const char *quoteThese)
+// No point in constructing one over and over.
+Value::Formatter Value::s_defaultFormatter;
+
+Value::Formatter::Formatter()
+    : _precision(DEFAULT_PRECISION)
+    , _useDefaultNull(true)
+    , _tsv(false)
+    , _quote('\'')
+    , _format("dcsv")
+    , _nullRepr("null")
+    , _nanRepr("nan")
+{ }
+
+Value::Formatter::Formatter(string const& format)
+    : _precision(DEFAULT_PRECISION)
+    , _useDefaultNull(true)
+    , _quote('\'')
+    , _nullRepr("null")
+    , _nanRepr("nan")
 {
-    while (char c = *s++) {
-        if (strchr(quoteThese, c))
-            os << '\\';
-        os << c;
+    // Break the format into a lowercase base format and a possibly
+    // bUmPy cAsE option string.
+    assert(!format.empty());
+    string::size_type pos = format.find(':');
+    if (pos == string::npos) {
+        _format = format;
+    } else {
+        _format = format.substr(0, pos);
+        _options = format.substr(pos + 1); // maintain upper/lower
+    }
+    transform(_format.begin(), _format.end(), _format.begin(), ::tolower);
+
+    // Among other behaviors, TSV has its own default null representation.
+    _tsv = (_format.find("tsv") != string::npos);
+    if (_tsv) {
+        _nullRepr = "\\N";
+    }
+
+    // Interpret options that force a particular null representation.
+    pos = _options.find_first_of("EN?");
+    if (pos != string::npos) {
+        _useDefaultNull = false;
+        switch(_options[pos]) {
+        case 'E':
+            // Print null as empty string.
+            _nullRepr = "";
+            break;
+        case 'n':
+            // Print null as null (overrides TSV default).
+            _nullRepr = "null";
+            break;
+        case 'N':
+            // Print null as \N (Linear TSV).  Our TSV default.
+            _nullRepr = "\\N";
+            break;
+        case '?':
+            // Uniform printing of missing values.
+            _nullRepr = "?0";
+            break;
+        }
+    }
+
+    // Interpret options that force a particular quote character.
+    pos = _options.find_first_of("ds");
+    if (pos != string::npos) {
+        _quote = (_options[pos] == 'd' ? '"' : '\'');
+    }
+}
+
+
+int Value::Formatter::setPrecision(int p)
+{
+    int prev = _precision;
+    _precision = p < 0 ? DEFAULT_PRECISION : p;
+    return prev;
+}
+
+
+/** Emit TSV representation of a character. */
+void Value::Formatter::tsvChar(stringstream& ss, char ch)
+{
+    switch (ch) {
+    case '\t':  ss << "\\t";    break;
+    case '\n':  ss << "\\n";    break;
+    case '\r':  ss << "\\r";    break;
+    case '\\':  ss << "\\\\";   break;
+    default:    ss << ch;      break;
     }
 }
 
 /**
- * Helper Value functions implementation
+ * Emit quoted CSV string.
  *
- * NOTE: This will only work efficiently for the built in types. If you try
+ * This isn't the correct way to quote a CSV string, but it's the way
+ * we've historically been doing it... for CSV and for the "SciDB text"
+ * family of formats.
+ */
+void Value::Formatter::quoteCstr(stringstream& ss, const char *s) const
+{
+    ss << _quote;
+    while (char c = *s++) {
+        if (c == _quote) {
+            ss << '\\' << c;
+        } else if (c == '\\') {
+            ss << "\\\\";
+        } else {
+            ss << c;
+        }
+    }
+    ss << _quote;
+}
+
+/**
+ * Do format-based stringification of a value.
+ *
+ * @note This will only work efficiently for the built-in types. If you try to
  *       use this for a UDT it needs to do a lookup to try and find a UDF.
  */
-string ValueToString(const TypeId& type, const Value& value, int precision)
+string Value::Formatter::format(TypeId const& type, Value const& value) const
 {
-    std::stringstream ss;
+    static const string TSV_ESCAPED("\t\r\n\\");
+    stringstream ss;
 
     /*
     ** Start with the most common ones, and do the least common ones
@@ -376,98 +469,125 @@ string ValueToString(const TypeId& type, const Value& value, int precision)
     */
     if ( value.isNull() ) {
         if (value.getMissingReason() == 0) {
-            ss << "null";
+            ss << _nullRepr;
         } else {
             ss << '?' << value.getMissingReason();
         }
     } else if ( TID_DOUBLE == type ) {
-        double val = value.getDouble();
-        if (isnan(val) || val==0)
-            val = abs(val);
-        ss.precision(precision);
-        ss << val;
+        double val = value.get<double>();
+        if (std::isnan(val)) {
+            ss << _nanRepr;
+        }
+        else {
+            ss.precision(_precision);
+            ss << val;
+        }
     } else if ( TID_INT64 == type ) {
-        ss << value.getInt64();
+        ss << value.get<int64_t>();
     } else if ( TID_INT32 == type ) {
-        ss << value.getInt32();
+        ss << value.get<int32_t>();
     } else if ( TID_STRING == type ) {
         char const* str = value.getString();
         if (str == NULL) {
-            ss << "null";
+            ss << _nullRepr;
+        } else if (_tsv) {
+            string raw(str);
+            if (raw.find_first_of(TSV_ESCAPED) == string::npos) {
+                ss << raw;
+            } else {
+                for (const char* cp = str; *cp; ++cp) {
+                    tsvChar(ss, *cp);
+                }
+            }
         } else {
-            ss << '\'';
-            tidStringQuote(ss, str, "\\'");
-            ss << '\'';
+            // CSV and the SciDB text family of formats handle strings the same way.
+            quoteCstr(ss, str);
         }
     } else if ( TID_CHAR == type ) {
-
-        ss << '\'';
-        const char ch = value.getChar();
-        if (ch == '\0') {
-                ss << "\\0";
-        } else if (ch == '\n') {
-                ss << "\\n";
-        } else if (ch == '\r') {
-                ss << "\\r";
-        } else if (ch == '\t') {
-                ss << "\\t";
-        } else if (ch == '\f') {
-                ss << "\\f";
+        const char ch = value.get<char>();
+        if (_tsv) {
+            tsvChar(ss, ch);
         } else {
+            ss << '\'';
+            if (ch == '\0') {
+                ss << "\\0";
+            } else if (ch == '\n') {
+                ss << "\\n";
+            } else if (ch == '\r') {
+                ss << "\\r";
+            } else if (ch == '\t') {
+                ss << "\\t";
+            } else if (ch == '\f') {
+                ss << "\\f";
+            } else {
                 if (ch == '\'' || ch == '\\') {
-                ss << '\\';
+                    ss << '\\';
                 }
                 ss << ch;
+            }
+            ss << '\'';
         }
-        ss << '\'';
-
     } else if ( TID_FLOAT == type ) {
-        ss << value.getFloat();
+        float val = value.get<float>();
+        if (std::isnan(val)) {
+            ss << _nanRepr;
+        }
+        else {
+            ss.precision(_precision);
+            ss << val;
+        }
     } else if (( TID_BOOL == type ) || ( TID_INDICATOR == type )) {
-        ss << (value.getBool() ? "true" : "false");
+        ss << boolalpha << value.get<bool>();
     } else if ( TID_DATETIME == type ) {
 
         char buf[STRFTIME_BUF_LEN];
         struct tm tm;
-        time_t dt = (time_t)value.getDateTime();
+        time_t dt = static_cast<time_t>(value.getDateTime());
 
         gmtime_r(&dt, &tm);
         strftime(buf, sizeof(buf), DEFAULT_STRFTIME_FORMAT, &tm);
-        ss << '\'' << buf << '\'';
+        if (_tsv) {
+            ss << buf;
+        } else {
+            // No quote marks in a timestamp so no need for quoteCstr().
+            ss << _quote << buf << _quote;
+        }
 
     } else if ( TID_DATETIMETZ == type) {
+        char buf[STRFTIME_BUF_LEN + 8];
+        time_t *seconds = (time_t*) value.data();
+        time_t *offset = seconds+1;
 
-            char buf[STRFTIME_BUF_LEN + 8];
-            time_t *seconds = (time_t*) value.data();
-            time_t *offset = seconds+1;
+        struct tm tm;
+        gmtime_r(seconds,&tm);
+        size_t offs = strftime(buf, sizeof(buf), DEFAULT_STRFTIME_FORMAT, &tm);
 
-            struct tm tm;
-            gmtime_r(seconds,&tm);
-            size_t offs = strftime(buf, sizeof(buf), DEFAULT_STRFTIME_FORMAT, &tm);
+        char sign = *offset > 0 ? '+' : '-';
 
-            char sign = *offset > 0 ? '+' : '-';
+        time_t aoffset = *offset > 0 ? *offset : (*offset) * -1;
 
-            time_t aoffset = *offset > 0 ? *offset : (*offset) * -1;
-
-            sprintf(buf+offs, " %c%02d:%02d",
-                    sign,
-                    (int32_t) aoffset/3600,
-                    (int32_t) (aoffset%3600)/60);
-
-
-            ss << '\'' << buf << '\'';
+        sprintf(buf+offs, " %c%02d:%02d",
+                sign,
+                (int32_t) aoffset/3600,
+                (int32_t) (aoffset%3600)/60);
+        if (_tsv) {
+            ss << buf;
+        } else {
+            // No quote marks in a timestamp so no need for quoteCstr().
+            ss << _quote << buf << _quote;
+        }
     } else if ( TID_INT8 == type ) {
-        ss << (int)value.getInt8();
+        ss << static_cast<int>(value.get<int8_t>());
     } else if ( TID_INT16 == type ) {
-        ss << value.getInt16();
+        ss << value.get<int16_t>();
     } else if ( TID_UINT8 == type ) {
-        ss << (int)value.getUint8();
+        ss << static_cast<int>(value.get<uint8_t>());
     } else if ( TID_UINT16 == type ) {
-        ss << value.getUint16();
+        ss << value.get<uint16_t>();
     } else if ( TID_UINT32 == type ) {
-        ss << value.getUint32();
+        ss << value.get<uint32_t>();
     } else if ( TID_UINT64 == type ) {
-        ss << value.getUint64();
+        ss << value.get<uint64_t>();
     } else if ( TID_VOID == type ) {
         ss << "<void>";
     } else  {
@@ -485,8 +605,8 @@ inline char mStringToMonth(const char* s)
     {
         {"apr", 4},
         {"aug", 8},
-        {"feb", 2},
         {"dec",12},
+        {"feb", 2},
         {"jan", 1},
         {"jul", 7},
         {"jun", 6},
@@ -530,32 +650,33 @@ time_t parseDateTime(std::string const& str)
     char amPmString[3]="";
 
     if (( sscanf(s, "%d-%3s-%d %d.%d.%d %2s%n", &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &amPmString[0], &n) == 7 ||
-          sscanf(s, "%d-%3s-%d %d.%d.%d%n", &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) == 6 ||
-          sscanf(s, "%d-%3s-%d%n", &t.tm_mday, &mString[0], &t.tm_year, &n) == 3 ||
-          sscanf(s, "%d%3s%d:%d:%d:%d%n", &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) == 6 ) && n == (int) str.size())
+          sscanf(s, "%d-%3s-%d %d.%d.%d%n",     &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) == 6 ||
+          sscanf(s, "%d-%3s-%d%n",              &t.tm_mday, &mString[0], &t.tm_year, &n) == 3 ||
+          sscanf(s, "%d%3s%d:%d:%d:%d%n",       &t.tm_mday, &mString[0], &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) == 6 ) && n == (int) str.size())
     {
         t.tm_mon = mStringToMonth(mString);
-        if(amPmString[0]=='P')
+
+        if(amPmString[0]=='P' && t.tm_hour < 12)
         {
             t.tm_hour += 12;
         }
     }
     else
     {
-        if((sscanf(s, "%d/%d/%d %d:%d:%d%n", &t.tm_mon, &t.tm_mday, &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
-            sscanf(s, "%d.%d.%d %d:%d:%d%n", &t.tm_mday, &t.tm_mon, &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
+        if((sscanf(s, "%d/%d/%d %d:%d:%d%n",    &t.tm_mon, &t.tm_mday, &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
+            sscanf(s, "%d.%d.%d %d:%d:%d%n",    &t.tm_mday, &t.tm_mon, &t.tm_year, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
             sscanf(s, "%d-%d-%d %d:%d:%d.%d%n", &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec, &sec_frac, &n) != 7 &&
             sscanf(s, "%d-%d-%d %d.%d.%d.%d%n", &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec, &sec_frac, &n) != 7 &&
-            sscanf(s, "%d-%d-%d %d.%d.%d%n", &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
-            sscanf(s, "%d-%d-%d %d:%d:%d%n", &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
-            sscanf(s, "%d/%d/%d %d:%d%n", &t.tm_mon, &t.tm_mday, &t.tm_year, &t.tm_hour, &t.tm_min, &n) != 5 &&
-            sscanf(s, "%d.%d.%d %d:%d%n", &t.tm_mday, &t.tm_mon, &t.tm_year, &t.tm_hour, &t.tm_min, &n) != 5 &&
-            sscanf(s, "%d-%d-%d %d:%d%n", &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &n) != 5 &&
-            sscanf(s, "%d-%d-%d%n", &t.tm_year, &t.tm_mon, &t.tm_mday, &n) != 3 &&
-            sscanf(s, "%d/%d/%d%n", &t.tm_mon, &t.tm_mday, &t.tm_year, &n) != 3 &&
-            sscanf(s, "%d.%d.%d%n", &t.tm_mday, &t.tm_mon, &t.tm_year, &n) != 3 &&
-            sscanf(s, "%d:%d:%d%n", &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 3 &&
-            sscanf(s, "%d:%d%n", &t.tm_hour, &t.tm_min, &n) != 2)
+            sscanf(s, "%d-%d-%d %d.%d.%d%n",    &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
+            sscanf(s, "%d-%d-%d %d:%d:%d%n",    &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 6 &&
+            sscanf(s, "%d/%d/%d %d:%d%n",       &t.tm_mon, &t.tm_mday, &t.tm_year, &t.tm_hour, &t.tm_min, &n) != 5 &&
+            sscanf(s, "%d.%d.%d %d:%d%n",       &t.tm_mday, &t.tm_mon, &t.tm_year, &t.tm_hour, &t.tm_min, &n) != 5 &&
+            sscanf(s, "%d-%d-%d %d:%d%n",       &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &n) != 5 &&
+            sscanf(s, "%d-%d-%d%n",             &t.tm_year, &t.tm_mon, &t.tm_mday, &n) != 3 &&
+            sscanf(s, "%d/%d/%d%n",             &t.tm_mon, &t.tm_mday, &t.tm_year, &n) != 3 &&
+            sscanf(s, "%d.%d.%d%n",             &t.tm_mday, &t.tm_mon, &t.tm_year, &n) != 3 &&
+            sscanf(s, "%d:%d:%d%n",             &t.tm_hour, &t.tm_min, &t.tm_sec, &n) != 3 &&
+            sscanf(s, "%d:%d%n",                &t.tm_hour, &t.tm_min, &n) != 2)
                     || n != (int)str.size())
             throw USER_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_FAILED_PARSE_STRING) << str << TID_DATETIME;
     }
@@ -685,12 +806,14 @@ TypeId propagateTypeToReal(const TypeId& type)
 void StringToValue(const TypeId& type, const string& str, Value& value)
 {
     if ( TID_DOUBLE == type ) {
-        if (str == "NA") {
-            // backward compatibility
-            value.setDouble(NAN);
-        } else {
-            value.setDouble(atof(str.c_str()));
+        errno = 0;
+        char *endptr = 0;
+        double d = ::strtod(str.c_str(), &endptr);
+        if (errno || !iswhitespace(endptr)) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TYPE_CONVERSION_ERROR2)
+                << str << "string" << "double" << (errno ? ::strerror(errno) : endptr);
         }
+        value.setDouble(d);
     } else if ( TID_INT64 == type ) {
         int64_t val = StringToInteger<int64_t>(str.c_str(), TID_INT64);
         value.setInt64(val);
@@ -702,12 +825,14 @@ void StringToValue(const TypeId& type, const string& str, Value& value)
     } else if ( TID_STRING == type ) {
         value.setString(str.c_str());
     } else if ( TID_FLOAT == type ) {
-        if (str == "NA") {
-            // backward compatibility
-            value.setFloat(NAN);
-        } else {
-            value.setFloat(atof(str.c_str()));
+        errno = 0;
+        char *endptr = 0;
+        float f = ::strtof(str.c_str(), &endptr);
+        if (errno || !iswhitespace(endptr)) {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TYPE_CONVERSION_ERROR2)
+                << str << "string" << "float" << (errno ? ::strerror(errno) : endptr);
         }
+        value.setFloat(f);
     } else if ( TID_INT8 == type ) {
         int8_t val = StringToInteger<int8_t>(str.c_str(), TID_INT8);
         value.setInt8(val);
@@ -733,7 +858,7 @@ void StringToValue(const TypeId& type, const string& str, Value& value)
             value.setBool(false);
         } else {
             throw SYSTEM_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TYPE_CONVERSION_ERROR2)
-                << str << "string" << "bool";
+                << str << "string" << "bool" << "Unrecognized token";
         }
     } else if ( TID_DATETIME == type ) {
         value.setDateTime(parseDateTime(str));
@@ -741,12 +866,12 @@ void StringToValue(const TypeId& type, const string& str, Value& value)
         parseDateTimeTz(str, value);
     } else if ( TID_VOID == type ) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TYPE_CONVERSION_ERROR2)
-            << str << "string" << type;
+            << str << "string" << type << "Type 'void' is not parseable";
     } else {
         std::stringstream ss;
         ss << type;
         throw SYSTEM_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TYPE_CONVERSION_ERROR2)
-            << str << "string" << type;
+            << str << "string" << type << "Unrecognized type";
     }
 }
 
@@ -846,22 +971,35 @@ template<>  TypeId type2TypeId<double>()    {return TID_DOUBLE;}
  *  Construct and return value that carries a tile that consists of the single
  *  constant value 'v' repeated indefinitely.
  */
-Value makeTileConstant(const TypeId& t,const Value& v)
+Value makeTileConstant(const TypeId& tid,const Value& v)
 {
-    Value               w(TypeLibrary::getType(t),Value::asTile);
+    Type                t(TypeLibrary::getType(tid));
+    Value               w(t,Value::asTile);
     RLEPayload*   const p = w.getTile();
     RLEPayload::Segment s(0,0,true,v.isNull());
 
-    if (!s._null)
+    if (!s.null())
     {
         std::vector<char> varPart;
 
         p->appendValue(varPart,v,0);
-        p->setVarPart(varPart);
+        if (!varPart.empty()) {
+            ASSERT_EXCEPTION(t.variableSize(), "Setting empty varpart?");
+            p->setVarPart(varPart);
+        } else {
+            ASSERT_EXCEPTION(!t.variableSize(), "Setting varpart of fixed-size attribute tile?");
+        }
     }
 
     p->addSegment(s);
-    p->flush(INFINITE_LENGTH);
+
+    // By calling flush with the max length we are making this a
+    // special case tile that can be flagged by the length of the tile.
+    //
+    // Special case tiles are created when a binary op is used
+    // Example:  apply(A, a + 3)
+    // The 3 part will be a special case tile with the max length set.
+    p->flush(CoordinateBounds::getMaxLength());
 
     return w;
 }

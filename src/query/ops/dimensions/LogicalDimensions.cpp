@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -85,15 +85,15 @@ public:
     	ADD_PARAM_IN_ARRAY_NAME()
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 1);
 
-        const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         ArrayDesc arrayDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, query->getCatalogVersion(arrayName), LAST_VERSION, arrayDesc);
 
         vector<AttributeDesc> attributes(8);
         attributes[0] = AttributeDesc((AttributeID)0, "name",  TID_STRING, 0, 0);
@@ -113,10 +113,10 @@ public:
         attributes[7] = AttributeDesc((AttributeID)7, "type",  TID_STRING, 0, 0);
         vector<DimensionDesc> dimensions(1);
 
-        size_t nAttrs = arrayDesc.getDimensions().size();
-        size_t end    = nAttrs>0 ? nAttrs-1 : 0;
-        dimensions[0] = DimensionDesc("No", 0, 0, end, end, nAttrs, 0);
-        return ArrayDesc("Dimensions", attributes, dimensions);
+        size_t nDims = arrayDesc.getDimensions().size();
+        size_t end    = nDims>0 ? nDims-1 : 0;
+        dimensions[0] = DimensionDesc("No", 0, 0, end, end, nDims, 0);
+        return ArrayDesc("Dimensions", attributes, dimensions, defaultPartitioning());
     }
 
 };

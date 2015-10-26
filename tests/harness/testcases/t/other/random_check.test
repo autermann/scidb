@@ -8,7 +8,7 @@ create array A <a:int32> [x=0:8,1,0]
 --igdata "store(build(A,random()),A)"
 
 --test
---aql select distinct_count from analyze(A) where distinct_count < 6
+filter( op_distinct_count (A,a), count < 6)
 
 --cleanup
 remove(A)

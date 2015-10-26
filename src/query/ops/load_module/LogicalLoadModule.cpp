@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -61,11 +61,12 @@ struct LogicalLoadModule : LogicalOperator
         _usage = "load_module(module-path : string)";    // The usage string
     }
 
-    ArrayDesc inferSchema(vector<ArrayDesc>,shared_ptr<Query>)
+    ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query>)
     {
         return ArrayDesc("load_module",
                Attributes(1,AttributeDesc(0,"module",TID_STRING,0,0)),
-               Dimensions(1,DimensionDesc("i",0,0,0,0,1,0)));
+               Dimensions(1,DimensionDesc("i",0,0,0,0,1,0)),
+               defaultPartitioning());
     }
 };
 

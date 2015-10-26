@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,6 +28,8 @@
  */
 
 #include <query/Operator.h>
+
+using namespace std;
 
 namespace scidb
 {
@@ -62,7 +64,7 @@ public:
      * @param query the query context
      * @return the output array object
      */
-    shared_ptr< Array> execute(vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         /* Find my instanceId from the query. Query has many useful methods like
          * - the total number of instances
@@ -78,13 +80,13 @@ public:
          * reading and writing are saved to disk, should the array size exceed the MEM_ARRAY_THRESHOLD setting. _schema
          * came from LogicalHelloInstances::inferSchema() and was shipped to all instanced by scidb.
          */
-        shared_ptr<Array> outputArray(new MemArray(_schema, query));
+        std::shared_ptr<Array> outputArray(new MemArray(_schema, query));
         /* return outputArray; -- at this point this would return an empty array */
 
         /* In order to write data to outputArray, we create an ArrayIterator. The argument given is the attribute ID.
          * The ArrayIterator allows one to read existing chunks and add new chunks to the array.
          */
-        shared_ptr<ArrayIterator> outputArrayIter = outputArray->getIterator(0);
+        std::shared_ptr<ArrayIterator> outputArrayIter = outputArray->getIterator(0);
 
         /* We are adding one chunk in the one-dimensional space. All chunks have a position, which is also the position
          * of the top-left element in the chunk. In this simple example, each chunk contains only once cell and this is
@@ -93,7 +95,7 @@ public:
         Coordinates position(1, instanceId);
 
         /* Create the chunk and open a ChunkIterator to it. */
-        shared_ptr<ChunkIterator> outputChunkIter = outputArrayIter->newChunk(position).getIterator(query, 0);
+        std::shared_ptr<ChunkIterator> outputChunkIter = outputArrayIter->newChunk(position).getIterator(query, 0);
 
         /* Set the position inside the chunk */
         outputChunkIter->setPosition(position);

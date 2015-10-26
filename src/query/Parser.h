@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,7 +25,7 @@
 
 /****************************************************************************/
 
-#include <boost/shared_ptr.hpp>                           // For shared_ptr
+#include <memory>
 
 /****************************************************************************/
 namespace scidb {
@@ -38,11 +38,11 @@ class LogicalExpression;
 class LogicalQueryPlanNode;
 
 /****************************************************************************/
-namespace arena {typedef boost::shared_ptr<class Arena> ArenaPtr;}
+namespace arena {typedef std::shared_ptr<class Arena> ArenaPtr;}
 /****************************************************************************/
 
-boost::shared_ptr<LogicalQueryPlanNode> parseStatement (const boost::shared_ptr<Query>&,bool afl);
-boost::shared_ptr<LogicalExpression>    parseExpression(const std::string&);
+std::shared_ptr<LogicalQueryPlanNode> parseStatement (const std::shared_ptr<Query>&,bool afl);
+std::shared_ptr<LogicalExpression>    parseExpression(const std::string&);
 
 /****************************************************************************/
 
@@ -52,7 +52,7 @@ void                                    loadModule(const std::string&);
 /****************************************************************************/
 
 ArrayDesc                               logicalListMacros ();
-boost::shared_ptr<Array>                physicalListMacros(const arena::ArenaPtr&);
+std::shared_ptr<Array>                physicalListMacros(const arena::ArenaPtr&);
 
 /****************************************************************************/
 }

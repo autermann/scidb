@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,17 +54,17 @@ namespace scidb
     }
 
     void DelegateChunk::overrideTileMode(bool enabled) {
-        if (chunk != NULL) { 
+        if (chunk != NULL) {
             ((Chunk*)chunk)->overrideTileMode(enabled);
         }
         tileMode = enabled;
     }
 
-    Array const& DelegateChunk::getArray() const 
+    Array const& DelegateChunk::getArray() const
     {
         return array;
     }
-    
+
     const AttributeDesc& DelegateChunk::getAttributeDesc() const
     {
         return array.getArrayDesc().getAttributes()[attrID];
@@ -76,18 +76,18 @@ namespace scidb
     }
 
     Coordinates const& DelegateChunk::getFirstPosition(bool withOverlap) const
-    {                                           
+    {
         return chunk->getFirstPosition(withOverlap);
     }
 
     Coordinates const& DelegateChunk::getLastPosition(bool withOverlap) const
-    {                                           
+    {
         return chunk->getLastPosition(withOverlap);
     }
 
-    boost::shared_ptr<ConstChunkIterator> DelegateChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> DelegateChunk::getConstIterator(int iterationMode) const
     {
-        return boost::shared_ptr<ConstChunkIterator>(array.createChunkIterator(this, iterationMode));
+        return std::shared_ptr<ConstChunkIterator>(array.createChunkIterator(this, iterationMode));
     }
 
     void DelegateChunk::setInputChunk(ConstChunk const& inputChunk)
@@ -101,7 +101,7 @@ namespace scidb
     }
 
     DelegateArrayIterator const& DelegateChunk::getArrayIterator() const
-    { 
+    {
         return iterator;
     }
 
@@ -132,7 +132,7 @@ namespace scidb
 
     void DelegateChunk::unPin() const
     {
-        if (isClone) { 
+        if (isClone) {
             chunk->unPin();
         }
     }
@@ -148,11 +148,11 @@ namespace scidb
     }
 
     void DelegateChunk::compress(CompressedBuffer& buf,
-                                 boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+                                 std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
     {
-        if (isClone) { 
+        if (isClone) {
             chunk->compress(buf, emptyBitmap);
-        } else { 
+        } else {
             ConstChunk::compress(buf, emptyBitmap);
         }
     }
@@ -173,17 +173,17 @@ namespace scidb
     //
     // Delegate chunk iterator methods
     //
-    int DelegateChunkIterator::getMode()
+    int DelegateChunkIterator::getMode() const
     {
         return inputIterator->getMode();
     }
 
-     Value& DelegateChunkIterator::getItem()
+     Value const& DelegateChunkIterator::getItem()
     {
         return inputIterator->getItem();
     }
 
-    bool DelegateChunkIterator::isEmpty()
+    bool DelegateChunkIterator::isEmpty() const
     {
         return inputIterator->isEmpty();
     }
@@ -221,22 +221,22 @@ namespace scidb
     DelegateChunkIterator::DelegateChunkIterator(DelegateChunk const* aChunk, int iterationMode)
     : chunk(aChunk), inputIterator(aChunk->getInputChunk().getConstIterator(iterationMode & ~INTENDED_TILE_MODE))
     {
-    }        
+    }
 
     //
     // Delegate array iterator methods
     //
 
-    DelegateArrayIterator::DelegateArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input)
-    : array(delegate), 
-      attr(attrID), 
+    DelegateArrayIterator::DelegateArrayIterator(DelegateArray const& delegate, AttributeID attrID, std::shared_ptr<ConstArrayIterator> input)
+    : array(delegate),
+      attr(attrID),
       inputIterator(input),
       chunk(delegate.createChunk(this, attrID)),
       chunkInitialized(false)
     {
     }
 
-    boost::shared_ptr<ConstArrayIterator> DelegateArrayIterator::getInputIterator() const
+    std::shared_ptr<ConstArrayIterator> DelegateArrayIterator::getInputIterator() const
     {
         return inputIterator;
     }
@@ -247,7 +247,7 @@ namespace scidb
         return *chunk;
     }
 
-	bool DelegateArrayIterator::end()
+    bool DelegateArrayIterator::end()
     {
         return inputIterator->end();
     }
@@ -279,11 +279,11 @@ namespace scidb
     // Delegate array methods
     //
 
-    DelegateArray::DelegateArray(ArrayDesc const& arrayDesc, boost::shared_ptr<Array> input, bool clone)
+    DelegateArray::DelegateArray(ArrayDesc const& arrayDesc, std::shared_ptr<Array> input, bool clone)
     : desc(arrayDesc), inputArray(input), isClone(clone)
     {
     }
-        
+
     string const& DelegateArray::getName() const
     {
         return desc.getName();
@@ -299,9 +299,9 @@ namespace scidb
         return desc;
     }
 
-    boost::shared_ptr<ConstArrayIterator> DelegateArray::getConstIterator(AttributeID id) const
+    std::shared_ptr<ConstArrayIterator> DelegateArray::getConstIterator(AttributeID id) const
     {
-        return boost::shared_ptr<ConstArrayIterator>(createArrayIterator(id));
+        return std::shared_ptr<ConstArrayIterator>(createArrayIterator(id));
     }
 
     DelegateChunk* DelegateArray::createChunk(DelegateArrayIterator const* iterator, AttributeID id) const
@@ -313,13 +313,13 @@ namespace scidb
     {
         return new DelegateChunkIterator(chunk, iterationMode);
     }
-    
+
     DelegateArrayIterator* DelegateArray::createArrayIterator(AttributeID id) const
     {
         return new DelegateArrayIterator(*this, id, inputArray->getConstIterator(id));
     }
-    
-    boost::shared_ptr<Array> DelegateArray::getInputArray() const
+
+    std::shared_ptr<Array> DelegateArray::getInputArray() const
     {
         return inputArray;
     }
@@ -328,25 +328,25 @@ namespace scidb
     // NonEmptyable array
     //
 
-    NonEmptyableArray::NonEmptyableArray(boost::shared_ptr<Array> input)
+    NonEmptyableArray::NonEmptyableArray(std::shared_ptr<Array> input)
     : DelegateArray(input->getArrayDesc(), input, true)
     {
         Attributes const& oldAttrs(desc.getAttributes());
         emptyTagID = oldAttrs.size();
         Attributes newAttrs(emptyTagID+1);
-        for (size_t i = 0; i < emptyTagID; i++) { 
+        for (size_t i = 0; i < emptyTagID; i++) {
             newAttrs[i] = oldAttrs[i];
         }
         newAttrs[emptyTagID] = AttributeDesc(emptyTagID,
                                              DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
                                              TID_INDICATOR,
                                              AttributeDesc::IS_EMPTY_INDICATOR, 0);
-        desc = ArrayDesc(desc.getName(), newAttrs, desc.getDimensions());
+        desc = ArrayDesc(desc.getName(), newAttrs, desc.getDimensions(), defaultPartitioning());
     }
 
     DelegateArrayIterator* NonEmptyableArray::createArrayIterator(AttributeID id) const
-    {  
-        if (id == emptyTagID) { 
+    {
+        if (id == emptyTagID) {
             return new DummyBitmapArrayIterator(*this, id, inputArray->getConstIterator(0));
         }
         return new DelegateArrayIterator(*this, id,
@@ -362,27 +362,27 @@ namespace scidb
             ? (DelegateChunkIterator*)new DummyBitmapChunkIterator(chunk, iterationMode)
             : (DelegateChunkIterator*)new DelegateChunkIterator(chunk, iterationMode);
     }
-    
+
     DelegateChunk* NonEmptyableArray::createChunk(DelegateArrayIterator const* iterator,
                                                   AttributeID id) const
     {
         return new DelegateChunk(*this, *iterator, id, id != emptyTagID);
     }
 
-    Value& NonEmptyableArray::DummyBitmapChunkIterator::getItem()
+    Value const& NonEmptyableArray::DummyBitmapChunkIterator::getItem()
     {
         return _true;
     }
 
-    bool NonEmptyableArray::DummyBitmapChunkIterator::isEmpty()
+    bool NonEmptyableArray::DummyBitmapChunkIterator::isEmpty() const
     {
         return false;
     }
 
     NonEmptyableArray::DummyBitmapChunkIterator::DummyBitmapChunkIterator(DelegateChunk const* chunk, int iterationMode)
-    : DelegateChunkIterator(chunk, iterationMode), 
+    : DelegateChunkIterator(chunk, iterationMode),
       _true(TypeLibrary::getType(TID_BOOL))
-    {        
+    {
         _true.setBool(true);
     }
 
@@ -399,8 +399,8 @@ namespace scidb
         }
         return shapeChunk;
     }
-    
-    NonEmptyableArray::DummyBitmapArrayIterator::DummyBitmapArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator)
+
+    NonEmptyableArray::DummyBitmapArrayIterator::DummyBitmapArrayIterator(DelegateArray const& delegate, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator)
     : DelegateArrayIterator(delegate, attrID, inputIterator)
     {
     }
@@ -413,8 +413,8 @@ namespace scidb
                            const boost::shared_array<char>& src,
                            Coordinates const& from,
                            Coordinates const& till,
-                           shared_ptr<Query>const& query)
-    : DelegateArray(desc, shared_ptr<Array>(), true),
+                           std::shared_ptr<Query>const& query)
+    : DelegateArray(desc, std::shared_ptr<Array>(), true),
       _startingChunk(from),
       _from(from),
       _till(till),
@@ -426,23 +426,23 @@ namespace scidb
         _query = query;
         desc.getChunkPositionFor(_startingChunk);
         Dimensions const& dims = desc.getDimensions();
-        for (size_t i = 0, n = dims.size(); i < n; i++) { 
+        for (size_t i = 0, n = dims.size(); i < n; i++) {
             _size[i] = _till[i] - _from[i] + 1;
-            if (_size[i] == 0) { 
+            if (_size[i] == 0) {
                 _empty = true;
             }
-            if (_till[i] > dims[i].getEndMax()) { 
+            if (_till[i] > dims[i].getEndMax()) {
                 _till[i] = dims[i].getEndMax();
             }
         }
     }
 
-    SplitArray::~SplitArray() 
-    { 
+    SplitArray::~SplitArray()
+    {
     }
 
     DelegateArrayIterator* SplitArray::createArrayIterator(AttributeID id) const
-    {  
+    {
         return new SplitArray::ArrayIterator(*this, id);
     }
 
@@ -471,12 +471,12 @@ namespace scidb
                 last[i] = min(lastChunkPosition[i], lastArrayPosition[i]);
             }
             Value value;
-            
+
             // duration of getChunk() short enough
-            const boost::shared_ptr<scidb::Query> 
+            const std::shared_ptr<scidb::Query>
                 localQueryPtr(Query::getValidQueryPtr(array._query));
 
-            boost::shared_ptr<ChunkIterator> chunkIter = 
+            std::shared_ptr<ChunkIterator> chunkIter =
                 chunk.getIterator(localQueryPtr, nDims <= 2 ?
                                   ChunkIterator::SEQUENTIAL_WRITE : 0);
             double* src = reinterpret_cast<double*>(array._src.get());
@@ -512,20 +512,20 @@ namespace scidb
     {
         return !hasCurrent;
     }
-    
+
     void SplitArray::ArrayIterator::operator ++()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         size_t i = dims.size()-1;
-        while ((addr.coords[i] += dims[i].getChunkInterval()) > array._till[i]) { 
-            if (i == 0) { 
+        while ((addr.coords[i] += dims[i].getChunkInterval()) > array._till[i]) {
+            if (i == 0) {
                 hasCurrent = false;
                 return;
             }
             addr.coords[i] = array.startingChunk()[i];
             i -= 1;
-        } 
+        }
         chunkInitialized = false;
     }
 
@@ -536,7 +536,7 @@ namespace scidb
 
     bool SplitArray::ArrayIterator::setPosition(Coordinates const& pos)
     {
-        for (size_t i = 0, n = dims.size(); i < n; i++) { 
+        for (size_t i = 0, n = dims.size(); i < n; i++) {
             if (pos[i] < array.startingChunk()[i] || pos[i] > array._till[i]) {
                 return false;
             }
@@ -555,7 +555,7 @@ namespace scidb
     }
 
     SplitArray::ArrayIterator::ArrayIterator(SplitArray const& arr, AttributeID attrID)
-    : DelegateArrayIterator(arr, attrID, shared_ptr<ConstArrayIterator>()),
+    : DelegateArrayIterator(arr, attrID, std::shared_ptr<ConstArrayIterator>()),
       dims(arr.getArrayDesc().getDimensions()),
       array(arr),
       attrBitSize(TypeLibrary::getType(arr.getArrayDesc().getAttributes()[attrID].getType()).bitSize())
@@ -573,24 +573,24 @@ namespace scidb
     //
     // Materialized array
     //
-    MaterializedArray::ArrayIterator::ArrayIterator(MaterializedArray& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat)
+    MaterializedArray::ArrayIterator::ArrayIterator(MaterializedArray& arr, AttributeID attrID, std::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat)
     : DelegateArrayIterator(arr, attrID, input),
       _array(arr),
       _chunkToReturn(0)
-    {     
+    {
     }
-    
-    ConstChunk const& MaterializedArray::ArrayIterator::getChunk() 
-    { 
+
+    ConstChunk const& MaterializedArray::ArrayIterator::getChunk()
+    {
         if(_chunkToReturn)
         {
             return *_chunkToReturn;
         }
-        
+
         ConstChunk const& chunk = inputIterator->getChunk();
         MaterializeFormat format = _array._format;
-        if (chunk.isMaterialized() 
-            && (format == PreserveFormat 
+        if (chunk.isMaterialized()
+            && (format == PreserveFormat
                 || (format == RLEFormat)))
         {
             ((ConstChunk&)chunk).overrideTileMode(false);
@@ -599,9 +599,9 @@ namespace scidb
         }
 #ifdef NO_MATERIALIZE_CACHE
         if (!_materializedChunk) {
-            _materializedChunk = boost::shared_ptr<MemChunk>(new MemChunk());
+            _materializedChunk = std::shared_ptr<MemChunk>(new MemChunk());
         }
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_array._query));
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_array._query));
         MaterializedArray::materialize(query, *_materializedChunk, chunk, _format);
 #else
         _materializedChunk = _array.getMaterializedChunk(chunk);
@@ -628,11 +628,11 @@ namespace scidb
         DelegateArrayIterator::reset();
     }
 
-    boost::shared_ptr<MemChunk> MaterializedArray::getMaterializedChunk(ConstChunk const& inputChunk)
+    std::shared_ptr<MemChunk> MaterializedArray::getMaterializedChunk(ConstChunk const& inputChunk)
     {
         bool newChunk = false;
-        boost::shared_ptr<MemChunk> chunk;
-        boost::shared_ptr<ConstRLEEmptyBitmap> bitmap;
+        std::shared_ptr<MemChunk> chunk;
+        std::shared_ptr<ConstRLEEmptyBitmap> bitmap;
         Coordinates const& pos = inputChunk.getFirstPosition(false);
         AttributeID attr = inputChunk.getAttributeDesc().getId();
         {
@@ -645,9 +645,9 @@ namespace scidb
             }
         }
         if (newChunk) {
-            boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+            std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
             materialize(query, *chunk, inputChunk, _format);
-            if (!bitmap) { 
+            if (!bitmap) {
                 bitmap = chunk->getEmptyBitmap();
             }
             chunk->setEmptyBitmap(bitmap);
@@ -666,8 +666,8 @@ namespace scidb
         return chunk;
     }
 
-MaterializedArray::MaterializedArray(boost::shared_ptr<Array> input,
-                                     shared_ptr<Query>const& query,
+MaterializedArray::MaterializedArray(std::shared_ptr<Array> input,
+                                     std::shared_ptr<Query>const& query,
                                      MaterializeFormat chunkFormat)
     : DelegateArray(input->getArrayDesc(), input, true),
       _format(chunkFormat),
@@ -684,7 +684,7 @@ MaterializedArray::MaterializedArray(boost::shared_ptr<Array> input,
 
     size_t nMaterializedChunks = 0;
 
-void MaterializedArray::materialize(const shared_ptr<Query>& query,
+void MaterializedArray::materialize(const std::shared_ptr<Query>& query,
                                     MemChunk& materializedChunk,
                                     ConstChunk const& chunk,
                                     MaterializeFormat format)
@@ -692,10 +692,10 @@ void MaterializedArray::materialize(const shared_ptr<Query>& query,
         nMaterializedChunks += 1;
         materializedChunk.initialize(chunk);
         materializedChunk.setBitmapChunk((Chunk*)chunk.getBitmapChunk());
-        boost::shared_ptr<ConstChunkIterator> src 
+        std::shared_ptr<ConstChunkIterator> src
             = chunk.getConstIterator(ChunkIterator::IGNORE_DEFAULT_VALUES|ChunkIterator::IGNORE_EMPTY_CELLS|
                                      (chunk.isSolid() ? ChunkIterator::INTENDED_TILE_MODE : 0));
-        boost::shared_ptr<ChunkIterator> dst 
+        std::shared_ptr<ChunkIterator> dst
             = materializedChunk.getIterator(query,
                                             (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
         size_t count = 0;
@@ -714,8 +714,8 @@ void MaterializedArray::materialize(const shared_ptr<Query>& query,
     }
 
     DelegateArrayIterator* MaterializedArray::createArrayIterator(AttributeID id) const
-    {  
+    {
         return new MaterializedArray::ArrayIterator(*(MaterializedArray*)this, id, inputArray->getConstIterator(id), _format);
     }
-    
+
 }

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -80,9 +80,9 @@ struct GEMMOptionParser : qi::grammar<Iterator_tt, ParsedOptions_t()>
         // PROBLEM: here we need _option to be the type of the alternation of
         //          a std::string (the noValkey) and the _keyVal (pair<std::string,double>)
         _option    = _key > '=' > _value;
-        _key       = qi::string("ALPHA") 
-                   | qi::string("BETA") 
-                   | qi::string("TRANSA") 
+        _key       = qi::string("ALPHA")
+                   | qi::string("BETA")
+                   | qi::string("TRANSA")
                    | qi::string("TRANSB");
         _value     = qi::double_ ;
 

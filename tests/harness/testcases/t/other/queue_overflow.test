@@ -9,51 +9,12 @@
 --start-query-logging
 --start-igdata
 
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
+create array A <a:int32> [x=0:1999,10,0,y=0:999,10,0]
 store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
-
-create array A <a:int32> [x=0:999,10,0,y=0:999,10,0]
-store(filter(build(A,iif(x+y=0,1,x+y)),1),A)
-remove(A)
 
 --cleanup
+remove(A)
+
 --stop-igdata
 --stop-query-logging
 

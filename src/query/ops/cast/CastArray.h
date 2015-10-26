@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -82,7 +82,7 @@ public:
     /**
      * Map for matching attributes which required types conversion
      */
-    typedef map<AttributeID, FunctionPointer> CastingMap;
+    typedef std::map<AttributeID, FunctionPointer> CastingMap;
 
     /**
      * Constructor
@@ -91,7 +91,7 @@ public:
      * @param inputArray Input array
      * @param castingMap Filled map with casting functions
      */
-    CastArray(ArrayDesc const& desc, boost::shared_ptr<Array> &inputArray, CastingMap &castingMap):
+    CastArray(ArrayDesc const& desc, std::shared_ptr<Array> &inputArray, CastingMap &castingMap):
         DelegateArray(desc, inputArray),
         _castingMap(castingMap)
     {

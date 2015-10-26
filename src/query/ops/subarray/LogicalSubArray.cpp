@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,7 +41,7 @@ namespace scidb
  * Constructs a new array descriptor with the appropriate dimensions.
  ***/
 ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos,
-        Coordinates& highPos, boost::shared_ptr<Query> const& query) {
+        Coordinates& highPos, std::shared_ptr<Query> const& query) {
     Dimensions dims = desc.getDimensions();
     Dimensions newDims(dims.size());
 
@@ -57,7 +57,7 @@ ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos,
     /***
      * FIXME: Don't really know what are the number of cells and the size of the array
      **/
-    return ArrayDesc(desc.getName(), desc.getAttributes(), newDims);
+    return ArrayDesc(desc.getName(), desc.getAttributes(), newDims, defaultPartitioning());
 }
 
 /**
@@ -111,9 +111,9 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(
             const std::vector<ArrayDesc> &schemas) {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         size_t i = _parameters.size();
         Dimensions const& dims = schemas[0].getDimensions();
         size_t nDims = dims.size();
@@ -127,7 +127,7 @@ public:
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas,
-            boost::shared_ptr<Query> query) {
+            std::shared_ptr<Query> query) {
         assert(inputSchemas.size() == 1);
         assert(
                 _parameters.size() == 0 || _parameters.size() == inputSchemas[0].getDimensions().size() * 2);
@@ -135,9 +135,9 @@ public:
         for (Parameters::const_iterator it = _parameters.begin();
                 it != _parameters.end(); ++it) {
             assert(
-                    ((boost::shared_ptr<OperatorParam>&)*it)->getParamType() == PARAM_LOGICAL_EXPRESSION);
+                    ((std::shared_ptr<OperatorParam>&)*it)->getParamType() == PARAM_LOGICAL_EXPRESSION);
             assert(
-                    ((boost::shared_ptr<OperatorParamLogicalExpression>&)*it)->isConstant());
+                    ((std::shared_ptr<OperatorParamLogicalExpression>&)*it)->isConstant());
         }
 
         ArrayDesc& desc = inputSchemas[0];
@@ -151,7 +151,7 @@ public:
         for (size_t i = 0; i < nDims; i++) {
             Value const& low =
                 evaluate(
-                    ((boost::shared_ptr<
+                    ((std::shared_ptr<
                         OperatorParamLogicalExpression>&) _parameters[i])->getExpression(), query, TID_INT64);
             if ( low.isNull()  || low.getInt64() < dims[i].getStartMin())
             {
@@ -163,7 +163,7 @@ public:
             }
             Value const& high =
                 evaluate(
-                    ((boost::shared_ptr<
+                    ((std::shared_ptr<
                         OperatorParamLogicalExpression>&) _parameters[i + nDims])->getExpression(), query, TID_INT64);
             if ( high.isNull() || high.getInt64() > dims[i].getEndMax())
             {

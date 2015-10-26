@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,12 +31,11 @@
 #ifndef RESHAPE_ARRAY_H
 #define RESHAPE_ARRAY_H
 
-#include "array/DelegateArray.h"
-#include "array/MemArray.h"
+#include <array/DelegateArray.h>
+#include <array/MemArray.h>
 
 namespace scidb {
 
-using namespace boost;
 using namespace std;
 
 class ReshapeArray;
@@ -45,26 +44,26 @@ class ReshapeChunk;
 class ReshapeChunkIterator;
 
 class ReshapeChunkIterator : public ConstChunkIterator
-{  
+{
     ReshapeArray const& array;
     ReshapeChunk& chunk;
     Coordinates outPos;
     Coordinates inPos;
     Coordinates first;
     Coordinates last;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
-    boost::shared_ptr<ConstArrayIterator> arrayIterator;
+    std::shared_ptr<ConstChunkIterator> inputIterator;
+    std::shared_ptr<ConstArrayIterator> arrayIterator;
     int mode;
     bool hasCurrent;
 
   public:
-    virtual int    getMode();
+    virtual int    getMode() const;
     virtual bool   setPosition(Coordinates const& pos);
     virtual Coordinates const& getPosition();
     virtual void   operator++();
     virtual void   reset();
-    virtual  Value& getItem();
-    virtual bool   isEmpty();
+    virtual Value const& getItem();
+    virtual bool   isEmpty() const;
     virtual bool   end();
     virtual ConstChunk const& getChunk();
 
@@ -80,7 +79,7 @@ class ReshapeChunk : public DelegateChunk
     MemChunk chunk;
 
   public:
-    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
     void initialize(Coordinates const& pos);
 
     ReshapeChunk(ReshapeArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID);
@@ -101,7 +100,7 @@ class ReshapeArrayIterator : public DelegateArrayIterator
     virtual void operator ++();
     virtual void reset();
 
-	ReshapeArrayIterator(ReshapeArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
+	ReshapeArrayIterator(ReshapeArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator);
 };
 
 class ReshapeArray : public DelegateArray
@@ -114,14 +113,14 @@ class ReshapeArray : public DelegateArray
     Dimensions outDims;
 
     void in2out(Coordinates const& inPos, Coordinates& outPos) const;
-    void out2in(Coordinates const& outPos, Coordinates& inPos) const; 
+    void out2in(Coordinates const& outPos, Coordinates& inPos) const;
 
   public:
 
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    ReshapeArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array);
+    ReshapeArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array);
 };
 
 }

@@ -1,11 +1,24 @@
 :
+# BEGIN_COPYRIGHT
+#
+# Copyright (C) 2014-2015 SciDB, Inc.
+# All Rights Reserved.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
+#
+# END_COPYRIGHT
+
 # Create load array and target array for the NYSE loadpipe demo.
-# From the shell:
-#
-#   $ eval $(./make_nyse_arrays.sh)
-#   $ echo $TYPE_PATTERN
-#
-# ...and you'll have $TYPE_PATTERN for use with -t option.
 
 if [ "$1" = "-r" ]
 then
@@ -56,7 +69,4 @@ else
        sendTime=34200000000:*, 500000, 0];
 EOF
 
-    # All that output when to the tty, but put this useful shell command to stdout.
-    # Useful for -t option to loadpipe/loadcsv.
-    echo "TYPE_PATTERN=NNNNNNNSNNNSSSSSSSN"
 fi

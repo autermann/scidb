@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -62,10 +62,10 @@ def create_test():
 				logg("line is test")
 				#my_key = line.split('(')[0].replace('Test ','').replace('FAIL: ','')
 				my_key = line.split('(')[1].split(',')[1].strip()
-				
+
 				# my_key is the name of the aggregate function
 				# dicts[] is used to store the count of my_key
-				
+
 				if not dicts.has_key(my_key):
 					dicts[my_key] = 0
 				dicts[my_key] += 1
@@ -79,7 +79,7 @@ def create_test():
 		print j
 	except Exception, inst:
 		logg("exception_raised_in_create_test")
-                print "     Exception Type (create_test): %s" % type(inst)     # the exception instance	
+                print "     Exception Type (create_test): %s" % type(inst)     # the exception instance
 
 
 def generate_file(test_id, commands):
@@ -114,7 +114,7 @@ def generate_file(test_id, commands):
 		o_file.close()
 	except Exception, inst:
 		logg("exception_raised_in_generate_file")
-                print "     Exception Type (generate_file): %s" % type(inst)     # the exception instance	
+                print "     Exception Type (generate_file): %s" % type(inst)     # the exception instance
 
 
 def logg(st):

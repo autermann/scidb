@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,20 +48,19 @@ namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class BetweenArray;
 class BetweenArrayIterator;
 class BetweenChunkIterator;
 
-typedef boost::shared_ptr<SpatialRanges> SpatialRangesPtr;
-typedef boost::shared_ptr<SpatialRangesChunkPosIterator> SpatialRangesChunkPosIteratorPtr;
+typedef std::shared_ptr<SpatialRanges> SpatialRangesPtr;
+typedef std::shared_ptr<SpatialRangesChunkPosIterator> SpatialRangesChunkPosIteratorPtr;
 
 class BetweenChunk : public DelegateChunk
 {
     friend class BetweenChunkIterator;
 public:
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
 
     void setInputChunk(ConstChunk const& inputChunk);
 
@@ -72,18 +71,18 @@ private:
     SpatialRange myRange;  // the firstPosition and lastPosition of this chunk.
     bool fullyInside;
     bool fullyOutside;
-    boost::shared_ptr<ConstArrayIterator> emptyBitmapIterator;
+    std::shared_ptr<ConstArrayIterator> emptyBitmapIterator;
 };
-    
+
 class BetweenChunkIterator : public ConstChunkIterator, CoordinatesMapper
 {
 public:
-    int getMode() {
+    int getMode() const {
         return _mode;
     }
 
-    Value& getItem();
-    bool isEmpty();
+    Value const& getItem();
+    bool isEmpty() const;
     bool end();
     void operator ++();
     Coordinates const& getPosition();
@@ -96,37 +95,37 @@ public:
   protected:
     BetweenArray const& array;
     BetweenChunk const& chunk;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
+    std::shared_ptr<ConstChunkIterator> inputIterator;
     Coordinates currPos;
     int _mode;
     bool hasCurrent;
     bool _ignoreEmptyCells;
     MemChunk shapeChunk;
-    boost::shared_ptr<ConstChunkIterator> emptyBitmapIterator;
+    std::shared_ptr<ConstChunkIterator> emptyBitmapIterator;
     TypeId type;
 
     /**
      * Several member functions of class SpatialRanges takes a hint, on where the last successful search.
      */
-    size_t _hintForSpatialRanges;
+    mutable size_t _hintForSpatialRanges;
 };
 
 class ExistedBitmapBetweenChunkIterator : public BetweenChunkIterator
 {
 public:
-    virtual  Value& getItem();
+    virtual Value const& getItem();
 
     ExistedBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode);
 
 private:
      Value _value;
 };
-     
-   
+
+
 class NewBitmapBetweenChunkIterator : public BetweenChunkIterator
 {
 public:
-    virtual  Value& getItem();
+    virtual Value const& getItem();
 
     NewBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode);
 
@@ -137,8 +136,8 @@ protected:
 class EmptyBitmapBetweenChunkIterator : public NewBitmapBetweenChunkIterator
 {
 public:
-    virtual Value& getItem();
-    virtual bool isEmpty();
+    virtual Value const& getItem();
+    virtual bool isEmpty() const;
 
     EmptyBitmapBetweenChunkIterator(BetweenChunk const& chunk, int iterationMode);
 };
@@ -226,7 +225,7 @@ public:
 protected:
     BetweenArray const& array;
     SpatialRangesChunkPosIteratorPtr _spatialRangesChunkPosIteratorPtr;
-	Coordinates pos; 
+	Coordinates pos;
     bool hasCurrent;
 
     /**
@@ -261,7 +260,7 @@ class BetweenArray : public DelegateArray
     friend class NewBitmapBetweenChunkIterator;
 
 public:
-    BetweenArray(ArrayDesc const& desc, SpatialRangesPtr const& spatialRangesPtr, boost::shared_ptr<Array> const& input);
+    BetweenArray(ArrayDesc const& desc, SpatialRangesPtr const& spatialRangesPtr, std::shared_ptr<Array> const& input);
 
     DelegateArrayIterator* createArrayIterator(AttributeID attrID) const;
     DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID attrID) const;

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,7 +22,7 @@
 
 #include <sys/types.h>
 #include <signal.h>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <util/Network.h>
 #include <util/NetworkMessage.h>
 #include <util/FileIO.h>
@@ -48,7 +48,7 @@ static bool checkLauncher(uint32_t testDelay,
                           uint64_t launchId,
                           MpiOperatorContext* ctx)
 {
-    boost::shared_ptr<MpiLauncher> launcher(ctx->getLauncher(launchId));
+    std::shared_ptr<MpiLauncher> launcher(ctx->getLauncher(launchId));
     if (isDebug()) {
         if (launcher) {
             // when running tests, slow down to give launcher a chance to exit
@@ -85,7 +85,7 @@ static bool checkLauncherWithTimeout(uint32_t testDelay,
     return (checkTimeout(startTime, timeout, launchId, ctx) && rc);
 }
 
-void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
+void MpiSlaveProxy::waitForHandshake(std::shared_ptr<MpiOperatorContext>& ctx)
 {
     if (_connection) {
         throw (InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
@@ -101,7 +101,7 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
                 static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT),
                 _1, _2);
 
-    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
+    std::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
     _connection = msg->getClientContext();
@@ -111,8 +111,8 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
             << "MPI slave handshake is invalid");
     }
 
-    boost::shared_ptr<scidb_msg::MpiSlaveHandshake> handshake =
-        boost::dynamic_pointer_cast<scidb_msg::MpiSlaveHandshake>(msg->getRecord());
+    std::shared_ptr<scidb_msg::MpiSlaveHandshake> handshake =
+        std::dynamic_pointer_cast<scidb_msg::MpiSlaveHandshake>(msg->getRecord());
     assert(handshake);
 
     // parse the handshake
@@ -158,7 +158,7 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
                << "MPI slave handshake has invalid launchId");
     }
 
-    boost::shared_ptr<scidb::Query> query(Query::getValidQueryPtr(_query));
+    std::shared_ptr<scidb::Query> query(Query::getValidQueryPtr(_query));
 
     if (handshake->rank() != query->getInstanceID()) { // logical instance ID
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
@@ -181,7 +181,7 @@ void MpiSlaveProxy::waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx)
                   <<", rank="<<handshake->rank());
 }
 
-void MpiSlaveProxy::sendCommand(mpi::Command& cmd, boost::shared_ptr<MpiOperatorContext>& ctx)
+void MpiSlaveProxy::sendCommand(mpi::Command& cmd, std::shared_ptr<MpiOperatorContext>& ctx)
 {
     if (!_connection) {
         throw (InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
@@ -189,7 +189,7 @@ void MpiSlaveProxy::sendCommand(mpi::Command& cmd, boost::shared_ptr<MpiOperator
     }
 
     // set command
-    boost::shared_ptr<scidb_msg::MpiSlaveCommand> cmdPtr(new scidb_msg::MpiSlaveCommand());
+    std::shared_ptr<scidb_msg::MpiSlaveCommand> cmdPtr(new scidb_msg::MpiSlaveCommand());
     cmdPtr->set_command(cmd.getCmd());
 
     // set args
@@ -217,7 +217,7 @@ void MpiSlaveProxy::sendCommand(mpi::Command& cmd, boost::shared_ptr<MpiOperator
 }
 
 /// @todo XXX TODO tigor: make it timeout ? TBD
-int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx, bool raise)
+int64_t MpiSlaveProxy::waitForStatus(std::shared_ptr<MpiOperatorContext>& ctx, bool raise)
 {
     if (!_connection) {
         throw (InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
@@ -229,7 +229,7 @@ int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx,
     MpiOperatorContext::LaunchErrorChecker errChecker =
        boost::bind(&checkLauncher, _delayForTestingInSec, _1, _2);
 
-    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
+    std::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
     LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForStatus: message from client: "
@@ -252,8 +252,8 @@ int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx,
                << "MPI slave returned invalid status");
     }
 
-    boost::shared_ptr<scidb_msg::MpiSlaveResult> result =
-        boost::dynamic_pointer_cast<scidb_msg::MpiSlaveResult>(msg->getRecord());
+    std::shared_ptr<scidb_msg::MpiSlaveResult> result =
+        std::dynamic_pointer_cast<scidb_msg::MpiSlaveResult>(msg->getRecord());
     assert(result);
 
     if (!result->has_status()) {
@@ -269,7 +269,7 @@ int64_t MpiSlaveProxy::waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx,
     return result->status();
 }
 
-void MpiSlaveProxy::waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx)
+void MpiSlaveProxy::waitForExit(std::shared_ptr<MpiOperatorContext>& ctx)
 {
     if (!_connection) {
         throw (InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
@@ -284,7 +284,7 @@ void MpiSlaveProxy::waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx)
                 static_cast<double>(_MPI_SLAVE_RESPONSE_TIMEOUT),
                 _1, _2);
 
-    boost::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
+    std::shared_ptr<scidb::ClientMessageDescription> msg = ctx->popMsg(_launchId, errChecker);
     assert(msg);
 
     LOG4CXX_DEBUG(logger, "MpiSlaveProxy::waitForExit: "

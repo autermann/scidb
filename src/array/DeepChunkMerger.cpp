@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,7 +36,7 @@ namespace scidb
 {
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.deepChunkMerge"));
 
-DeepChunkMerger::DeepChunkMerger(MemChunk& dst, MemChunk const& with, boost::shared_ptr<Query> const& query)
+DeepChunkMerger::DeepChunkMerger(MemChunk& dst, MemChunk const& with, std::shared_ptr<Query> const& query)
 : _dst(dst), _with(with), _query(query), _pinBufferWith(with),
   _numFinishedPPositionsDst(0), _numFinishedPPositionsWith(0), _numOverlappedPPositions(0)
 {
@@ -308,32 +308,34 @@ void DeepChunkMerger::fillMergedPayloadUsingIntermediateResult(RLEPayload& merge
 
     BOOST_FOREACH(IntermediatePayloadSegment const& inputSegment, _intermediatePayloadSegments) {
         RLEPayload::Segment outputSegment;
-        outputSegment._null = inputSegment._null;
-        outputSegment._pPosition = inputSegment._pPosition;
-        outputSegment._same = inputSegment._same;
-        outputSegment._valueIndex = (inputSegment._null ? inputSegment._valueIndex : numRealVals);
+        outputSegment.setNull(inputSegment.null());
+        outputSegment.setPPosition(inputSegment.pPosition());
+        outputSegment.setSame(inputSegment.same());
+        outputSegment.setValueIndex(inputSegment.null() ? inputSegment.valueIndex() : numRealVals);
 
-        int realLength = inputSegment._length; // how many real values to insert to the payload
-        if (inputSegment._null) {
+        int realLength = inputSegment.length(); // how many real values to insert to the payload
+        if (inputSegment.null()) {
             realLength = 0;
-        } else if (inputSegment._same) {
+        } else if (inputSegment.same()) {
             realLength = 1;
         }
         numRealVals += realLength;
 
         mergedPayload.appendAPartialSegmentOfValues(outputSegment, varPart,
-                inputSegment._isFromDst ? *(_payloadDst.get()) : *(_payloadWith.get()),
-                inputSegment._valueIndex, realLength); // realLength may be 0, but we still need to insert the segment (of missing values)
+                inputSegment.isFromDst() ? *(_payloadDst.get()) : *(_payloadWith.get()),
+                inputSegment.valueIndex(), realLength); // realLength may be 0, but we still need
+                                                        // to insert the segment (of missing values)
     }
 
     // The last (dummy) segment
     if (! _intermediatePayloadSegments.empty()) {
         IntermediatePayloadSegment const& lastSegment = _intermediatePayloadSegments.back();
-        mergedPayload.flush(lastSegment._pPosition + lastSegment._length);
+        mergedPayload.flush(lastSegment.pPosition() + lastSegment.length());
     }
 
-    // The var part.
-    mergedPayload.setVarPart(varPart);
+    // The var part, if any.
+    if (!varPart.empty())
+        mergedPayload.setVarPart(varPart);
 }
 
 position_t DeepChunkMerger::localToGlobalPPosition(bool isFromDst, position_t localPPosition)
@@ -349,7 +351,7 @@ position_t DeepChunkMerger::localToGlobalPPosition(bool isFromDst, position_t lo
 void DeepChunkMerger::advancePayloadIteratorBy(bool isFromDst, position_t length, ConstRLEPayload::SegmentIterator& itPayload)
 {
     IntermediatePayloadSegment outputSegment;
-    outputSegment._isFromDst = isFromDst;
+    outputSegment.setFromDst(isFromDst);
 
     position_t remainingLength = length;
     assert(remainingLength > 0);
@@ -359,7 +361,7 @@ void DeepChunkMerger::advancePayloadIteratorBy(bool isFromDst, position_t length
         ConstRLEPayload::SegmentWithLength inputSegment;
         itPayload.getVirtualSegment(inputSegment);
         position_t stepSize = min(remainingLength, inputSegment._length);
-        position_t pPosition = localToGlobalPPosition(isFromDst, inputSegment._pPosition);
+        position_t pPosition = localToGlobalPPosition(isFromDst, inputSegment.pPosition());
         outputSegment.AssignValuesExceptIsFromDst(pPosition, stepSize, itPayload, inputSegment);
         appendIntermediatePayloadSegment(outputSegment);
 
@@ -372,7 +374,7 @@ void DeepChunkMerger::advanceBothPayloadIteratorsBy(position_t length,
         ConstRLEPayload::SegmentIterator& itPayloadDst, ConstRLEPayload::SegmentIterator& itPayloadWith)
 {
     IntermediatePayloadSegment outputSegment;
-    outputSegment._isFromDst = false;  // always use the values from _with
+    outputSegment.setFromDst(false);  // always use the values from _with
 
     // Skip the payload segments in _dst
     position_t remainingLength = length;
@@ -396,7 +398,7 @@ void DeepChunkMerger::advanceBothPayloadIteratorsBy(position_t length,
         ConstRLEPayload::SegmentWithLength inputSegment;
         itPayloadWith.getVirtualSegment(inputSegment);
         position_t stepSize = min(remainingLength, inputSegment._length);
-        position_t pPosition = localToGlobalPPosition(false, inputSegment._pPosition);       // isFromDst = false
+        position_t pPosition = localToGlobalPPosition(false, inputSegment.pPosition());       // isFromDst = false
         outputSegment.AssignValuesExceptIsFromDst(pPosition, stepSize, itPayloadWith, inputSegment);
         appendIntermediatePayloadSegment(outputSegment);
 
@@ -410,11 +412,11 @@ void DeepChunkMerger::appendIntermediatePayloadSegment(IntermediatePayloadSegmen
     bool appended = false;
     if (! _intermediatePayloadSegments.empty()) {
         IntermediatePayloadSegment& last = _intermediatePayloadSegments.back();
-        if (last._currSeg == outputSegment._currSeg && last._isFromDst == outputSegment._isFromDst) {
-            assert(last._pPosition + last._length == outputSegment._pPosition);
-            assert(last._same == outputSegment._same);
+        if (last.currSeg() == outputSegment.currSeg() && last.isFromDst() == outputSegment.isFromDst()) {
+            assert(last.pPosition() + last.length() == outputSegment.pPosition());
+            assert(last.same() == outputSegment.same());
 
-            last._length += outputSegment._length;
+            last.setLength(last.length() + outputSegment.length());
             appended = true;
         }
     }

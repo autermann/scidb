@@ -212,10 +212,10 @@ SCIDB QUERY : <scan(winners)>
 {10} 'marathon','Baldini',2004,7855,'Italy',2
 {11} 'marathon','Wanjiru',2008,7596,'Kenya',4
 
-SCIDB QUERY : <CREATE ARRAY perCountryMedalCount <country:string, medalCount: uint64 null> [country_id=0:*,20,0]>
+SCIDB QUERY : <CREATE ARRAY perCountryMedalCount <country:string null, medalCount: uint64 null> [country_id=0:*,20,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(redimension(winners, perCountryMedalCount, count(*) as medalCount),perCountryMedalCount)>
+SCIDB QUERY : <store(redimension(winners, perCountryMedalCount, count(*) as medalCount, min(country) as country),perCountryMedalCount)>
 {country_id} country,medalCount
 {0} 'Canada',1
 {1} 'Ethiopia',1

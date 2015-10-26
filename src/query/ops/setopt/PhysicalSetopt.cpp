@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -55,19 +55,19 @@ class PhysicalSetopt: public PhysicalOperator
         : PhysicalOperator(logicalName, physicalName, parameters, schema)
     { }
 
-    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         string oldValue;
 
-        boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
+        std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
 
-        shared_ptr<OperatorParamPhysicalExpression> p0 =
-            (shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0];
+        std::shared_ptr<OperatorParamPhysicalExpression> p0 =
+            (std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0];
         string name = p0->getExpression()->evaluate().getString();
 
         if (_parameters.size() == 2) {
-            shared_ptr<OperatorParamPhysicalExpression> p1 =
-                (shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1];
+            std::shared_ptr<OperatorParamPhysicalExpression> p1 =
+                (std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1];
             string newValue = p1->getExpression()->evaluate().getString();
 
             try {

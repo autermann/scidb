@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,10 +35,10 @@
 #include <time.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <boost/function.hpp>
 
-#include "util/Mutex.h"
-#include "system/Exceptions.h"
-#include "boost/function.hpp"
+#include <util/Mutex.h>
+#include <system/Exceptions.h>
 
 namespace scidb
 {
@@ -88,7 +88,7 @@ public:
             if (!errorChecker()) {
                return false;
             }
-           
+
             signaled = false;
             do {
                 struct timespec ts;
@@ -101,7 +101,7 @@ public:
                 if (e == 0) {
                     return true;
                 }
-                if (e != ETIMEDOUT) 
+                if (e != ETIMEDOUT)
                 {
                     assert(false);
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_THREAD_EVENT_ERROR) << e;
@@ -122,7 +122,7 @@ public:
     }
 
     void signal()
-    { 
+    {
         signaled = true;
         if (pthread_cond_broadcast(&_cond)) {
             assert(false);

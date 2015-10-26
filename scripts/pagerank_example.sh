@@ -2,13 +2,20 @@
 #
 # BEGIN_COPYRIGHT
 #
-# PARADIGM4 INC.
-# This file is part of the Paradigm4 Enterprise SciDB distribution kit
-# and may only be used with a valid Paradigm4 contract and in accord
-# with the terms and conditions specified by that contract.
-#
-# Copyright (C) 2010 - 2014 Paradigm4 Inc.
+# Copyright (C) 2014-2015 SciDB, Inc.
 # All Rights Reserved.
+#
+# SciDB is free software: you can redistribute it and/or modify
+# it under the terms of the AFFERO GNU General Public License as published by
+# the Free Software Foundation.
+#
+# SciDB is distributed "AS-IS" AND WITHOUT ANY WARRANTY OF ANY KIND,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+# NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. See
+# the AFFERO GNU General Public License for the complete license terms.
+#
+# You should have received a copy of the AFFERO GNU General Public License
+# along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 #
 # END_COPYRIGHT
 #
@@ -56,7 +63,7 @@ function nColStart { local aName=$1
     getDimStart "$aName" 0
 }
 
-function getValue { local aqlExpr=$1 
+function getValue { local aqlExpr=$1
     local VAL=`$IQUERY -ocsv -aq "$aqlExpr" | tail -n1`
     echo $VAL
 }
@@ -170,7 +177,7 @@ $IQUERY -aq "load_library('linear_algebra')" # for spgemm()
 # G is suitable for applying the Perron-Frobenius theorem, by which we know a
 # unique right eigenvector (called the perron vector, P) exists
 # (that is, the solution of G*PI = PI corresponding to the largest eigenvalue)
-# 
+#
 # Since the Perron-Frobenius theorem applies, we can use the power method to converge on this eigenvector
 # compute Q_k+1 = G*Q_k ; Q_0 = t(1/n,1/n,...), or the uniform probability distribution across all vertices
 #
@@ -280,7 +287,7 @@ timequery_n "store($ACTIVE_H_Q,$ACTIVE_H)"
 
 # NOTE: ZERO_COL_0_Q is dense
 ZERO_COLS_0_Q="filter(merge($NZ_COLS, build($NZ_COLS,0)), nonzero=0)"
-# but ZERO_COL_1_Q is back to sparse, via filter 
+# but ZERO_COL_1_Q is back to sparse, via filter
 ZERO_COLS_Q="filter(project(apply(${ZERO_COLS_0_Q},zero, iif(nonzero=0,int8(1),int8(0)) ),zero), zero <> 0)"
 ZERO_COLS_ACTIVE_Q="filter(project(apply(join($ZERO_COLS_Q as ZC,$ACTIVE_H as AH),zcActive,ZC.zero*AH.active),zcActive), zcActive <> 0)"
 
@@ -289,7 +296,7 @@ $IQUERY -naq "remove($ZERO_COLS_ACTIVE)" 2>/dev/null         # failures expected
 timequery_n "store($ZERO_COLS_ACTIVE_Q,$ZERO_COLS_ACTIVE)"
 
 #
-# and now the matrix version of the three vectors above 
+# and now the matrix version of the three vectors above
 #
 NZ_COLS_VEC="PAGERANK_NZ_COLS_VEC_$$"
 $IQUERY -naq "remove($NZ_COLS_VEC)" 2>/dev/null         # failures expected
@@ -298,7 +305,7 @@ timequery_n "store(redimension(project(apply($NZ_COLS,
                                              vtx, v0,
                                              vectorDummy, 0),
                                        q, vtx, vectorDummy),
-                               $Q_VEC_SCHEMA),                                       
+                               $Q_VEC_SCHEMA),
                    $NZ_COLS_VEC)"
 ACTIVE_H_VEC="PAGERANK_ACTIVE_H_VEC_$$"
 $IQUERY -naq "remove($ACTIVE_H_VEC)" 2>/dev/null         # failures expected
@@ -307,7 +314,7 @@ timequery_n "store(redimension(project(apply($ACTIVE_H,
                                              vtx, v0,
                                              vectorDummy, 0),
                                        q, vtx, vectorDummy),
-                               $Q_VEC_SCHEMA),                                       
+                               $Q_VEC_SCHEMA),
                    $ACTIVE_H_VEC)"
 ZERO_COLS_ACTIVE_VEC="PAGERANK_ZERO_COLS_ACTIVE_VEC_$$"
 $IQUERY -naq "remove($ZERO_COLS_ACTIVE_VEC)" 2>/dev/null         # failures expected
@@ -316,7 +323,7 @@ timequery_n "store(redimension(project(apply($ZERO_COLS_ACTIVE,
                                              vtx, v0,
                                              vectorDummy, 0),
                                        q, vtx, vectorDummy),
-                               $Q_VEC_SCHEMA),                                       
+                               $Q_VEC_SCHEMA),
                    $ZERO_COLS_ACTIVE_VEC)"
 
 # NUM_ACTIVE is less that NUM_ROW, so we won't loose value in the active
@@ -343,7 +350,7 @@ timequery_n "store(redimension(project(apply($ACTIVE_H,
                                              vtx, v0,
                                              vectorDummy, 0),
                                        q, vtx, vectorDummy),
-                               $Q_VEC_SCHEMA),                                       
+                               $Q_VEC_SCHEMA),
                    $Q_VEC)"
 
 #
@@ -383,7 +390,7 @@ for (( II=0; II < ITER_LIMIT; II++)) ; do
                                                         qtmp, float($ALPHA__NACTIVE)*float($TRAP_VAL)+
                                                               float($BETA__NACTIVE)*float($TELEPORT_VAL)),
                                                   qtmp)),
-                                    qtmp), 
+                                    qtmp),
                             $Q_VEC_SCHEMA),
                         $Q_VEC_NEXT)"
     STATUS=$?

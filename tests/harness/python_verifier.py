@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -48,7 +48,7 @@ class Var(object):
     """
     Variable type and condition verifier.
     """
-    
+
     def __init__(self, a_name=None, a_desc=None, a_type=None, a_cond= None, a_none=False):
         """
         @param a_name: name of the variable/argument for verification.
@@ -137,7 +137,7 @@ class Var(object):
 
     def wrap(self, value):
         """
-        Wrap the value by additional checkers 
+        Wrap the value by additional checkers
         (type verifier of items for iterable, for example).
         """
         return value
@@ -178,8 +178,8 @@ class Var(object):
         """
         Return the doc string for add to doc string of wrapped function/method.
         """
-        return "@param %s: %s\n@type %s: %s" % (self.name, 
-                                                self.desc, 
+        return "@param %s: %s\n@type %s: %s" % (self.name,
+                                                self.desc,
                                                 self.name,
                                                 self.type.__name__)
 
@@ -189,14 +189,14 @@ def not_empty_string(value):
     return len(value)>0
 
 class Str(Var):
-    def __init__(self, a_name, a_desc=None, 
+    def __init__(self, a_name, a_desc=None,
                  a_cond=not_empty_string, a_none=False):
         """
-        Verifier for the string. 
+        Verifier for the string.
         By default expect the not-empty string.
         If you want accept the empty strings please set a_cond=None.
         """
-        super(Str, self).__init__(a_name=a_name, 
+        super(Str, self).__init__(a_name=a_name,
                                      a_desc=a_desc,
                                      a_type=str,
                                      a_cond=a_cond,
@@ -278,12 +278,12 @@ def verify(*vargs, **vkwargs):
     for var in vargs:
         if not isinstance(var, Var):
             raise TypeError("verify: expected Var or subclass of Var, "
-                            "but received '%s' with type %s." % 
+                            "but received '%s' with type %s." %
                             (var, type(var).__name__))
     for (key, var) in vkwargs.iteritems():
         if not isinstance(var, Var):
             raise TypeError("verify: expected Var %s or subclass of Var, "
-                            "but received '%s' with type %s." % 
+                            "but received '%s' with type %s." %
                             (key, var, type(var).__name__))
     if ENABLED:
         def decorator(f):
@@ -294,7 +294,7 @@ def verify(*vargs, **vkwargs):
             def wrapper(*args, **kwargs):
                 if len(args) != len(vargs):
                     raise TypeError("%s: count of expected arguments (%s) and "
-                                    "count of received arguments (%s) is different" 
+                                    "count of received arguments (%s) is different"
                                     % (f.__name__, len(vargs), len(args)))
                 for (expected, received) in zip(vargs, args):
                     expected.verify(f, received)

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -69,7 +69,7 @@ public:
         ADD_PARAM_CONSTANT("string")
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         //FIXME: Need parameters to infer the schema correctly
@@ -77,7 +77,7 @@ public:
         attrs[0] = AttributeDesc((AttributeID)0, "library",  TID_STRING, 0, 0 );
         Dimensions dims(1);
         dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
-        return ArrayDesc("load_library", attrs, dims);
+        return ArrayDesc("load_library", attrs, dims, defaultPartitioning());
     }
 };
 

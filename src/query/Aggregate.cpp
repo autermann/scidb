@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,9 +28,10 @@
 
 #include <query/Aggregate.h>
 #include <query/FunctionLibrary.h>
+#include <boost/foreach.hpp>
 #include <log4cxx/logger.h>
 
-using boost::shared_ptr;
+using std::shared_ptr;
 using namespace std;
 
 namespace scidb
@@ -47,8 +48,8 @@ void  AggregateChunkMerger::clear()
 bool
 AggregateChunkMerger::mergePartialChunk(InstanceID instanceId,
                                              AttributeID attId,
-                                             boost::shared_ptr<MemChunk>& chunk,
-                                             const boost::shared_ptr<Query>& query)
+                                             std::shared_ptr<MemChunk>& chunk,
+                                             const std::shared_ptr<Query>& query)
 {
     static const char* funcName = "AggregateChunkMerger::mergePartialChunk: ";
     assert(chunk);
@@ -88,12 +89,12 @@ AggregateChunkMerger::mergePartialChunk(InstanceID instanceId,
     return true;
 }
 
-boost::shared_ptr<MemChunk>
+std::shared_ptr<MemChunk>
 AggregateChunkMerger::getMergedChunk(AttributeID attId,
-                                     const boost::shared_ptr<Query>& query)
+                                     const std::shared_ptr<Query>& query)
 {
     static const char* funcName = "AggregateChunkMerger::getMergedChunk: ";
-    boost::shared_ptr<MemChunk> result;
+    std::shared_ptr<MemChunk> result;
     LOG4CXX_TRACE(logger, funcName
                   << "final chunk pos="<< CoordsToStr(_mergedChunk->getFirstPosition(false))
                   <<" attId="<<attId
@@ -107,7 +108,9 @@ AggregateChunkMerger::getMergedChunk(AttributeID attId,
 
 #endif //SCIDB_CLIENT
 
-void AggregateLibrary::addAggregate(AggregatePtr const& aggregate)
+void AggregateLibrary::addAggregate(
+        AggregatePtr const& aggregate,
+        string const & libraryName /* = "scidb" */ )
 {
     if (!aggregate) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_ADD_NULL_FACTORY);
@@ -144,15 +147,35 @@ void AggregateLibrary::addAggregate(AggregatePtr const& aggregate)
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_DUPLICATE_AGGREGATE_FACTORY);
     }
 
-    _registeredFactories[aggregate->getName()][aggregate->getAggregateType().typeId()] = aggregate;
+    AggregateElement element(aggregate, libraryName);
+    _registeredFactories[aggregate->getName()][aggregate->getAggregateType().typeId()] = element;
 }
 
-void AggregateLibrary::getAggregateNames(std::vector<std::string>& names) const
+size_t AggregateLibrary::getNumAggregates() const
 {
-    names.clear();
-    for (FactoriesMap::const_iterator iter = _registeredFactories.begin(); iter != _registeredFactories.end(); iter++)
+    size_t size = 0;
+    for (   FactoriesMap::const_iterator it = _registeredFactories.begin();
+            it != _registeredFactories.end();
+            ++it)
     {
-        names.push_back((*iter).first);
+        const AggregateTypeIdToElementMap &aggregateTypeIdToElementMap = (*it).second;
+        size += aggregateTypeIdToElementMap.size();
+    }
+
+    return size;
+}
+
+void AggregateLibrary::visitPlugins(const Visitor& visit) const
+{
+    ScopedMutexLock cs (_mutex);
+
+    BOOST_FOREACH(FactoriesMap::value_type const& i,_registeredFactories)
+    {
+        // Visit each element in the TypeIdToElementMap
+        BOOST_FOREACH(AggregateTypeIdToElementMap::value_type const& j,i.second)
+        {
+            visit(i.first,j.first,j.second.getLibraryName());
+        }
     }
 }
 
@@ -175,11 +198,12 @@ AggregatePtr AggregateLibrary::createAggregate(std::string const& aggregateName,
         }
     }
 
-    if (aggregateType.typeId() == TID_VOID && !i2->second->supportAsterisk()) {
+    const AggregateElement &aggregateElement = (*i2).second;
+    if (aggregateType.typeId() == TID_VOID && !aggregateElement.getPtr()->supportAsterisk()) {
         throw USER_EXCEPTION(SCIDB_SE_TYPE, SCIDB_LE_AGGREGATE_DOESNT_SUPPORT_ASTERISK) << aggregateName;
     }
 
-    return i2->second->clone(aggregateType);
+    return aggregateElement.getPtr()->clone(aggregateType);
 }
 
 } // namespace scidb

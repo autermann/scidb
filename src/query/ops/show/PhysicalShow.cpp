@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -49,13 +49,13 @@ public:
     {
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution>& inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext>& inputDistributions,
                                                  const std::vector< ArrayDesc>& inputSchemas) const
     {
-        return ArrayDistribution(psLocalInstance);
+        return RedistributeContext(psLocalInstance);
     }
 
-    void preSingleExecute(boost::shared_ptr<Query> query)
+    void preSingleExecute(std::shared_ptr<Query> query)
     {
         stringstream ss;
 
@@ -63,24 +63,24 @@ public:
 
         if (_parameters[0]->getParamType() == PARAM_SCHEMA)
         {
-        	desc = ((const shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        	desc = ((const std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
         }
         else if (_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION)
         {
     		string queryString =
-    				((const shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])
+    				((const std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])
     				->getExpression()->evaluate().getString();
     		bool afl = false;
         	if (_parameters.size() == 2)
         	{
-                string lang = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])
+                string lang = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])
                 		->getExpression()->evaluate().getString();
     			std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
                 afl = lang == "afl";
         	}
 
-            boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
-            boost::shared_ptr<Query> innerQuery = Query::createFakeQuery(
+            std::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+            std::shared_ptr<Query> innerQuery = Query::createFakeQuery(
                              query->getPhysicalCoordinatorID(),
                              query->mapLogicalToPhysical(query->getInstanceID()),
                              query->getCoordinatorLiveness());
@@ -95,31 +95,31 @@ public:
 
         printSchema(ss, desc);
 
-        _result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
-        boost::shared_ptr<ArrayIterator> arrIt = _result->getIterator(0);
+        _result = std::shared_ptr<MemArray>(new MemArray(_schema,query));
+        std::shared_ptr<ArrayIterator> arrIt = _result->getIterator(0);
         Coordinates coords;
         coords.push_back(0);
         Chunk& chunk = arrIt->newChunk(coords);
-        boost::shared_ptr<ChunkIterator> chunkIt = chunk.getIterator(query);
+        std::shared_ptr<ChunkIterator> chunkIt = chunk.getIterator(query);
         Value v(TypeLibrary::getType(TID_STRING));
         v.setString(ss.str().c_str());
         chunkIt->writeItem(v);
         chunkIt->flush();
     }
 
-    boost::shared_ptr<Array> execute(
-        std::vector<boost::shared_ptr<Array> >& inputArrays,
-        boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(
+        std::vector<std::shared_ptr<Array> >& inputArrays,
+        std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
         if (!_result) {
-            _result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
+            _result = std::shared_ptr<MemArray>(new MemArray(_schema,query));
         }
         return _result;
     }
 
 private:
-    boost::shared_ptr<Array> _result;
+    std::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalShow, "show", "impl_show")

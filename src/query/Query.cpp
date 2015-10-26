@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,74 +29,42 @@
  */
 #include <malloc.h>
 #include <time.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/archive/text_iarchive.hpp>
 
-#include "query/QueryProcessor.h"
-#include "query/RemoteArray.h"
+#include <query/QueryProcessor.h>
+#include <query/RemoteArray.h>
 #include "array/DBArray.h"
-#include "smgr/io/Storage.h"
-#include "network/NetworkManager.h"
-#include "system/SciDBConfigOptions.h"
-#include "system/SystemCatalog.h"
-#include "system/Cluster.h"
-#include "util/iqsort.h"
-#include "util/LockManager.h"
-#include <system/BlockCyclic.h>
-#include <system/Exceptions.h>
-#include <system/System.h>
 #include <network/MessageUtils.h>
+#include <network/NetworkManager.h>
 #include <network/MessageHandleJob.h>
+#include <system/BlockCyclic.h>
+#include <system/Cluster.h>
+#include <system/Exceptions.h>
+#include <system/SciDBConfigOptions.h>
+#include <system/SystemCatalog.h>
+#include <system/System.h>
 #include <smgr/io/ReplicationManager.h>
+#include <smgr/io/Storage.h>
+#include <util/LockManager.h>
+#include <util/iqsort.h>
+#include <util/session/Session.h>
 #ifndef SCIDB_CLIENT
 #include <util/MallocStats.h>
 #endif
 
-using namespace std;
-using namespace boost;
-
-namespace boost
-{
-   bool operator< (shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
-                   shared_ptr<scidb::SystemCatalog::LockDesc> const& r) {
-      if (!l || !r) {
-         assert(false);
-         return false;
-      }
-      return (l->getArrayName() < r->getArrayName());
-   }
-
-   bool operator== (shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
-                    shared_ptr<scidb::SystemCatalog::LockDesc> const& r) {
-         assert(false);
-         throw SYSTEM_EXCEPTION(scidb::SCIDB_SE_INTERNAL, scidb::SCIDB_LE_NOT_IMPLEMENTED);
-         return false;
-   }
-
-   bool operator!= (shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
-                    shared_ptr<scidb::SystemCatalog::LockDesc> const& r) {
-       return !operator==(l,r);
-   }
-} // namespace boost
-
-namespace std
-{
-   bool less<shared_ptr<scidb::SystemCatalog::LockDesc> >::operator() (
-                               const shared_ptr<scidb::SystemCatalog::LockDesc>& l,
-                               const shared_ptr<scidb::SystemCatalog::LockDesc>& r) const
-   {
-      return l < r;
-   }
-} // namespace
 
 namespace scidb
 {
+using namespace std;
+using namespace arena;
+using namespace boost;
 
 // Query class implementation
 Mutex Query::queriesMutex;
-map<QueryID, boost::shared_ptr<Query> > Query::_queries;
+Query::Queries Query::_queries;
 uint32_t Query::nextID = 0;
 log4cxx::LoggerPtr Query::_logger = log4cxx::Logger::getLogger("scidb.qproc.processor");
 log4cxx::LoggerPtr UpdateErrorHandler::_logger = log4cxx::Logger::getLogger("scidb.qproc.processor");
@@ -131,9 +99,9 @@ bool Query::PendingRequests::test()
     return true;
 }
 
-boost::shared_ptr<Query> Query::createDetached(QueryID queryID)
+std::shared_ptr<Query> Query::createDetached(QueryID queryID)
 {
-    boost::shared_ptr<Query> query = boost::make_shared<Query>(queryID);
+    std::shared_ptr<Query> query = std::make_shared<Query>(queryID);
 
     const size_t smType = Config::getInstance()->getOption<int>(CONFIG_STAT_MONITOR);
     if (smType) {
@@ -144,12 +112,12 @@ boost::shared_ptr<Query> Query::createDetached(QueryID queryID)
     return query;
 }
 
-boost::shared_ptr<Query> Query::createFakeQuery(InstanceID coordID,
+std::shared_ptr<Query> Query::createFakeQuery(InstanceID coordID,
                                                 InstanceID localInstanceID,
-                                                shared_ptr<const InstanceLiveness> liveness,
+                                                std::shared_ptr<const InstanceLiveness> liveness,
                                                 int32_t *longErrorCode)
 {
-  boost::shared_ptr<Query> query = createDetached(0);
+  std::shared_ptr<Query> query = createDetached(FAKE_QUERY_ID);
   try {
 
       query->init(coordID, localInstanceID, liveness);
@@ -195,6 +163,7 @@ Query::Query(QueryID queryID):
 Query::~Query()
 {
     LOG4CXX_TRACE(_logger, "Query::~Query() " << _queryID << " "<<(void*)this);
+    LOG4CXX_DEBUG(_logger, "Query._arena:" << *_arena);
     if (statisticsMonitor) {
         statisticsMonitor->pushStatistics(*this);
     }
@@ -203,7 +172,7 @@ Query::~Query()
 
 void Query::init(InstanceID coordID,
                  InstanceID localInstanceID,
-                 shared_ptr<const InstanceLiveness>& liveness)
+                 std::shared_ptr<const InstanceLiveness>& liveness)
 {
    assert(liveness);
    assert(localInstanceID != INVALID_INSTANCE);
@@ -214,18 +183,19 @@ void Query::init(InstanceID coordID,
 
       assert( _queryID != INVALID_QUERY_ID);
 
-      /* set up our private arena...*/
+   /* Install a special arena within the query that all local operator arenas
+      should delagate to; we're now using a LeaArena here -  an adaptation of
+      Doug Lea's design with a tunable set of bin sizes - because it not only
+      supports recycling but also suballocates all of the blocks it hands out
+      from large - currently 64 MiB - slabs that are given back to the system
+      en masse no later than when the query completes;  the hope here is that
+      this reduces the overall fragmentation of the system heap...*/
       {
           assert(_arena == 0);
           char s[64];
           snprintf(s,SCIDB_SIZE(s),"query %lu",_queryID);
 
-          arena::Options options(s);
-          options.threading(true);
-        //options.resetting(true); LeaArena may not be ready for prime time...
-        //options.recycling(true);
-        //options.pagesize(64*MiB);
-          _arena = arena::newArena(options);
+          _arena = newArena(Options(s).lea(arena::getArena(),64*MiB));
       }
 
       assert(!_coordinatorLiveness);
@@ -252,7 +222,7 @@ void Query::init(InstanceID coordID,
 
       if (coordID == INVALID_INSTANCE) {
          _coordinatorID = INVALID_INSTANCE;
-         shared_ptr<Query::ErrorHandler> ptr(new BroadcastAbortErrorHandler());
+         std::shared_ptr<Query::ErrorHandler> ptr(new BroadcastAbortErrorHandler());
          pushErrorHandler(ptr);
       } else {
          _coordinatorID = mapPhysicalToLogical(coordID);
@@ -273,7 +243,7 @@ void Query::init(InstanceID coordID,
       _operatorQueue = NetworkManager::getInstance()->createWorkQueue();
       _operatorQueue->stop();
       assert(_operatorQueue);
-      _replicationCtx = boost::make_shared<ReplicationContext>(shared_from_this(), nInstances);
+      _replicationCtx = std::make_shared<ReplicationContext>(shared_from_this(), nInstances);
       assert(_replicationCtx);
    }
 
@@ -285,13 +255,13 @@ void Query::init(InstanceID coordID,
    LOG4CXX_DEBUG(_logger, "Initialized query (" << _queryID << ")");
 }
 
-shared_ptr<Query> Query::insert(const shared_ptr<Query>& query)
+std::shared_ptr<Query> Query::insert(const std::shared_ptr<Query>& query)
 {
     assert(query);
     assert(query->getQueryID()>0);
 
    // queriesMutex must be locked
-   pair<map<QueryID, shared_ptr<Query> >::iterator, bool > res =
+   pair<Queries::iterator,bool> res =
    _queries.insert( std::make_pair ( query->getQueryID(), query ) );
    setCurrentQueryID(query->getQueryID());
 
@@ -326,14 +296,14 @@ QueryID Query::generateID()
    return queryID;
 }
 
-boost::shared_ptr<Query> Query::create(QueryID queryID, InstanceID instanceId)
+std::shared_ptr<Query> Query::create(QueryID queryID, InstanceID instanceId)
 {
     assert(queryID > 0 && queryID != INVALID_QUERY_ID);
-    boost::shared_ptr<Query> query = createDetached(queryID);
+    std::shared_ptr<Query> query = createDetached(queryID);
     assert(query);
     assert(query->_queryID == queryID);
 
-    boost::shared_ptr<const scidb::InstanceLiveness> myLiveness =
+    std::shared_ptr<const scidb::InstanceLiveness> myLiveness =
        Cluster::getInstance()->getInstanceLiveness();
     assert(myLiveness);
 
@@ -368,7 +338,7 @@ void Query::stop()
     }
 }
 
-void Query::pushErrorHandler(const boost::shared_ptr<ErrorHandler>& eh)
+void Query::pushErrorHandler(const std::shared_ptr<ErrorHandler>& eh)
 {
     assert(eh);
     ScopedMutexLock cs(errorMutex);
@@ -395,10 +365,10 @@ void Query::done()
     _completionStatus = OK;
 }
 
-void Query::done(const shared_ptr<Exception> unwindException)
+void Query::done(const std::shared_ptr<Exception> unwindException)
 {
     bool isAbort = false;
-    shared_ptr<const scidb::Exception> msg;
+    std::shared_ptr<const scidb::Exception> msg;
     {
         ScopedMutexLock cs(errorMutex);
         if (SCIDB_E_NO_ERROR == _error->getLongErrorCode())
@@ -428,19 +398,21 @@ bool Query::doesExclusiveArrayAccess()
     return _doesExclusiveArrayAccess;
 }
 
-boost::shared_ptr<SystemCatalog::LockDesc>
-Query::requestLock(boost::shared_ptr<SystemCatalog::LockDesc>& requestedLock)
+std::shared_ptr<SystemCatalog::LockDesc>
+Query::requestLock(std::shared_ptr<SystemCatalog::LockDesc>& requestedLock)
 {
     assert(requestedLock);
+    assert(!requestedLock->isLocked());
     ScopedMutexLock cs(errorMutex);
 
     if (requestedLock->getLockMode() > SystemCatalog::LockDesc::RD) {
         _doesExclusiveArrayAccess = true;
     }
 
-    pair<QueryLocks::const_iterator, bool> res = _requestedLocks.insert(requestedLock);
+    pair<SystemCatalog::QueryLocks::const_iterator, bool> res = _requestedLocks.insert(requestedLock);
     if (res.second) {
-        LOG4CXX_TRACE(_logger, "Requested lock: " << requestedLock->toString() << " inserted");
+        assert((*res.first).get() == requestedLock.get());
+        LOG4CXX_DEBUG(_logger, "Requested lock: " << (*res.first)->toString() << " inserted");
         return requestedLock;
     }
 
@@ -448,16 +420,17 @@ Query::requestLock(boost::shared_ptr<SystemCatalog::LockDesc>& requestedLock)
         _requestedLocks.erase(res.first);
         res = _requestedLocks.insert(requestedLock);
         assert(res.second);
-        LOG4CXX_TRACE(_logger, "New requested lock: " << requestedLock->toString() << " inserted");
+        assert((*res.first).get() == requestedLock.get());
+        LOG4CXX_DEBUG(_logger, "Promoted lock: " << (*res.first)->toString() << " inserted");
     }
     return (*(res.first));
 }
 
-void Query::handleError(const shared_ptr<Exception>& unwindException)
+void Query::handleError(const std::shared_ptr<Exception>& unwindException)
 {
     assert(unwindException);
     assert(unwindException->getLongErrorCode() != SCIDB_E_NO_ERROR);
-    shared_ptr<const scidb::Exception> msg;
+    std::shared_ptr<const scidb::Exception> msg;
     {
         ScopedMutexLock cs(errorMutex);
 
@@ -505,11 +478,11 @@ void Query::invokeFinalizers(deque<Finalizer>& finalizers)
    }
 }
 
-void Query::invokeErrorHandlers(deque<shared_ptr<ErrorHandler> >& errorHandlers)
+void Query::invokeErrorHandlers(deque<std::shared_ptr<ErrorHandler> >& errorHandlers)
 {
-    for (deque<shared_ptr<ErrorHandler> >::reverse_iterator riter = errorHandlers.rbegin();
+    for (deque<std::shared_ptr<ErrorHandler> >::reverse_iterator riter = errorHandlers.rbegin();
          riter != errorHandlers.rend(); riter++) {
-        shared_ptr<ErrorHandler>& eh = *riter;
+        std::shared_ptr<ErrorHandler>& eh = *riter;
         try {
             eh->handleError(shared_from_this());
         } catch (const std::exception& e) {
@@ -526,8 +499,8 @@ void Query::handleAbort()
 {
     QueryID queryId = INVALID_QUERY_ID;
     deque<Finalizer> finalizersOnStack;
-    deque<shared_ptr<ErrorHandler> > errorHandlersOnStack;
-    shared_ptr<const scidb::Exception> msg;
+    deque<std::shared_ptr<ErrorHandler> > errorHandlersOnStack;
+    std::shared_ptr<const scidb::Exception> msg;
     {
         ScopedMutexLock cs(errorMutex);
 
@@ -578,7 +551,7 @@ void Query::handleCommit()
 {
     QueryID queryId = INVALID_QUERY_ID;
     deque<Finalizer> finalizersOnStack;
-    shared_ptr<const scidb::Exception> msg;
+    std::shared_ptr<const scidb::Exception> msg;
     {
         ScopedMutexLock cs(errorMutex);
 
@@ -621,7 +594,7 @@ void Query::handleCommit()
 void Query::handleComplete()
 {
     handleCommit();
-    boost::shared_ptr<MessageDesc>  msg(makeCommitMessage(_queryID));
+    std::shared_ptr<MessageDesc>  msg(makeCommitMessage(_queryID));
     NetworkManager::getInstance()->broadcastPhysical(msg);
 }
 
@@ -630,11 +603,11 @@ void Query::handleCancel()
     handleAbort();
 }
 
-void Query::handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>& newLiveness)
+void Query::handleLivenessNotification(std::shared_ptr<const InstanceLiveness>& newLiveness)
 {
     QueryID thisQueryId(0);
     InstanceID coordPhysId = INVALID_INSTANCE;
-    shared_ptr<const scidb::Exception> msg;
+    std::shared_ptr<const scidb::Exception> msg;
     bool isAbort = false;
     {
         ScopedMutexLock cs(errorMutex);
@@ -686,15 +659,15 @@ void Query::handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>
         return;
     }
     try {
-        boost::shared_ptr<MessageDesc> msg = makeAbortMessage(thisQueryId);
+        std::shared_ptr<MessageDesc> msg = makeAbortMessage(thisQueryId);
 
         // HACK (somewhat): set sourceid to coordinator, because only it can issue an abort
         assert(coordPhysId != INVALID_INSTANCE);
         msg->setSourceInstanceID(coordPhysId);
 
-        shared_ptr<MessageHandleJob> job = make_shared<ServerMessageHandleJob>(msg);
-        shared_ptr<WorkQueue> rq = NetworkManager::getInstance()->getRequestQueue();
-        shared_ptr<WorkQueue> wq = NetworkManager::getInstance()->getWorkQueue();
+        std::shared_ptr<MessageHandleJob> job = make_shared<ServerMessageHandleJob>(msg);
+        std::shared_ptr<WorkQueue> rq = NetworkManager::getInstance()->getRequestQueue();
+        std::shared_ptr<WorkQueue> wq = NetworkManager::getInstance()->getWorkQueue();
         job->dispatch(rq, wq);
 
     } catch (const scidb::Exception& e) {
@@ -755,6 +728,30 @@ bool Query::isPhysicalInstanceDead(InstanceID instance)
    return isDead;
 }
 
+
+bool Query::isDistributionDegraded(const ArrayDesc& desc)
+{
+    // For now, all arrays are distributed to all the instances
+    // (and that instance set never changes).
+    // In the future, arrays will be allowed to exist on different instances.
+
+    const size_t redundancy = Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY);
+    Cluster* cluster = Cluster::getInstance();
+    SCIDB_ASSERT(cluster);
+    std::shared_ptr<const InstanceMembership> membership(cluster->getInstanceMembership());
+    SCIDB_ASSERT(membership);
+    ASSERT_EXCEPTION( (membership->getViewId() == getCoordinatorLiveness()->getViewId()),
+                      "Cluster membership cannot change (yet)");
+    ASSERT_EXCEPTION( (getInstancesCount() <= membership->getInstances().size()),
+                      "Invalid membership and/or liveness");
+    ASSERT_EXCEPTION( ((getInstancesCount() + redundancy) >= membership->getInstances().size()),
+                      "No read quorum"); // otherwise we should not be executing this query
+    if (getInstancesCount() == membership->getInstances().size()) {
+        return false; // everyone is alive
+    }
+    return true;
+}
+
 static __thread QueryID currentQueryID = 0;
 QueryID Query::getCurrentQueryID()
 {
@@ -766,12 +763,12 @@ void Query::setCurrentQueryID(QueryID queryID)
     currentQueryID = queryID;
 }
 
-boost::shared_ptr<Query> Query::getQueryByID(QueryID queryID, bool raise)
+std::shared_ptr<Query> Query::getQueryByID(QueryID queryID, bool raise)
 {
-    shared_ptr<Query> query;
+    std::shared_ptr<Query> query;
     ScopedMutexLock mutexLock(queriesMutex);
 
-    map<QueryID, shared_ptr<Query> >::const_iterator q = _queries.find(queryID);
+    Queries::const_iterator q = _queries.find(queryID);
     if (q != _queries.end()) {
         setCurrentQueryID(queryID);
         return q->second;
@@ -786,18 +783,33 @@ boost::shared_ptr<Query> Query::getQueryByID(QueryID queryID, bool raise)
 
 void Query::freeQueries()
 {
-    map<QueryID, shared_ptr<Query> > queries;
+    Queries queries;
     {
         ScopedMutexLock mutexLock(queriesMutex);
         queries.swap(_queries);
     }
-    for (map<QueryID, shared_ptr<Query> >::iterator q = queries.begin();
+    for (Queries::iterator q = queries.begin();
          q != queries.end(); ++q) {
         LOG4CXX_DEBUG(_logger, "Deallocating query (" << q->second->getQueryID() << ")");
         try {
             q->second->handleAbort();
         } catch (Exception&) { }
     }
+}
+
+size_t Query::visitQueries(const Visitor& visit)
+{
+    ScopedMutexLock mutexLock(queriesMutex);
+
+    if (visit)
+    {
+        BOOST_FOREACH(const Queries::value_type& i,_queries)
+        {
+            visit(i.second);
+        }
+    }
+
+    return _queries.size();
 }
 
 void dumpMemoryUsage(const QueryID queryId)
@@ -809,6 +821,7 @@ void dumpMemoryUsage(const QueryID queryId)
                       "Stats after query ID ("<<queryId<<"): "
                       <<"Allocated size for PersistentChunks: " << StorageManager::getInstance().getUsedMemSize()
                       <<", allocated size for network messages: " << NetworkManager::getInstance()->getUsedMemSize()
+                      <<", MAX size for MemChunks: "<< SharedMemCache::getInstance().getMemThreshold()
                       <<", allocated size for MemChunks: " << SharedMemCache::getInstance().getUsedMemSize()
                       <<", MemChunks were swapped out: " << SharedMemCache::getInstance().getSwapNum()
                       <<", MemChunks were loaded: " << SharedMemCache::getInstance().getLoadsNum()
@@ -821,13 +834,13 @@ void dumpMemoryUsage(const QueryID queryId)
 
 void Query::destroy()
 {
-    shared_ptr<Array> resultArray;
-    shared_ptr<RemoteMergedArray> mergedArray;
-    shared_ptr<WorkQueue> bufferQueue;
-    shared_ptr<WorkQueue> errQueue;
-    shared_ptr<WorkQueue> opQueue;
+    std::shared_ptr<Array> resultArray;
+    std::shared_ptr<RemoteMergedArray> mergedArray;
+    std::shared_ptr<WorkQueue> bufferQueue;
+    std::shared_ptr<WorkQueue> errQueue;
+    std::shared_ptr<WorkQueue> opQueue;
     // XXX TODO: remove the context as wellto avoid potential memory leak
-    boost::shared_ptr<ReplicationContext> replicationCtx;
+    std::shared_ptr<ReplicationContext> replicationCtx;
     {
         ScopedMutexLock cs(errorMutex);
 
@@ -858,7 +871,7 @@ void Query::destroy()
 }
 
 void
-BroadcastAbortErrorHandler::handleError(const boost::shared_ptr<Query>& query)
+BroadcastAbortErrorHandler::handleError(const std::shared_ptr<Query>& query)
 {
     if (query->getQueryID() == 0) {
         return;
@@ -872,7 +885,7 @@ BroadcastAbortErrorHandler::handleError(const boost::shared_ptr<Query>& query)
         return;
     }
     LOG4CXX_DEBUG(_logger, "Broadcast ABORT message to all instances for query " << query->getQueryID());
-    shared_ptr<MessageDesc> abortMessage = makeAbortMessage(query->getQueryID());
+    std::shared_ptr<MessageDesc> abortMessage = makeAbortMessage(query->getQueryID());
     // query may not have the instance map, so broadcast to all
     NetworkManager::getInstance()->broadcastPhysical(abortMessage);
 }
@@ -880,9 +893,9 @@ BroadcastAbortErrorHandler::handleError(const boost::shared_ptr<Query>& query)
 void Query::freeQuery(QueryID queryID)
 {
     ScopedMutexLock mutexLock(queriesMutex);
-    map<QueryID, shared_ptr<Query> >::iterator i = _queries.find(queryID);
+    Queries::iterator i = _queries.find(queryID);
     if (i != _queries.end()) {
-        shared_ptr<Query> q = i->second;
+        std::shared_ptr<Query> q = i->second;
         LOG4CXX_DEBUG(_logger, "Deallocating query (" << q->getQueryID() << ")");
         _queries.erase(i);
     }
@@ -904,8 +917,8 @@ Query::OperatorContext::~OperatorContext()
 {
 }
 
-void Query::setOperatorContext(shared_ptr<OperatorContext> const& opContext,
-                               shared_ptr<JobQueue> const& jobQueue)
+void Query::setOperatorContext(std::shared_ptr<OperatorContext> const& opContext,
+                               std::shared_ptr<JobQueue> const& jobQueue)
 {
     assert(opContext);
     ScopedMutexLock lock(errorMutex);
@@ -921,10 +934,10 @@ void Query::unsetOperatorContext()
     _operatorQueue->stop();
 }
 
-ostream& writeStatistics(ostream& os, shared_ptr<PhysicalQueryPlanNode> node, size_t tab)
+ostream& writeStatistics(ostream& os, std::shared_ptr<PhysicalQueryPlanNode> node, size_t tab)
 {
     string tabStr(tab*4, ' ');
-    shared_ptr<PhysicalOperator> op = node->getPhysicalOperator();
+    std::shared_ptr<PhysicalOperator> op = node->getPhysicalOperator();
     os << tabStr << "*" << op->getPhysicalName() << "*: " << endl;
     writeStatistics(os, op->getStatistics(), tab + 1);
     for (size_t i = 0; i < node->getChildren().size(); i++) {
@@ -966,19 +979,19 @@ void Query::clearWarnings()
     _warnings.clear();
 }
 
-void RemoveErrorHandler::handleError(const shared_ptr<Query>& query)
+void RemoveErrorHandler::handleError(const std::shared_ptr<Query>& query)
 {
     boost::function<bool()> work = boost::bind(&RemoveErrorHandler::handleRemoveLock, _lock, true);
     Query::runRestartableWork<bool, Exception>(work);
 }
 
-bool RemoveErrorHandler::handleRemoveLock(const shared_ptr<SystemCatalog::LockDesc>& lock,
+bool RemoveErrorHandler::handleRemoveLock(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
                                           bool forceLockCheck)
 {
    assert(lock);
    assert(lock->getLockMode() == SystemCatalog::LockDesc::RM);
 
-   shared_ptr<SystemCatalog::LockDesc> coordLock;
+   std::shared_ptr<SystemCatalog::LockDesc> coordLock;
    if (!forceLockCheck) {
       coordLock = lock;
    } else {
@@ -995,23 +1008,31 @@ bool RemoveErrorHandler::handleRemoveLock(const shared_ptr<SystemCatalog::LockDe
    bool rc;
    if (coordLock->getArrayVersion() == 0)
    {
+       LOG4CXX_DEBUG(_logger, "RemoveErrorHandler::handleRemoveLock" <<
+                     " lock queryID="<< coordLock->getQueryId() <<
+                     " lock array name="<< coordLock->getArrayName());
        rc = SystemCatalog::getInstance()->deleteArray(coordLock->getArrayName());
    }
    else
    {
+       LOG4CXX_DEBUG(_logger, "RemoveErrorHandler::handleRemoveLock" <<
+                     " lock queryID="<< coordLock->getQueryId() <<
+                     " lock array name="<< coordLock->getArrayName() <<
+                     " lock array version="<< coordLock->getArrayVersion());
+
        rc = SystemCatalog::getInstance()->deleteArrayVersions(coordLock->getArrayName(),
                                                               coordLock->getArrayVersion());
    }
    return rc;
 }
 
-void UpdateErrorHandler::handleError(const shared_ptr<Query>& query)
+void UpdateErrorHandler::handleError(const std::shared_ptr<Query>& query)
 {
     boost::function<void()> work = boost::bind(&UpdateErrorHandler::_handleError, this, query);
     Query::runRestartableWork<void, Exception>(work);
 }
 
-void UpdateErrorHandler::_handleError(const shared_ptr<Query>& query)
+void UpdateErrorHandler::_handleError(const std::shared_ptr<Query>& query)
 {
    assert(query);
    if (!_lock) {
@@ -1041,8 +1062,8 @@ void UpdateErrorHandler::_handleError(const shared_ptr<Query>& query)
    return;
 }
 
-void UpdateErrorHandler::releaseLock(const shared_ptr<SystemCatalog::LockDesc>& lock,
-                                     const shared_ptr<Query>& query)
+void UpdateErrorHandler::releaseLock(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
+                                     const std::shared_ptr<Query>& query)
 {
    assert(lock);
    assert(query);
@@ -1056,7 +1077,15 @@ void UpdateErrorHandler::releaseLock(const shared_ptr<SystemCatalog::LockDesc>& 
    }
 }
 
-void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog::LockDesc> & lock,
+static bool isTransientArray(const std::shared_ptr<SystemCatalog::LockDesc> & lock)
+{
+    return ( lock->getArrayId() > 0 &&
+             lock->getArrayId() == lock->getArrayVersionId() &&
+             lock->getArrayVersion() == 0 );
+}
+
+
+void UpdateErrorHandler::handleErrorOnCoordinator(const std::shared_ptr<SystemCatalog::LockDesc> & lock,
                                                   RollbackWork& rollback)
 {
    assert(lock);
@@ -1064,7 +1093,7 @@ void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog
 
    string const& arrayName = lock->getArrayName();
 
-   shared_ptr<SystemCatalog::LockDesc> coordLock =
+   std::shared_ptr<SystemCatalog::LockDesc> coordLock =
       SystemCatalog::getInstance()->checkForCoordinatorLock(arrayName,
                                                             lock->getQueryId());
    if (!coordLock) {
@@ -1074,23 +1103,43 @@ void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog
       return;
    }
 
-   VersionID newVersion      = coordLock->getArrayVersion();
-   ArrayID newArrayVersionId = coordLock->getArrayVersionId();
-
-   if (coordLock->getLockMode() == SystemCatalog::LockDesc::CRT) {
-      SystemCatalog::getInstance()->deleteArray(arrayName);
-   } else if (newVersion != 0) {
-      assert(coordLock->getLockMode() == SystemCatalog::LockDesc::WR);
-      string newArrayVersionName = ArrayDesc::makeVersionedName(arrayName,newVersion);
-      SystemCatalog::getInstance()->deleteArray(newArrayVersionName);
+   if (isTransientArray(coordLock)) {
+       SCIDB_ASSERT(false);
+       // no rollback for transient arrays
+       return;
    }
 
-   if (newVersion != 0 &&
-       newArrayVersionId > 0 &&
-       rollback) {
+   const ArrayID unversionedArrayId  = coordLock->getArrayId();
+   const VersionID newVersion      = coordLock->getArrayVersion();
+   const ArrayID newArrayVersionId = coordLock->getArrayVersionId();
 
-       const ArrayID arrayId = coordLock->getArrayId();
-       assert(arrayId != 0);
+   if (unversionedArrayId == 0) {
+       SCIDB_ASSERT(newVersion == 0);
+       SCIDB_ASSERT(newArrayVersionId == 0);
+       // the query has not done much progress, nothing to rollback
+       return;
+   }
+
+   ASSERT_EXCEPTION(newVersion > 0,
+                    string("UpdateErrorHandler::handleErrorOnCoordinator:")+
+                    string(" inconsistent newVersion<=0"));
+   ASSERT_EXCEPTION(unversionedArrayId > 0,
+                    string("UpdateErrorHandler::handleErrorOnCoordinator:")+
+                    string(" inconsistent unversionedArrayId<=0"));
+   ASSERT_EXCEPTION(newArrayVersionId > 0,
+                    string("UpdateErrorHandler::handleErrorOnCoordinator:")+
+                    string(" inconsistent newArrayVersionId<=0"));
+
+   const VersionID lastVersion = SystemCatalog::getInstance()->getLastVersion(unversionedArrayId);
+
+   if (lastVersion == newVersion) {
+       // we are done, the verson is committed
+       return;
+   }
+   SCIDB_ASSERT(lastVersion < newVersion);
+   SCIDB_ASSERT(lastVersion == (newVersion-1));
+
+   if (rollback) {
 
        LOG4CXX_DEBUG(_logger, "UpdateErrorHandler::handleErrorOnCoordinator:"
                      " the new version "<< newVersion
@@ -1099,12 +1148,11 @@ void UpdateErrorHandler::handleErrorOnCoordinator(const shared_ptr<SystemCatalog
                      <<" is being rolled back for query ("
                      << lock->getQueryId() << ")");
 
-       const VersionID lastStableVersion = newVersion-1;
-       rollback(lastStableVersion, arrayId, newArrayVersionId);
+       rollback(lastVersion, unversionedArrayId, newArrayVersionId);
    }
 }
 
-void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::LockDesc>& lock,
+void UpdateErrorHandler::handleErrorOnWorker(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
                                              bool forceCoordLockCheck,
                                              RollbackWork& rollback)
 {
@@ -1124,7 +1172,7 @@ void UpdateErrorHandler::handleErrorOnWorker(const shared_ptr<SystemCatalog::Loc
    if (newVersion != 0) {
 
        if (forceCoordLockCheck) {
-           shared_ptr<SystemCatalog::LockDesc> coordLock;
+           std::shared_ptr<SystemCatalog::LockDesc> coordLock;
            do {  //XXX TODO: fix the wait, possibly with batching the checks
                coordLock = SystemCatalog::getInstance()->checkForCoordinatorLock(arrayName,
                                                                                  lock->getQueryId());
@@ -1190,7 +1238,7 @@ void UpdateErrorHandler::doRollback(VersionID lastVersion,
    }
 }
 
-void Query::releaseLocks(const shared_ptr<Query>& q)
+void Query::releaseLocks(const std::shared_ptr<Query>& q)
 {
     assert(q);
     LOG4CXX_DEBUG(_logger, "Releasing locks for query " << q->getQueryID());
@@ -1203,14 +1251,9 @@ void Query::releaseLocks(const shared_ptr<Query>& q)
     runRestartableWork<uint32_t, Exception>(work);
 }
 
-boost::shared_ptr<Array> Query::getArray(std::string const& arrayName)
-{
-    return boost::shared_ptr<Array>(DBArray::newDBArray(arrayName, shared_from_this()));
-}
-
 void Query::acquireLocks()
 {
-    Query::QueryLocks locks;
+    SystemCatalog::QueryLocks locks;
     {
         ScopedMutexLock cs(errorMutex);
         validate();
@@ -1224,7 +1267,7 @@ void Query::acquireLocks()
 
 void Query::retryAcquireLocks()
 {
-    Query::QueryLocks locks;
+    SystemCatalog::QueryLocks locks;
     {
         ScopedMutexLock cs(errorMutex);
         // try to assert that the lock release finalizer is in place
@@ -1240,7 +1283,7 @@ void Query::retryAcquireLocks()
     acquireLocksInternal(locks);
 }
 
-void Query::acquireLocksInternal(Query::QueryLocks& locks)
+void Query::acquireLocksInternal(SystemCatalog::QueryLocks& locks)
 {
     LOG4CXX_TRACE(_logger, "Acquiring "<< locks.size()
                   << " array locks for query " << _queryID);
@@ -1248,7 +1291,7 @@ void Query::acquireLocksInternal(Query::QueryLocks& locks)
     bool foundDeadInstances = (_coordinatorLiveness->getNumDead() > 0);
     try {
         SystemCatalog::ErrorChecker errorChecker = bind(&Query::validate, this);
-        BOOST_FOREACH(const shared_ptr<SystemCatalog::LockDesc>& lock, locks)
+        BOOST_FOREACH(const std::shared_ptr<SystemCatalog::LockDesc>& lock, locks)
         {
             assert(lock);
             assert(lock->getQueryId() == _queryID);
@@ -1265,14 +1308,56 @@ void Query::acquireLocksInternal(Query::QueryLocks& locks)
             }
         }
         validate();
+
+        // get the array metadata catalog version, i.e. 'timestamp' the arrays in use by this query
+        if (!locks.empty()) {
+            SystemCatalog::getInstance()->getCurrentVersion(locks);
+        }
     } catch (const scidb::SystemCatalog::LockBusyException& e) {
         throw;
     } catch (std::exception&) {
         releaseLocks(shared_from_this());
         throw;
     }
-    LOG4CXX_DEBUG(_logger, "Acquired "<< locks.size()
-                  << " array locks for query " << _queryID);
+    if (_logger->isDebugEnabled()) {
+        LOG4CXX_DEBUG(_logger, "Acquired "<< locks.size() << " array locks for query " << _queryID);
+        BOOST_FOREACH(const std::shared_ptr<SystemCatalog::LockDesc>& lock, locks)
+        {
+            LOG4CXX_DEBUG(_logger, "Acquired lock: " << lock->toString());
+        }
+    }
+}
+
+ArrayID
+Query::getCatalogVersion(const std::string& arrayName, bool allowMissing) const
+{
+    assert(isCoordinator());
+    // XXX TODO: currently synchronization is not used because
+    // XXX TODO: it is called strictly before or after the query array lock acquisition
+    if (_requestedLocks.empty() ) {
+        // we have not acquired the locks yet
+        return SystemCatalog::ANY_VERSION;
+    }
+    const std::string* unversionedNamePtr(&arrayName);
+    std::string unversionedName;
+    if (!ArrayDesc::isNameUnversioned(arrayName) ) {
+        unversionedName = ArrayDesc::makeUnversionedName(arrayName);
+        unversionedNamePtr = &unversionedName;
+    }
+    std::shared_ptr<SystemCatalog::LockDesc> key(make_shared<SystemCatalog::LockDesc>((*unversionedNamePtr),
+                                                                                 getQueryID(),
+                                                                                 Cluster::getInstance()->getLocalInstanceId(),
+                                                                                 SystemCatalog::LockDesc::INVALID_ROLE,
+                                                                                 SystemCatalog::LockDesc::INVALID_MODE));
+    SystemCatalog::QueryLocks::const_iterator iter = _requestedLocks.find(key);
+    if (iter == _requestedLocks.end() && allowMissing) {
+        return SystemCatalog::ANY_VERSION;
+    }
+    ASSERT_EXCEPTION(iter!=_requestedLocks.end(),
+                     string("Query::getCatalogVersion: unlocked array: ")+arrayName);
+    const std::shared_ptr<SystemCatalog::LockDesc>& lock = (*iter);
+    assert(lock->isLocked());
+    return lock->getArrayCatalogId();
 }
 
 uint64_t Query::getLockTimeoutNanoSec()
@@ -1313,12 +1398,12 @@ void Query::listLiveInstances(InstanceVisitor& func)
     assert(Cluster::getInstance()->getInstanceMembership()->getInstances().size() == getInstancesCount());
 
     for (vector<InstanceID>::const_iterator iter = _liveInstances.begin(); iter != _liveInstances.end(); ++iter) {
-        boost::shared_ptr<Query> thisQuery(shared_from_this());
+        std::shared_ptr<Query> thisQuery(shared_from_this());
         func(thisQuery, (*iter));
     }
 }
 
-ReplicationContext::ReplicationContext(const boost::shared_ptr<Query>& query, size_t nInstances)
+ReplicationContext::ReplicationContext(const std::shared_ptr<Query>& query, size_t nInstances)
 : _query(query)
 #ifndef NDEBUG // for debugging
 ,_chunkReplicasReqs(nInstances)
@@ -1334,9 +1419,10 @@ ReplicationContext::QueueInfoPtr ReplicationContext::getQueueInfo(QueueID id)
 {   // mutex must be locked
     QueueInfoPtr& qInfo = _inboundQueues[id];
     if (!qInfo) {
-        uint64_t size = Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE);
+        int size = Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE);
         assert(size>0);
-        qInfo = boost::make_shared<QueueInfo>(NetworkManager::getInstance()->createWorkQueue(1,size));
+        size = (size<1) ? 4 : size+4; // allow some minimal extra space to tolerate mild overflows
+        qInfo = std::make_shared<QueueInfo>(NetworkManager::getInstance()->createWorkQueue(1,static_cast<uint64_t>(size)));
         assert(!qInfo->getArray());
         assert(qInfo->getQueue());
         qInfo->getQueue()->stop();
@@ -1345,7 +1431,7 @@ ReplicationContext::QueueInfoPtr ReplicationContext::getQueueInfo(QueueID id)
     return qInfo;
 }
 
-void ReplicationContext::enableInboundQueue(ArrayID aId, const boost::shared_ptr<Array>& array)
+void ReplicationContext::enableInboundQueue(ArrayID aId, const std::shared_ptr<Array>& array)
 {
     assert(array);
     assert(aId > 0);
@@ -1353,32 +1439,32 @@ void ReplicationContext::enableInboundQueue(ArrayID aId, const boost::shared_ptr
     QueueID qId(aId);
     QueueInfoPtr qInfo = getQueueInfo(qId);
     assert(qInfo);
-    boost::shared_ptr<scidb::WorkQueue> wq = qInfo->getQueue();
+    std::shared_ptr<scidb::WorkQueue> wq = qInfo->getQueue();
     assert(wq);
     qInfo->setArray(array);
     wq->start();
 }
 
-boost::shared_ptr<scidb::WorkQueue> ReplicationContext::getInboundQueue(ArrayID aId)
+std::shared_ptr<scidb::WorkQueue> ReplicationContext::getInboundQueue(ArrayID aId)
 {
     assert(aId > 0);
     ScopedMutexLock cs(_mutex);
     QueueID qId(aId);
     QueueInfoPtr qInfo = getQueueInfo(qId);
     assert(qInfo);
-    boost::shared_ptr<scidb::WorkQueue> wq = qInfo->getQueue();
+    std::shared_ptr<scidb::WorkQueue> wq = qInfo->getQueue();
     assert(wq);
     return wq;
 }
 
-boost::shared_ptr<scidb::Array> ReplicationContext::getPersistentArray(ArrayID aId)
+std::shared_ptr<scidb::Array> ReplicationContext::getPersistentArray(ArrayID aId)
 {
     assert(aId > 0);
     ScopedMutexLock cs(_mutex);
     QueueID qId(aId);
     QueueInfoPtr qInfo = getQueueInfo(qId);
     assert(qInfo);
-    boost::shared_ptr<scidb::Array> array = qInfo->getArray();
+    std::shared_ptr<scidb::Array> array = qInfo->getArray();
     assert(array);
     assert(qInfo->getQueue());
     return array;
@@ -1393,7 +1479,7 @@ void ReplicationContext::removeInboundQueue(ArrayID aId)
     // But we now have a sync point here, to coordinate the storage manager
     // fluhes.  So we may be able to implement queue removal in the future.
 
-    boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+    std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
     syncBarrier(0, query);
     syncBarrier(1, query);
 
@@ -1401,36 +1487,36 @@ void ReplicationContext::removeInboundQueue(ArrayID aId)
 }
 
 namespace {
-void generateReplicationItems(boost::shared_ptr<MessageDesc>& msg,
-                              std::vector<boost::shared_ptr<ReplicationManager::Item> >* replicaVec,
-                              const boost::shared_ptr<Query>& query,
+void generateReplicationItems(std::shared_ptr<MessageDesc>& msg,
+                              std::vector<std::shared_ptr<ReplicationManager::Item> >* replicaVec,
+                              const std::shared_ptr<Query>& query,
                               InstanceID iId)
 {
     if (iId == query->getInstanceID()) {
         return;
     }
-    boost::shared_ptr<ReplicationManager::Item> item(new ReplicationManager::Item(iId, msg, query));
+    std::shared_ptr<ReplicationManager::Item> item(new ReplicationManager::Item(iId, msg, query));
     replicaVec->push_back(item);
 }
 }
 void ReplicationContext::replicationSync(ArrayID arrId)
 {
     assert(arrId > 0);
-    if (Config::getInstance()->getOption<int>(CONFIG_REDUNDANCY) <= 0) {
+    if (Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY) <= 0) {
         return;
     }
 
-    boost::shared_ptr<MessageDesc> msg = boost::make_shared<MessageDesc>(mtChunkReplica);
-    boost::shared_ptr<scidb_msg::Chunk> chunkRecord = msg->getRecord<scidb_msg::Chunk> ();
+    std::shared_ptr<MessageDesc> msg = std::make_shared<MessageDesc>(mtChunkReplica);
+    std::shared_ptr<scidb_msg::Chunk> chunkRecord = msg->getRecord<scidb_msg::Chunk> ();
     chunkRecord->set_array_id(arrId);
     // tell remote instances that we are done replicating
     chunkRecord->set_eof(true);
 
     assert(_replicationMngr);
-    boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+    std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
     msg->setQueryID(query->getQueryID());
 
-    vector<boost::shared_ptr<ReplicationManager::Item> > replicasVec;
+    vector<std::shared_ptr<ReplicationManager::Item> > replicasVec;
     Query::InstanceVisitor f =
         boost::bind(&generateReplicationItems, msg, &replicasVec, _1, _2);
     query->listLiveInstances(f);
@@ -1439,12 +1525,12 @@ void ReplicationContext::replicationSync(ArrayID arrId)
 
     assert(replicasVec.size() == (query->getInstancesCount()-1));
     for (size_t i=0; i<replicasVec.size(); ++i) {
-        const boost::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
+        const std::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
         assert(_replicationMngr);
         _replicationMngr->send(item);
     }
     for (size_t i=0; i<replicasVec.size(); ++i) {
-        const boost::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
+        const std::shared_ptr<ReplicationManager::Item>& item = replicasVec[i];
         assert(_replicationMngr);
         _replicationMngr->wait(item);
         assert(item->isDone());
@@ -1484,17 +1570,17 @@ void ReplicationContext::replicationAck(InstanceID sourceId, ArrayID arrId)
 /// cached pointer to the ReplicationManager singeton
 ReplicationManager*  ReplicationContext::_replicationMngr;
 
-void ReplicationContext::enqueueInbound(ArrayID arrId, shared_ptr<Job>& job)
+void ReplicationContext::enqueueInbound(ArrayID arrId, std::shared_ptr<Job>& job)
 {
     assert(job);
     assert(arrId>0);
     assert(job->getQuery());
     ScopedMutexLock cs(_mutex);
 
-    boost::shared_ptr<WorkQueue> queryQ(getInboundQueue(arrId));
+    std::shared_ptr<WorkQueue> queryQ(getInboundQueue(arrId));
 
     if (Query::_logger->isTraceEnabled()) {
-        shared_ptr<Query> query(job->getQuery());
+        std::shared_ptr<Query> query(job->getQuery());
         LOG4CXX_TRACE(Query::_logger, "ReplicationContext::enqueueInbound"
                       <<" job="<<job.get()
                       <<", queue="<<queryQ.get()
@@ -1509,7 +1595,7 @@ void ReplicationContext::enqueueInbound(ArrayID arrId, shared_ptr<Job>& job)
         LOG4CXX_ERROR(Query::_logger, "ReplicationContext::enqueueInbound"
                       << ": Overflow exception from the message queue (" << queryQ.get()
                       << "): "<<e.what());
-        shared_ptr<Query> query(job->getQuery());
+        std::shared_ptr<Query> query(job->getQuery());
         assert(query);
         assert(false);
         query->handleError(e.copy());

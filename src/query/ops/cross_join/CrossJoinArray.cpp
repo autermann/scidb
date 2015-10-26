@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,15 +29,15 @@
  * @author poliocough@gmail.com
  */
 
+#include <array/MemArray.h>
+#include <system/Exceptions.h>
 #include "CrossJoinArray.h"
-#include "array/MemArray.h"
-#include "system/Exceptions.h"
 
+using namespace std;
+using namespace boost;
 
 namespace scidb
 {
-    using namespace boost;
-
     //
     // CrossJoin chunk methods
     //
@@ -71,7 +71,7 @@ namespace scidb
        return withOverlap ? lastPosWithOverlap : lastPos;
      }
 
-    shared_ptr<ConstChunkIterator> CrossJoinChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> CrossJoinChunk::getConstIterator(int iterationMode) const
     {
         if ((iterationMode & ChunkIterator::IGNORE_EMPTY_CELLS) == false)
         {
@@ -79,7 +79,7 @@ namespace scidb
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CHUNK_WRONG_ITERATION_MODE);
         }
 
-        return shared_ptr<ConstChunkIterator>(new CrossJoinChunkIterator(*this, iterationMode));
+        return std::shared_ptr<ConstChunkIterator>(new CrossJoinChunkIterator(*this, iterationMode));
     }
 
     CrossJoinChunk::CrossJoinChunk(CrossJoinArray const& cross, AttributeID attrID, bool isLeftAttr)
@@ -107,34 +107,28 @@ namespace scidb
     //
     // CrossJoin chunk iterator methods
     //
-    int CrossJoinChunkIterator::getMode()
+    int CrossJoinChunkIterator::getMode() const
     {
         return leftIterator->getMode();
     }
 
-    Value& CrossJoinChunkIterator::getItem()
+    Value const& CrossJoinChunkIterator::getItem()
     {
-         if (!hasCurrent)
-             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
+        if (!hasCurrent)
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
 
-         if (chunk.isEmptyIndicatorAttribute)
-         {
+        if (chunk.isEmptyIndicatorAttribute)
+        {
             boolValue.setBool(!isEmpty());
             return boolValue;
         }
 
-        if(chunk.isLeftAttribute)
-        {
-            return leftIterator->getItem();
-        }
-        else
-        {
-            boolValue = (*currentBucket)[currentIndex].second;
-            return boolValue;
-        }
+        return chunk.isLeftAttribute
+            ? leftIterator->getItem()
+            : (*currentBucket)[currentIndex].second;
     }
 
-    bool CrossJoinChunkIterator::isEmpty()
+    bool CrossJoinChunkIterator::isEmpty() const
     {
         return false;
     }
@@ -151,10 +145,10 @@ namespace scidb
 
         if( ++currentIndex >= (ssize_t) currentBucket->size())
         {
+            Coordinates joinKey(array.nJoinDims);
             ++(*leftIterator);
             while (!leftIterator->end())
             {
-                Coordinates joinKey(array.nJoinDims);
                 array.decomposeLeftCoordinates(leftIterator->getPosition(), joinKey);
 
                 ChunkHash::const_iterator it = rightHash.find(joinKey);
@@ -238,13 +232,13 @@ namespace scidb
       currentIndex(-1)
     {
         rightHash.clear();
-        shared_ptr<ConstChunkIterator> iter = aChunk.rightChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE);
+        std::shared_ptr<ConstChunkIterator> iter = aChunk.rightChunk->getConstIterator(iterationMode & ~INTENDED_TILE_MODE);
         Coordinates joinKey(array.nJoinDims);
         Coordinates rightLeftover(array.nRightDims - array.nJoinDims);
         while(!iter->end())
         {
             array.decomposeRightCoordinates(iter->getPosition(), joinKey, rightLeftover);
-            rightHash[joinKey].push_back( make_pair<Coordinates,Value> (rightLeftover, iter->getItem()));
+            rightHash[joinKey].push_back( make_pair(rightLeftover, iter->getItem()));
             ++(*iter);
         }
 
@@ -279,9 +273,9 @@ namespace scidb
     // CrossJoin array iterator methods
     //
     CrossJoinArrayIterator::CrossJoinArrayIterator(CrossJoinArray const& cross, AttributeID attrID,
-                                                   shared_ptr<ConstArrayIterator> left,
-                                                   shared_ptr<ConstArrayIterator> right,
-                                                   shared_ptr<ConstArrayIterator> input)
+                                                   std::shared_ptr<ConstArrayIterator> left,
+                                                   std::shared_ptr<ConstArrayIterator> right,
+                                                   std::shared_ptr<ConstArrayIterator> input)
     : array(cross),
       attr(attrID),
       leftIterator(left),
@@ -363,8 +357,8 @@ namespace scidb
     // CrossJoin array methods
     //
     CrossJoinArray::CrossJoinArray(const ArrayDesc& d,
-                                   const shared_ptr<Array>& leftArray,
-                                   const shared_ptr<Array>& rightArray,
+                                   const std::shared_ptr<Array>& leftArray,
+                                   const std::shared_ptr<Array>& rightArray,
                                    vector<int> const& ljd,
                                    vector<int> const& rjd)
     : desc(d),
@@ -504,11 +498,11 @@ namespace scidb
         return desc;
     }
 
-    shared_ptr<ConstArrayIterator> CrossJoinArray::getConstIterator(AttributeID attrID) const
+    std::shared_ptr<ConstArrayIterator> CrossJoinArray::getConstIterator(AttributeID attrID) const
 	{
-        shared_ptr<ConstArrayIterator> leftIterator;
-        shared_ptr<ConstArrayIterator> rightIterator;
-        shared_ptr<ConstArrayIterator> inputIterator;
+        std::shared_ptr<ConstArrayIterator> leftIterator;
+        std::shared_ptr<ConstArrayIterator> rightIterator;
+        std::shared_ptr<ConstArrayIterator> inputIterator;
         AttributeID inputAttrID = attrID;
 
         if (leftEmptyTagPosition >= 0) { // left array is emptyable
@@ -553,6 +547,6 @@ namespace scidb
                 rightIterator = right->getConstIterator(0);
             }
         }
-        return shared_ptr<CrossJoinArrayIterator>(new CrossJoinArrayIterator(*this, attrID, leftIterator, rightIterator, inputIterator));
+        return std::shared_ptr<CrossJoinArrayIterator>(new CrossJoinArrayIterator(*this, attrID, leftIterator, rightIterator, inputIterator));
     }
 }

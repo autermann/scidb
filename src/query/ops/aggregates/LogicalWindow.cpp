@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,11 +24,11 @@
  * LogicalWindow.cpp
  *
  *  Created on: Apr 11, 2010
- *      Author: Knizhnik, poliocough@gmail.com, 
- *              Paul Brown <paulgeoffreybrown@gmail.com> 
+ *      Author: Knizhnik, poliocough@gmail.com,
+ *              Paul Brown <paulgeoffreybrown@gmail.com>
  */
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <log4cxx/logger.h>
 
 #include "query/Operator.h"
@@ -51,11 +51,11 @@ using namespace std;
  *   <br> METHOD := 'materialize' | 'probe'
  *
  * @par Summary:
- *   Produces a result array with the same size and dimensions as the source 
- *   array, where each ouput cell stores some aggregate calculated over a 
- *   window around the corresponding cell in the source array. A pair of 
- *   window specification values (leftEdge, rightEdge) must exist for every 
- *   dimension in the source and output array. 
+ *   Produces a result array with the same size and dimensions as the source
+ *   array, where each ouput cell stores some aggregate calculated over a
+ *   window around the corresponding cell in the source array. A pair of
+ *   window specification values (leftEdge, rightEdge) must exist for every
+ *   dimension in the source and output array.
  *
  * @par Input:
  *   - srcArray: a source array with srcAttrs and srcDims.
@@ -68,14 +68,14 @@ using namespace std;
  *     The count aggregate may take * as the input attribute, meaning to count all the items in the group including null items.
  *     The default resultName for count(*) is 'count'.
  *   - An optional final argument that specifies how the operator is to perform
- *     its calculation. At the moment, we support two internal algorithms: 
- *     "materialize" (which materializes an entire source chunk before 
- *     computing the output windows) and "probe" (which probes the source 
+ *     its calculation. At the moment, we support two internal algorithms:
+ *     "materialize" (which materializes an entire source chunk before
+ *     computing the output windows) and "probe" (which probes the source
  *     array for the data in each window). In general, materializing the input
- *     is a more efficient strategy, but when we're using thin(...) in 
- *     conjunction with window(...), we're often better off using probes, 
- *     rather than materilization. This is a decision that the optimizer needs 
- *     to make. 
+ *     is a more efficient strategy, but when we're using thin(...) in
+ *     conjunction with window(...), we're often better off using probes,
+ *     rather than materilization. This is a decision that the optimizer needs
+ *     to make.
  *
  * @par Output array:
  *        <
@@ -111,13 +111,13 @@ using namespace std;
 class LogicalWindow: public LogicalOperator
 {
 public:
-   
+
     LogicalWindow(const std::string& logicalName, const std::string& alias):
             LogicalOperator(logicalName, alias)
     {
         //
-        //  Input to the operator consists of an input array, followed 
-        // by a variable list of paramaters. 
+        //  Input to the operator consists of an input array, followed
+        // by a variable list of paramaters.
         ADD_PARAM_INPUT();
         ADD_PARAM_VARIES();
     }
@@ -125,31 +125,31 @@ public:
     /**
      * @see LogicalOperator::nextVaryParamPlaceholder()
      */
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
         //
-        //  The arguments to the window(...) operator are: 
+        //  The arguments to the window(...) operator are:
         //     window( srcArray {, leftEdge, rightEdge}+ {, AGGREGATE_CALL}+ [, METHOD ] )
-        // 
-        //   * There must be as many {, leftEdge, rightEdge}+ pairs as there are dimensions 
-        //     in srcArray. 
+        //
+        //   * There must be as many {, leftEdge, rightEdge}+ pairs as there are dimensions
+        //     in srcArray.
         //   * There must be at least one aggregate.
-        //   * The (optional) [, METHOD] is a string. 
-        // 
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        //   * The (optional) [, METHOD] is a string.
+        //
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
 
-        if (_parameters.size() < schemas[0].getDimensions().size() * 2) 
+        if (_parameters.size() < schemas[0].getDimensions().size() * 2)
         {
             res.push_back(PARAM_CONSTANT("int64"));
-        } else if (_parameters.size() == schemas[0].getDimensions().size() * 2) 
+        } else if (_parameters.size() == schemas[0].getDimensions().size() * 2)
         {
             res.push_back(PARAM_AGGREGATE_CALL());
-        } else 
+        } else
         {
-            //  In this part we expect either an optional aggregate 
-            // or an optional string AFTER aggregate. If the last one 
-            // was an aggregate, the next one might be an aggregate, 
-            // or a string. But otherwise (it was a string) then all 
+            //  In this part we expect either an optional aggregate
+            // or an optional string AFTER aggregate. If the last one
+            // was an aggregate, the next one might be an aggregate,
+            // or a string. But otherwise (it was a string) then all
             // you can have is the END_OF_VARIES.
             if (_parameters[_parameters.size() - 1]->getParamType() ==
 PARAM_AGGREGATE_CALL)
@@ -163,16 +163,16 @@ PARAM_AGGREGATE_CALL)
     }
 
     /**
-     *  Construct the description of the output array based on the input 
+     *  Construct the description of the output array based on the input
      *
-     *   The output array of the window(...) operator is the same size and 
-     *  shape as the input, and has a set of attributes the same size and 
-     *  type as the aggregates. 
+     *   The output array of the window(...) operator is the same size and
+     *  shape as the input, and has a set of attributes the same size and
+     *  type as the aggregates.
      *
      *  @param ArrayDesc& desc - ArrayDesc of the input array
      *
      *  @return ArrayDesc - ArrayDesc of output array from window(...) op
-     * 
+     *
      */
     inline ArrayDesc createWindowDesc(ArrayDesc const& desc)
     {
@@ -187,56 +187,56 @@ PARAM_AGGREGATE_CALL)
                                        srcDim.getCurrStart(),
                                        srcDim.getCurrEnd(),
                                        srcDim.getEndMax(),
-                                       srcDim.getChunkInterval(), 
+                                       srcDim.getChunkInterval(),
                                        0);
         }
 
-        ArrayDesc output (desc.getName(), Attributes(), aggDims);
+        ArrayDesc output (desc.getName(), Attributes(), aggDims, defaultPartitioning());
 
         //
-        //  Process the variadic parameters to the operator. Check 
-        // that the aggregates make sense, and check for the presence 
-        // of the optional variable argument that tells the operator 
-        // which algorithm to use. 
+        //  Process the variadic parameters to the operator. Check
+        // that the aggregates make sense, and check for the presence
+        // of the optional variable argument that tells the operator
+        // which algorithm to use.
         for (size_t i = dims.size() * 2, size = _parameters.size(); i < size; i++)
         {
-            boost::shared_ptr<scidb::OperatorParam> param = _parameters[i];
+            std::shared_ptr<scidb::OperatorParam> param = _parameters[i];
 
-            switch ( param->getParamType() ) { 
+            switch ( param->getParamType() ) {
                case PARAM_AGGREGATE_CALL:
                {
                    bool isInOrderAggregation = true;
-                   addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall> &) param, desc, output,
+                   addAggregatedAttribute( (std::shared_ptr <OperatorParamAggregateCall> &) param, desc, output,
                            isInOrderAggregation);
                    break;
                }
                case PARAM_LOGICAL_EXPRESSION:
-               { 
+               {
                    //
-                   //  If there is a Logical Expression at this point, 
-                   // it needs to be a constant string, and the string 
-                   // needs to be one of the two legitimate algorithm names. 
-                   const boost::shared_ptr<OperatorParamLogicalExpression> paramLogicalExpression = boost::static_pointer_cast<OperatorParamLogicalExpression>(param);
-                   if ((paramLogicalExpression->isConstant()) && 
+                   //  If there is a Logical Expression at this point,
+                   // it needs to be a constant string, and the string
+                   // needs to be one of the two legitimate algorithm names.
+                   const std::shared_ptr<OperatorParamLogicalExpression> paramLogicalExpression = std::static_pointer_cast<OperatorParamLogicalExpression>(param);
+                   if ((paramLogicalExpression->isConstant()) &&
                        (TID_STRING == paramLogicalExpression->getExpectedType
-().typeId())) 
-                   { 
-                       string s(boost::static_pointer_cast<Constant>(paramLogicalExpression->getExpression())->getValue().getString());
+().typeId()))
+                   {
+                       string s(std::static_pointer_cast<Constant>(paramLogicalExpression->getExpression())->getValue().getString());
 
-                       if (!((s == WindowArray::PROBE) || (s == WindowArray::MATERIALIZE ))) 
+                       if (!((s == WindowArray::PROBE) || (s == WindowArray::MATERIALIZE )))
                        {
-                           stringstream ss; 
+                           stringstream ss;
                            ss << WindowArray::PROBE << " or " << WindowArray::MATERIALIZE;
-                           throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, 
+                           throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
                                                       SCIDB_LE_OP_WINDOW_ERROR5,
-                                                      _parameters[i]->getParsingContext()) 
+                                                      _parameters[i]->getParsingContext())
                            << ss.str();
-                       } 
+                       }
                    }
                }
                 break;
-               default: 
-                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, 
+               default:
+                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
                                             SCIDB_LE_OP_WINDOW_ERROR5,
                                             _parameters[i]->getParsingContext());
             }
@@ -255,7 +255,7 @@ PARAM_AGGREGATE_CALL)
     /**
      *  @see LogicalOperator::inferSchema()
      */
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         SCIDB_ASSERT(schemas.size() == 1);
 
@@ -265,15 +265,15 @@ PARAM_AGGREGATE_CALL)
         size_t windowSize = 1;
         for (size_t i = 0, size = nDims * 2, boundaryNo = 0; i < size; i+=2, ++boundaryNo)
         {
-            int64_t boundaryLower = 
-                    evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(), query, TID_INT64).getInt64();
+            int64_t boundaryLower =
+                    evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i])->getExpression(), query, TID_INT64).getInt64();
 
             if (boundaryLower < 0)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_WINDOW_ERROR3,
                     _parameters[i]->getParsingContext());
 ;
-            int64_t boundaryUpper = 
-                    evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i+1])->getExpression(), query, TID_INT64).getInt64();
+            int64_t boundaryUpper =
+                    evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[i+1])->getExpression(), query, TID_INT64).getInt64();
 
             if (boundaryUpper < 0)
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_WINDOW_ERROR3,
@@ -289,7 +289,7 @@ PARAM_AGGREGATE_CALL)
         return createWindowDesc(desc);
     }
 
-private: 
+private:
     static const std::string PROBE;
     static const std::string MATERIALIZE;
 

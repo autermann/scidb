@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,21 +36,19 @@
 #include <sstream>
 #include <string.h>
 #include <string>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/format.hpp>
 
-#include "system/ErrorCodes.h"
-#include "system/Constants.h"
-#include "util/StringUtil.h"
+#include <system/ErrorCodes.h>
+#include <system/Constants.h>
+#include <util/StringUtil.h>
 
 #define SYSTEM_EXCEPTION(short_error_code, long_error_code)\
     scidb::SystemException(REL_FILE, __FUNCTION__, __LINE__, "scidb", short_error_code,\
     long_error_code, #short_error_code, #long_error_code)
 
 #define SYSTEM_EXCEPTION_SPTR(short_error_code, long_error_code)        \
-    boost::make_shared<scidb::SystemException>(                         \
+    std::make_shared<scidb::SystemException>(                         \
         REL_FILE, __FUNCTION__, __LINE__, "scidb",                      \
         int(short_error_code), int(long_error_code),                    \
         #short_error_code, #long_error_code)
@@ -60,7 +58,7 @@
     long_error_code, #short_error_code, #long_error_code)
 
 #define USER_EXCEPTION_SPTR(short_error_code, long_error_code)  \
-    boost::make_shared<scidb::UserException>(                   \
+    std::make_shared<scidb::UserException>(                   \
         REL_FILE, __FUNCTION__, __LINE__, "scidb",              \
         int(short_error_code), int(long_error_code),            \
         #short_error_code, #long_error_code)
@@ -76,7 +74,7 @@
         exception.getStringifiedLongErrorCode().c_str(), parsing_context)
 
 #define USER_QUERY_EXCEPTION_SPTR(short_error_code, long_error_code, parsing_context) \
-    boost::make_shared<scidb::UserQueryException>(                      \
+    std::make_shared<scidb::UserQueryException>(                      \
         REL_FILE, __FUNCTION__, __LINE__, "scidb",                      \
         int(short_error_code), int(long_error_code),                    \
         #short_error_code, #long_error_code, parsing_context)
@@ -137,10 +135,10 @@ class ParsingContext;
  */
 class
 __attribute__((visibility("default")))
-Exception: public std::exception
+Exception: public virtual std::exception
 {
 public:
-    typedef boost::shared_ptr<Exception> Pointer;
+    typedef std::shared_ptr<Exception> Pointer;
 
     Exception(){}
 
@@ -211,7 +209,7 @@ __attribute__((visibility("default")))
 UserException: public Exception
 {
 public:
-    typedef boost::shared_ptr<UserException> Pointer;
+    typedef std::shared_ptr<UserException> Pointer;
 
     UserException(const char* file, const char* function, int32_t line,
         const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
@@ -248,11 +246,11 @@ public:
 private:
     void format();
 
-    template <class T> friend boost::shared_ptr<Exception> operator <<(boost::shared_ptr<Exception> e, const T &param);
+    template <class T> friend std::shared_ptr<Exception> operator <<(std::shared_ptr<Exception> e, const T &param);
 };
 
 template <class T>
-boost::shared_ptr<UserException> operator <<(boost::shared_ptr<UserException> e, const T &param)
+std::shared_ptr<UserException> operator <<(std::shared_ptr<UserException> e, const T &param)
 {
     (*e) << param;
     return e;
@@ -266,21 +264,21 @@ __attribute__((visibility("default")))
 UserQueryException: public UserException
 {
 public:
-    typedef boost::shared_ptr<UserQueryException> Pointer;
+    typedef std::shared_ptr<UserQueryException> Pointer;
 
     UserQueryException(const char* file, const char* function, int32_t line,
         const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
         const char* stringified_short_error_code, const char* stringified_long_error_code,
-        const boost::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id = 0);
+        const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id = 0);
 
     UserQueryException(const char* file, const char* function, int32_t line,
         const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
         const char* stringified_short_error_code, const char* stringified_long_error_code,
-        const boost::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id = 0);
+        const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id = 0);
 
 	~UserQueryException() throw () {}
 
-    boost::shared_ptr<ParsingContext> getParsingContext() const;
+    std::shared_ptr<ParsingContext> getParsingContext() const;
 
     template <class T>
     UserQueryException& operator <<(const T &param)
@@ -303,13 +301,13 @@ public:
 
     void raise() const;
 private:
-    boost::shared_ptr<ParsingContext> _parsingContext;
+    std::shared_ptr<ParsingContext> _parsingContext;
 
     void format();
 };
 
 template <class T>
-boost::shared_ptr<UserQueryException> operator <<(boost::shared_ptr<UserQueryException> e, const T &param)
+std::shared_ptr<UserQueryException> operator <<(std::shared_ptr<UserQueryException> e, const T &param)
 {
     (*e) << param;
     return e;
@@ -323,7 +321,7 @@ __attribute__((visibility("default")))
 SystemException: public Exception
 {
 public:
-    typedef boost::shared_ptr<SystemException> Pointer;
+    typedef std::shared_ptr<SystemException> Pointer;
 
     SystemException(const char* file, const char* function, int32_t line,
         const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
@@ -362,7 +360,7 @@ private:
 };
 
 template <class T>
-boost::shared_ptr<SystemException> operator <<(boost::shared_ptr<SystemException> e, const T &param)
+std::shared_ptr<SystemException> operator <<(std::shared_ptr<SystemException> e, const T &param)
 {
     (*e) << param;
     return e;

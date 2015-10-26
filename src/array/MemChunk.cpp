@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -50,6 +50,7 @@ namespace scidb
 {
     using namespace boost;
     using namespace std;
+    using namespace arena;
 
     const size_t MAX_SPARSE_CHUNK_INIT_SIZE = 1*MiB;
     const bool _sDebug = false;
@@ -76,7 +77,7 @@ namespace scidb
         return *array;
     }
 
-    boost::shared_ptr<ConstRLEEmptyBitmap> MemChunk::getEmptyBitmap() const
+    std::shared_ptr<ConstRLEEmptyBitmap> MemChunk::getEmptyBitmap() const
     {
         return (emptyBitmap ? emptyBitmap :
                 (bitmapChunk ? bitmapChunk->getEmptyBitmap() :
@@ -115,7 +116,7 @@ namespace scidb
                 (getAttributeDesc().isEmptyIndicator() ? this : NULL));
     }
 
-    void MemChunk::setEmptyBitmap(boost::shared_ptr<ConstRLEEmptyBitmap> const& bitmap)
+    void MemChunk::setEmptyBitmap(std::shared_ptr<ConstRLEEmptyBitmap> const& bitmap)
     {
         emptyBitmap = bitmap;
         if (bitmap) {
@@ -152,16 +153,16 @@ namespace scidb
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "LruMemChunk::initialize";
     }
 
-    boost::shared_ptr<ChunkIterator> LruMemChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
+    std::shared_ptr<ChunkIterator> LruMemChunk::getIterator(std::shared_ptr<Query> const& query, int iterationMode)
     {
         if (Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query) != query) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "invalid query");
         }
         return MemChunk::getIterator(query, iterationMode);
     }
-    boost::shared_ptr<ConstChunkIterator> LruMemChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> LruMemChunk::getConstIterator(int iterationMode) const
     {
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query));
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query));
         return MemChunk::getConstIterator(query, iterationMode);
     }
   #endif
@@ -188,7 +189,8 @@ namespace scidb
         for (size_t i = 0, n = dims.size(); i < n; i++) {
             if (firstPos[i] < dims[i].getStartMin() ||
                 lastPos[i] > dims[i].getEndMax()) {
-                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES);
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES)
+                    << CoordsToStr(firstPos) << dims[i];
             }
             if ((firstPosWithOverlaps[i] -= dims[i].getChunkOverlap()) < dims[i].getStartMin()) {
                 firstPosWithOverlaps[i] = dims[i].getStartMin();
@@ -257,48 +259,48 @@ namespace scidb
 
     void MemChunk::fillRLEBitmap()
     {
-        boost::shared_ptr<Query> emptyQuery;
+        std::shared_ptr<Query> emptyQuery;
         RLEChunkIterator iterator(*arrayDesc, addr.attId, this, NULL, ChunkIterator::NO_EMPTY_CHECK, emptyQuery);
-        boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap = iterator.getEmptyBitmap();
+        std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap = iterator.getEmptyBitmap();
         allocate(emptyBitmap->packedSize());
         emptyBitmap->pack(static_cast<char*>(getData()));
     }
 
-    boost::shared_ptr<ChunkIterator> MemChunk::getIterator(boost::shared_ptr<Query> const& query, int iterationMode)
+    std::shared_ptr<ChunkIterator> MemChunk::getIterator(std::shared_ptr<Query> const& query, int iterationMode)
     {
-        return boost::shared_ptr<ChunkIterator>(new RLEChunkIterator(*arrayDesc, addr.attId, this, bitmapChunk, iterationMode, query));
+        return std::shared_ptr<ChunkIterator>(new RLEChunkIterator(*arrayDesc, addr.attId, this, bitmapChunk, iterationMode, query));
 
     }
-    boost::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(int iterationMode) const
     {
-        boost::shared_ptr<Query> emptyQuery;
+        std::shared_ptr<Query> emptyQuery;
         return MemChunk::getConstIterator(emptyQuery, iterationMode);
     }
-    boost::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(boost::shared_ptr<Query> const& query, int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> MemChunk::getConstIterator(std::shared_ptr<Query> const& query, int iterationMode) const
     {
         PinBuffer scope(*this);
         if (getAttributeDesc().isEmptyIndicator() || getConstData() == NULL) {
-            return boost::make_shared<RLEBitmapChunkIterator>(*arrayDesc, addr.attId,
+            return std::make_shared<RLEBitmapChunkIterator>(*arrayDesc, addr.attId,
                                                               (Chunk*)this, bitmapChunk,
                                                               iterationMode, query);
         } else if ((iterationMode & ConstChunkIterator::INTENDED_TILE_MODE) ||
                    (iterationMode & ConstChunkIterator::TILE_MODE)) { //old tile mode
 
-            return boost::make_shared<RLEConstChunkIterator>(*arrayDesc, addr.attId,
+            return std::make_shared<RLEConstChunkIterator>(*arrayDesc, addr.attId,
                                                              (Chunk*)this, bitmapChunk,
                                                              iterationMode, query);
         }
 
         // non-tile mode, but using the new tiles for read ahead buffering
-        boost::shared_ptr<RLETileConstChunkIterator> tiledIter =
+        std::shared_ptr<RLETileConstChunkIterator> tiledIter =
 
-        boost::make_shared<RLETileConstChunkIterator>(*arrayDesc,
+        std::make_shared<RLETileConstChunkIterator>(*arrayDesc,
                                                       addr.attId,
                                                       (Chunk*)this,
                                                       bitmapChunk,
                                                       iterationMode,
                                                       query);
-        return boost::make_shared< BufferedConstChunkIterator< boost::shared_ptr<RLETileConstChunkIterator> > >(tiledIter, query);
+        return std::make_shared< BufferedConstChunkIterator< std::shared_ptr<RLETileConstChunkIterator> > >(tiledIter, query);
     }
 
     bool MemChunk::pin() const
@@ -310,14 +312,14 @@ namespace scidb
     {
     }
 
-    void MemChunk::write(const boost::shared_ptr<Query>& query)
+    void MemChunk::write(const std::shared_ptr<Query>& query)
     {
         // MemChunks can be stand-alone and not always have the query context,
         // dont validate query (yet?)
     }
 
     void MemChunk::compress(CompressedBuffer& buf,
-                            boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+                            std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
     {
         ConstChunk const* src = this;
         MemChunk closure;
@@ -342,6 +344,12 @@ namespace scidb
         buf.setCompressionMethod(compressionMethod);
     }
 
+    void MemChunk::setData(SharedBuffer const* buf)
+    {
+        //XXX TODO: add checks to validate buf
+        reallocate(buf->getSize());
+        memcpy(getData(), buf->getConstData(), buf->getSize());
+    }
     void MemChunk::decompress(CompressedBuffer const& buf)
     {
         allocate(buf.getDecompressedSize());
@@ -415,7 +423,7 @@ namespace scidb
         ((MemArray*)array)->unpinChunk(*(LruMemChunk*)this);
     }
 
-    void LruMemChunk::write(const boost::shared_ptr<Query>& query)
+    void LruMemChunk::write(const std::shared_ptr<Query>& query)
     {
         if (Query::getValidQueryPtr(static_cast<const MemArray*>(array)->_query) != query) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "invalid query");
@@ -429,17 +437,17 @@ namespace scidb
     // RLEChunkIterator
     //
     //
-    boost::shared_ptr<ConstRLEEmptyBitmap> BaseChunkIterator::getEmptyBitmap()
+    std::shared_ptr<ConstRLEEmptyBitmap> BaseChunkIterator::getEmptyBitmap()
     {
         return emptyBitmap;
     }
 
-    int BaseChunkIterator::getMode()
+    int BaseChunkIterator::getMode() const
     {
         return mode;
     }
 
-    bool BaseChunkIterator::isEmpty()
+    bool BaseChunkIterator::isEmpty() const
     {
         return false;
     }
@@ -526,7 +534,7 @@ namespace scidb
                                          AttributeID aid,
                                          Chunk* data,
                                          int iterationMode,
-                                         boost::shared_ptr<Query> const& query)
+                                         std::shared_ptr<Query> const& query)
     : CoordinatesMapper(*data),
       array(desc),
       attrID(aid),
@@ -584,7 +592,7 @@ namespace scidb
 
 RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                                              AttributeID attr, Chunk* data, Chunk* bitmap, int iterationMode,
-                                             boost::shared_ptr<Query> const& query)
+                                             std::shared_ptr<Query> const& query)
     : BaseChunkIterator(desc, attr, data, iterationMode, query),
       payload((char const*)data->getConstData()),
       payloadIterator(&payload),
@@ -601,12 +609,12 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         }
 
         if (((iterationMode & APPEND_CHUNK) || bitmap == NULL) && payload.packedSize() < data->getSize()) {
-            emptyBitmap = boost::shared_ptr<ConstRLEEmptyBitmap>(new ConstRLEEmptyBitmap((char*)data->getData() + payload.packedSize()));
+            emptyBitmap = make_shared<ConstRLEEmptyBitmap>((char*)data->getData() + payload.packedSize());
         } else if (bitmap != NULL) {
             emptyBitmap = bitmap->getEmptyBitmap();
         }
         if (!emptyBitmap) {
-            emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
+            emptyBitmap = make_shared<RLEEmptyBitmap>(_logicalChunkSize);
         }
         if (hasOverlap && (iterationMode & IGNORE_OVERLAPS)) {
             emptyBitmap = emptyBitmap->cut(data->getFirstPosition(true),
@@ -648,7 +656,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         }
     }
 
-    Value& RLEConstChunkIterator::getItem()
+    Value const& RLEConstChunkIterator::getItem()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -705,7 +713,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
 
     RLEBitmapChunkIterator::RLEBitmapChunkIterator(ArrayDesc const& desc, AttributeID attr,
                                                    Chunk* data, Chunk* bitmap, int iterationMode,
-                                                   boost::shared_ptr<Query> const& query)
+                                                   std::shared_ptr<Query> const& query)
     : BaseChunkIterator(desc, attr, data, iterationMode, query),
       value((mode & TILE_MODE) ? Value(type,Value::asTile) : Value(type))
     {
@@ -713,7 +721,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         dataChunkPinned=false; // bitmap is copied out
 
         if (data->getData() == NULL) {
-            emptyBitmap = shared_ptr<RLEEmptyBitmap>(new RLEEmptyBitmap(_logicalChunkSize));
+            emptyBitmap = make_shared<RLEEmptyBitmap>(_logicalChunkSize);
         } else {
             emptyBitmap = data->getEmptyBitmap();
             if (hasOverlap && (iterationMode & IGNORE_OVERLAPS)) {
@@ -728,7 +736,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         trueValue.setBool(true);
     }
 
-    Value& RLEBitmapChunkIterator::getItem()
+    Value const& RLEBitmapChunkIterator::getItem()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -750,9 +758,9 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                                        Chunk* data,
                                        Chunk* bitmap,
                                        int iterationMode,
-                                       boost::shared_ptr<Query> const& query)
+                                       std::shared_ptr<Query> const& query)
     : BaseChunkIterator(desc, attrID, data, iterationMode, query),
-      _arena (arena::newArena(arena::Options("RLEValueMap").pagesize(64*KiB).resetting(true))),
+      _arena (newArena(Options("RLEValueMap").scoped(query?query->getArena():arena::getArena()).threading(0))),
       _values(_arena),
       _valuesFootprint(0),
       _initialFootprint(0),
@@ -778,7 +786,7 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
                 // use ValueMap, suck all the existing data into a ValueMap first
 
                 if (isEmptyable) {
-                    shared_ptr<ConstChunkIterator> it =
+                    std::shared_ptr<ConstChunkIterator> it =
                         data->getConstIterator(ConstChunkIterator::APPEND_CHUNK|
                                                ConstChunkIterator::IGNORE_EMPTY_CELLS);
                     while (!it->end()) {
@@ -860,12 +868,12 @@ RLEConstChunkIterator::RLEConstChunkIterator(ArrayDesc const& desc,
         return false;
     }
 
-    bool RLEChunkIterator::isEmpty()
+    bool RLEChunkIterator::isEmpty() const
     {
         return _values.find(getPos()) == _values.end();
     }
 
-    Value& RLEChunkIterator::getItem()
+    Value const& RLEChunkIterator::getItem()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -912,7 +920,7 @@ void addToPayload(const position_t curPos,
         }
         if (mode & TILE_MODE) {
             RLEPayload* tile = item.getTile();
-            if (tile->count() == INFINITE_LENGTH) {
+            if (tile->count() == CoordinateBounds::getMaxLength()) {
                 position_t end = min(tilePos + tileSize, _logicalChunkSize);
                 tile->trim(end - tilePos);
             }
@@ -1076,7 +1084,7 @@ void addToPayload(const position_t curPos,
 
             } else if (isEmptyable && (mode & APPEND_EMPTY_BITMAP)) {
                 assert(bitmapChunk);
-                boost::shared_ptr<ConstRLEEmptyBitmap> bitmap = bitmapChunk->getEmptyBitmap();
+                std::shared_ptr<ConstRLEEmptyBitmap> bitmap = bitmapChunk->getEmptyBitmap();
                 if (bitmap) {
                     dataChunk->allocate(resultPayload->packedSize() + bitmap->packedSize());
                     resultPayload->pack((char*)dataChunk->getData());
@@ -1091,7 +1099,7 @@ void addToPayload(const position_t curPos,
                 resultPayload->pack((char*)dataChunk->getData());
             }
         }
-        boost::shared_ptr<Query> query(getQuery());
+        std::shared_ptr<Query> query(getQuery());
         /* Once _needsFlush is unset, the following may happen:
            1. write() is successful & accessCount is decremented
            2. LruMemChunk::write() fails and the chunk will be kicked out by the ~MemArray()
@@ -1108,12 +1116,12 @@ void addToPayload(const position_t curPos,
 
     // New Tile based iterators
 
-    int BaseTileChunkIterator::getMode()
+    int BaseTileChunkIterator::getMode() const
     {
         return _mode;
     }
 
-    bool BaseTileChunkIterator::isEmpty()
+    bool BaseTileChunkIterator::isEmpty() const
     {
         return false;
     }
@@ -1205,7 +1213,7 @@ BaseTileChunkIterator::BaseTileChunkIterator(ArrayDesc const& desc,
                                              AttributeID aid,
                                              Chunk* data,
                                              int iterationMode,
-                                             boost::shared_ptr<Query> const& query)
+                                             std::shared_ptr<Query> const& query)
 : CoordinatesMapper(*data),
   _array(desc),
   _attrID(aid),
@@ -1246,7 +1254,7 @@ RLETileConstChunkIterator::RLETileConstChunkIterator(ArrayDesc const& desc,
                                                      Chunk* data,
                                                      Chunk* bitmap,
                                                      int iterationMode,
-                                                     shared_ptr<Query> const& query)
+                                                     std::shared_ptr<Query> const& query)
   : BaseTileChunkIterator(desc, attr, data, iterationMode, query),
     _payload(NULL),
     _lPosition(-1),
@@ -1314,7 +1322,9 @@ RLETileConstChunkIterator::RLETileConstChunkIterator(ArrayDesc const& desc,
                       <<" pCount="<<   _payload.count());
     }
 
-    assert(_emptyBitmap->count() <= _payload.count());
+    ASSERT_EXCEPTION(_emptyBitmap->count() <= _payload.count(),
+                     string(func) +
+                     string(": EBM count > payload count"));
 
     _fastTileInitialize = (_emptyBitmap->count() == _payload.count()) &&
                           (!_payload.isBool()) &&
@@ -1393,7 +1403,7 @@ void RLETileConstChunkIterator::reset()
     }
 }
 
-Value& RLETileConstChunkIterator::getItem()
+Value const& RLETileConstChunkIterator::getItem()
 {
     assert(! (_mode & TILE_MODE));
     if (!_hasCurrent) {
@@ -1416,8 +1426,8 @@ Value& RLETileConstChunkIterator::getItem()
 const Coordinates&
 RLETileConstChunkIterator::getData(scidb::Coordinates& offset,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData,
-                                   boost::shared_ptr<BaseTile>& tileCoords)
+                                   std::shared_ptr<BaseTile>& tileData,
+                                   std::shared_ptr<BaseTile>& tileCoords)
 {
     if (offset.empty()) {
         return offset;
@@ -1438,8 +1448,8 @@ RLETileConstChunkIterator::getData(scidb::Coordinates& offset,
 position_t
 RLETileConstChunkIterator::getData(position_t logicalOffset,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData,
-                                   boost::shared_ptr<BaseTile>& tileCoords)
+                                   std::shared_ptr<BaseTile>& tileData,
+                                   std::shared_ptr<BaseTile>& tileCoords)
 {
     const CoordinatesMapperWrapper coordMapper(this);
     return getDataInternal(logicalOffset, maxValues, tileData, tileCoords,
@@ -1449,7 +1459,7 @@ RLETileConstChunkIterator::getData(position_t logicalOffset,
 const Coordinates&
 RLETileConstChunkIterator::getData(scidb::Coordinates& offset,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData)
+                                   std::shared_ptr<BaseTile>& tileData)
 {
     if (offset.empty()) {
         return offset;
@@ -1467,7 +1477,7 @@ RLETileConstChunkIterator::getData(scidb::Coordinates& offset,
 position_t
 RLETileConstChunkIterator::getData(position_t logicalOffset,
                                    size_t maxValues,
-                                   boost::shared_ptr<BaseTile>& tileData)
+                                   std::shared_ptr<BaseTile>& tileData)
 {
     return getDataInternal(logicalOffset, maxValues, tileData);
 }
@@ -1477,7 +1487,7 @@ RLETileConstChunkIterator::getData(position_t logicalOffset,
 position_t
 RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData)
+                                           std::shared_ptr<BaseTile>& tileData)
 {
     const char * func = "RLETileConstChunkIterator::getDataInternal(data)";
     assert(! (_mode & TILE_MODE));
@@ -1497,7 +1507,7 @@ RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
         return _lPosition;
     }
 
-    shared_ptr<BaseTile> dataTile  = _tileFactory->construct(_attr.getType(), BaseEncoding::RLE);
+    std::shared_ptr<BaseTile> dataTile  = _tileFactory->construct(_attr.getType(), BaseEncoding::RLE);
 
     if (_fastTileInitialize) {
         position_t pPosition = _emptyBitmapIterator.getPPos();
@@ -1552,8 +1562,8 @@ RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
 position_t
 RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
                                            size_t maxValues,
-                                           boost::shared_ptr<BaseTile>& tileData,
-                                           boost::shared_ptr<BaseTile>& tileCoords,
+                                           std::shared_ptr<BaseTile>& tileData,
+                                           std::shared_ptr<BaseTile>& tileCoords,
                                            const scidb::TypeId& coordTileType,
                                            const BaseTile::Context* coordCtx)
 {
@@ -1574,7 +1584,7 @@ RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
         return _lPosition;
     }
 
-    shared_ptr<BaseTile> dataTile = _tileFactory->construct(_attr.getType(), BaseEncoding::RLE);
+    std::shared_ptr<BaseTile> dataTile = _tileFactory->construct(_attr.getType(), BaseEncoding::RLE);
 
     if (_fastTileInitialize) {
 
@@ -1590,7 +1600,7 @@ RLETileConstChunkIterator::getDataInternal(position_t logicalOffset,
         dataTile->reserve(maxValues);
     }
 
-    shared_ptr<BaseTile> coordTile = _tileFactory->construct(coordTileType, BaseEncoding::ARRAY, coordCtx);
+    std::shared_ptr<BaseTile> coordTile = _tileFactory->construct(coordTileType, BaseEncoding::ARRAY, coordCtx);
     coordTile->initialize();
     coordTile->reserve(maxValues);
 

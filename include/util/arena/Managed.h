@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
 /****************************************************************************/
 
 #include <util/Arena.h>                                  // For Allocator
-#include <boost/container/scoped_allocator.hpp>          // For scoped adaptor
+#include <scoped_allocator>                              // For scoped adaptor
 
 /****************************************************************************/
 namespace scidb
@@ -41,7 +41,7 @@ namespace scidb
  *  allocates memory from an %arena.
  */
 #define SCIDB_MANAGED_BASE(S,C,P...)                                                         \
-    S::C<P,::boost::container::scoped_allocator_adaptor<                                     \
+    S::C<P,::std::scoped_allocator_adaptor<                                     \
            ::scidb::arena::Allocator<                                                        \
            typename S::C<P>::allocator_type::value_type  > > >
 

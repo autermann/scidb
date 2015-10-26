@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,12 +41,12 @@ public class Connection implements java.sql.Connection
             throw new SQLException(e);
         }
     }
-    
+
     public org.scidb.client.Connection getSciDBConnection()
     {
         return scidbConnection;
-    } 
-    
+    }
+
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
@@ -378,5 +378,50 @@ public class Connection implements java.sql.Connection
     {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public int getNetworkTimeout() throws SQLException
+    {
+        return 0;
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public void setNetworkTimeout(java.util.concurrent.Executor executor, int milliseconds) throws SQLException
+    {
+        throw new SQLFeatureNotSupportedException("The Java7 method Connection.setNetworkTimeout() is not supported.");
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public void setSchema(String schema) throws SQLException
+    {
+        throw new SQLFeatureNotSupportedException("The Java7 method Connection.setSchema() is not supported.");
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public String getSchema() throws SQLException
+    {
+        return null;
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public void abort(java.util.concurrent.Executor executor) throws SQLException
+    {
+        throw new SQLFeatureNotSupportedException("The Java7 method Connection.abort() is not supported.");
     }
 }

@@ -40,41 +40,9 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(UNB, '${TEST_DAT
 
 SCIDB QUERY : <save(UNB, 'unb.out', 0, '(double,string)')>
 {x} a,b
-{0} 0,0
-{2} 1,0
-{4} 2,0
-{6} 3,0
-{8} 4,0
-{10} 5,0
-{12} 6,0
-{14} 7,0
-{16} 8,0
-{18} 9,0
-{20} 10,0
-{22} 11,0
-{24} 12,0
-{26} 13,0
-{28} 14,0
-{29} 15,0
 
 SCIDB QUERY : <save(UNB, 'unb.txt', 0, '(double,string)')>
 {x} a,b
-{0} 0,0
-{2} 1,0
-{4} 2,0
-{6} 3,0
-{8} 4,0
-{10} 5,0
-{12} 6,0
-{14} 7,0
-{16} 8,0
-{18} 9,0
-{20} 10,0
-{22} 11,0
-{24} 12,0
-{26} 13,0
-{28} 14,0
-{29} 15,0
 
 SCIDB QUERY : <load(UNB1,'unb.out', 0, '(double,string)')>
 {x} a,b
@@ -119,6 +87,9 @@ SCIDB QUERY : <load(UNB2,'unb.out', 0, '(double,string)')>
 
 SCIDB QUERY : <save(UNB2, 'unb2.txt', 0, '(double,string)')>
 {x} a,b
+
+SCIDB QUERY : <load(UNB2, 'unb2.txt', 0, '(double,string)')>
+{x} a,b
 {0} 0,'0'
 {1} 1,'0'
 {2} 2,'0'
@@ -138,22 +109,6 @@ SCIDB QUERY : <save(UNB2, 'unb2.txt', 0, '(double,string)')>
 
 SCIDB QUERY : <save(UNB2, 'unb2.txt', 0, 'text')>
 {x} a,b
-{0} 0,'0'
-{1} 1,'0'
-{2} 2,'0'
-{3} 3,'0'
-{4} 4,'0'
-{5} 5,'0'
-{6} 6,'0'
-{7} 7,'0'
-{8} 8,'0'
-{9} 9,'0'
-{10} 10,'0'
-{11} 11,'0'
-{12} 12,'0'
-{13} 13,'0'
-{14} 14,'0'
-{15} 15,'0'
 
 SCIDB QUERY : <load(UNB4, 'unb2.txt', -0, 'text')>
 {x} a,b
@@ -224,7 +179,7 @@ SCIDB QUERY : <load(UNB4, 'unb.txt', 0, '(double,string)')>
 {14} 14,'0'
 {15} 15,'0'
 
-SCIDB QUERY : <load(UNB5,'unb.out', 0, '(double,dummy)')>
+SCIDB QUERY : <load(UNB5,'unb.out', 0, '(double,skip)')>
 {x} a
 {0} 0
 {1} 1
@@ -245,22 +200,6 @@ SCIDB QUERY : <load(UNB5,'unb.out', 0, '(double,dummy)')>
 
 SCIDB QUERY : <save(UNB5,'unb5.txt')>
 {x} a
-{0} 0
-{1} 1
-{2} 2
-{3} 3
-{4} 4
-{5} 5
-{6} 6
-{7} 7
-{8} 8
-{9} 9
-{10} 10
-{11} 11
-{12} 12
-{13} 13
-{14} 14
-{15} 15
 
 SCIDB QUERY : <load(UNB6,'unb5.txt')>
 {x} a

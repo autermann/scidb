@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,6 +22,8 @@
 
 #include <query/Operator.h>
 #include "UniqSettings.h"
+
+using namespace std;
 
 namespace scidb
 {
@@ -73,9 +75,9 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const& schemas)
+    vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const& schemas)
     {
-        vector<shared_ptr<OperatorParamPlaceholder> > res;
+        vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() < UniqSettings::MAX_PARAMETERS)
         {
@@ -84,7 +86,7 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         ArrayDesc const& inputSchema = schemas[0];
         if (inputSchema.getAttributes(true).size() != 1)
@@ -109,8 +111,8 @@ public:
          */
         outputAttributes = addEmptyTagAttribute(outputAttributes);
         Dimensions outputDimensions;
-        outputDimensions.push_back(DimensionDesc("i", 0, MAX_COORDINATE, settings.outputChunkSize(), 0));
-        return ArrayDesc(inputSchema.getName(), outputAttributes, outputDimensions);
+        outputDimensions.push_back(DimensionDesc("i", 0, CoordinateBounds::getMax(), settings.outputChunkSize(), 0));
+        return ArrayDesc(inputSchema.getName(), outputAttributes, outputDimensions, defaultPartitioning());
     }
 };
 

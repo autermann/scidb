@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,15 +40,16 @@
 #define CROSS_JOIN_ARRAY_H_
 
 #include <string>
-#include "array/Array.h"
-#include "array/Metadata.h"
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
+
+#include <array/Array.h>
+#include <array/Metadata.h>
 
 namespace scidb
 {
 
 typedef std::vector<std::pair<Coordinates, Value> > HashBucket;
-typedef boost::unordered_map<Coordinates, HashBucket> ChunkHash;
+typedef std::unordered_map<Coordinates, HashBucket, CoordinatesHash> ChunkHash;
 
 class CrossJoinArray;
 class CrossJoinArrayIterator;
@@ -64,7 +65,7 @@ class CrossJoinChunk : public ConstChunk
     int getCompressionMethod() const;
     Coordinates const& getFirstPosition(bool withOverlap) const;
     Coordinates const& getLastPosition(bool withOverlap) const;
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
 
     void setInputChunk(ConstChunk const* leftChunk, ConstChunk const* rightChunk);
 
@@ -90,9 +91,9 @@ class CrossJoinChunk : public ConstChunk
 class CrossJoinChunkIterator : public ConstChunkIterator
 {
   public:
-    int getMode();
-    Value& getItem();
-    bool isEmpty();
+    int getMode() const;
+    Value const& getItem();
+    bool isEmpty() const;
     bool end();
     void operator ++();
     Coordinates const& getPosition();
@@ -107,7 +108,7 @@ class CrossJoinChunkIterator : public ConstChunkIterator
 
     CrossJoinArray const& array;
     CrossJoinChunk const& chunk;
-    boost::shared_ptr<ConstChunkIterator> leftIterator;
+    std::shared_ptr<ConstChunkIterator> leftIterator;
     Coordinates currentPos;
     bool hasCurrent;
     Value boolValue;
@@ -131,9 +132,9 @@ class CrossJoinArrayIterator : public ConstArrayIterator
 	 * attribute in the input array.
 	 */
 	CrossJoinArrayIterator(CrossJoinArray const& cross, AttributeID attrID,
-                           boost::shared_ptr<ConstArrayIterator> leftIterator,
-                           boost::shared_ptr<ConstArrayIterator> rightIterator,
-                           boost::shared_ptr<ConstArrayIterator> inputIterator);
+                           std::shared_ptr<ConstArrayIterator> leftIterator,
+                           std::shared_ptr<ConstArrayIterator> rightIterator,
+                           std::shared_ptr<ConstArrayIterator> inputIterator);
 
 	/***
 	 * Get chunk method retrieves the chunk at current position from the input iterator and either
@@ -179,9 +180,9 @@ class CrossJoinArrayIterator : public ConstArrayIterator
   private:
     CrossJoinArray const& array;
 	AttributeID attr;
-    boost::shared_ptr<ConstArrayIterator> leftIterator;
-    boost::shared_ptr<ConstArrayIterator> rightIterator;
-    boost::shared_ptr<ConstArrayIterator> inputIterator;
+    std::shared_ptr<ConstArrayIterator> leftIterator;
+    std::shared_ptr<ConstArrayIterator> rightIterator;
+    std::shared_ptr<ConstArrayIterator> inputIterator;
     CrossJoinChunk chunk;
 	Coordinates currentPos;
     bool hasCurrent;
@@ -196,13 +197,13 @@ class CrossJoinArray : public Array
 
   public:
     CrossJoinArray(const ArrayDesc& desc,
-                   const boost::shared_ptr<Array>& left,
-                   const boost::shared_ptr<Array>& right,
+                   const std::shared_ptr<Array>& left,
+                   const std::shared_ptr<Array>& right,
                    std::vector<int> const& leftJoinDims,
                    std::vector<int> const& rightJoinDims);
 
     virtual const ArrayDesc& getArrayDesc() const;
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const;
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const;
 
     bool matchPosition(Coordinates const& left, Coordinates const& right) const;
     Coordinates getLeftPosition(Coordinates const& pos) const;
@@ -218,8 +219,8 @@ class CrossJoinArray : public Array
     ArrayDesc desc;
     ArrayDesc leftDesc;
     ArrayDesc rightDesc;
-    boost::shared_ptr<Array> left;
-    boost::shared_ptr<Array> right;
+    std::shared_ptr<Array> left;
+    std::shared_ptr<Array> right;
 
     const size_t nLeftDims;
     const size_t nRightDims;

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -23,7 +23,7 @@
 // standards
 
 // de-facto standards
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/numeric/conversion/cast.hpp>
 #include <log4cxx/logger.h>
 
@@ -53,8 +53,8 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_line
 
 
 void pdgemmMaster(Query* query,  // or do I need only the ctx?
-                   boost::shared_ptr<MpiOperatorContext>& ctx, // query->getOperatorCtxt returns superclass
-                   boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
+                   std::shared_ptr<MpiOperatorContext>& ctx, // query->getOperatorCtxt returns superclass
+                   std::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                    const string& ipcName, // can this be in the ctx too?
                    void*  argsBuf,
                    const slpp::int_t& NPROW, const slpp::int_t& NPCOL,

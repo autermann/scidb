@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,7 +42,6 @@ namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class BuildArray;
 class BuildArrayIterator;
@@ -55,7 +54,7 @@ class BuildChunk : public ConstChunk
     virtual const AttributeDesc& getAttributeDesc() const;
     virtual Coordinates const& getFirstPosition(bool withOverlap) const;
     virtual Coordinates const& getLastPosition(bool withOverlap) const;
-    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
     virtual int getCompressionMethod() const;
     virtual Array const& getArray() const;
 
@@ -75,16 +74,16 @@ class BuildChunk : public ConstChunk
 class BuildChunkIterator : public ConstChunkIterator
 {
 public:
-    virtual int getMode();
-    virtual bool isEmpty();
-    virtual Value& getItem();
+    virtual int getMode() const;
+    virtual bool isEmpty() const;
+    virtual Value const& getItem();
     virtual void operator ++();
     virtual bool end();
     virtual Coordinates const& getPosition();
     virtual bool setPosition(Coordinates const& pos);
     virtual void reset();
     ConstChunk const& getChunk();
-    virtual boost::shared_ptr<Query> getQuery() { return _query; }
+    virtual std::shared_ptr<Query> getQuery() { return _query; }
 
     BuildChunkIterator(BuildArray& array, ConstChunk const* chunk, AttributeID attrID, int iterationMode);
 
@@ -103,7 +102,7 @@ public:
     Expression _expression;
     ExpressionContext _params;
     bool _nullable;
-    boost::shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
 };
 
 class BuildArrayIterator : public ConstArrayIterator
@@ -139,14 +138,14 @@ friend class BuildChunk;
 
 public:
         virtual ArrayDesc const& getArrayDesc() const;
-        virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const;
+        virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const;
 
-        BuildArray(boost::shared_ptr<Query>& query, ArrayDesc const& desc, boost::shared_ptr<Expression> expression);
+        BuildArray(std::shared_ptr<Query>& query, ArrayDesc const& desc, std::shared_ptr<Expression> expression);
 
 private:
     ArrayDesc _desc;
-    boost::shared_ptr<Expression> _expression;
-    vector<BindInfo> _bindings;
+    std::shared_ptr<Expression> _expression;
+    std::vector<BindInfo> _bindings;
      FunctionPointer _converter;
     size_t nInstances;
     size_t instanceID;

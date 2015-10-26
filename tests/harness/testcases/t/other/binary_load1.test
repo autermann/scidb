@@ -33,9 +33,9 @@ load(AB2, 'abc_null.txt', 0, 'text',16)
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(AB2, 'abc_null.txt', 0, 'text')"
 --igdata "load(AB2, 'abc_null.txt', 0, 'text',12)"
 load(PQR, 'abc.out', 0, '(int32,string,double)')
-save(AB, 'abc_dummy.out', 0, '(int32,string,dummy)')
-load(PQR1, 'abc_dummy.out', 0, '(int32,string)')
-load(PQR1, 'abc.out', 0, '(int32,string,dummy(8))')
+save(project(AB, a, b), 'abc_skip.out', 0, '(int32,string,skip)')
+load(PQR1, 'abc_skip.out', 0, '(int32,string,skip)')
+load(PQR1, 'abc.out', 0, '(int32,string,skip(8))')
 
 --reset-format
 
@@ -46,7 +46,7 @@ remove(AB)
 remove(ABC)
 remove(ABC_null)
 remove(ABC2_null)
-remove(AB1)  
+remove(AB1)
 remove(AB2)
 remove(PQR)
 remove(PQR1)

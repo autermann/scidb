@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -252,7 +252,7 @@ class Node
             cnodes            getList(child c)     const {return get(c)->getList();}
             Node*             get(child c)         const {return getList()[c];}
             Node*             get(child a,child b) const {return get(a)->get(b);}
-            string            dump()               const;
+            std::string            dump()               const;
 
  public:                   // Operations
             real              getReal()            const;
@@ -339,7 +339,7 @@ class Factory
 
  private:                  // Representation
             Arena&            _arena;                    // Memory allocator
-            vector<Node*>     _stack;                    // Parser shadow stack
+            std::vector<Node*>     _stack;                    // Parser shadow stack
             size_t            _items;                    // Top of shadow stack
 };
 
@@ -399,8 +399,8 @@ class Visitor
 };
 
 /****************************************************************************/
-ostream&                      operator<<(ostream&,order);
-ostream&                      operator<<(ostream&,const Node*);
+std::ostream&                      operator<<(std::ostream&,order);
+std::ostream&                      operator<<(std::ostream&,const Node*);
 /****************************************************************************/
 Name*                         getAlias  (const Node*);
 Node*&                        setAlias  (Node*&,Name*);

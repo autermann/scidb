@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -23,9 +23,9 @@
 /**
  * @file FunctionDescription.cpp
  *
- * @brief Function Description objects. 
+ * @brief Function Description objects.
  *
- * @author Paul G. Brown <paul_geoffrey_brown@yahoo.com> 
+ * @author Paul G. Brown <paul_geoffrey_brown@yahoo.com>
  */
 #include <vector>
 #include "query/TypeSystem.h"
@@ -57,9 +57,9 @@ std::string FunctionDescription::getMangleName() const
 }
 
 std::ostream& operator<<(std::ostream& stream,
-                         const FunctionDescription& ob) 
+                         const FunctionDescription& ob)
 {
-    stream  << "function " << ob.getName() 
+    stream  << "function " << ob.getName()
 			<< " (" << ob.getInputArgs() << " )"
 			<< " returns (" << ob.getOutputArgs() << " )";
 

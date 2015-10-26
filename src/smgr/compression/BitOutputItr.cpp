@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,14 +26,14 @@
 
 namespace scidb
 {
-  // put bits lower-order bits, higher 8 minus bits must be 0 
+  // put bits lower-order bits, higher 8 minus bits must be 0
 
 int32_t BitOutputItr::put(const uint8_t e, const size_t bits)
   {
     uint8_t lhsLength, rhsLength;
     int32_t putValue;
     uint8_t shift;
-    
+
 
     // we have to divide it among two bytes
     // modify this, copy over lhs length, then memcpy remaining bits, except rhs length, which is masked
@@ -42,13 +42,13 @@ int32_t BitOutputItr::put(const uint8_t e, const size_t bits)
       rhsLength = bits - lhsLength; // second byte
       _bits = _bits | (e >> rhsLength);
       putValue = _dst->put(_bits);
-      
+
       // set up for the next values
       _bits = 0;
       _bits = _bits | (e << (8-rhsLength));
       _bitsWritten = rhsLength;
       return putValue;
-      
+
     }
 
     shift = 8 - _bitsWritten - bits;
@@ -63,16 +63,16 @@ int32_t BitOutputItr::put(const uint8_t e, const size_t bits)
 	_bits = 0;
 	return putValue;
       }
-	
+
     return 0;
   }
-    
-    
+
+
   int32_t BitOutputItr::flush()
   {
     if(_bitsWritten > 0)
       {
-	
+
 	return _dst->put(_bits);
       }
     else

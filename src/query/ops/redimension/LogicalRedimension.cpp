@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@ namespace scidb {
  * @brief The operator: redimension().
  *
  * @par Synopsis:
- *   redimension( srcArray, schemaArray | schema , isStrict=false | {, AGGREGATE_CALL}* )
+ *   redimension( srcArray, schemaArray | schema , isStrict=true | {, AGGREGATE_CALL}* )
  *   <br> AGGREGATE_CALL := AGGREGATE_FUNC(inputAttr) [as resultName]
  *   <br> AGGREGATE_FUNC := approxdc | avg | count | max | min | sum | stdev | var | some_use_defined_aggregate_function
  *
@@ -98,9 +98,9 @@ public:
         ADD_PARAM_VARIES();
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.reserve(3);
         res.push_back(END_OF_VARIES_PARAMS());
         res.push_back(PARAM_AGGREGATE_CALL());
@@ -110,18 +110,18 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
 
         ArrayDesc const& srcDesc = schemas[0];
-        ArrayDesc dstDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc dstDesc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         //Compile a desc of all possible attributes (aggregate calls first) and source dimensions
-        ArrayDesc aggregationDesc (srcDesc.getName(), Attributes(), srcDesc.getDimensions());
+        ArrayDesc aggregationDesc (srcDesc.getName(), Attributes(), srcDesc.getDimensions(), defaultPartitioning());
         vector<string> aggregatedNames;
         bool isStrictSet = false;
-        bool isStrict=false;
+        bool isStrict=true;
 
         //add aggregate calls first
         for (size_t i = 1; i < _parameters.size(); ++i)
@@ -138,7 +138,7 @@ public:
             }
 
             bool isInOrderAggregation = false;
-            addAggregatedAttribute( (shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc,
+            addAggregatedAttribute( (std::shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc,
                                     isInOrderAggregation);
             string aggName =  aggregationDesc.getAttributes()[aggregationDesc.getAttributes().size()-1].getName();
             bool aggFound = false;
@@ -287,7 +287,7 @@ public:
                   << "redimension" << ss.str();
         }
 
-        return ArrayDesc(srcDesc.getName(), dstDesc.getAttributes(), outputDims, dstDesc.getFlags());
+        return ArrayDesc(srcDesc.getName(), dstDesc.getAttributes(), outputDims, defaultPartitioning(), dstDesc.getFlags());
     }
 };
 

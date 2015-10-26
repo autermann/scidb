@@ -19,13 +19,14 @@ load(UNB1,'unb.out', 0, '(double,string)')
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(UNB2,'unb.txt', 0, 'text')"
 load(UNB2,'unb.out', 0, '(double,string)')
 save(UNB2, 'unb2.txt', 0, '(double,string)')
+load(UNB2, 'unb2.txt', 0, '(double,string)')
 save(UNB2, 'unb2.txt', 0, 'text')
 load(UNB4, 'unb2.txt', -0, 'text')
 
-## Undesired output 
+## Undesired output
 load(UNB3,'unb.out', 0, '(float,float)')
 load(UNB4, 'unb.txt', 0, '(double,string)')
-load(UNB5,'unb.out', 0, '(double,dummy)')
+load(UNB5,'unb.out', 0, '(double,skip)')
 save(UNB5,'unb5.txt')
 load(UNB6,'unb5.txt')
 load(UNB6,'unb5.txt')

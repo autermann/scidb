@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,18 +24,18 @@ package scidb_msg;
 
 option java_package = "org.scidb.io.network";
 /**
- *  Add creating new object according to new message type in
- *  MessageDesc::createRecordByType (../src/BaseConnection.cpp)
+ * Add creating new object according to new message type in
+ * MessageDesc::createRecordByType (../src/BaseConnection.cpp)
  *
  * Example of message (more detail: http://code.google.com/apis/protocolbuffers/docs/proto.html):
  *
- *  message SearchRequest
- *  {
- *      required string query = 1;
- *      repeated int32 page_number = 2;
- *      optional int32 result_per_page = 3 [default	= 10];
- *      optional int32 result_count = 4;
- *  }
+ * message SearchRequest
+ * {
+ *     required string query = 1;
+ *     repeated int32 page_number = 2;
+ *     optional int32 result_per_page = 3 [default    = 10];
+ *     optional int32 result_count = 4;
+ * }
  *
  */
 
@@ -44,9 +44,9 @@ option java_package = "org.scidb.io.network";
  */
 message Query
 {
-	required string query = 1;
-	required bool afl = 2 [default = false];
-        optional string program_options = 3 [default = "unknown"];
+    required string query = 1;
+    required bool afl = 2 [default = false];
+    optional string program_options = 3 [default = "unknown"];
 }
 
 /**
@@ -103,27 +103,27 @@ message Chunk
  */
 message QueryResult
 {
-	message AttributeDesc
-	{
-		required uint32 id = 1;
-		required string name = 2;
-		required string type = 3;
-	    required uint32 flags = 4;
-	    required uint32 default_compression_method = 5;
-	    required int32 default_missing_reason = 6;
-	    required bytes default_value = 7;
-	}
+    message AttributeDesc
+    {
+        required uint32 id = 1;
+        required string name = 2;
+        required string type = 3;
+        required uint32 flags = 4;
+        required uint32 default_compression_method = 5;
+        required int32 default_missing_reason = 6;
+        required bytes default_value = 7;
+    }
 
-	message DimensionDesc
-	{
-            required string name = 1;
-            required int64 start_min = 2;
-            required int64 curr_start = 3;
-            required int64 curr_end = 4;
-            required int64 end_max = 5;
-            required int64 chunk_interval = 6;
-            required int64 chunk_overlap = 7;
-	}
+    message DimensionDesc
+    {
+        required string name = 1;
+        required int64 start_min = 2;
+        required int64 curr_start = 3;
+        required int64 curr_end = 4;
+        required int64 end_max = 5;
+        required int64 chunk_interval = 6;
+        required int64 chunk_overlap = 7;
+    }
 
     message Warning
     {
@@ -136,16 +136,16 @@ message QueryResult
         required string strings_namespace = 7;
     }
 
-	optional string array_name = 2;
-	repeated AttributeDesc attributes = 3;
-	repeated DimensionDesc dimensions = 4;
-        optional string explain_physical = 5;
-	optional uint64 execution_time = 6;
-	optional bool selective = 7;
-        optional string explain_logical = 8;
-        repeated Warning warnings = 9;//warnings posted during query preparing
-        repeated string plugins = 10;
-        optional bool exclusive_array_access = 11;
+    optional string array_name = 2;
+    repeated AttributeDesc attributes = 3;
+    repeated DimensionDesc dimensions = 4;
+    optional string explain_physical = 5;
+    optional uint64 execution_time = 6;
+    optional bool selective = 7;
+    optional string explain_logical = 8;
+    repeated Warning warnings = 9;//warnings posted during query preparing
+    repeated string plugins = 10;
+    optional bool exclusive_array_access = 11;
 }
 
 /**
@@ -153,20 +153,23 @@ message QueryResult
  */
 message PhysicalPlan
 {
-	required string physical_plan = 2;
-        required uint64 view_id = 3;
-        message InstanceListEntry
-        {
-          required uint64 instance_id = 2;
-          required uint64 gen_id = 3;
-        }
-        message InstanceList
-        {
-          repeated InstanceListEntry instance_entry = 2;
-        }
-        required InstanceList dead_list = 4;
-        required InstanceList live_list = 5;
-        required string cluster_uuid = 6;
+    required string physical_plan = 2;
+    required uint64 view_id = 3;
+
+    message InstanceListEntry
+    {
+        required uint64 instance_id = 2;
+        required uint64 gen_id = 3;
+    }
+
+    message InstanceList
+    {
+        repeated InstanceListEntry instance_entry = 2;
+    }
+ 
+    required InstanceList dead_list = 4;
+    required InstanceList live_list = 5;
+    required string cluster_uuid = 6;
 }
 
 /**
@@ -185,7 +188,6 @@ message Error
     required int32 long_error_code = 8;
     optional string stringified_short_error_code = 9;
     optional string stringified_long_error_code = 10;
-
 
     //UserQueryException part
     message ParsingContext
@@ -206,11 +208,11 @@ message Error
  * Cancel query execution message
  * Sync messages
  */
- message DummyQuery
- {
+message DummyQuery
+{
     optional uint64 payload_id = 2;
     optional string cluster_uuid = 3;
- }
+}
 
 
 /**
@@ -229,49 +231,87 @@ message ResourcesFileExistsResponse
 }
 
 /**
-* Message used to convey flow control information
-*/
+ * Message used to convey flow control information
+ */
 message Control
 {
-  message Channel
-  {
-    required uint32 id = 1;
-    required uint64 available = 2;
-    required uint64 local_sn = 3;
-    required uint64 remote_sn = 4;
-  }
-  required uint64 local_gen_id = 1;
-  required uint64 remote_gen_id = 2;
-  repeated Channel channels = 3;
+    message Channel
+    {
+        required uint32 id = 1;
+        required uint64 available = 2;
+        required uint64 local_sn = 3;
+        required uint64 remote_sn = 4;
+    }
+    
+    required uint64 local_gen_id = 1;
+    required uint64 remote_gen_id = 2;
+    repeated Channel channels = 3;
 }
 
 /**
-*  MPI slave -> SciDB handshake
-*/
+ *  MPI slave -> SciDB handshake
+ */
 message MpiSlaveHandshake
 {
-  required string cluster_uuid = 1;
-  required uint64 instance_id = 2;
-  required uint64 launch_id = 3;
-  required uint64 rank = 4;
-  required uint64 pid  = 5;
-  required uint64 ppid = 6;
+    required string cluster_uuid = 1;
+    required uint64 instance_id = 2;
+    required uint64 launch_id = 3;
+    required uint64 rank = 4;
+    required uint64 pid  = 5;
+    required uint64 ppid = 6;
 }
 
 /**
-*  MPI slave -> SciDB command result
-*/
+ *  MPI slave -> SciDB command result
+ */
 message MpiSlaveResult
 {
-  required uint64 launch_id = 1;
-  required int64 status = 3;
+    required uint64 launch_id = 1;
+    required int64 status = 3;
 }
 
 /**
-* SciDB -> MPI slave command
-*/
+ * SciDB -> MPI slave command
+ */
 message MpiSlaveCommand
 {
-  required string command = 1;
-  repeated string args = 2;
+    required string command = 1;
+    repeated string args = 2;
+}
+
+/**
+ * Client -> Server
+ * Applications should send this as the first message to
+ * start initialization
+ */
+message NewClientStart
+{
+}
+
+/**
+ * Server -> Client
+ * Send when newClient initialization is complete
+ */
+message NewClientComplete
+{
+    required bool  authenticated = 1;
+}
+
+/**
+ * Server -> Client
+ * Message for authenticate command
+ */
+message SecurityMessage
+{
+    required int32  msg_type   = 1;
+    required string msg        = 2;
+}
+
+/**
+ * Client -> Server
+ * Response to SecurityMessage
+ */
+message SecurityMessageResponse
+{
+    required string response = 1;
 }

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,8 +37,8 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.common.thread
 
 namespace scidb
 {
-    void Job::executeOnQueue(boost::weak_ptr<WorkQueue>& wq,
-                             boost::shared_ptr<SerializationCtx>& sCtx)
+    void Job::executeOnQueue(std::weak_ptr<WorkQueue>& wq,
+                             std::shared_ptr<SerializationCtx>& sCtx)
     {
         _wq=wq;
         _wqSCtx = sCtx;
@@ -94,7 +94,7 @@ namespace scidb
     bool Job::wait(bool propagateException, bool allowMultipleWaits)
     {
         _done.enter();
-        if (allowMultipleWaits) { 
+        if (allowMultipleWaits) {
             _done.release(); // allow multiple waits
         }
         if (_error && _error->getShortErrorCode() != SCIDB_E_NO_ERROR) {

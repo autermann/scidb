@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
 /****************************************************************************/
 
 #include <util/arena/Managed.h>                          // For macros
-#include <boost/container/set.hpp>                       // For set
+#include <set>                                           // For set
 
 /****************************************************************************/
 namespace scidb { namespace arena { namespace managed {
@@ -49,10 +49,10 @@ namespace scidb { namespace arena { namespace managed {
  *  @author     jbell@paradigm4.com.
  */
 template<class V,class P = std::less<V> >
-class set : public SCIDB_MANAGED_BASE(boost::container,set,V,P)
+class set : public SCIDB_MANAGED_BASE(std,set,V,P)
 {
  private:            // Implementation
-                        SCIDB_MANAGED_ORDERED(boost::container,set,V,P)
+                        SCIDB_MANAGED_ORDERED(std,set,V,P)
 
  public:             // Construction
     explicit            set(                                  const P& p = P()) : base_type(p)      {}
@@ -88,10 +88,10 @@ inline void swap(set<V,P>& a,set<V,P>& b) {a.swap(b);}
  *  @author     jbell@paradigm4.com.
  */
 template<class V,class P = std::less<V> >
-class multiset : public SCIDB_MANAGED_BASE(boost::container,multiset,V,P)
+class multiset : public SCIDB_MANAGED_BASE(std,multiset,V,P)
 {
  private:            // Implementation
-                        SCIDB_MANAGED_ORDERED(boost::container,multiset,V,P)
+                        SCIDB_MANAGED_ORDERED(std,multiset,V,P)
 
  public:             // Construction
     explicit            multiset(                                  const P& p = P()) : base_type(p)      {}

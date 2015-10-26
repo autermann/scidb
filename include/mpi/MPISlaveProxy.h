@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,13 +28,12 @@
 #ifndef MPISLAVEPROXY_H_
 #define MPISLAVEPROXY_H_
 
-#include <boost/shared_ptr.hpp>
-#include <util/Network.h>
-#include <query/Query.h>
+#include <memory>
 #include <mpi/MPIManager.h>
 #include <mpi/MPIUtils.h>
 
-using namespace std;
+#include <util/Network.h>
+#include <query/Query.h>
 
 namespace scidb
 {
@@ -43,7 +42,8 @@ namespace scidb
      * on all SciDB instances in the form of MPI slaves. This proxy interface allows the MPI-based
      * operators running an all instances to communicate with the MPI slaves and manage their life-time.
      */
-    class MpiSlaveProxy {
+    class MpiSlaveProxy
+    {
     public:
         class InvalidStateException: public SystemException
         {
@@ -63,8 +63,8 @@ namespace scidb
             }
         };
 
-        friend boost::shared_ptr<MpiSlaveProxy> newMPISlaveProxyForTests(uint64_t launchId,
-                                                                         const boost::shared_ptr<Query>& q,
+        friend std::shared_ptr<MpiSlaveProxy> newMPISlaveProxyForTests(uint64_t launchId,
+                                                                         const std::shared_ptr<Query>& q,
                                                                          const std::string& installPath,
                                                                          uint32_t timeout, uint32_t delay);
         /**
@@ -77,7 +77,7 @@ namespace scidb
          * waitForExit()
          * @param delay in seconds, currently used to slowdown errorChecking in waitForExit()
          */
-        MpiSlaveProxy(uint64_t launchId, const boost::shared_ptr<Query>& q,
+        MpiSlaveProxy(uint64_t launchId, const std::shared_ptr<Query>& q,
                       const std::string& installPath, uint32_t timeout, uint32_t delay)
         : _launchId(launchId),
           _queryId(q->getQueryID()),
@@ -100,7 +100,7 @@ namespace scidb
          * waitForHandshake()
          * waitForExit()
          */
-        MpiSlaveProxy(uint64_t launchId, const boost::shared_ptr<Query>& q,
+        MpiSlaveProxy(uint64_t launchId, const std::shared_ptr<Query>& q,
                       const std::string& installPath, uint32_t timeout)
         : _launchId(launchId),
           _queryId(q->getQueryID()),
@@ -119,7 +119,7 @@ namespace scidb
          * @param q current query
          * @param installPath installation directory of this SciDB instance (i.e. "data directory")
          */
-        MpiSlaveProxy(uint64_t launchId, const boost::shared_ptr<Query>& q,
+        MpiSlaveProxy(uint64_t launchId, const std::shared_ptr<Query>& q,
                       const std::string& installPath)
         : _launchId(launchId),
           _queryId(q->getQueryID()),
@@ -150,7 +150,7 @@ namespace scidb
          * @throw scidb::SystemException if the wait exceeds the timout,
          * or if the handshake is malformed and/or cannot be obtained
          */
-        void waitForHandshake(boost::shared_ptr<MpiOperatorContext>& ctx);
+        void waitForHandshake(std::shared_ptr<MpiOperatorContext>& ctx);
 
         /// @return pid,ppid of the MPI slave process
         const std::vector<pid_t>& getPids() const
@@ -165,7 +165,7 @@ namespace scidb
          * @throw MpiSlaveProxy::InvalidStateException if the handshake has not been received
          * @throw scidb::SystemException if the command cannot be sent
          */
-        void sendCommand(mpi::Command& cmd, boost::shared_ptr<MpiOperatorContext>& ctx);
+        void sendCommand(mpi::Command& cmd, std::shared_ptr<MpiOperatorContext>& ctx);
 
         /**
          * Wait for the last command status from the MPI slave
@@ -178,7 +178,7 @@ namespace scidb
          * @note This method never times out. It waits for status as long as the slave
          * maintains its "client" connection to SciDB.
          */
-        int64_t waitForStatus(boost::shared_ptr<MpiOperatorContext>& ctx, bool raise=true);
+        int64_t waitForStatus(std::shared_ptr<MpiOperatorContext>& ctx, bool raise=true);
 
         /**
          * Wait for the the local MPI slave to exit and disconnect
@@ -188,7 +188,7 @@ namespace scidb
          * @throw scidb::SystemException if the wait exceeds the timout,
          * or if the handshake is malformed and/or cannot be obtained
          */
-        void waitForExit(boost::shared_ptr<MpiOperatorContext>& ctx);
+        void waitForExit(std::shared_ptr<MpiOperatorContext>& ctx);
 
         /**
          * Attempt to kill the slave process (including its parent, orted)
@@ -201,10 +201,11 @@ namespace scidb
 
         /// @return the launch ID
         uint64_t getLaunchId() { return _launchId; }
+
     private:
         uint64_t _launchId;
         QueryID _queryId;
-        boost::weak_ptr<scidb::Query> _query;
+        std::weak_ptr<scidb::Query> _query;
         std::vector<pid_t> _pids;
         ClientContext::Ptr _connection;
         std::string _installPath;
@@ -214,5 +215,4 @@ namespace scidb
     };
 
 } //namespace
-
 #endif

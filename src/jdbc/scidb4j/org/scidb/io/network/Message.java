@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,20 +22,21 @@
 package org.scidb.io.network;
 
 import java.io.IOException;
-import org.scidb.util.InputStreamWithReadall;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-
 import com.google.protobuf.GeneratedMessage;
+
+import org.scidb.util.InputStreamWithReadall;
+import org.scidb.client.SciDBException;
 
 /**
  * Base class for constructing network messages locally and from socket stream
  */
 public abstract class Message
 {
-    private GeneratedMessage record;
-    private Header header;
+    private GeneratedMessage _record;
+    private Header           _header;
 
     public static final short mtNone = 0;
     public static final short mtExecuteQuery = 1;
@@ -66,7 +67,12 @@ public abstract class Message
     public static final short mtCommit = 26;
     public static final short mtCompleteQuery = 27;
     public static final short mtControl = 28;
-    public static final short mtSystemMax = 29;
+    public static final short mtUpdateQueryResult = 29;
+    public static final short mtNewClientStart = 30;
+    public static final short mtNewClientComplete = 31;
+    public static final short mtSecurityMessage = 32;
+    public static final short mtSecurityMessageResponse = 33;
+    public static final short mtSystemMax = 34;
 
     /**
      * Make message from header
@@ -75,7 +81,7 @@ public abstract class Message
      */
     public Message(Header header)
     {
-        this.header = header;
+        _header = header;
     }
 
     /**
@@ -88,7 +94,8 @@ public abstract class Message
      * @throws org.scidb.client.Error
      * @throws IOException
      */
-    public static Message parseFromStream(InputStreamWithReadall is) throws org.scidb.client.Error, IOException
+    public static Message parseFromStream(InputStreamWithReadall is)
+        throws SciDBException, IOException
     {
         Header hdr = Header.parseFromStream(is);
 
@@ -102,8 +109,17 @@ public abstract class Message
 
             case mtChunk:
                 return new Chunk(hdr, is);
+
+            case mtNewClientComplete:
+                return new NewClientComplete(hdr, is);
+
+            case mtSecurityMessage:
+                return new SecurityMessage(hdr, is);
+
             default:
-                throw new org.scidb.client.Error("Unknown network message type: " + hdr.messageType);
+                throw new SciDBException(
+                    "Unknown network message type: " +
+                    hdr.messageType);
         }
     }
 
@@ -115,20 +131,21 @@ public abstract class Message
      */
     public void writeToStream(OutputStream os) throws IOException
     {
-        ByteBuffer buf = ByteBuffer.allocate(32);
+        ByteBuffer buf = ByteBuffer.allocate(Header.headerSize);
         buf.clear();
         buf.order(ByteOrder.LITTLE_ENDIAN);
-        buf.putShort(header.netProtocolVersion);
-        buf.putShort(header.messageType);
-        buf.putInt(getRecordSize());
-        buf.putInt(header.binarySize);
+        buf.putShort(getHeader().netProtocolVersion);
+        buf.putShort(getHeader().messageType);
         buf.putInt(0); // Structure data aligning padding
-        buf.putLong(header.sourceInstanceID);
-        buf.putLong(header.queryID);
+        buf.putLong(getRecordSize());
+        buf.putLong(getHeader().binarySize);
+        buf.putLong(getHeader().sourceInstanceID);
+        buf.putLong(getHeader().queryID);
         buf.flip();
         os.write(buf.array());
-        if (record != null)
-            record.writeTo(os);
+        if (_record != null) {
+            _record.writeTo(os);
+        }
     }
 
     /**
@@ -138,7 +155,7 @@ public abstract class Message
      */
     public int getRecordSize()
     {
-        return (record != null) ? record.getSerializedSize() : 0;
+        return (_record != null) ? _record.getSerializedSize() : 0;
     }
 
     /**
@@ -148,7 +165,7 @@ public abstract class Message
      */
     private void setRecord(com.google.protobuf.GeneratedMessage record)
     {
-        this.record = record;
+        _record = record;
     }
 
     /**
@@ -158,7 +175,7 @@ public abstract class Message
      */
     public com.google.protobuf.GeneratedMessage getRecord()
     {
-        return record;
+        return _record;
     }
 
     /**
@@ -168,23 +185,25 @@ public abstract class Message
      */
     public Header getHeader()
     {
-        return header;
+        return _header;
     }
 
     /**
      * Message header which delimit protobuf parts.
-     * Note to developers: the headerSize is 32, even though the total size of all fields in class Header
-     * is 28. The reason is that the corresponding server-side C++ structure is 8-byte aligned.
+     * Note to developers: the headerSize is 32, even though the total
+     * size of all fields in class Header is 28. The reason is that
+     * the corresponding server-side C++ structure is 8-byte aligned.
      */
     public static class Header
-    {   /// Must match the server network protocol version (in src/network/BaseConnection.h)
-        public static final short NET_PROTOCOL_CURRENT_VER = 4;
+    {   /// Must match the server network protocol version
+        ///     (in src/network/BaseConnection.h)
+        private static final short _NET_PROTOCOL_CURRENT_VER = 7;
 
-        public static final int headerSize = 32;
+        public static final int headerSize = 40;
         public short netProtocolVersion; // uint16_t
         public short messageType; // uint16_t
-        public int recordSize; // uint32_t
-        public int binarySize; // uint32_t
+        public long recordSize; // uint64_t v7, uint32_t v6
+        public long binarySize; // uint64_t v7, uint32_t v6
         public long sourceInstanceID; // uint64_t
         public long queryID; // uint64_t
 
@@ -193,13 +212,14 @@ public abstract class Message
          */
         public Header()
         {
-            this.netProtocolVersion = NET_PROTOCOL_CURRENT_VER;
-            this.messageType = (short) 0;
-            this.sourceInstanceID = ~0;
-            this.recordSize = 0;
-            this.binarySize = 0;
-            this.queryID = 0;
+            netProtocolVersion = _NET_PROTOCOL_CURRENT_VER;
+            messageType = (short) 0;
+            sourceInstanceID = ~0;
+            recordSize = 0;
+            binarySize = 0;
+            queryID = 0;
         }
+
 
         /**
          * Construct header and fill query id and message type
@@ -221,25 +241,45 @@ public abstract class Message
          * @return Header
          * @throws IOException
          */
-        public static Header parseFromStream(InputStreamWithReadall is) throws IOException
+        public static Header parseFromStream(InputStreamWithReadall is)
+            throws IOException
         {
             Header res = new Header();
             byte[] b = new byte[Header.headerSize];
-            if (is.readAll(b, 0, Header.headerSize) != Header.headerSize) {
-                throw new IOException("Failed to read the full Message::Header");
+            int len = is.readAll(b, 0, Header.headerSize);
+            if (len != Header.headerSize) {
+                throw new IOException("Failed to read the full Message::Header, read " + len + " bytes");
             }
             ByteBuffer buf = ByteBuffer.wrap(b);
 
             buf.order(ByteOrder.LITTLE_ENDIAN);
             res.netProtocolVersion = buf.getShort();
             res.messageType = buf.getShort();
-            res.recordSize = buf.getInt();
-            res.binarySize = buf.getInt();
             buf.getInt(); // Structure data aligning padding
+            res.recordSize = buf.getLong();
+            res.binarySize = buf.getLong();
             res.sourceInstanceID = buf.getLong();
             res.queryID = buf.getLong();
 
             return res;
+        }
+
+        public int iRecordSize() throws IOException
+        {
+            if (this.recordSize > Integer.MAX_VALUE) {
+                throw new IOException("Header recordSize longer than int");
+            }
+            Long LongRecordSize = this.recordSize;
+            return LongRecordSize.intValue();
+        }
+
+        public int iBinarySize() throws IOException
+        {
+            if (this.binarySize > Integer.MAX_VALUE) {
+                throw new IOException("Header binarySize longer than int");
+            }
+            Long LongBinarySize = this.binarySize;
+            return LongBinarySize.intValue();
         }
     }
 
@@ -259,10 +299,19 @@ public abstract class Message
          * @param programOptions Program options
          * @param execute true=execute, false=prepare
          */
-        public Query(long queryId, String queryString, Boolean afl, String programOptions, Boolean execute)
+        public Query(
+            long queryId,
+            String queryString,
+            Boolean afl,
+            String programOptions,
+            Boolean execute)
         {
-            super(new Message.Header(queryId, execute ? mtExecuteQuery : mtPrepareQuery));
-            ScidbMsg.Query.Builder recBuilder = ScidbMsg.Query.newBuilder();
+            super(new Message.Header(
+                queryId, execute ? mtExecuteQuery : mtPrepareQuery));
+
+            ScidbMsg.Query.Builder recBuilder =
+                ScidbMsg.Query.newBuilder();
+
             recBuilder.setQuery(queryString);
             recBuilder.setAfl(afl);
             recBuilder.setProgramOptions(programOptions);
@@ -284,12 +333,13 @@ public abstract class Message
          * @param is Input stream
          * @throws IOException
          */
-        public Error(Header hdr, InputStreamWithReadall is) throws IOException
+        public Error(Header hdr, InputStreamWithReadall is)
+            throws IOException
         {
             super(hdr);
             assert (hdr.messageType == mtError);
-            byte[] buf = new byte[hdr.recordSize];
-            if (is.readAll(buf, 0, hdr.recordSize) != hdr.recordSize)  {
+            byte[] buf = new byte[hdr.iRecordSize()];
+            if (is.readAll(buf, 0, hdr.iRecordSize()) != hdr.recordSize)  {
                 throw new IOException("Failed to read the full Error::Header.");
             }
 
@@ -308,6 +358,7 @@ public abstract class Message
         }
     }
 
+
     /**
      * Query result message
      *
@@ -322,12 +373,13 @@ public abstract class Message
          * @param is Input stream
          * @throws IOException
          */
-        public QueryResult(Header hdr, InputStreamWithReadall is) throws IOException
+        public QueryResult(Header hdr, InputStreamWithReadall is)
+            throws IOException
         {
             super(hdr);
             assert (hdr.messageType == mtQueryResult);
-            byte[] buf = new byte[hdr.recordSize];
-            if (is.readAll(buf, 0, hdr.recordSize) != hdr.recordSize)  {
+            byte[] buf = new byte[hdr.iRecordSize()];
+            if (is.readAll(buf, 0, hdr.iRecordSize()) != hdr.recordSize)  {
                 throw new IOException("Failed to read the full QueryResult::Header");
             }
 
@@ -343,6 +395,83 @@ public abstract class Message
         public ScidbMsg.QueryResult getRecord()
         {
             return (ScidbMsg.QueryResult) super.getRecord();
+        }
+    }
+
+    /**
+     * NewClientComplete message
+     *
+     * Only for receiving
+     */
+    public static class NewClientComplete extends Message
+    {
+        /**
+         * Constructor
+         *
+         * @param hdr Header
+         * @param is Input stream
+         * @throws IOException
+         */
+        public NewClientComplete(Header hdr, InputStreamWithReadall is)
+            throws IOException
+        {
+            super(hdr);
+            assert (hdr.messageType == mtNewClientComplete);
+            byte[] buf = new byte[hdr.iRecordSize()];
+            if (is.readAll(buf, 0, hdr.iRecordSize()) != hdr.recordSize)  {
+                throw new IOException("Failed to read the full Error::Header.");
+            }
+            super.setRecord(ScidbMsg.NewClientComplete.parseFrom(buf));
+        }
+
+        /**
+         * Returns Cast base protobuf record to NewClientComplete and return
+         *
+         * @return Error protobuf record
+         */
+        @Override
+        public ScidbMsg.NewClientComplete getRecord()
+        {
+            return (ScidbMsg.NewClientComplete) super.getRecord();
+        }
+    }
+
+
+    /**
+     * SecurityMessage message
+     *
+     * Only for receiving
+     */
+    public static class SecurityMessage extends Message
+    {
+        /**
+         * Constructor
+         *
+         * @param hdr Header
+         * @param is Input stream
+         * @throws IOException
+         */
+        public SecurityMessage(Header hdr, InputStreamWithReadall is)
+            throws IOException
+        {
+            super(hdr);
+            assert (hdr.messageType == mtSecurityMessage);
+            byte[] buf = new byte[hdr.iRecordSize()];
+            if (is.readAll(buf, 0, hdr.iRecordSize()) != hdr.recordSize)  {
+                throw new IOException("Failed to read the full Error::Header.");
+            }
+            super.setRecord(ScidbMsg.SecurityMessage.parseFrom(buf));
+        }
+
+        /**
+         * Returns Cast base protobuf record to NewClientComplete and return
+         *
+         * @return Error protobuf record
+         */
+        @Override
+        public ScidbMsg.SecurityMessage getRecord()
+        {
+            return (ScidbMsg.SecurityMessage) super.getRecord();
         }
     }
 
@@ -390,13 +519,13 @@ public abstract class Message
         {
             super(hdr);
             assert (hdr.messageType == mtChunk);
-            byte[] buf = new byte[hdr.recordSize];
-            if (is.readAll(buf, 0, hdr.recordSize) != hdr.recordSize)  {
+            byte[] buf = new byte[hdr.iRecordSize()];
+            if (is.readAll(buf, 0, hdr.iRecordSize()) != hdr.recordSize)  {
                 throw new IOException("Failed to read the full Chunk::Header");
             }
 
-            chunkData = new byte[hdr.binarySize];
-            if (is.readAll(chunkData, 0, hdr.binarySize) != hdr.binarySize) {
+            chunkData = new byte[hdr.iBinarySize()];
+            if (is.readAll(chunkData, 0, hdr.iBinarySize()) != hdr.binarySize) {
                 throw new IOException("Failed to read the full Chunk data");
             }
 
@@ -443,6 +572,40 @@ public abstract class Message
         public AbortQuery(long queryId)
         {
             super(new Message.Header(queryId, mtCancelQuery));
+        }
+    }
+
+
+    /**
+     * Message for newClientStart
+     */
+    public static class NewClientStart extends Message
+    {
+        public NewClientStart(long queryId)
+        {
+            super(new Message.Header(queryId, mtNewClientStart));
+
+            ScidbMsg.NewClientStart.Builder recBuilder =
+                ScidbMsg.NewClientStart.newBuilder();
+
+            super.setRecord(recBuilder.build());
+        }
+    }
+
+    /**
+     * Message for SecurityMessageResponse
+     */
+    public static class SecurityMessageResponse extends Message
+    {
+        public SecurityMessageResponse(long queryId, String response)
+        {
+            super(new Message.Header(queryId, mtSecurityMessageResponse));
+
+            ScidbMsg.SecurityMessageResponse.Builder recBuilder =
+                ScidbMsg.SecurityMessageResponse.newBuilder();
+
+            recBuilder.setResponse(response);
+            super.setRecord(recBuilder.build());
         }
     }
 }

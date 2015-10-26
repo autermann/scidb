@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -47,7 +47,6 @@ set(ops_lib_src
     apply/PhysicalApply.cpp
     sg/LogicalSG.cpp
     sg/PhysicalSG.cpp
-    load/LogicalLoad.cpp
     store/LogicalStore.cpp
     store/PhysicalStore.cpp
     redimension/LogicalRedimension.cpp
@@ -88,11 +87,7 @@ set(ops_lib_src
     sort/PhysicalSort.cpp
     sort/ArrayBreaker.cpp
     sort/DistributedSort.cpp
-    sort/LogicalOldSort.cpp
-    sort/PhysicalOldSort.cpp
-    sort2/LogicalSort.cpp
-    sort2/PhysicalSort.cpp
-    list/ListArrayBuilder.cpp
+    list/ListArrayBuilders.cpp
     list/LogicalList.cpp
     list/PhysicalList.cpp
     attributes/LogicalAttributes.cpp
@@ -101,9 +96,6 @@ set(ops_lib_src
     dimensions/PhysicalDimensions.cpp
     rename/LogicalRename.cpp
     rename/PhysicalRename.cpp
-    concat/LogicalConcat.cpp
-    concat/PhysicalConcat.cpp
-    concat/ConcatArray.cpp
     unpack/LogicalUnpack.cpp
     unpack/PhysicalUnpack.cpp
     build/LogicalBuild.cpp
@@ -121,25 +113,15 @@ set(ops_lib_src
     merge/LogicalMerge.cpp
     merge/PhysicalMerge.cpp
     merge/MergeArray.cpp
-    normalize/LogicalNormalize.cpp
-    normalize/PhysicalNormalize.cpp
-    normalize/NormalizeArray.cpp
     save/LogicalSave.cpp
     save/PhysicalSave.cpp
+    save/LogicalSaveOld.cpp
+    save/PhysicalSaveOld.cpp
     xgrid/LogicalXgrid.cpp
     xgrid/PhysicalXgrid.cpp
     xgrid/XgridArray.cpp
-    thin/LogicalThin.cpp
-    thin/PhysicalThin.cpp
-    thin/ThinArray.cpp
     help/LogicalHelp.cpp
     help/PhysicalHelp.cpp
-    lookup/LogicalLookup.cpp
-    lookup/PhysicalLookup.cpp
-    lookup/LookupArray.cpp
-    reverse/LogicalReverse.cpp
-    reverse/PhysicalReverse.cpp
-    reverse/ReverseArray.cpp
     input/LogicalInput.cpp
     input/PhysicalInput.cpp
     input/InputArray.cpp
@@ -149,15 +131,10 @@ set(ops_lib_src
     explainPhysical/PhysicalExplainPhysical.cpp
     versions/LogicalVersions.cpp
     versions/PhysicalVersions.cpp
-    allversions/LogicalAllVersions.cpp
-    allversions/PhysicalAllVersions.cpp
-    allversions/AllVersionsArray.cpp
     explainLogical/LogicalExplainLogical.cpp
     explainLogical/PhysicalExplainLogical.cpp
     unload_library/LogicalUnLoadLibrary.cpp
     unload_library/PhysicalUnLoadLibrary.cpp
-    attribute_rename/LogicalAttributeRename.cpp
-    attribute_rename/PhysicalAttributeRename.cpp
     cancel/LogicalCancel.cpp
     cancel/PhysicalCancel.cpp
     show/LogicalShow.cpp
@@ -170,8 +147,6 @@ set(ops_lib_src
     diskinfo/PhysicalDiskInfo.cpp
     materialize/LogicalMaterialize.cpp
     materialize/PhysicalMaterialize.cpp
-    analyze/LogicalAnalyze.cpp
-    analyze/PhysicalAnalyze.cpp
     rankquantile/LogicalRank.cpp
     rankquantile/PhysicalRank.cpp
     rankquantile/LogicalQuantile.cpp

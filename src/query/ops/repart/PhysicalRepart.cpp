@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,48 +51,49 @@ public:
     //True if this is a no-op (just a metadata change, doesn't change chunk sizes or overlap)
     bool isNoop(ArrayDesc const& inputSchema) const
     {
-        return samePartitioning(_schema, inputSchema);
+        return _schema.samePartitioning(inputSchema);
     }
 
-    virtual bool changesDistribution(vector<ArrayDesc> const& inputSchemas) const
+    virtual bool changesDistribution(std::vector<ArrayDesc>const& inputSchemas) const
     {
         return !isNoop(inputSchemas[0]);
     }
 
-    virtual PhysicalBoundaries getOutputBoundaries(vector<PhysicalBoundaries> const& sourceBoundaries,
-                                                   vector<ArrayDesc> const& sourceSchema) const
+    virtual PhysicalBoundaries getOutputBoundaries(std::vector<PhysicalBoundaries>const& sourceBoundaries,
+                                                   std::vector<ArrayDesc>const& sourceSchema) const
     {
         return sourceBoundaries[0];
     }
 
-    virtual ArrayDistribution getOutputDistribution(vector<ArrayDistribution> const& sourceDistribution,
-                                                    vector< ArrayDesc> const& inputSchemas) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext>const& sourceDistribution,
+                                                    std::vector<ArrayDesc>const& inputSchemas) const
     {
         if (isNoop(inputSchemas[0]))
         {
             return sourceDistribution[0];
         }
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
-    virtual bool outputFullChunks(std::vector< ArrayDesc> const& inputSchemas) const
+    virtual bool outputFullChunks(std::vector<ArrayDesc>const& inputSchemas) const
     {
         return isNoop(inputSchemas[0]);
     }
 
-    boost::shared_ptr<Array> execute(vector< shared_ptr<Array> >& sourceArray, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& sourceArray, std::shared_ptr<Query> query)
     {
-        shared_ptr<Array> input = sourceArray[0];
+        std::shared_ptr<Array> input = sourceArray[0];
         if (isNoop(input->getArrayDesc()))
         {
-            return shared_ptr<Array> (new DelegateArray(_schema, input, true) );
+            return std::shared_ptr<Array> (new DelegateArray(_schema, input, true) );
         }
 
         Attributes const& destAttrs = _schema.getAttributes(true); // true = exclude empty tag.
+        Dimensions const& destDims  = _schema.getDimensions();
 
         vector<AggregatePtr> aggregates (destAttrs.size());
-        vector<size_t> attrMapping(destAttrs.size());
-        vector<size_t> dimMapping(_schema.getDimensions().size());
+        vector<size_t>       attrMapping(destAttrs.size());
+        vector<size_t>       dimMapping (destDims.size());
 
         for (size_t i=0; i<attrMapping.size(); ++i)
         {
@@ -104,7 +105,7 @@ public:
         }
 
         ElapsedMilliSeconds timing;
-        shared_ptr<Array> res = redimensionArray(input,
+        std::shared_ptr<Array> res = redimensionArray(input,
                                                  attrMapping,
                                                  dimMapping,
                                                  aggregates,

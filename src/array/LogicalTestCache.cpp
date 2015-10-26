@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -63,16 +63,16 @@ public:
         LogicalOperator(logicalName, alias)
     {}
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         Attributes outputAttrs;
         outputAttrs.push_back(AttributeDesc(0, "dummy", TID_DOUBLE, AttributeDesc::IS_NULLABLE, 0));
         Dimensions outputDims;
         outputDims.push_back(DimensionDesc("i",0,0,1,0));
-        return ArrayDesc("test_cache", outputAttrs, outputDims);
+        return ArrayDesc("test_cache", outputAttrs, outputDims, defaultPartitioning());
     }
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalTestCache, "test_cache");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalTestCache, "_test_cache");
 
 } //namespace scidb

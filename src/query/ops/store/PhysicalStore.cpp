@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,107 +51,27 @@ using namespace boost;
 
 namespace scidb {
 
-class PhysicalStore: public PhysicalOperator
+class PhysicalStore: public PhysicalUpdate
 {
   private:
-   ArrayUAID _arrayUAID;   /**< UAID of new array */
-   ArrayID _arrayID;   /**< ID of new array */
-   VersionID _lastVersion;
-   shared_ptr<SystemCatalog::LockDesc> _lock;
+
+    static const string& getArrayName(const Parameters& parameters)
+    {
+        SCIDB_ASSERT(!parameters.empty());
+        return ((std::shared_ptr<OperatorParamReference>&)parameters[0])->getObjectName();
+    }
 
   public:
-   PhysicalStore(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema),
-        _arrayUAID(0),
-        _arrayID(0),
-        _lastVersion(0)
+   PhysicalStore(const string& logicalName,
+                 const string& physicalName,
+                 const Parameters& parameters,
+                 const ArrayDesc& schema):
+        PhysicalUpdate(logicalName,
+                       physicalName,
+                       parameters,
+                       schema,
+                       getArrayName(parameters))
    {}
-
-   void preSingleExecute(shared_ptr<Query> query)
-   {
-        ArrayDesc parentArrayDesc;
-        shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-        assert(membership);
-        if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-            (membership->getInstances().size() != query->getInstancesCount()))
-        {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-        }
-
-        _lock = make_shared<SystemCatalog::LockDesc>(_schema.getName(),
-                                                     query->getQueryID(),
-                                                     Cluster::getInstance()->getLocalInstanceId(),
-                                                     SystemCatalog::LockDesc::COORD,
-                                                     SystemCatalog::LockDesc::WR);
-        shared_ptr<Query::ErrorHandler> ptr(make_shared<UpdateErrorHandler>(_lock));
-        query->pushErrorHandler(ptr);
-
-     /* array does not yet exist? ...*/
-
-        if (!SystemCatalog::getInstance()->getArrayDesc(_schema.getName(),parentArrayDesc,false))
-        {
-            if (_schema.getId() != 0)
-            {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << _schema.getName();
-            }
-            _lock->setLockMode(SystemCatalog::LockDesc::CRT);
-            BOOST_VERIFY(SystemCatalog::getInstance()->updateArrayLock(_lock));
-            parentArrayDesc = _schema;
-            SystemCatalog::getInstance()->addArray(parentArrayDesc, psHashPartitioned);
-        }
-        else
-        if (parentArrayDesc.isTransient())
-        {
-            if (_schema.getId() != parentArrayDesc.getId())
-            {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << _schema.getName();
-            }
-            _lock->setArrayId       (_arrayUAID   = parentArrayDesc.getUAId());
-            _lock->setArrayVersion  (_lastVersion = 0);
-            _lock->setArrayVersionId(_arrayID     = parentArrayDesc.getId());
-            BOOST_VERIFY(SystemCatalog::getInstance()->updateArrayLock(_lock));
-            return;
-        }
-        else // exists but not transient, so get its latest version
-        {
-            if (_schema.getId() != parentArrayDesc.getId())
-            {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_ARRAY_DOESNT_EXIST) << _schema.getName();
-            }
-            _lastVersion = SystemCatalog::getInstance()->getLastVersion(parentArrayDesc.getId());
-        }
-
-        _arrayUAID = parentArrayDesc.getUAId();
-        _lock->setArrayId(_arrayUAID);
-        _lock->setArrayVersion(_lastVersion+1);
-
-        BOOST_VERIFY(SystemCatalog::getInstance()->updateArrayLock(_lock));
-
-        {
-            Dimensions newVersionDims(_schema.getDimensions());
-
-            BOOST_FOREACH (DimensionDesc& d, newVersionDims)
-            {
-                d.setCurrStart(MAX_COORDINATE);
-                d.setCurrEnd(MIN_COORDINATE);
-            }
-            _schema = ArrayDesc(ArrayDesc::makeVersionedName(_schema.getName(), _lastVersion+1), parentArrayDesc.getAttributes(), newVersionDims);
-        }
-
-        SystemCatalog::getInstance()->addArray(_schema, psHashPartitioned);
-        _arrayID = _schema.getId();
-        _lock->setArrayVersionId(_arrayID);
-        BOOST_VERIFY(SystemCatalog::getInstance()->updateArrayLock(_lock));
-   }
-
-    virtual void postSingleExecute(shared_ptr<Query> query)
-    {
-        assert(_lock);
-        if (_arrayID!=0 && !_schema.isTransient())
-        {
-            SystemCatalog::getInstance()->createNewVersion(_arrayUAID, _arrayID);
-        }
-    }
 
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
                                                    const std::vector< ArrayDesc>         & inputSchemas) const
@@ -159,83 +79,112 @@ class PhysicalStore: public PhysicalOperator
         return inputBoundaries.front();
     }
 
+    /**
+     * If chunk sizes or overlaps differ, repartition the input array to match the target.
+     */
+    virtual void requiresRedimensionOrRepartition(
+        vector<ArrayDesc> const& inputSchemas,
+        vector<ArrayDesc const*>& modifiedPtrs) const
+    {
+        SCIDB_ASSERT(inputSchemas.size() == 1);
+        SCIDB_ASSERT(modifiedPtrs.size() == 1);
+
+        // If input matches target array schema, no problem.
+        if (inputSchemas[0].samePartitioning(_schema)) {
+            modifiedPtrs.clear();
+            return;
+        }
+
+        // If input was manually repartitioned, we're not allowed to override
+        // it, so you're scrod.
+        //
+        if (modifiedPtrs[0] != NULL) {
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_REPART_FORBIDDEN)
+                << getLogicalName();
+        }
+
+        // Request a repartition to the target array's schema.
+        modifiedPtrs[0] = &_schema;
+    }
+
     virtual DistributionRequirement getDistributionRequirement(const std::vector< ArrayDesc> & inputSchemas) const
     {
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder,
-                                       vector<ArrayDistribution>(1,ArrayDistribution(psHashPartitioned)));
+                                       vector<RedistributeContext>(1,RedistributeContext(defaultPartitioning())));
     }
 
-    /**
-     * Record the array 't' in the transient array cache. Implements a callback
-     * that is suitable for use as a query finalizer.
-     */
-    static void recordTransient(const MemArrayPtr& t,const QueryPtr& query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        if (query->wasCommitted())                       // Was committed ok?
+        SCIDB_ASSERT(inputArrays.size() == 1);
+        VersionID version = _schema.getVersionId();
+        SCIDB_ASSERT(version == ArrayDesc::getVersionFromName (_schema.getName()));
+        const string& unvArrayName = getArrayName(_parameters);
+        SCIDB_ASSERT(unvArrayName == ArrayDesc::makeUnversionedName(_schema.getName()));
+
+        if (!_lock)
         {
-            transient::record(t);                        // ...record in cache
-        }
-    }
+            SCIDB_ASSERT(!query->isCoordinator());
+            const SystemCatalog::LockDesc::LockMode lockMode =
+                _schema.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
 
-    shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
-    {
-        assert(inputArrays.size() == 1);
-        VersionID    version = ArrayDesc::getVersionFromName (_schema.getName());
-        string baseArrayName = ArrayDesc::makeUnversionedName(_schema.getName());
+            _lock = std::shared_ptr<SystemCatalog::LockDesc>(make_shared<SystemCatalog::LockDesc>(
+                                                           unvArrayName,
+                                                           query->getQueryID(),
+                                                           Cluster::getInstance()->getLocalInstanceId(),
+                                                           SystemCatalog::LockDesc::WORKER,
+                                                           lockMode));
+            if (lockMode == SystemCatalog::LockDesc::WR) {
+                SCIDB_ASSERT(!_schema.isTransient());
+                _lock->setArrayVersion(version);
+                std::shared_ptr<Query::ErrorHandler> ptr(make_shared<UpdateErrorHandler>(_lock));
+                query->pushErrorHandler(ptr);
+            }
+
+           Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock,_lock,_1);
+           query->pushFinalizer(f);
+           SystemCatalog::ErrorChecker errorChecker(bind(&Query::validate, query));
+           if (!SystemCatalog::getInstance()->lockArray(_lock, errorChecker)) {
+               throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK) << _lock->toString();
+           }
+           SCIDB_ASSERT(_lock->getLockMode() == lockMode);
+        }
 
         if (_schema.isTransient())                       // Storing to transient?
         {
-            MemArrayPtr        p(new MemArray(_schema,query)); // materialized copy
-            PhysicalBoundaries b(PhysicalBoundaries::createEmpty(_schema.getDimensions().size()));
+            SCIDB_ASSERT(_lock->getLockMode() == SystemCatalog::LockDesc::XCL);
+
+            MemArrayPtr        outArray(make_shared<MemArray>(_schema,query)); // materialized copy
+            PhysicalBoundaries bounds(PhysicalBoundaries::createEmpty(_schema.getDimensions().size()));
 
          /* Pick the best append mode that the source array will support...*/
 
             bool vertical = inputArrays[0]->getSupportedAccess() >= Array::MULTI_PASS;
 
-            p->append(inputArrays[0],vertical);          // ...materialize it
+            outArray->append(inputArrays[0],vertical);          // ...materialize it
 
          /* Run back over the chunks one more time to compute the physical bounds
             of the array...*/
 
-            for (shared_ptr<ConstArrayIterator> i(p->getConstIterator(0)); !i->end(); ++(*i))
+            for (std::shared_ptr<ConstArrayIterator> i(outArray->getConstIterator(0)); !i->end(); ++(*i))
             {
-                b.updateFromChunk(&i->getChunk());       // ...update bounds
+                bounds.updateFromChunk(&i->getChunk());       // ...update bounds
             }
 
-            SystemCatalog::getInstance()->updateArrayBoundaries(_schema,b);
-            query->pushFinalizer(bind(&recordTransient,p,_1));
+            updateSchemaBoundaries(_schema, bounds, query);
+            query->pushFinalizer(boost::bind(&PhysicalUpdate::recordTransient, this, outArray,_1));
             getInjectedErrorListener().check();          // ...for error injection
-            return p;                                    // ...return the copy
+            return outArray;                             // ...return the copy
         }
 
-        if (!_lock)
-        {
-           _lock = shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(baseArrayName,
-                                                                                   query->getQueryID(),
-                                                                                   Cluster::getInstance()->getLocalInstanceId(),
-                                                                                   SystemCatalog::LockDesc::WORKER,
-                                                                                   SystemCatalog::LockDesc::WR));
-           _lock->setArrayVersion(version);
-           shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(_lock));
-           query->pushErrorHandler(ptr);
-
-           Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock,_lock,_1);
-           query->pushFinalizer(f);
-           SystemCatalog::ErrorChecker errorChecker(bind(&Query::validate, query));
-           if (!SystemCatalog::getInstance()->lockArray(_lock, errorChecker))
-           {
-              throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK)<< baseArrayName;
-           }
-        }
-
-        shared_ptr<Array>  srcArray    (inputArrays[0]);
+        std::shared_ptr<Array>  srcArray    (inputArrays[0]);
         ArrayDesc const&   srcArrayDesc(srcArray->getArrayDesc());
-        shared_ptr<Array>  dstArray    (DBArray::newDBArray(_schema.getName(), query)); // We can't use _arrayID because it's not initialized on remote instances
+        std::shared_ptr<Array>  dstArray    (DBArray::newDBArray(_schema, query));
         ArrayDesc const&   dstArrayDesc(dstArray->getArrayDesc());
+        SCIDB_ASSERT(dstArrayDesc == _schema);
 
         query->getReplicationContext()->enableInboundQueue(dstArrayDesc.getId(), dstArray);
 
-        size_t nAttrs = dstArrayDesc.getAttributes().size();
+        const size_t nAttrs = dstArrayDesc.getAttributes().size();
 
         if (nAttrs == 0)
         {
@@ -245,21 +194,27 @@ class PhysicalStore: public PhysicalOperator
         if (nAttrs > srcArrayDesc.getAttributes().size())
         {
             assert(nAttrs == srcArrayDesc.getAttributes().size()+1);
-            srcArray = boost::shared_ptr<Array>(new NonEmptyableArray(srcArray));
+            srcArray = std::shared_ptr<Array>(make_shared<NonEmptyableArray>(srcArray));
         }
 
         // Perform parallel evaluation of aggregate
-        shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
-        size_t nJobs = srcArray->getSupportedAccess() == Array::RANDOM ? Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE) : 1;
-        vector< shared_ptr<StoreJob> > jobs(nJobs);
+        std::shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
+        size_t nJobs = false // until we have a trully multi-threaded storage manager and
+                             // StoreJob that yields its thread, store() is single-threaded
+            ? Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE)
+            : 1;
+
+        vector< std::shared_ptr<StoreJob> > jobs(nJobs);
         Dimensions const& dims = dstArrayDesc.getDimensions();
-        size_t nDims = dims.size();
+        const size_t nDims = dims.size();
         for (size_t i = 0; i < nJobs; i++) {
             jobs[i] = make_shared<StoreJob>(i, nJobs, dstArray, srcArray, nDims, nAttrs, query);
         }
-        for (size_t i = 0; i < nJobs; i++) {
+        for (size_t i = 1; i < nJobs; i++) {
             queue->pushJob(jobs[i]);
         }
+
+        jobs[0]->execute();
 
         PhysicalBoundaries bounds = PhysicalBoundaries::createEmpty(nDims);
         int errorJob = -1;
@@ -281,10 +236,13 @@ class PhysicalStore: public PhysicalOperator
         {
             createdChunks.insert(jobs[i]->getCreatedChunks().begin(), jobs[i]->getCreatedChunks().end());
         }
+
         //Insert tombstone entries
         StorageManager::getInstance().removeDeadChunks(dstArrayDesc, createdChunks, query);
 
-        SystemCatalog::getInstance()->updateArrayBoundaries(_schema, bounds);
+        // Update boundaries
+        updateSchemaBoundaries(_schema, bounds, query);
+
         query->getReplicationContext()->replicationSync(dstArrayDesc.getId());
         query->getReplicationContext()->removeInboundQueue(dstArrayDesc.getId());
 

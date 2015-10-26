@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -39,9 +39,14 @@ message(STATUS "****************** BEGIN mpi/slaving/CMakeLists.txt ************
 if (SCALAPACK_FOUND AND LAPACK_FOUND AND BLAS_FOUND AND
     MPI_CXX_FOUND AND MPI_Fortran_FOUND)
 
+    configure_file(${MPI_CXX_COMPILER} mpicxx COPYONLY)
+    execute_process(COMMAND sed "-i" "/^Show=$/i MPICH_CXX=${MPICH_CXX}" "${CMAKE_CURRENT_BINARY_DIR}/mpicxx")
+    configure_file(${MPI_Fortran_COMPILER} mpif77 COPYONLY)
+    execute_process(COMMAND sed "-i" "/^Show=$/i MPICH_FC=${MPICH_FC}" "${CMAKE_CURRENT_BINARY_DIR}/mpif77")
+
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_INCLUDE}")
-    set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})         # hack - we don't understand FindMPI yet
-    set(CMAKE_Fortran_COMPILER ${MPI_Fortran_COMPILER}) # hack - we don't understand FindMPI yet
+    set(CMAKE_CXX_COMPILER ${CMAKE_CURRENT_BINARY_DIR}/mpicxx)
+    set(CMAKE_Fortran_COMPILER ${CMAKE_CURRENT_BINARY_DIR}/mpif77)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I ${SCALAPACK_INC_DIR}")
 
     message(STATUS "Debug: CMAKE_CXX_COMPLIER is ${CMAKE_CXX_COMPILER}")

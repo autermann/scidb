@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -180,24 +180,24 @@ class PhysicalSaveBmp: public PhysicalOperator
      */
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
-        vector<ArrayDistribution> requiredDistribution(1);
-        requiredDistribution[0] = ArrayDistribution(psLocalInstance, boost::shared_ptr<DistributionMapper>(), 0);
+        vector<RedistributeContext> requiredDistribution(1);
+        requiredDistribution[0] = RedistributeContext(psLocalInstance, std::shared_ptr<CoordinateTranslator>(), 0);
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
     /**
      * Run.
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         if (query->getInstanceID() != 0)
         {
             //I am not instance 0 - I don't need to do anything. Return an empty array.
-            return shared_ptr<Array>(new MemArray(_schema,query));
+            return std::shared_ptr<Array>(new MemArray(_schema,query));
         }
 
         //I am instance 0, let's save the array to a bmp image.
-        string filepath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+        string filepath = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 
         ArrayDesc const& inputSchema = inputArrays[0]->getArrayDesc();
 
@@ -209,13 +209,13 @@ class PhysicalSaveBmp: public PhysicalOperator
 
         SimpleImage image(nRows, nCols);
 
-        vector<shared_ptr<ConstArrayIterator> > aiters(3);
+        vector<std::shared_ptr<ConstArrayIterator> > aiters(3);
         aiters[0] = inputArrays[0]->getConstIterator(0);
         aiters[1] = inputArrays[0]->getConstIterator(1);
         aiters[2] = inputArrays[0]->getConstIterator(2);
 
         int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS;
-        vector<shared_ptr<ConstChunkIterator> > citers(3);
+        vector<std::shared_ptr<ConstChunkIterator> > citers(3);
         while(!aiters[0]->end())
         {
             citers[0] = aiters[0]->getChunk().getConstIterator(iterationMode);
@@ -267,22 +267,22 @@ class PhysicalSaveBmp: public PhysicalOperator
         }
         fclose(f);
 
-        shared_ptr<Array> dstArray(new MemArray(_schema,query));
+        std::shared_ptr<Array> dstArray(new MemArray(_schema,query));
         Coordinates outPos(1);
         outPos[0]=0;
         Value outValue;
 
-        shared_ptr<ArrayIterator> daiter = dstArray->getIterator(0);
+        std::shared_ptr<ArrayIterator> daiter = dstArray->getIterator(0);
         Chunk& outChunk = daiter->newChunk(outPos);
-        shared_ptr<ChunkIterator> dciter = outChunk.getIterator(query);
+        std::shared_ptr<ChunkIterator> dciter = outChunk.getIterator(query);
         dciter->setPosition(outPos);
         outValue.setString("File Saved Successfully");
         dciter->writeItem(outValue);
         dciter->flush();
 
-        shared_ptr<ArrayIterator>daiter2 = dstArray->getIterator(1);
+        std::shared_ptr<ArrayIterator>daiter2 = dstArray->getIterator(1);
         Chunk& outChunk2 = daiter2->newChunk(outPos);
-        shared_ptr<ChunkIterator>dciter2 = outChunk2.getIterator(query);
+        std::shared_ptr<ChunkIterator>dciter2 = outChunk2.getIterator(query);
         dciter2->setPosition(outPos);
         outValue.setDouble(fileSize * 1.0 / MiB);
         dciter2->writeItem(outValue);

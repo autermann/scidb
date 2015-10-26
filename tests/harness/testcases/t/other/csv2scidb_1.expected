@@ -22,9 +22,9 @@ Query was executed successfully
 SCIDB QUERY : <CREATE ARRAY Raw_CSVLoad_8 < attr_2 : string > [ I=0:*,4,0 ]>
 Query was executed successfully
 
-SCIDB QUERY : <cat ${TEST_DATA_DIR}/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load>
+SCIDB QUERY : <sed 1d ${TEST_DATA_DIR}/csv2scidb_1.csv > /tmp/csv2scidb_test_1.load>
 
-SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load', -2, 'csv' )>
 {Offset} symbl,time,price,qry
 {0} 'Foo','T_001',10,100
 {1} 'Foo','T_001',10.5,200
@@ -77,7 +77,7 @@ SCIDB QUERY : <load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load' )>
 {48} 'Wump','T_010',5.5,150
 {49} 'Wump','T_012',6,150
 
-SCIDB QUERY : <load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load', -2, 'csv:p' )>
 {Offset} tax_id,gene_id,go_id,evidence,qualifier,term,pubmed_id,category
 {0} 9606,54879,'GO:0005488','IEA',null,'binding',null,'Function'
 {1} 9606,268,'GO:0007568','IEA',null,'aging',null,'Process'
@@ -99,7 +99,7 @@ SCIDB QUERY : <load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load' )>
 {17} 9606,2,'GO:0019899','IPI',null,'enzyme binding',11435418,'Function'
 {18} 9606,2,'GO:0019959','IPI',null,'interleukin-8 binding',10880251,'Function'
 
-SCIDB QUERY : <load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load', -2, 'csv' )>
 {Line} Probe_ID,Platform_ID,Entrez_Gene_ID,Symbol,Synonyms,Description,TaxOn_ID,Count_Gene,Count_RefSeq,Unique_to_Gene,Unique_to_Genome,Unique_to_RefSeq
 {0} '213828_x_at','HG_U133_Plus_2',100133109,'','','',9606,10,15,false,false,false
 {1} '213826_s_at','HG_U133_Plus_2',100133109,'','','',9606,9,14,false,false,false
@@ -111,7 +111,7 @@ SCIDB QUERY : <load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )>
 {7} '230554_at','HG_U133_Plus_2',100291873,'','','',9606,2,3,false,false,false
 {8} '214069_at','HG_U133_Plus_2',100291873,'','','',9606,3,5,false,false,false
 
-SCIDB QUERY : <load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load', -2, 'csv' )>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <subarray (Raw_CSVLoad_4, 0,100)>
@@ -130,7 +130,7 @@ SCIDB QUERY : <show ( Raw_CSVLoad_4 )>
 {i} schema
 {0} 'Raw_CSVLoad_4<Probe_ID:string,Platform_ID:string,Entrez_Gene_ID:int32,Symbol:string,Synonyms:string,Description:string,TaxOn_ID:int32,Count_Gene:int32,Count_RefSeq:int32,Unique_to_Gene:bool,Unique_to_Genome:bool,Unique_to_RefSeq:bool> [Line=0:*,1000000,0]'
 
-SCIDB QUERY : <load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load', -2, 'csv' )>
 {I} attr_1
 {0} 1
 {1} 2
@@ -138,7 +138,7 @@ SCIDB QUERY : <load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load' )>
 {3} 4
 {4} 5
 
-SCIDB QUERY : <load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load', -2, 'csv' )>
 {I} attr_1
 {0} 1
 {1} 2
@@ -146,7 +146,7 @@ SCIDB QUERY : <load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load' )>
 {3} 4
 {4} 5
 
-SCIDB QUERY : <load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load', -2, 'csv' )>
 {I} attr_1
 {0} 'foo'
 {1} 'bar'
@@ -154,7 +154,7 @@ SCIDB QUERY : <load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load' )>
 {3} 'wump'
 {4} 'foobar'
 
-SCIDB QUERY : <load ( Raw_CSVLoad_8, '/tmp/csv2scidb_test_8.load' )>
+SCIDB QUERY : <load ( Raw_CSVLoad_8, '/tmp/csv2scidb_test_8.load', -2, 'csv' )>
 {I} attr_2
 {0} 'foo'
 {1} 'bar'

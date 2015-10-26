@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,11 +51,11 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const&,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const&,
             std::vector<ArrayDesc> const&) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
@@ -63,14 +63,14 @@ public:
         return false;
     }
 
-    inline bool isSameShape(ArrayDesc const& a1, ArrayDesc const& a2) 
+    inline bool isSameShape(ArrayDesc const& a1, ArrayDesc const& a2)
     {
         Dimensions const& d1 = a1.getDimensions();
         Dimensions const& d2 = a2.getDimensions();
-        if (d1.size() != d2.size()) { 
+        if (d1.size() != d2.size()) {
             return false;
         }
-        for (size_t i = 0, n = d1.size(); i < n; i++) { 
+        for (size_t i = 0, n = d1.size(); i < n; i++) {
             if (d1[i].getLength() != d2[i].getLength()  || d1[i].getStartMin() != d2[i].getStartMin() || d1[i].getChunkInterval() != d2[i].getChunkInterval())
             {
                 return false;
@@ -79,14 +79,14 @@ public:
         return true;
     }
 
-    inline bool isShift(ArrayDesc const& a1, ArrayDesc const& a2) 
+    inline bool isShift(ArrayDesc const& a1, ArrayDesc const& a2)
     {
         Dimensions const& d1 = a1.getDimensions();
         Dimensions const& d2 = a2.getDimensions();
-        if (d1.size() != d2.size()) { 
+        if (d1.size() != d2.size()) {
             return false;
         }
-        for (size_t i = 0, n = d1.size(); i < n; i++) { 
+        for (size_t i = 0, n = d1.size(); i < n; i++) {
             if (d1[i].getLength() != d2[i].getLength() || d1[i].getChunkInterval() != d2[i].getChunkInterval())
             {
                 return false;
@@ -107,25 +107,25 @@ public:
 	 * Reshape is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	shared_ptr<Array> execute(vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
-        shared_ptr< Array> array = inputArrays[0];
+        std::shared_ptr< Array> array = inputArrays[0];
         ArrayDesc const& desc = array->getArrayDesc();
 
         if (isSameShape(_schema, desc))
         {
-            return shared_ptr<Array>(new DelegateArray(_schema, array, true));
+            return std::shared_ptr<Array>(new DelegateArray(_schema, array, true));
         }
         if (isShift(_schema, desc))
         {
-            return shared_ptr<Array>(new ShiftArray(_schema, array));
+            return std::shared_ptr<Array>(new ShiftArray(_schema, array));
         }
         array = ensureRandomAccess(array, query);
-        return shared_ptr<Array>(new ReshapeArray(_schema, array));
+        return std::shared_ptr<Array>(new ReshapeArray(_schema, array));
 	 }
 };
-    
+
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalReshape, "reshape", "physicalReshape")
 
 }  // namespace scidb

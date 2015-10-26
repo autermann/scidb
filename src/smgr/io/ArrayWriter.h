@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,29 +43,13 @@ namespace scidb
     class ArrayWriter
     {
       public:
-        enum { DEFAULT_PRECISION = 6 };
+        enum { DEFAULT_PRECISION = 6 }; // FLT_DIG from <float.h>
 
         /// Values for #save method 'flags' parameter.
         enum Flags {
             F_APPEND = 0x01,    ///< Open file in append mode
             F_PARALLEL = 0x02   ///< This is a parallel save
         };
-
-        /**
-         * Save data from in text format in specified file
-         * @param arrayName name of the array which data will be saved
-         * @param file path to the exported data file
-         * @param query doing the save
-         * @param format output format: csv, csv+, tsv, tsv+, sparse, auto, etc.
-         * @param flags see ArrayWriter::Flags
-         * @return number of saved tuples
-         */
-       static uint64_t save(std::string const& arrayName,
-                            std::string const& file,
-                            const boost::shared_ptr<Query>& query,
-                            std::string const& format = "auto",
-                            unsigned flags = 0);
-
 
         /**
          * Save data from in text format in specified file
@@ -78,7 +62,7 @@ namespace scidb
          */
         static uint64_t save(Array const& array,
                              std::string const& file,
-                             const boost::shared_ptr<Query>& query,
+                             const std::shared_ptr<Query>& query,
                              std::string const& format = "auto",
                              unsigned flags = 0);
 

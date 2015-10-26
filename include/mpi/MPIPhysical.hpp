@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,6 @@
 #include <mpi/MPIManager.h>
 
 namespace scidb {
-using namespace boost;
 
 inline Coordinates getStartMin(Array* a) {
     Coordinates result(2);
@@ -99,7 +98,7 @@ inline bool doCerrTiming()
 #endif
 }
 
-void throwIfDegradedMode(shared_ptr<Query>& query);
+void throwIfDegradedMode(std::shared_ptr<Query>& query);
 
 
 
@@ -111,9 +110,9 @@ public:
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
-    virtual void setQuery(const boost::shared_ptr<Query>& query);
+    virtual void setQuery(const std::shared_ptr<Query>& query);
 
-    virtual void postSingleExecute(shared_ptr<Query> query);
+    virtual void postSingleExecute(std::shared_ptr<Query> query);
 
 protected:
     // TODO James : speak to Tigor about whether these methods might be implemented on the _ctx instead of around it.
@@ -127,7 +126,7 @@ protected:
      *  @xxxxx (sets state): _launchId, _mustLaunch, _ctx, _launcher, _ipcName
      *  @return true if this instance participates in the computation and should handshake with a slave; false otherwise
      */
-    bool launchMPISlaves(shared_ptr<Query>& query, const size_t maxSlaves);
+    bool launchMPISlaves(std::shared_ptr<Query>& query, const size_t maxSlaves);
 
     /** @param numBufs : how many to allocate
      *  @param elemSize : sizeof(float) or sizeof(double) or sizeof(complex)
@@ -135,9 +134,9 @@ protected:
      *  @param fill value (could make this a template function)
      *  @returns std::vector<SMIptr_t> shmIpc(NUM_BUFS)
      */
-    typedef boost::shared_ptr<SharedMemoryIpc> SMIptr_t ;
+    typedef std::shared_ptr<SharedMemoryIpc> SMIptr_t ;
     std::vector<SMIptr_t> allocateMPISharedMemory(size_t numBufs, size_t  elemSize[], size_t sizes[],
-                                                  string dbgNames[]);
+                                                  std::string dbgNames[]);
     /**
      * Release shared memory regions and associated resources which are not used in constructing the result array
      * @param shmIpc list of shm regions
@@ -170,10 +169,10 @@ protected:
 protected:
     uint64_t                              _launchId;	// would like the MpiOperatorContext to track this
     std::string				  _ipcName;
-    boost::shared_ptr<MpiOperatorContext> _ctx;
+    std::shared_ptr<MpiOperatorContext> _ctx;
     private:
     bool				  _mustLaunch;  // would like the MpiOperatorContext to track this
-    boost::shared_ptr<MpiLauncher>        _launcher;    // move to MpiOperatorContext
+    std::shared_ptr<MpiLauncher>        _launcher;    // move to MpiOperatorContext
 };
 
 

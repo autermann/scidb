@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,13 +42,14 @@ namespace scidb
 
 struct VarValue
 {
-    boost::shared_ptr<Value> value;
-    boost::shared_ptr< std::vector<char> > varPart;
+    std::shared_ptr<Value> value;
+    std::shared_ptr< std::vector<char> > varPart;
 };
 
-/**
- * A set of helper templates for code generation related to adding and setting values
- */
+///////////////////////////////////////////////////////////////////
+// Below are a set of helper template functions for code generation related to adding and setting values.
+///////////////////////////////////////////////////////////////////
+
 template <typename T>
 size_t addPayloadValues(RLEPayload* p, size_t n = 1)
 {
@@ -108,12 +109,14 @@ bool getPayloadValue<bool>(const ConstRLEPayload* p, size_t index) {
 template <> inline
 VarValue getPayloadValue<VarValue>(const ConstRLEPayload* p, size_t index) {
     VarValue res;
-    res.value = boost::shared_ptr<Value>(new Value());
+    res.value = std::shared_ptr<Value>(new Value());
     p->getValueByIndex(*res.value, index);
     return res;
 }
 
-// UNARY TEMPLATE FUNCTIONS
+///////////////////////////////////////////////////////////////////
+// Below are unary template functions.
+///////////////////////////////////////////////////////////////////
 
 template<typename T, typename TR>
 struct UnaryMinus
@@ -172,7 +175,10 @@ void rle_unary_func(const Value** args,  Value* result, void*)
 }
 
 void rle_unary_bool_not(const Value** args,  Value* result, void*);
-// BINARY TEMPLATE FUNCTIONS
+
+///////////////////////////////////////////////////////////////////
+// Below are binary template functions.
+///////////////////////////////////////////////////////////////////
 
 template<typename T1, typename T2, typename TR>
 struct BinaryPlus
@@ -332,7 +338,6 @@ struct BinaryFunctionCall
     };
 };
 
-
 template<typename T1, typename T2, typename TR>
 struct BinaryStringPlus
 {
@@ -341,20 +346,20 @@ struct BinaryStringPlus
         const std::string str1(v1.value->getString());
         const std::string str2(v2.value->getString());
         VarValue res;
-        res.value = boost::shared_ptr<Value>(new Value());
+        res.value = std::shared_ptr<Value>(new Value());
         res.value->setString((str1 + str2).c_str());
         return res;
     }
 };
 
 template<typename T>
-void setVarPart(T& v, const boost::shared_ptr<std::vector<char> >& part)
+void setVarPart(T& v, const std::shared_ptr<std::vector<char> >& part)
 {
     // Nothing for every datatype except VarType which is specified below
 }
 
 template<> inline
-void setVarPart<VarValue>(VarValue& v, const boost::shared_ptr<std::vector<char> >& part)
+void setVarPart<VarValue>(VarValue& v, const std::shared_ptr<std::vector<char> >& part)
 {
     v.varPart = part;
 }
@@ -432,7 +437,7 @@ void rle_binary_func(const Value** args, Value* result, void*)
     const Value& v2 = *args[1];
     Value& res = *result;
     res.getTile()->clear();
-    boost::shared_ptr<std::vector<char> > varPart(new std::vector<char>());
+    std::shared_ptr<std::vector<char> > varPart(new std::vector<char>());
 
     if (v1.getTile()->count() == 0 ||
         v1.getTile()->nSegments() == 0 ||
@@ -445,19 +450,22 @@ void rle_binary_func(const Value** args, Value* result, void*)
 
     size_t i1 = 0;
     size_t i2 = 0;
-    RLEPayload::Segment ps1 = v1.getTile()->getSegment(i1);
-    uint64_t ps1_length = v1.getTile()->getSegment(i1).length();
-    RLEPayload::Segment ps2 = v2.getTile()->getSegment(i2);
-    uint64_t ps2_length = v2.getTile()->getSegment(i2).length();
+    size_t ps1_length;
+    size_t ps2_length;
+    RLEPayload::Segment ps1 = v1.getTile()->getSegment(i1, ps1_length);
+    RLEPayload::Segment ps2 = v2.getTile()->getSegment(i2, ps2_length);
     uint64_t chunkSize = 0;
 
-    if (ps1_length == INFINITE_LENGTH) {
-        // v1 is constant with infinity length. Align it pPosition to v2
-        ps1._pPosition = ps2._pPosition;
+	// Checking against max length is the equivalent to verifying if this is a special case
+    // tile.  Special case tiles of this sort are created in TypeSystem.cpp in the method
+    // makeTileConstant(const TypeId &, const Value &).
+    if (ps1_length == CoordinateBounds::getMaxLength()) {
+        // v1 is constant with max length. Align it pPosition to v2
+        ps1.setPPosition(ps2.pPosition());
     } else {
-        if (ps2_length == INFINITE_LENGTH) {
-            // v2 is constant with infinity length. Align it pPosition to v1
-            ps2._pPosition = ps1._pPosition;
+        if (ps2_length == CoordinateBounds::getMaxLength()) {
+            // v2 is constant with max length. Align it pPosition to v1
+            ps2.setPPosition(ps1.pPosition());
         }
     }
 
@@ -465,7 +473,7 @@ void rle_binary_func(const Value** args, Value* result, void*)
     {
         // At this point ps1 and ps2 should aligned
         // Segment with less length will be iterated and with more length cut at the end of loop
-        assert(ps1._pPosition == ps2._pPosition);
+        assert(ps1.pPosition() == ps2.pPosition());
 
         const uint64_t length = std::min(ps1_length, ps2_length);
         if (length == 0) {
@@ -474,61 +482,61 @@ void rle_binary_func(const Value** args, Value* result, void*)
         RLEPayload::Segment rs;
 
         // Check NULL cases
-        if ( (ps1._same && ps1._null) || (ps2._same && ps2._null) ) {
-            rs._same = true;
-            rs._null = true;
-            rs._pPosition = ps1._pPosition;
-            rs._valueIndex = 0; // we do not know what missing reason to use. That's why we set it to 0.
+        if ( (ps1.same() && ps1.null()) || (ps2.same() && ps2.null()) ) {
+            rs.setSame(true);
+            rs.setNull(true);
+            rs.setPPosition(ps1.pPosition());
+            rs.setValueIndex(0); // we do not know what missing reason to use. That's why we set it to 0.
         } else { // No one is NULL and we can evaluate
-            rs._null = false;
-            rs._pPosition = ps1._pPosition;
-            if (ps1._same) {
-                if (ps2._same) {
-                    rs._same = true;
-                    rs._valueIndex = addPayloadValues<TR>(res.getTile());
-                    TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1._valueIndex),
-                                               getPayloadValue<T2>(v2.getTile(), ps2._valueIndex));
+            rs.setNull(false);
+            rs.setPPosition(ps1.pPosition());
+            if (ps1.same()) {
+                if (ps2.same()) {
+                    rs.setSame(true);
+                    rs.setValueIndex(addPayloadValues<TR>(res.getTile()));
+                    TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1.valueIndex()),
+                                               getPayloadValue<T2>(v2.getTile(), ps2.valueIndex()));
                     setVarPart<TR>(r, varPart);
-                    setPayloadValue<TR>(res.getTile(), rs._valueIndex, r);
+                    setPayloadValue<TR>(res.getTile(), rs.valueIndex(), r);
                 } else {
-                    rs._same = false;
-                    rs._valueIndex = addPayloadValues<TR>(res.getTile(), length);
-                    size_t i = rs._valueIndex;
-                    size_t j = ps2._valueIndex;
+                    rs.setSame(false);
+                    rs.setValueIndex(addPayloadValues<TR>(res.getTile(), length));
+                    size_t i = rs.valueIndex();
+                    size_t j = ps2.valueIndex();
                     const size_t end = j + length;
                     while (j < end) {
-                        TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1._valueIndex),
+                        TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), ps1.valueIndex()),
                                                    getPayloadValue<T2>(v2.getTile(), j++));
                         setVarPart<TR>(r, varPart);
                         setPayloadValue<TR>(res.getTile(), i++, r);
                     }
                 }
             } else { // dense non-nullable data
-                if (ps2._same) {
-                    rs._same = false;
-                    rs._valueIndex = addPayloadValues<TR>(res.getTile(), length);
-                    size_t i = rs._valueIndex;
-                    size_t j = ps1._valueIndex;
+                if (ps2.same()) {
+                    rs.setSame(false);
+                    rs.setValueIndex(addPayloadValues<TR>(res.getTile(), length));
+                    size_t i = rs.valueIndex();
+                    size_t j = ps1.valueIndex();
                     const size_t end = j + length;
                     while (j < end) {
                         TR r = O<T1, T2, TR>::func(getPayloadValue<T1>(v1.getTile(), j++),
-                                                   getPayloadValue<T2>(v2.getTile(), ps2._valueIndex));
+                                                   getPayloadValue<T2>(v2.getTile(), ps2.valueIndex()));
                         setVarPart<TR>(r, varPart);
                         setPayloadValue<TR>(res.getTile(), i++, r);
                     }
                 } else {
-                    rs._same = false;
-                    rs._valueIndex = addPayloadValues<TR>(res.getTile(), length);
-                    size_t i = rs._valueIndex;
-                    size_t j1 = ps1._valueIndex;
-                    size_t j2 = ps2._valueIndex;
+                    rs.setSame(false);
+                    rs.setValueIndex(addPayloadValues<TR>(res.getTile(), length));
+                    size_t i = rs.valueIndex();
+                    size_t j1 = ps1.valueIndex();
+                    size_t j2 = ps2.valueIndex();
                     if (!fastDenseBinary<O, T1, T2, TR>(length,
                                                         (const char*)v1.getTile()->getFixData(),
                                                         j1,
                                                         (const char*)v2.getTile()->getFixData(),
                                                         j2,
                                                         res.getTile()->getFixData(),
-                                                        int(rs._valueIndex)))
+                                                        rs.valueIndex()))
                     {
                         const size_t end = j1 + length;
                         while (j1 < end) {
@@ -542,7 +550,7 @@ void rle_binary_func(const Value** args, Value* result, void*)
             }
         }
         res.getTile()->addSegment(rs);
-        chunkSize = rs._pPosition + length;
+        chunkSize = rs.pPosition() + length;
 
         // Moving to the next segments
         if (ps1_length == ps2_length) {
@@ -550,29 +558,25 @@ void rle_binary_func(const Value** args, Value* result, void*)
                 break;
             if (++i2 >= v2.getTile()->nSegments())
                 break;
-            ps1 = v1.getTile()->getSegment(i1);
-            ps1_length = v1.getTile()->getSegment(i1).length();
-            ps2 = v2.getTile()->getSegment(i2);
-            ps2_length = v2.getTile()->getSegment(i2).length();
+            ps1 = v1.getTile()->getSegment(i1, ps1_length);
+            ps2 = v2.getTile()->getSegment(i2, ps2_length);
         } else {
             if (ps1_length < ps2_length) {
                 if (++i1 >= v1.getTile()->nSegments())
                     break;
-                ps1 = v1.getTile()->getSegment(i1);
-                ps1_length = v1.getTile()->getSegment(i1).length();
-                ps2._pPosition += length;
+                ps1 = v1.getTile()->getSegment(i1, ps1_length);
+                ps2.addToPPosition(length);
                 ps2_length -= length;
-                if (!ps2._same)
-                    ps2._valueIndex += length;
+                if (!ps2.same())
+                    ps2.setValueIndex(ps2.valueIndex() + length);
             } else {
                 if (++i2 >= v2.getTile()->nSegments())
                     break;
-                ps2 = v2.getTile()->getSegment(i2);
-                ps2_length = v2.getTile()->getSegment(i2).length();
-                ps1._pPosition += length;
+                ps2 = v2.getTile()->getSegment(i2, ps2_length);
+                ps1.addToPPosition(length);
                 ps1_length -= length;
-                if (!ps1._same)
-                    ps1._valueIndex += length;
+                if (!ps1.same())
+                    ps1.setValueIndex(ps1.valueIndex() + length);
             }
         }
     }
@@ -586,9 +590,10 @@ void inferIsNullArgTypes(const ArgTypes& factInputArgs, std::vector<ArgTypes>& p
 void rle_unary_bool_is_null(const Value** args, Value* result, void*);
 void rle_unary_null_to_any(const Value** args, Value* result, void*);
 
-/**
- * Aggregator classes
- */
+///////////////////////////////////////////////////////////////////
+// Below are aggregator classes.
+///////////////////////////////////////////////////////////////////
+
 template <typename TS, typename TSR>
 class AggSum
 {
@@ -725,13 +730,13 @@ bool isNanValue(T value)
 template<> inline
 bool isNanValue<double>(double value)
 {
-    return isnan(value);
+    return std::isnan(value);
 }
 
 template<> inline
 bool isNanValue<float>(float value)
 {
-    return isnan(value);
+    return std::isnan(value);
 }
 
 template <typename TS, typename TSR>
@@ -975,6 +980,6 @@ public:
     }
 };
 
-}
+} // namespace
 
-#endif // TILEFUNCTIONS_H
+#endif

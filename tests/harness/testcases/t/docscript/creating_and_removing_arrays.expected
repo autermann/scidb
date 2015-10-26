@@ -146,7 +146,7 @@ SCIDB QUERY : <store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),
 SCIDB QUERY : <store(join(event,join(person,join(year,join(country,time)))),winnersFlat)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(redimension(winnersFlat,winners),winners)>
+SCIDB QUERY : <store(redimension(winnersFlat,winners,false),winners)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <show(winners)>

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -94,7 +94,7 @@ public:
         _msg[LA_ERROR29] = "ssvdNorm: Argument #%1% must be bounded";
         _msg[LA_ERROR30] = "linregr:: final parameter must be \n'coefficients', \n'residuals', \n'multiple R2',  \n'adjusted R2', \n'F-statistic', \n'p-value', \n'residual stderror', \n'stderror', \n'tvalue', \n'P-statistic', \n'confidence intervals'";
         _msg[LA_ERROR31] = "logistregr:: last parameter must be 'coefficients' or 'summary'";
-        _msg[LA_ERROR32] = "'use' = ['everything' | 'all.obs' | 'complete.obs' | 'nan.or.complete' | 'pairwise.complete.obs']";
+        _msg[LA_ERROR32] = "unused message";
         _msg[LA_ERROR33] = "SVD accepts 'left', 'right' and 'values' parameters";
         _msg[LA_ERROR34] = "corr accepts 'kendall', 'spearman' and 'pearson' parameters";
         _msg[LA_ERROR35] = "Singular values overflow";

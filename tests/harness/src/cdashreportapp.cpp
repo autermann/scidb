@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -185,7 +185,7 @@ int CdashReportApp :: validateParameters (void)
 
 	if (full_path1 == full_path2)
         throw ConfigError (FILE_LINE_FUNCTION, "Files specified by --ctestreport and --harnessreport can not be the same");
-	
+
     if (!bfs :: is_regular (full_path2))
     {
         stringstream ss;

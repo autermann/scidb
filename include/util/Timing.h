@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -39,12 +39,11 @@
 namespace scidb
 {
 
-using namespace std;
-
 /**
  * A utility class that returns the #elapsed milliseconds between start() and elapsed() calls.
  */
-class ElapsedMilliSeconds {
+class ElapsedMilliSeconds
+{
 public:
     /**
      * The Constructor records the start time unless told not to do so.
@@ -115,7 +114,7 @@ public:
                                 bool noMSWhatSoEver=false,
                                 bool omitZeroUnits=true)
     {
-        ostringstream os;
+        std::ostringstream os;
         uint64_t h, m, s, ms;
         h = in/(1000*3600);
         in -= h*(1000*3600);
@@ -177,7 +176,5 @@ protected:
     timeval _startTime;
 };
 
-
-}
-
+} // namespace
 #endif /* TIMING_H_ */

@@ -68,13 +68,22 @@ SCIDB QUERY : <select max(a),max(b),min(a),min(b) from array(<a:double, b:float,
 {i} max,max_1,min_2,min_3
 {0} nan,nan,nan,nan
 
+SCIDB QUERY : <create array L <a:double> [x=10:12,3,0]>
+Query was executed successfully
+
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "save(build(<a:double> [x=10:12,3,0], '[(nan),(inf),(inf)]', 1), '${TEST_DATA_DIR}/literal.txt')">
+{x} a
+
+SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(L, '${TEST_DATA_DIR}/literal.txt')">
 {x} a
 {10} nan
 {11} inf
 {12} inf
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "save(build(<a:double> [x=10:12,3,0], '[(nan),(inf),(inf)]', 1), '${TEST_DATA_DIR}/literal.txt')">
+{x} a
+
+SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(L, '${TEST_DATA_DIR}/literal.txt')">
 {x} a
 {10} nan
 {11} inf
@@ -168,6 +177,9 @@ SCIDB QUERY : <create array bad<x:double default infabc>[i=1:1,1,0]>
 
 SCIDB QUERY : <build(<a:datetime default now() , days: string default 'Thursday'> [x=0:2,3,0], '[(),("2011-12-13 18:41:14",),("2012-12-13 18:41:14",)]', true)>
 [Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <remove(L)>
+Query was executed successfully
 
 SCIDB QUERY : <remove(Test1)>
 Query was executed successfully

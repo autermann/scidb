@@ -39,17 +39,17 @@ store(apply(apply(A,b,point2str(str2point('(1,1)'))) As N1,c,str(rational(x+3,2)
 --error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql="load Y from  current instance 'mat.dmp' as '(int32,string,string)'"
 --aql load Y from  current instance 'mat.dmp' as '(int32,string,string)' errors 100 shadow array Y_shad
 --aql load Y from current instance 'tri.dmp' as '(int32,string,string)'
---aql load B from  current instance 'mat.dmp' as '(dummy(4),string,dummy(10))'
---aql load B from  current instance 'mat.dmp' as '(dummy(4),dummy(10),string)'
+--aql load B from  current instance 'mat.dmp' as '(skip(4),string,skip(10))'
+--aql load B from  current instance 'mat.dmp' as '(skip(4),skip(10),string)'
 
---error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql="load C from  current instance 'tri.dmp' as '(dummy(4),string,dummy(10))'"
---aql load C from  current instance 'tri.dmp' as '(dummy(4),string,dummy(10))' errors 100 shadow array C_shad
---aql load C from  current instance 'tri.dmp' as '(dummy(4),dummy(10),string)'
---error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql="load C from  current instance 'tri.dmp' as '(dummy(4),dummy(10),rational)'"
+--error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql="load C from  current instance 'tri.dmp' as '(skip(4),string,skip(10))'"
+--aql load C from  current instance 'tri.dmp' as '(skip(4),string,skip(10))' errors 100 shadow array C_shad
+--aql load C from  current instance 'tri.dmp' as '(skip(4),skip(10),string)'
+--error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED --aql="load C from  current instance 'tri.dmp' as '(skip(4),skip(10),rational)'"
 
---aql load B from  current instance 'mathio.bin' as '(dummy(4),dummy(16),point)'
---aql load C from current instance 'trigno.bin' as '(dummy(4),dummy(16),rational)'
---aql load B from current instance 'trigno.bin' as '(dummy(4),point,dummy(16))'
+--aql load B from  current instance 'mathio.bin' as '(skip(4),skip(16),point)'
+--aql load C from current instance 'trigno.bin' as '(skip(4),skip(16),rational)'
+--aql load B from current instance 'trigno.bin' as '(skip(4),point,skip(16))'
 
 --cleanup
 remove(A)

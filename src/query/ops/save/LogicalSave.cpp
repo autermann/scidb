@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -84,10 +84,10 @@ public:
 		ADD_PARAM_VARIES();          //2
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
     nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         switch (_parameters.size()) {
           case 0:
@@ -103,14 +103,14 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 1);
         assert(_parameters.size() >= 1);
-        
-        if (_parameters.size() >= 3) { 
+
+        if (_parameters.size() >= 3) {
             Value v = evaluate(
-                ((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
+                ((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
                 query, TID_STRING);
             string const& format = v.getString();
 

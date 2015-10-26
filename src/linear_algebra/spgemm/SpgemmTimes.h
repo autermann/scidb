@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,15 +33,8 @@
 #include <limits>
 #include <sstream>
 
-// boost
-
-// scidb
-
-// local
-
 namespace scidb
 {
-using namespace boost;
 using namespace scidb;
 
 enum dummy {DBG_TIMING=1}; // 0 to disable
@@ -188,7 +181,7 @@ struct SpgemmTimes {
 * @param times -- the SpgemmTimes structure
 * @return      -- the ostream, os, that was passed in
 */
-std::ostream& operator<<(ostream& os, const SpgemmTimes& times)
+std::ostream& operator<<(std::ostream& os, const SpgemmTimes& times)
 {
     if(DBG_TIMING) {  // only during special debugging
         os << "spgemm(): " << std::endl;

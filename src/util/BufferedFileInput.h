@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,22 +37,20 @@
 #include <limits.h>
 #include <string>
 #include <errno.h>
+#include <boost/format.hpp>
+#include <log4cxx/logger.h>
+#include <log4cxx/basicconfigurator.h>
+#include <log4cxx/helpers/exception.h>
 
-#include "boost/format.hpp"
-
-#include "log4cxx/logger.h"
-#include "log4cxx/basicconfigurator.h"
-#include "log4cxx/helpers/exception.h"
-
-#include "system/Exceptions.h"
-#include "query/TypeSystem.h"
-#include "query/FunctionDescription.h"
-#include "query/FunctionLibrary.h"
-#include "query/Operator.h"
-#include "array/DBArray.h"
-#include "smgr/io/Storage.h"
-#include "system/SystemCatalog.h"
-#include "util/BufferedFileInput.h"
+#include <system/Exceptions.h>
+#include <query/TypeSystem.h>
+#include <query/FunctionDescription.h>
+#include <query/FunctionLibrary.h>
+#include <query/Operator.h>
+#include <array/DBArray.h>
+#include <smgr/io/Storage.h>
+#include <system/SystemCatalog.h>
+#include <util/BufferedFileInput.h>
 
 namespace scidb
 {
@@ -149,7 +147,7 @@ private: // private structures.
 
     public:
         FillBufferJob(
-                boost::shared_ptr<Query> const& query,
+                std::shared_ptr<Query> const& query,
                 Buffer* buffers,
                 FILE* f,
                 int64_t bufferSize,
@@ -171,7 +169,7 @@ private: // private members.
     int64_t _bufferSize;
 
     // the query
-    boost::weak_ptr<Query> _query;
+    std::weak_ptr<Query> _query;
 
 #ifndef NDEBUG
     // _debugOnlyNoMoreCalls is used only in debug mode, to assert that, once myGetc() returns EOF,
@@ -184,7 +182,7 @@ private: // private members.
 
     // the fill-buffer job
     // It is stored so that the destructor will wait for the job to finishes
-    boost::shared_ptr<FillBufferJob> _fillBufferJob;
+    std::shared_ptr<FillBufferJob> _fillBufferJob;
 
     /*
      * The non-inlined part of myGetc().
@@ -216,7 +214,7 @@ public: // public members.
     /*
      * Constructor.
      */
-    BufferedFileInput(FILE* f, boost::shared_ptr<Query>& query);
+    BufferedFileInput(FILE* f, std::shared_ptr<Query>& query);
 
     /*
      * Destructor.

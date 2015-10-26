@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,11 +34,11 @@
 namespace scidb
 {
 
-ThreadPool::ThreadPool(size_t threadCount, boost::shared_ptr<JobQueue> queue)
+ThreadPool::ThreadPool(size_t threadCount, std::shared_ptr<JobQueue> queue)
 : _queue(queue),
   _currentJobs(threadCount),
   _threadCount(threadCount),
-  _terminatedThreads(boost::make_shared<Semaphore>())
+  _terminatedThreads(std::make_shared<Semaphore>())
 {
     _shutdown = false;
     if (_threadCount <= 0) {
@@ -64,7 +64,7 @@ void ThreadPool::start()
     _threads.reserve(_threadCount);
     for (size_t i = 0; i < _threadCount; i++)
     {
-        boost::shared_ptr<Thread> thread(new Thread(*this, i));
+        std::shared_ptr<Thread> thread(new Thread(*this, i));
         _threads.push_back(thread);
         thread->start();
         getInjectedErrorListener().check();
@@ -80,7 +80,7 @@ bool ThreadPool::isStarted()
 class FakeJob : public Job
 {
 public:
-    FakeJob(): Job(boost::shared_ptr<Query>()) {
+    FakeJob(): Job(std::shared_ptr<Query>()) {
     }
 
     virtual void run()
@@ -90,7 +90,7 @@ public:
 
 void ThreadPool::stop()
 {
-    std::vector<boost::shared_ptr<Thread> > threads;
+    std::vector<std::shared_ptr<Thread> > threads;
     { // scope
         ScopedMutexLock lock(_mutex);
         if (_shutdown) {
@@ -102,7 +102,7 @@ void ThreadPool::stop()
     size_t nThreads = threads.size();
     for (size_t i = 0; i < threads.size(); ++i) {
         if (threads[i]->isStarted()) {
-            _queue->pushJob(boost::shared_ptr<Job>(new FakeJob()));
+            _queue->pushJob(std::shared_ptr<Job>(new FakeJob()));
         } else {
             --nThreads;
         }

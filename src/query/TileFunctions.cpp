@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -74,14 +74,15 @@ void rle_unary_bool_is_null(const Value** args, Value* result, void*)
     position_t tail = 0;
     for (size_t i = 0; i < vTile->nSegments(); i++)
     {
-        v = &vTile->getSegment(i);
+        size_t vLen;
+        v = &vTile->getSegment(i, vLen);
         RLEPayload::Segment r;
-        r._null = false;
-        r._pPosition = v->_pPosition;
-        r._same = v->length() > 1;
-        r._valueIndex = v->_null ? 1 : 0;
+        r.setNull(false);
+        r.setPPosition(v->pPosition());
+        r.setSame(vLen > 1);
+        r.setValueIndex(v->null() ? 1 : 0);
         rTile->addSegment(r);
-        tail = v->_pPosition + v->length();
+        tail = v->pPosition() + vLen;
     }
     rTile->flush(tail);
 }

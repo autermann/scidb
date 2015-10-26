@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,11 +34,10 @@
 
 #include <iostream>
 #include <stdarg.h>
-
 #include <boost/serialization/vector.hpp>
 
-#include "query/TypeSystem.h"
-#include "array/Metadata.h"
+#include <query/TypeSystem.h>
+#include <array/Metadata.h>
 
 namespace scidb
 {
@@ -49,7 +48,7 @@ namespace scidb
 typedef size_t ConversionCost;
 
 /**
- * Cost of implicit conversion 
+ * Cost of implicit conversion
  */
 const ConversionCost IMPLICIT_CONVERSION_COST  = 1;
 
@@ -61,10 +60,10 @@ const ConversionCost TRANSFORM_CONVERSION_COST = 100;
 /**
  * Cost of conversion causing loose of precision, like int64->int32
  */
-const ConversionCost TRUNCATE_CONVERSION_COST  = 10000; 
+const ConversionCost TRUNCATE_CONVERSION_COST  = 10000;
 
 /**
- * Cost of explicit conversion 
+ * Cost of explicit conversion
  */
 const ConversionCost EXPLICIT_CONVERSION_COST  = 1000000;
 
@@ -99,7 +98,7 @@ typedef void (*InferFunctionArgTypes)(const ArgTypes&, std::vector<ArgTypes>&, s
 
 class FunctionDescription
 {
-private: 
+private:
 
     //
     // Basic properties of the function. Consider three example functions:
@@ -167,10 +166,6 @@ public:
         _inferFunctionArgTypes(NULL)
     {
         assert(!_commutativity || inputArgs.size() == 2);
-
-        if (name == "random") {
-            std::cerr << "random's _isDeterministic is: " << _isDeterministic << std::endl;
-        }
     }
 
     FunctionDescription(const std::string& name, const ArgTypes& inputArgs,
@@ -188,10 +183,6 @@ public:
         _inferFunctionArgTypes(NULL)
     {
         assert(!_commutativity || inputArgs.size() == 2);
-
-        if (name == "random") {
-            std::cerr << "random's _isDeterministic is: " << _isDeterministic << std::endl;
-        }
     }
 
     FunctionDescription(const std::string& name, const ArgTypes& inputArgs,
@@ -210,10 +201,6 @@ public:
         _inferFunctionArgTypes(inferFunctionArgTypes)
     {
         assert(!_commutativity || inputArgs.size() == 2);
-
-        if (name == "random") {
-            std::cerr << "random's _isDeterministic is: " << _isDeterministic << std::endl;
-        }
     }
 
     /**
@@ -261,24 +248,24 @@ public:
 
     /**
      * Returns true iff. the UDF is deterministic. Deterministic functions
-     * always return the same result, given the same arguments. Examples of 
-     * non-deterministic* functions include random number generators, and 
-     * UDFs that call remote systems. 
+     * always return the same result, given the same arguments. Examples of
+     * non-deterministic* functions include random number generators, and
+     * UDFs that call remote systems.
      * @returns bool true iff. UDF is deterministic. false otherwise.
      */
     bool isDeterministic() const  { return _isDeterministic; }
 
     /**
-     * Returns true if the UDF is "internal", meaning it cannot be invoked 
+     * Returns true if the UDF is "internal", meaning it cannot be invoked
      * directly through AFL/AQL. Internal functions are used in combination
-     * to implement other functionality: like { scalar } -> scalar aggregates. 
+     * to implement other functionality: like { scalar } -> scalar aggregates.
      * @returns bool true if the function cannot be addressed from AFL/AQL
      */
     bool isInternalUDF() const  { return _isInternal; }
 
     /**
      * Returns true of the UDF needs to be called one more time after
-     * the final set of values has been passed into the function. The 
+     * the final set of values has been passed into the function. The
      * point being that the UDF malloc() something in the state
      * that needs to be free() after the query completes.
      */
@@ -299,14 +286,14 @@ public:
         return _name == ob._name && _inputArgs == ob._inputArgs && _outputArgs == ob._outputArgs;
     }
 };
-  
-class UserDefinedFunction 
-{ 
+
+class UserDefinedFunction
+{
   public:
     UserDefinedFunction(FunctionDescription const& desc);
 };
 
-class UserDefinedConverter 
+class UserDefinedConverter
 {
   public:
     UserDefinedConverter(TypeId from, TypeId to, ConversionCost cost, FunctionPointer ptr);
@@ -321,7 +308,7 @@ class UserDefinedType
 std::ostream& operator<<(std::ostream& stream, const FunctionDescription& ob);
 std::ostream& operator<<(std::ostream& stream, const std::vector<FunctionDescription>& ob);
 
-} // namespace typesystem
+} // namespace
 
 #endif // __FUNCTION_DESCRIPTION_H__
 

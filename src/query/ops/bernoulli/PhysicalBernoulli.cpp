@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -46,12 +46,12 @@ class BernoulliArrayIterator : public DelegateArrayIterator
   public:
 	virtual void operator ++()
     {
-        while (nextElem < nChunkElems) { 
+        while (nextElem < nChunkElems) {
             nextElem += nops.geomdist(probability);
         }
         nextElem -= nChunkElems;
         ++(*inputIterator);
-        while (!inputIterator->end()) { 
+        while (!inputIterator->end()) {
             nChunkElems = inputIterator->getChunk().count();
             if (nextElem < nChunkElems) {
                 return;
@@ -61,12 +61,12 @@ class BernoulliArrayIterator : public DelegateArrayIterator
         }
     }
 
-    virtual bool setPosition(Coordinates const& pos) 
+    virtual bool setPosition(Coordinates const& pos)
     {
         CoordinatesLess less;
         currPos = pos;
         inputDesc.getChunkPositionFor(currPos);
-        if (end() || !less(inputIterator->getPosition(), currPos)) { 
+        if (end() || !less(inputIterator->getPosition(), currPos)) {
             reset();
         }
         while (!end() && inputIterator->getPosition() != currPos) {
@@ -75,12 +75,12 @@ class BernoulliArrayIterator : public DelegateArrayIterator
         return !end();
     }
 
-	virtual void reset() 
-    { 
+	virtual void reset()
+    {
         inputIterator->reset();
         nops.ResetSeed(seed);
         nextElem = nops.geomdist(probability);
-        while (!inputIterator->end()) { 
+        while (!inputIterator->end()) {
             nChunkElems = inputIterator->getChunk().count();
             if (nextElem < nChunkElems) {
                 return;
@@ -90,7 +90,7 @@ class BernoulliArrayIterator : public DelegateArrayIterator
         }
     }
 
-    BernoulliArrayIterator(DelegateArray const& array, AttributeID attrID, shared_ptr<ConstArrayIterator> inputIterator,
+    BernoulliArrayIterator(DelegateArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator,
                            double prob, int rndGenSeed)
     : DelegateArrayIterator(array, attrID, inputIterator),
       probability(prob), seed(rndGenSeed), threshold((int)(RAND_MAX*probability)),
@@ -113,7 +113,7 @@ class BernoulliArrayIterator : public DelegateArrayIterator
     bool isPlainArray;
     bool isNewEmptyIndicator;
     Coordinates currPos;
-    
+
 };
 
 
@@ -125,52 +125,52 @@ class BernoulliArrayIterator : public DelegateArrayIterator
             if (!hasCurrent)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
             nextElem += nops.geomdist(arrayIterator.probability);
-            if (nextElem < arrayIterator.nChunkElems) { 
+            if (nextElem < arrayIterator.nChunkElems) {
                 setSamplePosition();
-            } else { 
+            } else {
                 hasCurrent = false;
             }
         }
 
-        virtual bool end() 
+        virtual bool end()
         {
             return !hasCurrent;
         }
- 
-        virtual void reset() 
-        { 
+
+        virtual void reset()
+        {
             hasCurrent = false;
         }
 
-        virtual Value& getItem() { 
+        virtual Value const& getItem() {
             return arrayIterator.isNewEmptyIndicator ? trueValue : DelegateChunkIterator::getItem();
         }
 
-        BernoulliChunkIterator(DelegateChunk const* chunk, int iterationMode) 
+        BernoulliChunkIterator(DelegateChunk const* chunk, int iterationMode)
         : DelegateChunkIterator(chunk, ConstChunkIterator::IGNORE_OVERLAPS|ConstChunkIterator::IGNORE_EMPTY_CELLS),
-          arrayIterator((BernoulliArrayIterator&)chunk->getArrayIterator()),                
+          arrayIterator((BernoulliArrayIterator&)chunk->getArrayIterator()),
           nops(arrayIterator.nops),
           nextElem(arrayIterator.nextElem),
           lastElem(0)
         {
-            setSamplePosition();        
+            setSamplePosition();
             trueValue.setBool(true);
         }
 
-        void setSamplePosition() 
+        void setSamplePosition()
         {
             size_t offset = nextElem;
-            if (!arrayIterator.isPlainArray) { 
+            if (!arrayIterator.isPlainArray) {
                 offset -= lastElem;
-                while (offset-- != 0 && !inputIterator->end()) { 
+                while (offset-- != 0 && !inputIterator->end()) {
                     ++(*inputIterator);
-                }            
+                }
                 lastElem = nextElem;
                 hasCurrent = !inputIterator->end();
             } else {
                 Coordinates pos = chunk->getFirstPosition(false);
                 Coordinates const& last = chunk->getLastPosition(false);
-            
+
                 for (int i = (int)pos.size(); --i >= 0; ) {
                     size_t length = last[i] - pos[i] + 1;
                     pos[i] += offset % length;
@@ -180,7 +180,7 @@ class BernoulliArrayIterator : public DelegateArrayIterator
                 hasCurrent = inputIterator->setPosition(pos);
             }
         }
-        
+
       private:
         BernoulliArrayIterator& arrayIterator;
         NumericOperations nops;
@@ -198,19 +198,19 @@ class BernoulliArray : public DelegateArray
         return new BernoulliChunkIterator(chunk, iterationMode);
     }
 
-    virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const 
+    virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const
     {
         return new BernoulliArrayIterator(*this, id, inputArray->getConstIterator(id < nAttrs ? id : 0), probability, seed);
     }
 
-    BernoulliArray(ArrayDesc const& desc, boost::shared_ptr<Array> input, double prob, int rndGenSeed) 
+    BernoulliArray(ArrayDesc const& desc, std::shared_ptr<Array> input, double prob, int rndGenSeed)
     : DelegateArray(desc, input),
       probability(prob),
       seed(rndGenSeed)
     {
         nAttrs = input->getArrayDesc().getAttributes().size();
     }
-    
+
 
   private:
     size_t nAttrs;
@@ -236,24 +236,24 @@ public:
 	 * Bernoulli is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
 		assert(inputArrays.size() == 1);
 
-		shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+		std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
 
         int seed = (_parameters.size() == 2)
-            ? (int)((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64()
+            ? (int)((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64()
             : (int)time(NULL);
-        double probability = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getDouble();
+        double probability = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getDouble();
         if (seed < 0)
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_SAMPLE_ERROR1);
         if (probability <= 0 || probability > 1)
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_SAMPLE_ERROR2);
-        return boost::shared_ptr<Array>(new BernoulliArray(_schema, inputArray, probability, seed));
+        return std::shared_ptr<Array>(new BernoulliArray(_schema, inputArray, probability, seed));
     }
 };
-    
+
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalBernoulli, "bernoulli", "physicalBernoulli")
 
 }  // namespace scidb

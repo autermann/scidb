@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -60,10 +60,10 @@ public:
         ADD_PARAM_INPUT()
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query);
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query);
 };
 
-ArrayDesc MPICopyLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+ArrayDesc MPICopyLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
 {
     assert(schemas.size() == 1);
 
@@ -79,32 +79,32 @@ ArrayDesc MPICopyLogical::inferSchema(std::vector<ArrayDesc> schemas, boost::sha
     DimensionDesc const& d1 = dims[1];
 
     // must have finite size
-    if (d0.getLength() == INFINITE_LENGTH
-        || d1.getLength() == INFINITE_LENGTH)
+    if (d0.isMaxStar() || d1.isMaxStar()) {
         throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR9);
+    }
 
     // is there a ctor that will take just the original names and do the following by a rule?
     Attributes atts(1);
     atts[0] = AttributeDesc((AttributeID)0, "copy", TID_DOUBLE, 0, 0);
     Dimensions outDims(2);
-    outDims[0] = DimensionDesc(d0.getBaseName() + "_1", 
+    outDims[0] = DimensionDesc(d0.getBaseName() + "_1",
                             d0.getStartMin(),
                             d0.getCurrStart(),
                             d0.getCurrEnd(),
-                            d0.getEndMax(), 
-                            d0.getChunkInterval(), 
+                            d0.getEndMax(),
+                            d0.getChunkInterval(),
                             0);
-    outDims[1] = DimensionDesc(d0.getBaseName() + "_2", 
+    outDims[1] = DimensionDesc(d0.getBaseName() + "_2",
                             d1.getStartMin(),
                             d1.getCurrStart(),
                             d1.getCurrEnd(),
-                            d1.getEndMax(), 
-                            d1.getChunkInterval(), 
+                            d1.getEndMax(),
+                            d1.getChunkInterval(),
                             0);
-    return ArrayDesc("mpicopy", atts, outDims);
+    return ArrayDesc("mpicopy", atts, outDims, defaultPartitioning());
 }
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(MPICopyLogical, "mpicopy");
+REGISTER_LOGICAL_OPERATOR_FACTORY(MPICopyLogical, "_mpicopy");
 
 } // end namespace
 

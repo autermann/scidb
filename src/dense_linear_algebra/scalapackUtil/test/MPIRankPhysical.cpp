@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,8 +26,7 @@
 #include <string>
 
 // std C
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 
 // SciDB
@@ -70,30 +69,36 @@ namespace scidb
 {
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.svd"));
 
-// REFACTOR:
-inline int64_t nrow(boost::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[0].getLength(); }
-// REFACTOR:
-inline int64_t ncol(boost::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[1].getLength(); }
+static const bool DBG = false;
 
 // REFACTOR:
-inline int64_t brow(boost::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[0].getChunkInterval(); }
+inline int64_t nrow(std::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[0].getLength(); }
 // REFACTOR:
-inline int64_t bcol(boost::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[1].getChunkInterval(); }
+inline int64_t ncol(std::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[1].getLength(); }
 
 // REFACTOR:
-inline Coordinates getStartMin(boost::shared_ptr<Array>& a) {
+inline int64_t brow(std::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[0].getChunkInterval(); }
+// REFACTOR:
+inline int64_t bcol(std::shared_ptr<Array>& a) { return a->getArrayDesc().getDimensions()[1].getChunkInterval(); }
+
+// REFACTOR:
+inline Coordinates getStartMin(std::shared_ptr<Array>& a) {
     Coordinates result(2);
     result[0] = a->getArrayDesc().getDimensions()[0].getStartMin();
     result[1] = a->getArrayDesc().getDimensions()[1].getStartMin();
-    std::cerr << "getStartMin(array) returns (" << result[0] << "," << result[1] << ")" << std::endl;
+    if (DBG) {
+        std::cerr << "getStartMin(array) returns (" << result[0] << "," << result[1] << ")" << std::endl;
+    }
     return result;
 }
 // REFACTOR:
-inline Coordinates getEndMax(boost::shared_ptr<Array>& a) {
+inline Coordinates getEndMax(std::shared_ptr<Array>& a) {
     Coordinates result(2);
     result[0] = a->getArrayDesc().getDimensions()[0].getEndMax();
     result[1] = a->getArrayDesc().getDimensions()[1].getEndMax();
-    std::cerr << "getEndMax(array) returns (" << result[0] << "," << result[1] << ")" << std::endl;
+    if (DBG) {
+        std::cerr << "getEndMax(array) returns (" << result[0] << "," << result[1] << ")" << std::endl;
+    }
     return result;
 }
 
@@ -117,22 +122,23 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psScaLAPACK);
+        return RedistributeContext(psScaLAPACK);
     }
     // if outputting partial blocks that need to be merged, one needs to override
     // another operator called ???
 
-    virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
+    virtual std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query);
 
     private:
-    void invokeMPIRank(std::vector< shared_ptr<Array> >* inputArrays,
-                       shared_ptr<Query>& query,
-                       shared_ptr<MpiOperatorContext>& ctx,
+    void invokeMPIRank(std::vector< std::shared_ptr<Array> >* inputArrays,
+                       std::shared_ptr<Query>& query,
+                       std::shared_ptr<MpiOperatorContext>& ctx,
+                       const blacs::context_t& blacsContext,
                        ArrayDesc& outSchema,
-                       shared_ptr<Array>* result,
+                       std::shared_ptr<Array>* result,
                        slpp::int_t* INFO);
 
 };
@@ -145,11 +151,11 @@ public:
 /// + calls invokeMPIRank()
 /// + returns the output OpArray.
 ///
-shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
 {
-    const bool DBG = false ;
-
-    std::cerr << "MPIRankPhysical::execute() begin ---------------------------------------" << std::endl;
+    if (DBG) {
+        std::cerr << "MPIRankPhysical::execute() begin ---------------------------------------" << std::endl;
+    }
 
     //
     // repartition and redistribution from SciDB chunks and arbitrary distribution
@@ -161,7 +167,7 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     size_t nInstances = query->getInstancesCount();
     slpp::int_t instanceID = query->getInstanceID();
 
-    shared_ptr<Array> input = inputArrays[0];
+    std::shared_ptr<Array> input = inputArrays[0];
     Dimensions const& dims = input->getArrayDesc().getDimensions();
     size_t nRows = dims[0].getLength();
     size_t nCols = dims[1].getLength();
@@ -170,10 +176,10 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         SCIDB_ASSERT(!isParticipating);
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
         make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query,  "MPIRankPhysical"), firstChunkSize);
 
-        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPIRankPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPIRankPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if(wasConverted) {
@@ -183,7 +189,7 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         inputArrays[0].reset();
 
         unlaunchMPISlavesNonParticipating();
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     //
@@ -192,14 +198,23 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     //
     const ProcGrid* procGrid = query->getProcGrid();
 
-    procRowCol_t MN = { nRows, nCols};
+    const size_t MaxUnsigned = std::numeric_limits<unsigned>::max();
+    ASSERT_EXCEPTION(
+            nRows <= MaxUnsigned &&
+            nCols <= MaxUnsigned &&
+            static_cast<size_t>(dims[0].getChunkInterval()) <= MaxUnsigned &&
+            static_cast<size_t>(dims[1].getChunkInterval()) <= MaxUnsigned,
+            "Narrowing conversion from size_t to unsigned in MPIRankPhysical lost information.");
+    procRowCol_t MN = { static_cast<unsigned>(nRows), static_cast<unsigned>(nCols)};
     procRowCol_t MNB = { procNum_t(dims[0].getChunkInterval()),
                          procNum_t(dims[1].getChunkInterval()) };
 
     procRowCol_t blacsGridSize = procGrid->useableGridSize(MN, MNB);
     procRowCol_t myGridPos = procGrid->gridPos(instanceID, blacsGridSize);
 
-    if(DBG) std::cerr << "*** myGridPos.row:" << myGridPos.row << " myGridPos.col:" << myGridPos.col << std::endl;
+    if (DBG) {
+        std::cerr << "*** myGridPos.row:" << myGridPos.row << " myGridPos.col:" << myGridPos.col << std::endl;
+    }
     if (myGridPos.row >= blacsGridSize.row || myGridPos.col >= blacsGridSize.col) {
         if(DBG) {
             std::cerr << "instID:" << instanceID << " myGridPos.row:" << myGridPos.row
@@ -214,10 +229,10 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         SCIDB_ASSERT(!isParticipating);
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
         make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query,  "MPIRankPhysical"), firstChunkSize);
 
-        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPIRankPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPIRankPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if(wasConverted) {
@@ -227,7 +242,7 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         inputArrays[0].reset();
 
         unlaunchMPISlavesNonParticipating();
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     } else {
         if(DBG) {
             std::cerr << "instID:" << instanceID << " myGridPos.row:" << myGridPos.row
@@ -236,29 +251,31 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
         }
     }
 
-    slpp::int_t ICTXT=-1;
     slpp::int_t IC = query->getInstancesCount();
     slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
-    std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
-    std::cerr << "(execute) scidb_set_blacs_gridinfo_(ctx:"<< ICTXT
-                                   << ", nprow:"<<blacsGridSize.row
-                                   << ", npcol:"<<blacsGridSize.col << "," << std::endl;
-    std::cerr << "                         myRow:"<<myGridPos.row
-                                     << ", myCol:" << myGridPos.col << ")" << std::endl;
-    scidb_set_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
+    if (DBG) {
+        std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
+        std::cerr << "(execute) scidb_set_blacs_gridinfo_()"
+                                       << ", nprow:"<<blacsGridSize.row
+                                       << ", npcol:"<<blacsGridSize.col << "," << std::endl;
+        std::cerr << "                         myRow:"<<myGridPos.row
+                                         << ", myCol:" << myGridPos.col << ")" << std::endl;
+    }
+    blacs::context_t blacsContext;
+    scidb_set_blacs_gridinfo_(blacsContext, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(blacsContext, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "scidb_blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "scidb_blacs_gridinfo_()" << std::endl;
         std::cerr << "   -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
         std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }
 
     int minLen = std::min(nRows, nCols);
-    std::cerr << "-------------------------------------" << std::endl ;
     if(DBG) {
+        std::cerr << "-------------------------------------" << std::endl ;
         std::cerr << "MPIRankPhysical::execute(): nInstances=" << nInstances << std::endl ;
         std::cerr << "MPIRankPhysical::execute(): nCols=" << nCols << std::endl ;
         std::cerr << "MPIRankPhysical::execute(): nRows=" << nRows << std::endl ;
@@ -281,19 +298,25 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     last[0] = dims[0].getStartMin() + dims[0].getLength() - 1;
     last[1] = dims[1].getStartMin() + dims[1].getLength() - 1;
 
-    if(DBG) std::cerr << "@@@ calling invokeMPIRank()" << std::endl ;
+    if(DBG) {
+        std::cerr << "@@@ calling invokeMPIRank()" << std::endl ;
+    }
     LOG4CXX_DEBUG(logger, "*@@@ calling invokeMPIRank()");
 
     const slpp::int_t DEFAULT_BAD_RESULT = -99;  // scalapack negative errors are the position of the bad argument
     slpp::int_t INFO = DEFAULT_BAD_RESULT ;
-    shared_ptr<Array> result;
+    std::shared_ptr<Array> result;
 
-    invokeMPIRank(&inputArrays, query, _ctx, _schema, &result, &INFO);
+    invokeMPIRank(&inputArrays, query, _ctx, blacsContext, _schema, &result, &INFO);
 
-    if(DBG) std::cerr << "@@@ execute: post invokeMPIRank, INFO:" << INFO << std::endl ;
+    if(DBG) {
+        std::cerr << "@@@ execute: post invokeMPIRank, INFO:" << INFO << std::endl ;
+    }
 
     if (INFO != 0) {
-        if(DBG) std::cerr << "ERROR: INFO is " << INFO << std::endl ;
+        if(DBG) {
+            std::cerr << "ERROR: INFO is " << INFO << std::endl ;
+        }
         if(INFO < 0) {
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR35);
         } else {
@@ -306,27 +329,32 @@ shared_ptr<Array> MPIRankPhysical::execute(std::vector< shared_ptr<Array> >& inp
     }
 
     // return the scidb array
-    if(DBG) std::cerr << "invokeMPIRank returning result" << std::endl ;
+    if (DBG) {
+        std::cerr << "invokeMPIRank returning result" << std::endl ;
+    }
     LOG4CXX_DEBUG(logger, "invokeMPIRank returning result");
 
     Dimensions const& rdims = result->getArrayDesc().getDimensions();
-    std::cerr << "returning result array size: " << rdims[0].getLength() <<
+    if (DBG) {
+        std::cerr << "returning result array size: " << rdims[0].getLength() <<
                                              "," << rdims[1].getLength() << std::endl ;
 
-    if(DBG) std::cerr << "MPIRankPhysical::execute() end ---------------------------------------" << std::endl;
+        std::cerr << "MPIRankPhysical::execute() end ---------------------------------------" << std::endl;
+    }
     return result;
 }
 
-void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArrays,
-                                     shared_ptr<Query>& query,
-                                     shared_ptr<MpiOperatorContext>& ctx,
+void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inputArrays,
+                                     std::shared_ptr<Query>& query,
+                                     std::shared_ptr<MpiOperatorContext>& ctx,
+                                     const blacs::context_t& blacsContext,
                                      ArrayDesc& outSchema,
-                                     shared_ptr<Array>* result,
+                                     std::shared_ptr<Array>* result,
                                      slpp::int_t* INFO)
 {
-    const bool DBG = false;
-
-    std::cerr << "invokeMPIRank reached" << std::endl ;
+    if (DBG) {
+        std::cerr << "invokeMPIRank reached" << std::endl ;
+    }
 
     size_t nInstances = query->getInstancesCount();
     slpp::int_t instanceID = query->getInstanceID();
@@ -340,31 +368,35 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     //
     //.... Get the (emulated) BLACS info .............................................
     //
-    slpp::int_t ICTXT=-1;
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-
-    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(blacsContext, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "(invoke) scidb_blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "(invoke) scidb_blacs_gridinfo_()" << std::endl;
         std::cerr << "-> NPROW: " << NPROW  << ", NPCOL: " << NPCOL << std::endl;
         std::cerr << "-> MYPROW:" << MYPROW << ", MYPCOL:" << MYPCOL << std::endl;
     }
 
     // REFACTOR these checks
     if(MYPROW < 0 || MYPCOL < 0) {
-        std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL << std::endl ;
+        if (DBG) {
+            std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL << std::endl ;
+        }
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << "MPIRank operator error: MYPROW:"<< MYPROW << " MYPCOL:"<<MYPCOL);
     }
 
     if(MYPROW >= NPROW) {
-        std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW << std::endl ;
+        if (DBG) {
+            std::cerr << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW << std::endl ;
+        }
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << "MPIRank operator error: MYPROW:"<< MYPROW << " NPROW:"<<NPROW);
     }
 
     if(MYPCOL >= NPCOL) {
-        std::cerr << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL << std::endl ;
+        if (DBG) {
+            std::cerr << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL << std::endl ;
+        }
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << "MPIRank operator error: MYPCOL:"<< MYPCOL << " NPCOL:"<<NPCOL);
     }
@@ -382,7 +414,9 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     size_t NPE = NPROW*NPCOL; // from blacs
     if(NPE > nInstances) {
         std::stringstream msg; msg << "MPIRank operator error: NPE:"<<NPE<< " nInstances:"<< nInstances;
-        std::cerr << msg.str() << std::endl;
+        if (DBG) {
+            std::cerr << msg.str() << std::endl;
+        }
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
     }
 
@@ -390,18 +424,22 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     slpp::int_t MYPE = MYPROW*NPCOL + MYPCOL ; // row-major
     if(MYPE != instanceID) {
         std::stringstream msg; msg << "MPIRank operator error: MYPE:"<<MYPE<< " instanceID:"<< instanceID;
-        std::cerr << msg.str() << std::endl;
+        if (DBG) {
+            std::cerr << msg.str() << std::endl;
+        }
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << msg.str()) ;
     }
 
-    if(DBG) std::cerr << "NPE/nInstances: " << NPE << std::endl;
-    if(DBG) std::cerr << "MYPE/instanceID: " << MYPE << std::endl;
+    if(DBG) {
+        std::cerr << "NPE/nInstances: " << NPE << std::endl;
+        std::cerr << "MYPE/instanceID: " << MYPE << std::endl;
+    }
 
     // REFACTOR  -- not only in DLA operators but also perhaps PhysicalMpiTest
     //
     // taken from PhysicalMpiTest operator code, pre-loop
     //
-    const boost::shared_ptr<const InstanceMembership> membership =
+    const std::shared_ptr<const InstanceMembership> membership =
         Cluster::getInstance()->getInstanceMembership();
 
     if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
@@ -417,32 +455,44 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     //
     // taken from PhysicalMpiTest operator code, in-loop
     //
-    if(DBG) std::cerr << "invokeMPIRank slave creation" << std::endl ;
-    if(DBG) std::cerr << "invokeMPIRank slave waitForHandshake 1" << std::endl ;
+    if(DBG) {
+        std::cerr << "invokeMPIRank slave creation" << std::endl ;
+        std::cerr << "invokeMPIRank slave waitForHandshake 1" << std::endl ;
+    }
     launchMPISlaves(query, NPROW*NPCOL);
-    if(DBG) std::cerr << "invokeMPIRank slave waitForHandshake 1 done" << std::endl ;
+    if(DBG) {
+        std::cerr << "invokeMPIRank slave waitForHandshake 1 done" << std::endl ;
+    }
 
-    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+    std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
 
     // REFACTOR: this is a pattern in DLAs
     //
     // get dimension information about the input arrays
     //
-    if(DBG) std::cerr << "invokeMPIRank get dim info" << std::endl ;
-    boost::shared_ptr<Array> Ain = (*inputArrays)[0];
+    if(DBG) {
+        std::cerr << "invokeMPIRank get dim info" << std::endl ;
+    }
+    std::shared_ptr<Array> Ain = (*inputArrays)[0];
 
     std::ostringstream tmp;
     Ain->getArrayDesc().getDimensions()[0].toString(tmp) ;
-    if(DBG) std::cerr << tmp.str() << std::endl;
+    if(DBG) {
+        std::cerr << tmp.str() << std::endl;
+    }
 
     std::ostringstream tmp2;
     Ain->getArrayDesc().getDimensions()[1].toString(tmp2) ;
-    std::cerr << tmp2.str() << std::endl;
+    if (DBG) {
+        std::cerr << tmp2.str() << std::endl;
+    }
 
     // find M,N from input array
     slpp::int_t M = nrow(Ain);
     slpp::int_t N = ncol(Ain);
-    if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
+    if(DBG) {
+        std::cerr << "M " << M << " N " << N << std::endl;
+    }
 
     // find MB,NB from input array, which is the chunk size
     // note that the best chunksizes for ScaLAPACK are 32x32 and 64x64
@@ -454,7 +504,9 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     //           size is not a legitimate one at this point
     if (brow(Ain) > SL_BLOCK_SIZE ||
         bcol(Ain) > SL_BLOCK_SIZE) {
-        std::cerr << "MPIRank operator error: chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large" << std::endl ;
+        if (DBG) {
+            std::cerr << "MPIRank operator error: chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large" << std::endl ;
+        }
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << "chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large");
     }
@@ -475,20 +527,24 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     // are found in the headers of the scalapack functions such as pdgesvd_()
     const slpp::int_t one = 1 ;
     slpp::int_t LD_IN = std::max(one, scidb_numroc_( M, MB, MYPROW, /*RSRC_IN*/0, NPROW ));
-    if(DBG) std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
-    if(DBG) std::cerr << "--> LD_IN = " << LD_IN << std::endl;
+    if(DBG) {
+        std::cerr << "M:"<<M <<" MB:"<<MB << " MYPROW:"<<MYPROW << " NPROW:"<<NPROW<< std::endl;
+        std::cerr << "--> LD_IN = " << LD_IN << std::endl;
+    }
 
     slpp::int_t LD_OUT = LD_IN; // because its a copy operation
 
     slpp::int_t TD_IN = std::max(one, scidb_numroc_( N, NB, MYPCOL, /*CSRC_IN*/0, NPCOL ));
-    if(DBG) std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
-    if(DBG) std::cerr << "-->TD_IN = " << TD_IN << std::endl;
+    if(DBG) {
+        std::cerr << "N:"<<N <<" NB:"<<NB  << " MYPCOL:"<<MYPCOL << " NPCOL:"<<NPCOL<< std::endl;
+        std::cerr << "-->TD_IN = " << TD_IN << std::endl;
+    }
 
     // create ScaLAPACK array descriptors
     slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
 
     slpp::desc_t DESC_IN;
-    scidb_descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LD_IN,  *INFO);
+    scidb_descinit_(DESC_IN, M, N, MB, NB, 0, 0, blacsContext, LD_IN,  *INFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: scidb_descinit(DESC_IN) failed, INFO " << descinitINFO
                                                                                  << " DESC_IN " << DESC_IN);
@@ -497,7 +553,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     LOG4CXX_DEBUG(logger, "MPIRankPhysical::invokeMPIRank(): DESC_IN " << DESC_IN);
 
     slpp::desc_t DESC_OUT;
-    scidb_descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LD_OUT, *INFO);
+    scidb_descinit_(DESC_OUT, M, N, MB, NB, 0, 0, blacsContext, LD_OUT, *INFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "MPIRankPhysical::invokeMPICopy: scidb_descinit(DESC_OUT) failed, INFO " << descinitINFO
                                                                                  << " DESC_OUT " << DESC_OUT);
@@ -516,11 +572,11 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
         std::cerr << "MB:" << MB << std::endl;
         std::cerr << "MYPROW:" << MYPROW << std::endl;
         std::cerr << "NPROW:" << NPROW << std::endl;
-    }
 
-    std::cerr << "LOCAL SIZES:@@@@@@@@@@@@@@@@@@@" << std::endl ;
-    std::cerr << "XX MP   = " << MP << std::endl;
-    std::cerr << "XX NQ   = " << NQ << std::endl;
+        std::cerr << "LOCAL SIZES:@@@@@@@@@@@@@@@@@@@" << std::endl ;
+        std::cerr << "XX MP   = " << MP << std::endl;
+        std::cerr << "XX NQ   = " << NQ << std::endl;
+    }
 
     // sizes
     const slpp::int_t SIZE_IN = MP * NQ ;
@@ -545,7 +601,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     InstanceID instanceId = Cluster::getInstance()->getLocalInstanceId();
     std::string ipcName = mpi::getIpcName(installPath, clusterUuid, query->getQueryID(), instanceId, _launchId);
 
-    typedef boost::shared_ptr<SharedMemoryIpc> SMIptr_t ;
+    typedef std::shared_ptr<SharedMemoryIpc> SMIptr_t ;
     std::vector<SMIptr_t> shmIpc(NUM_BUFS);
     for(size_t ii=0; ii<NUM_BUFS; ii++) {
         std::stringstream suffix;
@@ -589,20 +645,24 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     Coordinates coordLast = getEndMax(Ain);
 
     procRowCol_t firstChunkSize = { chunkRow(Ain), chunkCol(Ain) };
-    shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(*inputArrays, query,  "MPIRankPhysical"), firstChunkSize);
 
-    shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, schemeData, query, "MPIRankPhysical");
+    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, schemeData, query, "MPIRankPhysical");
 
     bool wasConverted = (tmpRedistedInput != Ain) ;  // only when redistribute was actually done (sometimes optimized away)
 
     scidb::ReformatToScalapack pdelsetOp(IN, DESC_IN, coordFirst[0], coordFirst[1], NPROW, NPCOL, MYPROW, MYPCOL);
 
-    if(DBG) std::cerr << "extract data from SciDB Ain to ScaLAPACK double* IN" << std::endl ;
+    if(DBG) {
+        std::cerr << "extract data from SciDB Ain to ScaLAPACK double* IN" << std::endl ;
+    }
     LOG4CXX_DEBUG(logger, "extract data from SciDB Ain to ScaLAPACK double* IN");
     extractDataToOp(tmpRedistedInput, /*attrID*/0, coordFirst, coordLast, pdelsetOp, query);
     LOG4CXX_DEBUG(logger, "extraction done");
-    if(DBG) std::cerr << "extraction done" << std::endl ;
+    if(DBG) {
+        std::cerr << "extraction done" << std::endl ;
+    }
 
     if(wasConverted) {
         SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
@@ -625,18 +685,24 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     //
     //.... Call the master wrapper
     //
-    if(DBG) std::cerr << "MPIRankPhysical: calling mpiRankMaster M,N:" << M  << "," << N
+    if(DBG) {
+        std::cerr << "MPIRankPhysical: calling mpiRankMaster M,N:" << M  << "," << N
                                   << "MB,NB:" << MB << "," << NB << std::endl;
+    }
     LOG4CXX_DEBUG(logger, "MPIRankPhysical: calling mpiRankMaster M,N:" << M <<","<< "MB,NB:" << MB << "," << NB);
 
-    if(DBG) std::cerr << "MPIRankPhysical calling PDGESVD to compute" << std:: endl;
+    if(DBG) {
+        std::cerr << "MPIRankPhysical calling PDGESVD to compute" << std:: endl;
+    }
     mpirankMaster(query.get(), ctx, slave, ipcName, argsBuf,
                   NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
                   IN,  DESC_IN, OUT, DESC_OUT, *INFO);
 
     LOG4CXX_DEBUG(logger, "MPIRank: mpiRankMaster finished");
-    std::cerr << "MPIRank: calling mpiRankMaster finished" << std::endl;
-    std::cerr << "MPIRank: mpiRankMaster returned INFO:" << *INFO << std::endl;
+    if (DBG) {
+        std::cerr << "MPIRank: calling mpiRankMaster finished" << std::endl;
+        std::cerr << "MPIRank: mpiRankMaster returned INFO:" << *INFO << std::endl;
+    }
 
     Dimensions const& dims = Ain->getArrayDesc().getDimensions();
 
@@ -645,13 +711,15 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     typedef scidb::ReformatFromScalapack<shmSharedPtr_t> reformatOp_t ;
 
     // Only in MPIRank
-    std::cerr << "--------------------------------------" << std::endl;
-    std::cerr << "sequential values of 'OUT' ScaLAPACK memory" << std::endl;
-    for(int ii=0; ii < SIZE_OUT; ii++) {
-        std::cerr << "OUT["<<ii<<"] = " << OUT[ii] << std::endl;
+    if (DBG) {
+        std::cerr << "--------------------------------------" << std::endl;
+        std::cerr << "sequential values of 'OUT' ScaLAPACK memory" << std::endl;
+        for(int ii=0; ii < SIZE_OUT; ii++) {
+            std::cerr << "OUT["<<ii<<"] = " << OUT[ii] << std::endl;
+        }
+        std::cerr << "--------------------------------------" << std::endl;
+        std::cerr << "using pdelgetOp to redist mpiRank OUT from memory to scidb array , start" << std::endl ;
     }
-    std::cerr << "--------------------------------------" << std::endl;
-    std::cerr << "using pdelgetOp to redist mpiRank OUT from memory to scidb array , start" << std::endl ;
 
     //
     // an OpArray is a SplitArray that is filled on-the-fly by calling the operator
@@ -672,18 +740,23 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< shared_ptr<Array> >* inputArra
     iterDelta[0] = NPROW * dims[0].getChunkInterval();
     iterDelta[1] = NPCOL * dims[1].getChunkInterval();
 
-    if(DBG) std::cerr << "MPIRank OUT SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
+    if(DBG) {
+        std::cerr << "MPIRank OUT SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
+    }
     LOG4CXX_DEBUG(logger, "Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
 
-    reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStartMin(), dims[1].getStartMin());
-    *result = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+    reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStartMin(), dims[1].getStartMin(),
+			      NPROW, NPCOL, MYPROW, MYPCOL);
+    *result = std::shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
                                                           first, last, iterDelta, query));
     releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
 
-    if(DBG) std::cerr << "invoke: returning from invokeMPIRank with INFO:" << *INFO << std::endl ;
+    if(DBG) {
+        std::cerr << "invoke: returning from invokeMPIRank with INFO:" << *INFO << std::endl ;
+    }
 }
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(MPIRankPhysical, "mpirank", "MPIRankPhysical");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(MPIRankPhysical, "_mpirank", "MPIRankPhysical");
 
 } //namespace

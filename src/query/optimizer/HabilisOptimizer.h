@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,11 +32,10 @@
 #ifndef HABILISOPTIMIZER_H_
 #define HABILISOPTIMIZER_H_
 
-#include "query/optimizer/Optimizer.h"
-#include "query/QueryPlan.h"
-#include "boost/shared_ptr.hpp"
-
 #include <vector>
+
+#include <query/optimizer/Optimizer.h>
+#include <query/QueryPlan.h>
 
 namespace scidb
 {
@@ -45,7 +44,7 @@ class HabilisOptimizer : public Optimizer
 {
 public:
    friend class OptimizerTests;
-   friend boost::shared_ptr<Optimizer> Optimizer::create();
+   friend std::shared_ptr<Optimizer> Optimizer::create();
 
    ~HabilisOptimizer()
    {}
@@ -55,15 +54,16 @@ public:
     * @return runnable physical plan.
     */
    PhysPlanPtr
-   optimize(const boost::shared_ptr<Query>& query,
-            boost::shared_ptr< LogicalPlan>& logicalPlan);
+   optimize(const std::shared_ptr<Query>& query,
+            std::shared_ptr< LogicalPlan>& logicalPlan);
 
    enum FeatureMask
    {
-       CONDENSE_SG     = 1,
-       INSERT_REPART   = 2,
-       INSERT_MATERIALIZATION = 4,
-       REWRITE_STORING_SG     = 8
+        CONDENSE_SG                          = 0x01,
+        // INSERT_REPART                        = 0x02,  // replaced with INSERT_RESHAPE
+        INSERT_MATERIALIZATION               = 0x04,
+        REWRITE_STORING_SG                   = 0x08,
+        INSERT_REDIMENSION_OR_REPARTITION    = 0x10
    };
 
 private:
@@ -106,7 +106,7 @@ private:
      /**
      * Current query of the plan. Initially empty.
      */
-     boost::shared_ptr<Query> _query;
+     std::shared_ptr<Query> _query;
 
     /**
      * Mask of features that are enabled
@@ -157,8 +157,8 @@ private:
      * @param[in] logicalInputSchemas all inputs to the logical node
      * @param[in] logicalOutputSchema output schema inferred by the logical node
      */
-    boost::shared_ptr < OperatorParam>
-    n_createPhysicalParameter (const boost::shared_ptr< OperatorParam> & logicalParameter,
+    std::shared_ptr < OperatorParam>
+    n_createPhysicalParameter (const std::shared_ptr< OperatorParam> & logicalParameter,
                                     const std::vector< ArrayDesc>& logicalInputSchemas,
                                     const ArrayDesc& logicalOutputSchema,
                                     bool tile);
@@ -169,7 +169,7 @@ private:
      * @param[in] logicalNode the node to translate.
      */
      PhysNodePtr
-    n_createPhysicalNode            (boost::shared_ptr < LogicalQueryPlanNode> logicalNode, bool tileMode);
+    n_createPhysicalNode            (std::shared_ptr < LogicalQueryPlanNode> logicalNode, bool tileMode);
 
 
     /**
@@ -180,8 +180,10 @@ private:
      * @param[in] storeArray store the result as a permanent new array (if true)
      */
      PhysNodePtr
-     n_buildSgNode           (const ArrayDesc & outputSchema, PartitioningSchema partSchema, bool storeArray = false);
-
+     n_buildSgNode(const ArrayDesc & outputSchema,
+                   PartitioningSchema partSchema,
+                   const std::shared_ptr<OperatorParam>& persistentArrayName =
+                   std::shared_ptr<OperatorParam>());
 
      /**
       * Build a new ReduceDistro node based on a given child attributes.
@@ -219,7 +221,7 @@ private:
      * @param requiredStats the distribution stats the chain must have after the operation.
      */
     void
-    cw_rectifyChainDistro( PhysNodePtr root,  PhysNodePtr sgCandidate, const  ArrayDistribution & requiredDistribution);
+    cw_rectifyChainDistro( PhysNodePtr root,  PhysNodePtr sgCandidate, const  RedistributeContext & requiredDistribution);
 
     //////Helper functions - tree walkers:
 
@@ -229,7 +231,7 @@ private:
      * @param logicalRoot the root of the tree to translate.
      */
      PhysNodePtr
-     tw_createPhysicalTree               (boost::shared_ptr < LogicalQueryPlanNode> logicalRoot, bool tileMode);
+     tw_createPhysicalTree               (std::shared_ptr < LogicalQueryPlanNode> logicalRoot, bool tileMode);
 
     /**
      * Add all necessary scatter-gather nodes to the tree.
@@ -266,12 +268,30 @@ private:
     tw_rewriteStoringSG(PhysNodePtr root);
 
     /**
+     * Update SG's isStrict flag if the upstream operator
+     * (i.e. input() or redimension()) overrides the default
+     * @param root root of physical plan.
+     */
+    void
+    tw_updateSgStrictness(PhysNodePtr root);
+
+    /**
      * Insert repart operators where chunksizes or overlaps don't match.
      * @param root root of physical plan.
      * @return true IFF a transformation was performed
      */
     bool
     tw_insertRepartNodes(PhysNodePtr root);
+
+    /**
+     * Insert redimensions or repartition operators where needed
+     * @param root root of physical plan.
+     * @return true IFF a transformation was performed
+     */
+    bool
+    tw_insertRedimensionOrRepartitionNodes(PhysNodePtr root);
+
+
 
     void
     tw_insertChunkMaterializers(PhysNodePtr root);

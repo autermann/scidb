@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,16 +54,16 @@ private:
     /**
      * Very simple and somewhat rude parser used for all boolean flags.
      */
-    void parseBooleanParameter(string const& paramString, string const& paramHeader, bool& parameterValue,
+    void parseBooleanParameter(std::string const& paramString, std::string const& paramHeader, bool& parameterValue,
                                bool& parameterSetFlag)
     {
         if (parameterSetFlag)
         {
-            ostringstream error;
+            std::ostringstream error;
             error<<"The '"<<paramHeader<<"' parameter cannot be set more than once";
             throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
         }
-        string paramContent = paramString.substr(paramHeader.size());
+        std::string paramContent = paramString.substr(paramHeader.size());
         if (paramContent == "true")
         {
             parameterValue = true;
@@ -74,7 +74,7 @@ private:
         }
         else
         {
-            ostringstream error;
+            std::ostringstream error;
             error<<"The '"<<paramHeader<<"' parameter must have a value of 'true' or 'false'; '"
                  <<paramContent<<"' is not valid.";
             throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
@@ -94,16 +94,16 @@ public:
      * @param logical true if we are called in the Logical phase, false if in the Physical phase
      * @param query the query context
      */
-    InstanceStatsSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
+    InstanceStatsSettings(std::vector<std::shared_ptr<OperatorParam> > const& operatorParameters,
                           bool logical,
-                          shared_ptr<Query>& query):
+                          std::shared_ptr<Query>& query):
        _dumpDataToLog(false),
        _dumpDataToLogSet(false),
        _global(false),
        _globalSet(false)
     {
-        string const logParamHeader     = "log=";
-        string const globalParamHeader  = "global=";
+        std::string const logParamHeader     = "log=";
+        std::string const globalParamHeader  = "global=";
         size_t nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   /* assert-like exception. Caller should have taken care of this! */
@@ -112,34 +112,34 @@ public:
         }
         for (size_t i= 0; i<nParams; ++i)
         {
-            shared_ptr<OperatorParam>const& param = operatorParameters[i];
-            string parameterString;
+            std::shared_ptr<OperatorParam>const& param = operatorParameters[i];
+            std::string parameterString;
 
             /* Here we extract data from a constant SciDB parameter. Note the pattern is different based on whether we
              * are in the logical of physical phase. The same pattern applies to constants of other types (DOUBLE).
              */
             if (logical)
             {
-                parameterString = evaluate(((shared_ptr<OperatorParamLogicalExpression>&) param)->
+                parameterString = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&) param)->
                                            getExpression(),query, TID_STRING).getString();
             }
             else
             {
-                parameterString = ((shared_ptr<OperatorParamPhysicalExpression>&) param)->
+                parameterString = ((std::shared_ptr<OperatorParamPhysicalExpression>&) param)->
                                   getExpression()->evaluate().getString();
             }
             /* very simple parsing */
-            if (starts_with(parameterString, logParamHeader))
+            if (boost::starts_with(parameterString, logParamHeader))
             {
                 parseBooleanParameter(parameterString, logParamHeader, _dumpDataToLog, _dumpDataToLogSet);
             }
-            else if (starts_with(parameterString, globalParamHeader))
+            else if (boost::starts_with(parameterString, globalParamHeader))
             {
                 parseBooleanParameter(parameterString, globalParamHeader, _global, _globalSet);
             }
             else
             {
-                ostringstream error;
+                std::ostringstream error;
                 error<<"Unrecognized parameter: '"<<parameterString<<"'";
                 throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
             }

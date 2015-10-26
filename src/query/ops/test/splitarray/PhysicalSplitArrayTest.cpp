@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,6 +29,8 @@
 #include <log4cxx/logger.h>
 #include <query/Operator.h>
 
+using namespace std;
+using namespace boost;
 
 namespace scidb
 {
@@ -45,10 +47,10 @@ public:
         _schema = schema;
     }
 
-    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays,
-            boost::shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
+            std::shared_ptr<Query> query)
     {
-        shared_ptr<Array> input = inputArrays[0];
+        std::shared_ptr<Array> input = inputArrays[0];
 
         Dimensions const& dims = _schema.getDimensions();
         size_t nRow = dims[0].getLength();
@@ -62,9 +64,9 @@ public:
         if (nInstances > 1) {
             input = redistributeToRandomAccess(input, query, psByCol,
                                                ALL_INSTANCE_MASK,
-                                               shared_ptr<DistributionMapper>(),
+                                               std::shared_ptr<CoordinateTranslator>(),
                                                0,
-                                               shared_ptr<PartitioningSchemaData>());
+                                               std::shared_ptr<PartitioningSchemaData>());
         }
 
         // the following is somewhat convoluted, and can be cleaned up, if deemed necessary, as a later step
@@ -85,13 +87,13 @@ public:
         // bS = blockSize, a multiple of chunkSize
         size_t bSCol = roundUpToMultiple(nCol, cSCol * nInstances) * cSCol ;
         if (!nRow || !nCol || !bSCol)
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
 
         // check for participation (may have more instances than array can use)
         size_t usedInstances = roundUpToMultiple(nCol, bSCol);
         if (usedInstances < nInstances) {
             if (query->getInstanceID() >= usedInstances) {
-                return shared_ptr<Array>(new MemArray(_schema,query));
+                return std::shared_ptr<Array>(new MemArray(_schema,query));
             }
         }
 
@@ -131,7 +133,7 @@ public:
         last[0] = dims[0].getEndMax();
         last[1] = first[1] + nColLocal - 1;
 
-        return boost::shared_ptr<Array>(new SplitArray(_schema, matrixShared, first, last, query));
+        return std::shared_ptr<Array>(new SplitArray(_schema, matrixShared, first, last, query));
     }
 
 private:
@@ -140,6 +142,6 @@ private:
     ArrayDesc   _schema;
 };
 
-DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSplitArrayTest, "splitarraytest", "PhysicalSplitArrayTest")
+DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSplitArrayTest, "_splitarraytest", "PhysicalSplitArrayTest")
 
 } //namespace scidb

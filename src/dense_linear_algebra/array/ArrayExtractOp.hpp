@@ -9,8 +9,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,9 +30,7 @@
 // C++
 #include <limits>
 #include <sstream>
-
-// boost
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 // scidb
 #include <array/Array.h>
@@ -58,9 +56,9 @@ static log4cxx::LoggerPtr extractOpLogger(log4cxx::Logger::getLogger("scidb.libd
 /// possible formats of chunk that could be passed to the function.
 
 template<class ExtractOp_tt>
-void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID,
+void extractDataToOp(std::shared_ptr<scidb::Array> array, scidb::AttributeID attrID,
                      scidb::Coordinates const& first, scidb::Coordinates const& last,
-                     ExtractOp_tt& extractOp, const shared_ptr<Query>& query)
+                     ExtractOp_tt& extractOp, const std::shared_ptr<Query>& query)
 {
     typedef double Value_t ;   // likely future template parameter
 
@@ -90,7 +88,7 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID,
 
 
 
-    boost::shared_ptr<scidb::ConstArrayIterator> chunksIt;
+    std::shared_ptr<scidb::ConstArrayIterator> chunksIt;
     for(chunksIt = array->getConstIterator(/*attrid*/0); ! chunksIt->end(); ++(*chunksIt) ) {
         if(DBG) std::cerr << "extractDataToOp: next chunksIt" << std::endl ;
 
@@ -98,15 +96,15 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID,
         scidb::Coordinates chunkOrigin(2); chunkOrigin = chunk.getFirstPosition(false);
         scidb::Coordinates chunkLast(2); chunkLast = chunk.getLastPosition(false);
 
-        shared_ptr<ConstChunkIterator> itChunk = chunk.getConstIterator();
+        std::shared_ptr<ConstChunkIterator> itChunk = chunk.getConstIterator();
         if( !dynamic_cast<RLETileConstChunkIterator*>(itChunk.get()) &&
-            !dynamic_cast<BufferedConstChunkIterator< boost::shared_ptr<RLETileConstChunkIterator> >* >(itChunk.get()) ) {
+            !dynamic_cast<BufferedConstChunkIterator< std::shared_ptr<RLETileConstChunkIterator> >* >(itChunk.get()) ) {
             // these iterators have functioning getData() implementations
             // see Tigor for more details
             // XXX TODO: can these checks be moved "inside" the[an?] emulation layer?
-            itChunk = make_shared<
+            itChunk = std::make_shared<
                          TileConstChunkIterator<
-                            shared_ptr<ConstChunkIterator> > >(itChunk, query);
+                            std::shared_ptr<ConstChunkIterator> > >(itChunk, query);
         }
         assert(itChunk->getLogicalPosition()>=0);
 
@@ -117,8 +115,8 @@ void extractDataToOp(shared_ptr<scidb::Array> array, scidb::AttributeID attrID,
         // for all non-zeros in chunk (memory is already zeroed)
         Coordinates coords(2);
         for (position_t offset = itChunk->getLogicalPosition(); offset >= 0; ) {
-            boost::shared_ptr<BaseTile> tileData;
-            boost::shared_ptr<BaseTile> tileCoords;
+            std::shared_ptr<BaseTile> tileData;
+            std::shared_ptr<BaseTile> tileCoords;
             offset = itChunk->getData(offset, MAX_VALUES_TO_GET, tileData, tileCoords);
             if (!tileData) {
                 assert(!tileCoords);

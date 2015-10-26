@@ -69,8 +69,6 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A2a from current 
 
 SCIDB QUERY : <save SP into current instance 'sp_int32.bin' as '(int32,string,double,int64,bool,float,string)'>
 {i} a,b,c,d,e,f,g
-{1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
-{1000} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
 SCIDB QUERY : <save SP into current instance'junk.bin' as '(int32,string,double,int64,datetime,float,datetime)'>
 [An error expected at this place for the query "save SP into current instance'junk.bin' as '(int32,string,double,int64,datetime,float,datetime)'". And it failed with error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER. Expected error code = scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER.]
@@ -104,8 +102,6 @@ SCIDB QUERY : <select * from dimensions(SP)>
 
 SCIDB QUERY : <save SP into current instance 'sp_int32_int64.bin' as '(int64,string,double,int64,bool,float,string)'>
 {i} a,b,c,d,e,f,g
-{1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
-{2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
 SCIDB QUERY : <load SP from current instance 'sp_int32_int64.bin' as '(int64,string,double,int64,bool,float,string)'>
 {i} a,b,c,d,e,f,g
@@ -131,8 +127,6 @@ SCIDB QUERY : <select * from dimensions(SP)>
 
 SCIDB QUERY : <save SP into 'sp_aql.bin' as 'opaque'>
 {i} a,b,c,d,e,f,g
-{1} 1,'first',4.44557,45,true,44.556,'FIRST_1'
-{2} 1000,'last',4.5567,44,false,44.332,'LAST_10'
 
 SCIDB QUERY : <load SP from 'sp_aql.bin' as 'opaque'>
 {i} a,b,c,d,e,f,g

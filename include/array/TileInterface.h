@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,13 +37,15 @@
 #include <string.h>
 #include <stdint.h>         // For the various int types
 #include <iostream>         // For the operator<< and the dump().
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include <boost/function.hpp>
+
 #include <util/Singleton.h>
 #include <query/TypeSystem.h>
 #include <array/RLE.h>
 
-namespace scidb {
+namespace scidb
+{
 
     /**
      * Abstract interface to various data formats, e.g. RLE encoded values, unencoded contiguous sequence of values a.k.a. array, etc.
@@ -167,7 +169,7 @@ namespace scidb {
             registerBuiltinTypes(); //must be non-virtual
         }
 
-        typedef boost::function< boost::shared_ptr<BaseTile>(const scidb::TypeId,
+        typedef boost::function< std::shared_ptr<BaseTile>(const scidb::TypeId,
                                                              const BaseEncoding::EncodingID,
                                                              const BaseTile::Context*) >
         TileConstructor;
@@ -176,7 +178,7 @@ namespace scidb {
                                  const BaseEncoding::EncodingID eID,
                                  const TileConstructor& constructor);
 
-        boost::shared_ptr<BaseTile> construct(const scidb::TypeId tID,
+        std::shared_ptr<BaseTile> construct(const scidb::TypeId tID,
                                               const BaseEncoding::EncodingID eID,
                                               const BaseTile::Context* ctx=NULL);
     private:
@@ -186,7 +188,19 @@ namespace scidb {
         void registerBuiltinTypes();
 
         typedef std::pair<BaseEncoding::EncodingID, scidb::TypeId> KeyType;
-        typedef boost::unordered_map<KeyType, TileConstructor > TileFactoryMap;
+
+        /// A functor to compute the hash value of KeyType.
+        struct KeyTypeHash
+        {
+            size_t operator()(KeyType const& key) const
+            {
+                size_t h1 = std::hash<size_t>()(static_cast<size_t>(key.first));
+                size_t h2 = std::hash<TypeId>()(key.second);
+                return h1 ^ (h2<<1);
+            }
+        };
+
+        typedef std::unordered_map<KeyType, TileConstructor, KeyTypeHash > TileFactoryMap;
         TileFactoryMap _factories;
     };
 

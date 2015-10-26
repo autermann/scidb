@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,15 +33,15 @@
 #define INTERNAL_STORAGE_H_
 
 #include <dirent.h>
+#include <map>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <memory>
 
 #include "Storage.h"
 #include "PersistentChunk.h"
 #include "ReplicationManager.h"
-#include <map>
-#include <vector>
-#include <string>
-#include <boost/unordered_map.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <array/MemArray.h>
 #include <array/DBArray.h>
 #include <util/DataStore.h>
@@ -88,7 +88,7 @@ namespace scidb
      */
     class VersionControl
     {
-      public:
+    public:
         /**
          * Extract content of specified version from the src chunk and place it in dst buffer
          * @param dst destination buffer. Implementation of this method should use
@@ -138,8 +138,8 @@ namespace scidb
      */
     class CachedStorage : public Storage, InjectedErrorListener<WriteChunkInjectedError>
     {
-      //Inner Structures
-      private:
+    //Inner Structures
+    private:
         struct ChunkInitializer
         {
             CachedStorage& storage;
@@ -157,16 +157,16 @@ namespace scidb
          */
         class DBArrayChunkBase : public Chunk
         {
-          public:
+        public:
             DBArrayChunkBase(PersistentChunk* chunk);
 
             virtual const Array& getArray() const;
             virtual const ArrayDesc& getArrayDesc() const;
             virtual const AttributeDesc& getAttributeDesc() const;
             virtual int getCompressionMethod() const;
-            virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
-            virtual boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
-            virtual boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query,
+            virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+            virtual std::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
+            virtual std::shared_ptr<ChunkIterator> getIterator(std::shared_ptr<Query> const& query,
                                                                  int iterationMode);
 
             virtual bool isMaterialized() const
@@ -191,23 +191,23 @@ namespace scidb
             virtual void allocate(size_t size);
             virtual void reallocate(size_t size);
             virtual void free();
-            virtual void compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
+            virtual void compress(CompressedBuffer& buf, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
             virtual Coordinates const& getFirstPosition(bool withOverlap) const;
             virtual Coordinates const& getLastPosition(bool withOverlap) const;
 
             virtual bool pin() const;
             virtual void unPin() const;
 
-            virtual void write(const boost::shared_ptr<Query>& query);
+            virtual void write(const std::shared_ptr<Query>& query);
             virtual void truncate(Coordinate lastCoord);
 
-            virtual void merge(ConstChunk const& with, boost::shared_ptr<Query>& query);
+            virtual void merge(ConstChunk const& with, std::shared_ptr<Query>& query);
             virtual void aggregateMerge(ConstChunk const& with,
-                                        boost::shared_ptr<Aggregate> const& aggregate,
-                                        boost::shared_ptr<Query>& query);
+                                        std::shared_ptr<Aggregate> const& aggregate,
+                                        std::shared_ptr<Query>& query);
             virtual void nonEmptyableAggregateMerge(ConstChunk const& with,
-                                                    boost::shared_ptr<Aggregate> const& aggregate,
-                                                    boost::shared_ptr<Query>& query);
+                                                    std::shared_ptr<Aggregate> const& aggregate,
+                                                    std::shared_ptr<Query>& query);
 
             AttributeID getAttributeId() const
             {
@@ -227,7 +227,7 @@ namespace scidb
                 //XXX tigor TODO: add logic to make sure this chunk is unpinned
             }
 
-          private:
+        private:
 
             DBArrayChunkBase();
             DBArrayChunkBase(const DBArrayChunkBase&);
@@ -242,18 +242,19 @@ namespace scidb
          */
         class DBArrayChunk : public DBArrayChunkBase
         {
-          public:
+        public:
             DBArrayChunk(DBArrayIterator& arrayIterator, PersistentChunk* chunk);
 
             virtual const Array& getArray() const;
             virtual const ArrayDesc& getArrayDesc() const;
             virtual const AttributeDesc& getAttributeDesc() const;
-            virtual void write(const boost::shared_ptr<Query>& query);
-            virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
-            virtual boost::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
-            virtual boost::shared_ptr<ChunkIterator> getIterator(boost::shared_ptr<Query> const& query, int iterationMode);
-            virtual void compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
+            virtual void write(const std::shared_ptr<Query>& query);
+            virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+            virtual std::shared_ptr<ConstRLEEmptyBitmap> getEmptyBitmap() const;
+            virtual std::shared_ptr<ChunkIterator> getIterator(std::shared_ptr<Query> const& query, int iterationMode);
+            virtual void compress(CompressedBuffer& buf, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
             virtual void decompress(const CompressedBuffer& buf);
+            virtual void showEmptyBitmap(const std::string & strPrefix) const;
 
         private:
 
@@ -307,9 +308,9 @@ namespace scidb
 
             // This is the current map from the chunks returned to the user of DBArrayIterator
             // to the StorageManager PersistentChunks
-            typedef boost::unordered_map<boost::shared_ptr<PersistentChunk>, boost::shared_ptr<DBArrayChunk> > DBArrayMap;
+            typedef std::unordered_map<std::shared_ptr<PersistentChunk>, std::shared_ptr<DBArrayChunk> > DBArrayMap;
             DBArrayMap _dbChunks;
-            DBArrayChunk* getDBArrayChunk(boost::shared_ptr<PersistentChunk>& dbChunk);
+            DBArrayChunk* getDBArrayChunk(std::shared_ptr<PersistentChunk>& dbChunk);
 
         private:
             Chunk* _currChunk;
@@ -317,15 +318,15 @@ namespace scidb
 
             AttributeDesc const& _attrDesc;
             StorageAddress _address;
-            boost::weak_ptr<Query> _query;
+            std::weak_ptr<Query> _query;
             bool const _writeMode;
-            boost::shared_ptr<const Array> _array;
+            std::shared_ptr<const Array> _array;
 
         public:
             DBArrayIterator(CachedStorage* storage,
-                            boost::shared_ptr<const Array>& array,
+                            std::shared_ptr<const Array>& array,
                             AttributeID attId,
-                            boost::shared_ptr<Query>& query,
+                            std::shared_ptr<Query>& query,
                             bool writeMode);
 
             ~DBArrayIterator();
@@ -341,11 +342,11 @@ namespace scidb
                 Chunk* notUsed(NULL);
                 return *notUsed;
             }
-            virtual Chunk& copyChunk(ConstChunk const& srcChunk, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap);
+            virtual Chunk& copyChunk(ConstChunk const& srcChunk, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap);
             virtual void   deleteChunk(Chunk& chunk);
             virtual Chunk& newChunk(Coordinates const& pos);
             virtual Chunk& newChunk(Coordinates const& pos, int compressionMethod);
-            virtual boost::shared_ptr<Query> getQuery() { return Query::getValidQueryPtr(_query); }
+            virtual std::shared_ptr<Query> getQuery() { return Query::getValidQueryPtr(_query); }
         };
 
         /**
@@ -356,34 +357,76 @@ namespace scidb
         class InnerChunkMapEntry
         {
         public:
+            enum Status {
+                NORMAL = 2,
+                INVALID = 4,
+                TOMBSTONE = 8
+            };
+
+            InnerChunkMapEntry() :
+                _status(NORMAL),
+                _hdrpos(0)
+                {}
+
             /**
              * Return pointer to chunk
              */
-            boost::shared_ptr<PersistentChunk>& getChunk()
-                { return _chunk; }
+            std::shared_ptr<PersistentChunk>& getChunk()
+                {
+                    assert(_status == NORMAL || _chunk == NULL);
+                    return _chunk;
+                }
+
+            const std::shared_ptr<PersistentChunk>& getChunk() const
+                {
+                    assert(_status == NORMAL || _chunk == NULL);
+                    return _chunk;
+                }
 
             /**
              * Is this a tombstone?
              */
-            bool isTombstone()
-                { return _chunk == NULL; }
+            bool isTombstone() const
+                { return (_status != NORMAL); }
 
             /**
-             * Set the tomstone position
-             * @param pos new tomstone position
+             * Set the tombstone position
+             * @param pos new tombstone position
              */
-            void setTombstonePos(uint64_t pos)
-                { _hdrpos = pos; }
+            void setTombstonePos(Status st, uint64_t pos)
+                {
+                    assert(st != NORMAL);
+                    _status = st;
+                    _hdrpos = pos;
+                }
 
             /**
              * Return position of tombstone
              */
-            uint64_t getTombstonePos()
-                { return _hdrpos; }
+            uint64_t getTombstonePos() const
+                {
+                    assert(_status != NORMAL);
+                    return _hdrpos;
+                }
+
+            /**
+             * Is entry valid?
+             */
+            bool isValid() const
+                { return (_status != INVALID); }
 
         private:
-            uint64_t _hdrpos;                           // if this is a tombstone, position in storage header
-            boost::shared_ptr<PersistentChunk> _chunk;  // pointer to chunk, NULL if tombstone
+
+            /* An entry is either:
+               NORMAL (pointer to persistent chunk)
+               INVALID (treated as tomstone in memory, but considered corrupt
+                        on disk)
+               TOMBSTONE (no chunk present at this location, but the position
+                          of descriptor is stored)
+             */
+            Status                           _status;
+            uint64_t                         _hdrpos;
+            std::shared_ptr<PersistentChunk> _chunk;
         };
 
     private:
@@ -400,15 +443,17 @@ namespace scidb
 
         std::vector<Compressor*> _compressors;
 
-        typedef map <StorageAddress, InnerChunkMapEntry> InnerChunkMap;
-        typedef boost::unordered_map<ArrayUAID, shared_ptr< InnerChunkMap > > ChunkMap;
+        typedef std::map<StorageAddress, InnerChunkMapEntry> InnerChunkMap;
+        typedef std::unordered_map<ArrayUAID, std::shared_ptr< InnerChunkMap > > ChunkMap;
+        typedef std::tuple<DataStore::Guid, off_t, size_t, off_t> ChunkExtent;
+        typedef std::set<ChunkExtent> Extents;
 
-        ChunkMap _chunkMap;   // The root of the chunk map
+        ChunkMap _chunkMap;  // The root of the chunk map
 
         size_t _cacheSize;    // maximal size of memory used by cached chunks
         size_t _cacheUsed;    // current size of memory used by cached chunks
                               // (it can be larger than cacheSize if all chunks are pinned)
-        Mutex _mutex;         // mutex used to synchronize access to the storage
+        Mutex mutable _mutex; // mutex used to synchronize access to the storage
         Event _loadEvent;     // event to notify threads waiting for completion of chunk load
         Event _initEvent;     // event to notify threads waiting for completion of chunk load
         PersistentChunk _lru; // header of LRU L2-list
@@ -428,13 +473,15 @@ namespace scidb
         uint64_t _logSizeLimit;      // transaciton log size limit
         uint64_t _logSize;
         int _currLog;
-        int _redundancy;
+        size_t _redundancy;
         int _nInstances;
         bool _syncReplication;
         bool _enableDeltaEncoding;
+        bool _enableChunkmapRecovery;
+        bool _skipChunkmapIntegrityCheck;
 
         RWLock _latches[N_LATCHES];  //XXX TODO: figure out if latches are necessary after removal of clone logic
-        set<uint64_t> _freeHeaders;
+        std::set<uint64_t> _freeHeaders;
 
         /// Cached RM pointer
         ReplicationManager* _replicationManager;
@@ -452,6 +499,25 @@ namespace scidb
         void initChunkMap();
 
         /**
+         * Record an extent in the extent map
+         */
+        void recordExtent(Extents& extents,
+                          std::shared_ptr<PersistentChunk>& chunk);
+
+        /**
+         * Erase an extent from the extent map
+         */
+        void eraseExtent(Extents& extents,
+                         std::shared_ptr<PersistentChunk>& chunk);
+
+        /**
+         * Check extent map for overlaps on disk.  If in "recovery mode"
+         * replace overlapping chunks with tombstones.  If not in "recovery
+         * mode" throw exception.  Delete extent map when done.
+         */
+        void checkExtentsForOverlaps(Extents& extents);
+
+        /**
          * Perform metadata/lock recovery and storage rollback as part of the intialization.
          * It may block waiting for the remote coordinator recovery to occur.
          */
@@ -461,19 +527,19 @@ namespace scidb
          * Mark a chunk as free in the on-disk and in-memory chunk map.  Also mark it as free
          * in the datastore ds if provided.
          */
-        void markChunkAsFree(InnerChunkMapEntry& entry, shared_ptr<DataStore>& ds);
+        void markChunkAsFree(InnerChunkMapEntry& entry, std::shared_ptr<DataStore>& ds);
 
         /**
          * Wait for the replica items (i.e. chunks) to be sent to NetworkManager
          * @param replicas a list of replica items to wait on
          */
-        void waitForReplicas(std::vector<boost::shared_ptr<ReplicationManager::Item> >& replicas);
+        void waitForReplicas(std::vector<std::shared_ptr<ReplicationManager::Item> >& replicas);
 
         /**
          * Abort any outstanding replica items (in case of errors)
          * @param replicas a list of replica items to abort
          */
-        void abortReplicas(vector<boost::shared_ptr<ReplicationManager::Item> >* replicasVec);
+        void abortReplicas(std::vector<std::shared_ptr<ReplicationManager::Item> >* replicasVec);
 
         /**
          * Unpin and free chunk (in case of errors)
@@ -490,7 +556,7 @@ namespace scidb
          * @param addr the address of the chunk in the array
          * @return pointer to the unloaded chunk object. Null if no such chunk is present.
          */
-        boost::shared_ptr<PersistentChunk> lookupChunk(ArrayDesc const& desc, StorageAddress const& addr);
+        std::shared_ptr<PersistentChunk> lookupChunk(ArrayDesc const& desc, StorageAddress const& addr);
 
         void internalFreeChunk(PersistentChunk& chunk);
 
@@ -544,8 +610,8 @@ namespace scidb
         void replicate(ArrayDesc const& desc, StorageAddress const& addr,
                        PersistentChunk* chunk, void const* data,
                        size_t compressedSize, size_t decompressedSize,
-                       boost::shared_ptr<Query> const& query,
-                       std::vector<boost::shared_ptr<ReplicationManager::Item> >& replicas);
+                       std::shared_ptr<Query> const& query,
+                       std::vector<std::shared_ptr<ReplicationManager::Item> >& replicas);
 
         /**
          * Assign replication instances for the particular chunk
@@ -555,27 +621,21 @@ namespace scidb
         /**
          * Check if chunk should be considered by DBArraIterator
          */
-        bool isResponsibleFor(ArrayDesc const& desc, PersistentChunk const& chunk, boost::shared_ptr<Query> const& query);
+        bool isResponsibleFor(ArrayDesc const& desc, PersistentChunk const& chunk, std::shared_ptr<Query> const& query);
 
         /**
          * Determine if a given chunk is a primary replica on this instance
          * @param chunk to examine
          * @return true if the chunk is a primary replica
          */
-        bool isPrimaryReplica(PersistentChunk const* chunk)
-        {
-            assert(chunk);
-            bool res = (chunk->getHeader().instanceId == _hdr.instanceId);
-            ASSERT_EXCEPTION((res || (_redundancy > 0)), "cannot store replica chunk when redundancy==0");
-            return res;
-        }
+        bool isPrimaryReplica(PersistentChunk const* chunk);
 
         /**
          * Return summary disk usage information
          */
         void getDiskInfo(DiskInfo& info);
 
-      public:
+    public:
         /**
          * Constructor
          */
@@ -584,7 +644,7 @@ namespace scidb
         /**
          * @see Storage::getChunkPositions
          */
-        void getChunkPositions(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, CoordinateSet& chunkPositions);
+        void getChunkPositions(ArrayDesc const& desc, std::shared_ptr<Query> const& query, CoordinateSet& chunkPositions);
 
         /**
          * Cleanup and close smgr
@@ -625,10 +685,10 @@ namespace scidb
         /**
          * @see Storage::createChunk
          */
-        boost::shared_ptr<PersistentChunk> createChunk(ArrayDesc const& desc,
+        std::shared_ptr<PersistentChunk> createChunk(ArrayDesc const& desc,
                                                        StorageAddress const& addr,
                                                        int compressionMethod,
-                                                       const boost::shared_ptr<Query>& query);
+                                                       const std::shared_ptr<Query>& query);
 
         /**
          * @see Storage::deleteChunk
@@ -653,7 +713,7 @@ namespace scidb
         void cloneLocalChunk(Coordinates const& pos,
                              ArrayDesc const& targetDesc, AttributeID targetAttrID,
                              ArrayDesc const& sourceDesc, AttributeID sourceAttrID,
-                             boost::shared_ptr<Query>& query);
+                             std::shared_ptr<Query>& query);
 
         /**
          * @see Storage::rollback
@@ -668,7 +728,7 @@ namespace scidb
          * fit entirely in memory.  Chage this in the future.
          * @see Storage::open
          */
-        void open(const string& storageDescriptorFilePath, size_t cacheSize);
+        void open(const std::string& storageDescriptorFilePath, size_t cacheSize);
 
         /**
          * Flush all changes to the physical device(s) for the indicated array.
@@ -680,30 +740,30 @@ namespace scidb
         /**
          * @see Storage::getArrayIterator
          */
-        boost::shared_ptr<ArrayIterator> getArrayIterator(boost::shared_ptr<const Array>& arr,
+        std::shared_ptr<ArrayIterator> getArrayIterator(std::shared_ptr<const Array>& arr,
                                                           AttributeID attId,
-                                                          boost::shared_ptr<Query>& query);
+                                                          std::shared_ptr<Query>& query);
 
         /**
          * @see Storage::getConstArrayIterator
          */
-        boost::shared_ptr<ConstArrayIterator> getConstArrayIterator(boost::shared_ptr<const Array>& arr,
+        std::shared_ptr<ConstArrayIterator> getConstArrayIterator(std::shared_ptr<const Array>& arr,
                                                                     AttributeID attId,
-                                                                    boost::shared_ptr<Query>& query);
+                                                                    std::shared_ptr<Query>& query);
 
         /**
          * @see Storage::writeChunk
          */
         void writeChunk(ArrayDesc const& desc,
                         PersistentChunk* chunk,
-                        boost::shared_ptr<Query> const& query);
+                        std::shared_ptr<Query> const& query);
 
         /**
          * @see Storage::readChunk
          */
-        boost::shared_ptr<PersistentChunk> readChunk(ArrayDesc const& desc,
+        std::shared_ptr<PersistentChunk> readChunk(ArrayDesc const& desc,
                                                      StorageAddress const& addr,
-                                                     const boost::shared_ptr<Query>& query);
+                                                     const std::shared_ptr<Query>& query);
 
         /**
          * @see Storage::setInstanceId
@@ -726,45 +786,45 @@ namespace scidb
         InstanceID getPrimaryInstanceId(ArrayDesc const& desc, StorageAddress const& address) const;
 
         /**
-         * @see Storage::listChunkDescriptors
+         * @see Storage::visitChunkDescriptors
          */
-        void listChunkDescriptors(ListChunkDescriptorsArrayBuilder& builder);
+        void visitChunkDescriptors(const ChunkDescriptorVisitor&) const;
 
         /**
-         * @see Storage::listChunkMap
+         * @see Storage::visitChunkMap
          */
-        void listChunkMap(ListChunkMapArrayBuilder& builder);
+        void visitChunkMap(const ChunkMapVisitor&) const;
 
         /**
          * @see Storage::findNextChunk
          */
-        bool findNextChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address);
+        bool findNextChunk(ArrayDesc const& desc, std::shared_ptr<Query> const& query, StorageAddress& address);
 
         /**
          * @see Storage::findChunk
          */
-        bool findChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address);
+        bool findChunk(ArrayDesc const& desc, std::shared_ptr<Query> const& query, StorageAddress& address);
 
         /**
          * @see Storage::removeLocalChunkVersion
          */
         void removeLocalChunkVersion(ArrayDesc const& arrayDesc,
                                      Coordinates const& coords,
-                                     boost::shared_ptr<Query> const& query);
+                                     std::shared_ptr<Query> const& query);
 
         /**
          * @see Storage::removeChunkVersion
          */
         void removeChunkVersion(ArrayDesc const& arrayDesc,
                                 Coordinates const& coords,
-                                boost::shared_ptr<Query> const& query);
+                                std::shared_ptr<Query> const& query);
 
         /**
          * @see Storage::removeDeadChunks
          */
         void removeDeadChunks(ArrayDesc const& arrayDesc,
-                              set<Coordinates, CoordinatesLess> const& liveChunks,
-                              boost::shared_ptr<Query> const& query);
+                std::set<Coordinates, CoordinatesLess> const& liveChunks,
+                std::shared_ptr<Query> const& query);
 
         /**
          * @see Storage::removeDeadChunks
@@ -775,7 +835,9 @@ namespace scidb
          * @see Storage::getDataStores
          */
         DataStores& getDataStores()
-            { return _datastores; }
+        {
+            return _datastores;
+        }
 
         static CachedStorage instance;
     };

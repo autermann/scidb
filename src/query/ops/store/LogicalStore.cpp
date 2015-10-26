@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -74,43 +74,64 @@ namespace scidb {
 class LogicalStore: public  LogicalOperator
 {
 public:
-	LogicalStore(const string& logicalName, const std::string& alias):
-	        LogicalOperator(logicalName, alias)
-	{
-        _properties.tile = true;
-		ADD_PARAM_INPUT()
-		ADD_PARAM_OUT_ARRAY_NAME()
-	}
-
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    LogicalStore(const string& logicalName, const std::string& alias)
+        : LogicalOperator(logicalName, alias)
     {
-        LogicalOperator::inferArrayAccess(query);
-        assert(_parameters.size() > 0);
-        assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-
-        assert(arrayName.find('@') == std::string::npos);
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
-                                                                                     query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalInstanceId(),
-                                                                                     SystemCatalog::LockDesc::COORD,
-                                                                                     SystemCatalog::LockDesc::WR));
-        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
-        assert(resLock);
-        assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
+        _properties.tile = true;
+        ADD_PARAM_INPUT()
+        ADD_PARAM_OUT_ARRAY_NAME()
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
-        assert(schemas.size() == 1);
-        assert(_parameters.size() == 1);
+        LogicalOperator::inferArrayAccess(query);
+        SCIDB_ASSERT(_parameters.size() > 0);
+        SCIDB_ASSERT(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
+        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
-        string arrayName = ((shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(arrayName.find('@') == std::string::npos);
+
+        ArrayDesc srcDesc;
+        SCIDB_ASSERT(!srcDesc.isTransient());
+        const bool dontThrow(false);
+
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION, srcDesc, dontThrow);
+
+        const SystemCatalog::LockDesc::LockMode lockMode =
+            srcDesc.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
+
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(arrayName,
+                                                                                       query->getQueryID(),
+                                                                                       Cluster::getInstance()->getLocalInstanceId(),
+                                                                                       SystemCatalog::LockDesc::COORD,
+                                                                                       lockMode));
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        SCIDB_ASSERT(resLock);
+        SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
+    }
+
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
+    {
+        SCIDB_ASSERT(schemas.size() == 1);
+        SCIDB_ASSERT(_parameters.size() == 1);
+
+        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayName));
+
         ArrayDesc const& srcDesc = schemas[0];
+        PartitioningSchema ps = srcDesc.getPartitioningSchema();
+        //XXX TODO: at some point we will take the distribution of the input,
+        //XXX TODO: but currently the ps value is not propagated through the pipeline correctly,
+        //XXX TODO: so we are forcing it.
+        //XXX TODO: Another complication is that SGs are inserted before the physical execution,
+        //XXX TODO: Here, we dont know the true distribution coming into the store()
+        ps = defaultPartitioning();
 
         //Ensure attributes names uniqueness.
         ArrayDesc dstDesc;
-        if (!SystemCatalog::getInstance()->getArrayDesc(arrayName, dstDesc, false))
+        if (!SystemCatalog::getInstance()->getArrayDesc(arrayName,
+                                                        query->getCatalogVersion(arrayName),
+                                                        dstDesc, false))
         {
             Attributes outAttrs;
             map<string, uint64_t> attrsMap;
@@ -128,9 +149,12 @@ public:
                         stringstream ss;
                         ss << attr.getName() << "_" << ++attrsMap[attr.getName()];
                         if (attrsMap.count(ss.str()) == 0) {
-                            newAttr = AttributeDesc(attr.getId(), ss.str(), attr.getType(), attr.getFlags(),
-                                attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
-                                attr.getDefaultValueExpr());
+                            newAttr = AttributeDesc(attr.getId(), ss.str(),
+                                                    attr.getType(), attr.getFlags(),
+                                                    attr.getDefaultCompressionMethod(),
+                                                    attr.getAliases(),
+                                                    &attr.getDefaultValue(),
+                                                    attr.getDefaultValueExpr());
                             attrsMap[ss.str()] = 1;
                             break;
                         }
@@ -178,56 +202,44 @@ public:
                 outDims.push_back(newDim);
             }
 
-         /* Notice that when storing to a non-existant array, we do not propagate the 
-            transience of the source array to to the target ...*/
-
-            return ArrayDesc(arrayName, outAttrs, outDims, srcDesc.getFlags() & (~ArrayDesc::TRANSIENT));
+            /* Notice that when storing to a non-existant array, we do not propagate the
+               transience of the source array to to the target ...*/
+            ArrayDesc schema(arrayName, outAttrs, outDims, ps,
+                             srcDesc.getFlags() & (~ArrayDesc::TRANSIENT));
+            return schema;
         }
-        else
-        {
-            Dimensions const& srcDims = srcDesc.getDimensions();
-            Dimensions const& dstDims = dstDesc.getDimensions();
 
-            //FIXME: Need more clear message and more granular condition
-            if (srcDims.size() != dstDims.size())
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT) << "store";
-            for (size_t i = 0, n = srcDims.size(); i < n; i++)
-            {
-                if (!(srcDims[i].getStartMin() == dstDims[i].getStartMin()
-                           && (srcDims[i].getEndMax() == dstDims[i].getEndMax()
-                               || (srcDims[i].getEndMax() < dstDims[i].getEndMax()
-                                   && ((srcDims[i].getLength() % srcDims[i].getChunkInterval()) == 0
-                                       || srcDesc.getEmptyBitmapAttribute() != NULL)))
-                           && srcDims[i].getChunkInterval() == dstDims[i].getChunkInterval()
-                           && srcDims[i].getChunkOverlap() == dstDims[i].getChunkOverlap()))
-                {
-                    // XXX To do: implement requiresRepart() method, remove interval/overlap checks
-                    // above, use SCIDB_LE_START_INDEX_MISMATCH here.
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-                }
-            }
+        // Check schemas to ensure that the source array can be stored in the destination.  We
+        // can ignore overlaps and chunk intervals because our physical operator implements
+        // requiresRedimensionOrRepartition() to get automatic repartitioning.
+        //
+        // XXX Why we allow short source dimensions if the source has an empty bitmap
+        // (SHORT_OK_IF_EBM), while insert() does not, remains a mystery.
+        //
+        ArrayDesc::checkConformity(srcDesc, dstDesc,
+                                   ArrayDesc::IGNORE_PSCHEME |
+                                   ArrayDesc::IGNORE_OVERLAP |
+                                   ArrayDesc::IGNORE_INTERVAL |
+                                   ArrayDesc::SHORT_OK_IF_EBM);
 
-            Attributes const& srcAttrs = srcDesc.getAttributes(true);
-            Attributes const& dstAttrs = dstDesc.getAttributes(true);
-
-            if (srcAttrs.size() != dstAttrs.size())
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-
-            for (size_t i = 0, n = srcAttrs.size(); i < n; i++) {
-                if(srcAttrs[i].getType() != dstAttrs[i].getType() || (!dstAttrs[i].isNullable() && srcAttrs[i].isNullable()))
-                    throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
-            }
-            Dimensions newDims(dstDims.size());
-            for (size_t i = 0; i < dstDims.size(); i++) {
-                DimensionDesc const& dim = dstDims[i];
-                newDims[i] = DimensionDesc(dim.getBaseName(),
-                                           dim.getNamesAndAliases(),
-                                           dim.getStartMin(), dim.getCurrStart(),
-                                           dim.getCurrEnd(), dim.getEndMax(), dim.getChunkInterval(), dim.getChunkOverlap());
-            }
-            return ArrayDesc(dstDesc.getId(), dstDesc.getUAId(), dstDesc.getVersionId(), arrayName, dstDesc.getAttributes(), newDims, dstDesc.getFlags());
+        Dimensions const& dstDims = dstDesc.getDimensions();
+        Dimensions newDims(dstDims.size()); //XXX need this ?
+        for (size_t i = 0; i < dstDims.size(); i++) {
+            DimensionDesc const& dim = dstDims[i];
+            newDims[i] = DimensionDesc(dim.getBaseName(),
+                                       dim.getNamesAndAliases(),
+                                       dim.getStartMin(), dim.getCurrStart(),
+                                       dim.getCurrEnd(), dim.getEndMax(),
+                                       dim.getChunkInterval(), dim.getChunkOverlap());
         }
-	}
+
+        dstDesc.setDimensions(newDims);
+        SCIDB_ASSERT(dstDesc.getId() == dstDesc.getUAId() && dstDesc.getName() == arrayName);
+        SCIDB_ASSERT(dstDesc.getUAId() > 0);
+        SCIDB_ASSERT(ps==dstDesc.getPartitioningSchema());
+        return dstDesc;
+    }
+
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalStore, "store")

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -25,28 +25,38 @@ SCIDB_VER="${1}"
 function ubuntu1204 ()
 {
 echo "Prepare Ubuntu 12.04 for building SciDB"
+
+INSTALL="apt-get install -y"
+
+${INSTALL} python-software-properties
+add-apt-repository ppa:ubuntu-toolchain-r/test
+
+add-apt-repository -y ppa:openjdk-r/ppa
+
 apt-get update
 
+${INSTALL} gcc-4.9 g++-4.9 gfortran-4.9
+
 # Build dependencies:
-apt-get install -y build-essential cmake libpqxx-3.1 libpqxx3-dev libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 expect debhelper sudo ant ant-contrib ant-optional libprotobuf-java openjdk-6-jdk junit git libpam-dev
+${INSTALL} build-essential cmake libpqxx-3.1 libpqxx3-dev libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 expect debhelper sudo ant ant-contrib ant-optional libprotobuf-java openjdk-8-jdk junit git libpam-dev scidb-${SCIDB_VER}-ant
 
 # Boost package build requires:
-apt-get install -y python3
+${INSTALL} python3
 
 # Scidb 3rd party packages
-apt-get install -y scidb-${SCIDB_VER}-libboost1.54-all-dev scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 scidb-${SCIDB_VER}-libcsv
+${INSTALL} scidb-${SCIDB_VER}-libboost1.54-all-dev scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 scidb-${SCIDB_VER}-libcsv scidb-${SCIDB_VER}-cityhash
 
 # Reduce rebuild time:
-apt-get install -y ccache
+${INSTALL} ccache
 
-# Documentation: 
-apt-get install -y fop docbook-xsl
+# Documentation:
+${INSTALL} fop docbook-xsl
 
 # Testing:
-apt-get install -y postgresql-8.4 postgresql-contrib-8.4
+${INSTALL} postgresql-8.4 postgresql-contrib-8.4
 
 # ScaLAPACK tests:
-apt-get install -y time
+${INSTALL} time
 
 echo "DONE"
 }
@@ -54,28 +64,38 @@ echo "DONE"
 function ubuntu1404 ()
 {
 echo "Prepare Ubuntu 14.04 for building SciDB"
+
+INSTALL="apt-get install -y"
+
+${INSTALL} python-software-properties
+add-apt-repository ppa:ubuntu-toolchain-r/test
+
+add-apt-repository -y ppa:openjdk-r/ppa
+
 apt-get update
 
+${INSTALL} gcc-4.9 g++-4.9 gfortran-4.9
+
 # Build dependencies:
-apt-get install -y build-essential cmake libpqxx-3.1 libpqxx3-dev libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 expect debhelper sudo ant ant-contrib ant-optional libprotobuf-java openjdk-6-jdk junit git libpam-dev
+${INSTALL} build-essential cmake libpqxx-3.1 libpqxx3-dev libprotobuf-dev protobuf-compiler doxygen flex bison liblog4cxx10 liblog4cxx10-dev libcppunit-dev libbz2-dev zlib1g-dev subversion libreadline6-dev libreadline6 python-paramiko python-crypto xsltproc gfortran libscalapack-mpi1 liblapack-dev libopenmpi-dev swig2.0 expect debhelper sudo ant ant-contrib ant-optional libprotobuf-java openjdk-8-jdk junit git libpam-dev scidb-${SCIDB_VER}-ant
 
 # Boost package build requires:
-apt-get install -y python3
+${INSTALL} python3
 
 # Scidb 3rd party packages
-apt-get install -y scidb-${SCIDB_VER}-libboost1.54-all-dev scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 scidb-${SCIDB_VER}-libcsv
+${INSTALL} scidb-${SCIDB_VER}-libboost1.54-all-dev scidb-${SCIDB_VER}-libmpich2-dev scidb-${SCIDB_VER}-mpich2 scidb-${SCIDB_VER}-libcsv scidb-${SCIDB_VER}-cityhash
 
 # Reduce rebuild time:
-apt-get install -y ccache
+${INSTALL} ccache
 
-# Documentation: 
-apt-get install -y fop docbook-xsl
+# Documentation:
+${INSTALL} fop docbook-xsl
 
 # Testing:
-apt-get install -y postgresql-9.3 postgresql-contrib-9.3
+${INSTALL} postgresql-9.3 postgresql-contrib-9.3
 
 # ScaLAPACK tests:
-apt-get install -y time
+${INSTALL} time
 
 echo "DONE"
 }
@@ -87,9 +107,22 @@ echo "Prepare CentOS 6 for building SciDB"
 # ...setup epel repo (libcsv is in there)
 rpm -U http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm || true
 
+# ...setup cern repo (devtoolset-3 is in there)
+rpm --import http://ftp.scientificlinux.org/linux/scientific/5x/x86_64/RPM-GPG-KEYs/RPM-GPG-KEY-cern
+yum install -y wget
+wget http://linuxsoft.cern.ch/cern/scl/slc6-scl.repo -O /etc/yum.repos.d/slc6-scl.repo
+
 INSTALL="yum install --enablerepo=scidb3rdparty -y"
+
+### Compilers
+# gcc/g++/gfort version 4.9
+${INSTALL} devtoolset-3
+
 # Build dependencies:
-${INSTALL} gcc gcc-c++ gcc-gfortran subversion doxygen flex flex-devel bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make scidb-${SCIDB_VER}-libboost-devel swig2 protobuf-devel log4cxx-devel libpqxx-devel expect scidb-${SCIDB_VER}-mpich2-devel scidb-${SCIDB_VER}-mpich2 lapack-devel blas-devel sudo java-1.6.0-openjdk-devel ant ant-contrib ant-nodeps ant-jdepend protobuf-compiler protobuf-java junit git pam-devel libcsv libcsv-devel
+${INSTALL} subversion doxygen flex flex-devel bison zlib-devel bzip2-devel readline-devel rpm-build python-paramiko postgresql-devel cppunit-devel python-devel cmake make  swig2 protobuf-devel log4cxx-devel libpqxx-devel expect lapack-devel blas-devel sudo java-1.8.0-openjdk-devel ant ant-contrib ant-nodeps ant-jdepend protobuf-compiler protobuf-java junit git pam-devel libcsv libcsv-devel scidb-${SCIDB_VER}-ant openssl-devel
+
+# Scidb 3rd party packages
+${INSTALL} scidb-${SCIDB_VER}-libboost-devel scidb-${SCIDB_VER}-mpich2-devel scidb-${SCIDB_VER}-mpich2 scidb-${SCIDB_VER}-cityhash
 
 # Reduce build time
 ${INSTALL} ccache

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,15 +28,15 @@
 #include <new>                                           // For placement new
 #include <iosfwd>                                        // For ostream
 #include <boost/utility.hpp>                             // For noncopyable
-#include <boost/make_shared.hpp>                         // For shared_ptr
+#include <memory>
 #include <boost/type_traits.hpp>                         // For has_trivial...
+#include <system/Constants.h>                            // For KiB, MiB, etc
 #include <util/Utility.h>                                // For stackonly
 
 /****************************************************************************/
 namespace scidb { namespace arena {
 /****************************************************************************/
 
-using boost::shared_ptr;                                 // A tracking pointer
 using boost::noncopyable;                                // An RIIA base class
 
 /****************************************************************************/
@@ -57,7 +57,7 @@ typedef size_t                count_t;                   // A 1D array length
 typedef unsigned              features_t;                // A feature bitfield
 typedef double                alignment_t;               // Aligned for doubles
 typedef void                (*finalizer_t)(void*);       // A finalizer callback
-typedef shared_ptr<Arena>     ArenaPtr;                  // A tracking pointer
+typedef std::shared_ptr<Arena>     ArenaPtr;                  // A tracking pointer
 
 /****************************************************************************/
 
@@ -437,6 +437,12 @@ class Options
             Options&          debugging (bool b)                               {_debugging  = b;assert(consistent());return *this;}
             Options&          threading (bool b)                               {_threading  = b;assert(consistent());return *this;}
 
+ public:                   // Operations
+            Options&          limited   (ArenaPtr p,size_t s)                  {return recycling(0).resetting(0).parent(p).limit(s);}
+            Options&          scoped    (ArenaPtr p,size_t s = 64*KiB)         {return recycling(0).resetting(1).parent(p).pagesize(s);}
+            Options&          lea       (ArenaPtr p,size_t s = 64*MiB)         {return recycling(1).resetting(1).parent(p).pagesize(s);}
+            Options&          oneshot   (ArenaPtr p,size_t s)                  {return recycling(1).resetting(1).parent(p).pagesize(s).limit(2*s - 1);}
+
  private:                  // Implementation
             bool              consistent()         const;
 
@@ -455,8 +461,8 @@ class Options
 /**
  *  @brief      Thrown in the event that an arena's memory limit is exhausted.
  *
- *  @details    Class arena::Exhausted specializes the familiar std::bad_alloc
- *              exception to indicate that a request to allocate memory off an
+ *  @details    Class arena::Exhausted specializes the familiar std::exception
+ *              base class to indicate that a request to allocate memory in an
  *              %arena would exceed the arena's maximum allocation limit, thus
  *              has been denied. The exception is potentially recoverable - it
  *              does not indicate that the entire system is out of memory, but
@@ -468,14 +474,14 @@ class Options
  *                  try  {return new(a) double[vast];}   // Can't hurt to try
  *                  catch(std::bad_alloc&)   {throw;}    // ...catastrophic
  *                  catch(arena::Exhausted&) {}          // ...recoverable
- *                  return new(a) double[a.available()]; // Recovering...
+ *                  return new(a) double[small];         // Recovering...
  * @endcode
  *              allows the caller to distinguish between both catastrophic and
  *              recoverable allocation failures.
  *
  *  @author     jbell@paradigm4.com.
  */
-class Exhausted : public std::bad_alloc
+class Exhausted : public virtual std::exception
 {};
 
 /**
@@ -665,10 +671,33 @@ type* newVector(Arena& a,count_t c,finalization m)
  *  arenas optimize allocations of simple objects by omitting the block header
  *  and the virtual function Arena::destroy() needs this header to be there in
  *  order to recover the allocation's finalizer function.
+ *
+ *  Notice how we explicitly prevent instantiating at type 'void', for in that
+ *  case there would be no way of knowing statically whether or not the object
+ *  requires finalizing. This guards against such questionable code as:
+ *
+ *  @code
+ *      void* p = newScalar<double>(a,78);               // Allocate a double
+ *                  ...
+ *      destroy(a,p);                                    // Can't destroy void*
+ *  @endcode
+ *
+ *  This is consistent, however, with the behavior of the delete operator that
+ *  we are mimicking:
+ *
+ *  @code
+ *      void* p = new double(78);                        // Allocates doubles
+ *                  ...
+ *      delete p;                                        // Can't delete void*
+ *  @endcode
+ *
+ *  which would be similarly rejected by the compiler.
  */
 template<class type>
 inline void destroy(Arena& a,const type* p)
 {
+    typedef type& cant_destroy_void_star;                // See comments above
+
     if (p != 0)                                          // Is a valid object?
     {
         if (boost::has_trivial_destructor<type>())       // ...no finalizer?
@@ -723,9 +752,9 @@ inline void destroy(Arena& a,const type* p,count_t c)
  *  @see http://www.boost.org/doc/libs/1_54_0/libs/smart_ptr/make_shared.html
  */
 template<class type>
-inline shared_ptr<type> allocate_shared(Arena& a)
+inline std::shared_ptr<type> allocate_shared(Arena& a)
 {
-    return boost::allocate_shared<type>(Allocator<type>(&a));
+    return std::allocate_shared<type>(Allocator<type>(&a));
 }
 
 /****************************************************************************/
@@ -758,9 +787,9 @@ struct deleter : private Allocator<char>
  *  is also allocated within the %arena 'a'.
  */
 template<class type>
-shared_ptr<type> attach_shared(Arena& a,type* p)
+std::shared_ptr<type> attach_shared(Arena& a,type* p)
 {
-    return shared_ptr<type>(p,detail::deleter(&a),Allocator<char>(a));
+    return std::shared_ptr<type>(p,detail::deleter(&a),Allocator<char>(a));
 }
 
 /** @cond ********************************************************************
@@ -777,10 +806,10 @@ inline type* newScalar(Arena& a,BOOST_PP_ENUM_BINARY_PARAMS(i,X,const& x),finali
 }                                                                                                  \
                                                                                                    \
 template<class type,BOOST_PP_ENUM_PARAMS(i,class X)>                                               \
-inline shared_ptr<type>                                                                            \
+inline std::shared_ptr<type>                                                                            \
 allocate_shared(Arena& a,BOOST_PP_ENUM_BINARY_PARAMS(i,X,const& x))                                \
 {                                                                                                  \
-    return boost::allocate_shared<type>(Allocator<type>(&a),                                       \
+    return std::allocate_shared<type>(Allocator<type>(&a),                                       \
                                         BOOST_PP_ENUM_PARAMS(i,x));                                \
 }
 

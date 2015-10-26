@@ -38,12 +38,9 @@ create array GRAPH_PAIRS <v0:int64, v1:int64>[dummy=0:*,10000*10000,0]
 --start-query-logging
 --start-igdata
 
-# csv to .scidb
---shell --command "csv2scidb -c 1000000000 < /public/data/p4linalg/twitter_combined_unique.csv > /tmp/409_twitter.scidb.txt"
 # e.g. .5 s
 
-load(GRAPH_PAIRS,    '/tmp/409_twitter.scidb.txt')
---shell --command "rm /tmp/409_twitter.scidb.txt"
+load(GRAPH_PAIRS, '/public/data/p4linalg/twitter_combined_unique.csv', -2, 'csv')
 
 # turn list of pairs into adjacency matrix
 #   what should the initialization be?  1/n  where n is ... what?

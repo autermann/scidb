@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,8 +35,6 @@
 #include <query/Expression.h>
 #include <query/TileFunctions.h>
 
-using boost::shared_ptr;
-using boost::make_shared;
 using namespace std;
 
 namespace scidb
@@ -52,11 +50,11 @@ protected:
 
     string _accumulateOp;
     Expression _accumulateExpression;
-    boost::shared_ptr<ExpressionContext> _accumulateContext;
+    std::shared_ptr<ExpressionContext> _accumulateContext;
 
     string _mergeOp;
     Expression _mergeExpression;
-    boost::shared_ptr<ExpressionContext> _mergeContext;
+    std::shared_ptr<ExpressionContext> _mergeContext;
 
     bool _initByFirstValue;
 
@@ -113,11 +111,11 @@ public:
         types[0] = stateType.typeId();
         types[1] = aggregateType.typeId();
         _accumulateExpression.compile(accumulateOp, names, types, stateType.typeId());
-        _accumulateContext = boost::shared_ptr<ExpressionContext>(new ExpressionContext(_accumulateExpression));
+        _accumulateContext = std::shared_ptr<ExpressionContext>(new ExpressionContext(_accumulateExpression));
 
         types[1] = stateType.typeId();
         _mergeExpression.compile(mergeOp, names, types);
-        _mergeContext = boost::shared_ptr<ExpressionContext>(new ExpressionContext(_mergeExpression));
+        _mergeContext = std::shared_ptr<ExpressionContext>(new ExpressionContext(_mergeExpression));
     }
 
     virtual AggregatePtr clone() const
@@ -320,9 +318,9 @@ public:
 class ApproxDCAggregate : public Aggregate
 {
 private:
-    static const size_t k = 17; //16 = 64K, 17 = 128K, ...
-    const size_t k_comp;
-    const size_t m;
+    static const size_t k       =  17;       //16 = 64K, 17 = 128K, ...
+    static const size_t k_comp  =  64 - k;
+    static const size_t m       =  1 << k;
 
 protected:
     virtual void accumulate(Value& dstState, Value const& srcValue)
@@ -333,14 +331,10 @@ protected:
         const uint32_t seed = 0x5C1DB;
         uint64_t h[2];
         MurmurHash3_x64_128(srcValue.getData<uint8_t>(), srcValue.size(), seed, h);
-        size_t j = h[0] >> k_comp;
 
-        uint8_t r = 1;
-        while ((h[0] & 1) == 0 && r <= k_comp)
-        {
-            h[0] >>= 1;
-            r++;
-        }
+        size_t  mask  = ((size_t) (m-1) << k_comp);
+        size_t  j     = h[0] >> k_comp;
+        uint8_t r     = getTrailingZeros(h[0] | mask) + 1;
 
         uint8_t *M = dstState.getData<uint8_t>();
         M[j] = max(M[j], r);
@@ -362,10 +356,8 @@ protected:
 
 public:
     ApproxDCAggregate()
-    : Aggregate("ApproxDC", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_UINT64)), k_comp(64 - k), m(1 << k)
+    : Aggregate("approxdc", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_UINT64))
     {}
-
-    virtual ~ApproxDCAggregate() {}
 
     virtual bool ignoreNulls() const
     {
@@ -427,7 +419,8 @@ public:
         }
         double E = alpha_m * m * m / c;
 
-        const double pow_2_32 = 0xffffffff;
+        const double pow_2_64_minus_1 = SIZE_MAX;
+
 
         //corrections
         if (E <= (5 / 2. * m))
@@ -443,11 +436,10 @@ public:
                 E = m * log(m / V);
             }
         }
-        else if (E > (1 / 30. * pow_2_32))
+        else if (E > (1 / 30. * pow_2_64_minus_1))
         {
-            E = -pow_2_32 * log(1 - E / pow_2_32);
+            E = -pow_2_64_minus_1 * log(1 - E / pow_2_64_minus_1);
         }
-
         dstValue.setUint64(E);
     }
 };

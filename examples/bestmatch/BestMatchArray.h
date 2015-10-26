@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,32 +37,31 @@
 
 namespace scidb {
 
-using namespace boost;
 using namespace std;
 
 class BestMatchArray;
 class BestMatchArrayIterator;
 
-struct BestMatchHash 
-{ 
-    struct Elem { 
+struct BestMatchHash
+{
+    struct Elem {
         Coordinates coords;
         int64_t hash;
         Elem* collisionChain;
 
         Elem(Coordinates const& pos, int64_t h, Elem* next) : coords(pos), hash(h), collisionChain(next) {}
     };
-    vector<Elem*> table;
+    std::vector<Elem*> table;
     bool  initialized;
     bool  busy;
     bool  waiting;
 
-    Elem*& collisionChain(int64_t hash) { 
+    Elem*& collisionChain(int64_t hash) {
         return table[hash % table.size()];
     }
 
     Elem* find(int64_t hash) const;
-        
+
     void addCatalogEntry(Coordinates const& pos, size_t i, int64_t hash, int64_t error);
 
     BestMatchHash();
@@ -73,35 +72,35 @@ struct BestMatchHash
 
 class BestMatchArrayIterator : public DelegateArrayIterator
 {
-  public: 
+  public:
 	virtual ConstChunk const& getChunk();
-    BestMatchArrayIterator(BestMatchArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> patIterator, boost::shared_ptr<ConstArrayIterator> catIterator);
+    BestMatchArrayIterator(BestMatchArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> patIterator, std::shared_ptr<ConstArrayIterator> catIterator);
 
   private:
     MemChunk chunk;
-    boost::shared_ptr<BestMatchHash> match;
-    boost::shared_ptr<ConstArrayIterator> catalogIterator;
+    std::shared_ptr<BestMatchHash> match;
+    std::shared_ptr<ConstArrayIterator> catalogIterator;
 };
 
 class BestMatchArray : public DelegateArray
 {
     friend class BestMatchArrayIterator;
   public:
-    boost::shared_ptr<BestMatchHash> findBestMatch(Coordinates const& chunkPos);
+    std::shared_ptr<BestMatchHash> findBestMatch(Coordinates const& chunkPos);
     int64_t getElemPosition(Coordinates const& pos, ConstChunk const& chunk);
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    BestMatchArray(ArrayDesc const& desc, boost::shared_ptr<Array> pattern, boost::shared_ptr<Array> catalog, int64_t error);
-    
+    BestMatchArray(ArrayDesc const& desc, std::shared_ptr<Array> pattern, std::shared_ptr<Array> catalog, int64_t error);
+
   private:
     Mutex mutex;
     Event event;
-    map<Coordinates, boost::weak_ptr<BestMatchHash> > matches;
-    boost::shared_ptr<Array> pattern;
-    boost::shared_ptr<Array> catalog;
-    boost::shared_ptr<ConstArrayIterator> patternIterator;
-    boost::shared_ptr<ConstArrayIterator> catalogIterator;
+    std::map<Coordinates, std::weak_ptr<BestMatchHash> > matches;
+    std::shared_ptr<Array> pattern;
+    std::shared_ptr<Array> catalog;
+    std::shared_ptr<ConstArrayIterator> patternIterator;
+    std::shared_ptr<ConstArrayIterator> catalogIterator;
 
     int64_t error;
     size_t nPatternAttributes;

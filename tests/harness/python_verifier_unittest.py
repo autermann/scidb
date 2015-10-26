@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -48,7 +48,7 @@ class TestVar(unittest.TestCase):
             Var(a_name="name", a_type=int, a_desc="desc",
                 a_cond=lambda(v): v> 0, a_none=None)
         with self.assertRaises(TypeError):
-            Var(a_name="name", a_type=int, a_desc="desc", 
+            Var(a_name="name", a_type=int, a_desc="desc",
                 a_cond=lambda(v): v> 0, a_none=5)
         Var(a_name="name", a_type=int, a_desc="desc", a_cond=lambda(v): v> 0, a_none=True)
 
@@ -62,7 +62,7 @@ class TestVar(unittest.TestCase):
         with self.assertRaises(ValueError):
             v.verify(self.test_value, 0)
         v.verify(self.test_value, 5)
-        v= Var(a_name="c", a_desc="desc", a_type=int, 
+        v= Var(a_name="c", a_desc="desc", a_type=int,
                a_cond=cond, a_none=True)
         v.verify(self.test_value, None)
         with self.assertRaises(ValueError):
@@ -171,4 +171,4 @@ class TestVerify(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
-    
+

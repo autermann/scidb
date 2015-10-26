@@ -12,7 +12,7 @@ find_program(SWIG_EXECUTABLE
 
 find_package_handle_standard_args(SWIG2
         REQUIRED_VARS SWIG_EXECUTABLE
-        VERSION_VAR Java6_VERSION
+        VERSION_VAR Java_VERSION
         )
 mark_as_advanced(
   SWIG_EXECUTABLE

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,11 +21,11 @@
 */
 package org.scidb.client;
 
-import org.scidb.io.network.Message;
-import org.scidb.io.network.Network;
-
 import java.io.IOException;
 import java.util.logging.Logger;
+
+import org.scidb.io.network.Message;
+import org.scidb.io.network.Network;
 
 /**
  * SciDB client-side array which reads chunks from network
@@ -42,7 +42,7 @@ public class Array
 
     /**
      * Constructor
-     * 
+     *
      * @param queryId Query ID
      * @param schema Array schema
      * @param net Network object
@@ -52,10 +52,10 @@ public class Array
         this.queryId = queryId;
         this.schema = schema;
         this.net = net;
-        
+
         chunks = new IChunk[this.schema.getAttributes().length];
     }
-    
+
     /**
      * Returns query ID
      * @return Query ID
@@ -64,7 +64,13 @@ public class Array
     {
         return queryId;
     }
-    
+
+    /// @return the Network object.
+    public Network getNetwork()
+    {
+        return net;
+    }
+
     /**
      * Returns array schema
      * @return Array schema
@@ -73,13 +79,13 @@ public class Array
     {
         return schema;
     }
-    
+
     /**
      * Fetch new chunks for each attribute
      * @throws IOException
-     * @throws Error
+     * @throws SciDBException
      */
-    public void fetch() throws IOException, Error
+    public void fetch() throws IOException, SciDBException
     {
         log.fine(String.format("Fetching chunks"));
         for (Schema.Attribute att: schema.getAttributes())
@@ -88,13 +94,27 @@ public class Array
             net.write(msg);
             msg = net.read();
 
-            if (!att.isEmptyIndicator())
-            {
-                chunks[att.getId()] = (IChunk) new Chunk((Message.Chunk) msg, this);
-            } else
-            {
-                _emptyBitmap = new EmptyChunk((Message.Chunk) msg, this);
-                chunks[att.getId()] = (IChunk) _emptyBitmap;
+            switch (msg.getHeader().messageType) {
+            case Message.mtChunk:
+                log.fine("Got chunk from server.");
+                if (!att.isEmptyIndicator())
+                {
+                    chunks[att.getId()] = (IChunk) new Chunk((Message.Chunk) msg, this);
+                } else
+                {
+                    _emptyBitmap = new EmptyChunk((Message.Chunk) msg, this);
+                    chunks[att.getId()] = (IChunk) _emptyBitmap;
+                }
+                break;
+
+            case Message.mtError:
+                log.fine("Got error message from server");
+                throw new SciDBException((Message.Error) msg);
+
+            default:
+                log.severe("Got unhandled network message during execution");
+                throw new SciDBException(String.format("Can not handle network message '%s'",
+                        msg.getHeader().messageType));
             }
         }
     }

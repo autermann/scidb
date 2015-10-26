@@ -1,8 +1,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -68,7 +68,7 @@ class myTest(scidbTestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )
-            
+
         # Wait for the query completion and grab the iquery "raw" output data:
         process.wait()
         stdoutData,stderrData = process.communicate(None)
@@ -82,7 +82,7 @@ def main():
     mt.registerCleaner(arrayCleaner.ArrayCleaner(iquery))
     mt.runTest()
     print 'All done!'
-    
+
 if __name__ == '__main__':
     main()
 """

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,7 @@ namespace scidb
     //
     // Reshape chunk iterator methods
     //
-    int ReshapeChunkIterator::getMode()
+    int ReshapeChunkIterator::getMode() const
     {
         return mode;
     }
@@ -56,28 +56,28 @@ namespace scidb
     void ReshapeChunkIterator::operator++()
     {
         size_t nDims = outPos.size();
-        while (true) { 
+        while (true) {
             size_t i = nDims-1;
-            while (++outPos[i] > last[i]) { 
-                if (i == 0) { 
+            while (++outPos[i] > last[i]) {
+                if (i == 0) {
                     hasCurrent = false;
                     return;
                 }
                 outPos[i] = first[i];
                 i -= 1;
             }
-            array.out2in(outPos, inPos);          
+            array.out2in(outPos, inPos);
             if (!inputIterator || !inputIterator->getChunk().contains(inPos, !(mode & IGNORE_OVERLAPS))) {
                 inputIterator.reset();
-                if (arrayIterator->setPosition(inPos)) { 
+                if (arrayIterator->setPosition(inPos)) {
                     ConstChunk const& inputChunk = arrayIterator->getChunk();
                     inputIterator = inputChunk.getConstIterator(mode);
-                    if (inputIterator->setPosition(inPos)) { 
+                    if (inputIterator->setPosition(inPos)) {
                         hasCurrent = true;
                         return;
                     }
                 }
-            } else if (inputIterator->setPosition(inPos)) { 
+            } else if (inputIterator->setPosition(inPos)) {
                 hasCurrent = true;
                 return;
             }
@@ -89,10 +89,10 @@ namespace scidb
         outPos = newPos;
         array.out2in(newPos, inPos);
         inputIterator.reset();
-        if (arrayIterator->setPosition(inPos)) { 
+        if (arrayIterator->setPosition(inPos)) {
             ConstChunk const& inputChunk = arrayIterator->getChunk();
             inputIterator = inputChunk.getConstIterator(mode);
-            if (inputIterator->setPosition(inPos)) { 
+            if (inputIterator->setPosition(inPos)) {
                 return hasCurrent = true;
             }
         }
@@ -106,19 +106,19 @@ namespace scidb
         return outPos;
     }
 
-     Value& ReshapeChunkIterator::getItem()
+    Value const& ReshapeChunkIterator::getItem()
     {
          if (!hasCurrent)
              throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
          return inputIterator->getItem();
     }
-    
+
     bool ReshapeChunkIterator::end()
-    { 
+    {
         return !hasCurrent;
     }
 
-    bool ReshapeChunkIterator::isEmpty()
+    bool ReshapeChunkIterator::isEmpty() const
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
@@ -129,7 +129,7 @@ namespace scidb
     {
         return chunk;
     }
- 
+
     ReshapeChunkIterator::ReshapeChunkIterator(ReshapeArray const& arr, ReshapeChunk& chk, int iterationMode)
     : array(arr),
       chunk(chk),
@@ -146,9 +146,9 @@ namespace scidb
     //
     // Reshape chunk methods
     //
-    boost::shared_ptr<ConstChunkIterator> ReshapeChunk::getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> ReshapeChunk::getConstIterator(int iterationMode) const
     {
-        return boost::shared_ptr<ConstChunkIterator>(new ReshapeChunkIterator(array, *(ReshapeChunk*)this, iterationMode));
+        return std::shared_ptr<ConstChunkIterator>(new ReshapeChunkIterator(array, *(ReshapeChunk*)this, iterationMode));
     }
 
     void ReshapeChunk::initialize(Coordinates const& pos)
@@ -164,7 +164,7 @@ namespace scidb
       array(arr)
     {
     }
-      
+
     //
     // Reshape array iterator
     //
@@ -188,11 +188,11 @@ namespace scidb
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        Dimensions const& dims = array.getArrayDesc().getDimensions(); 
-        while (true) { 
+        Dimensions const& dims = array.getArrayDesc().getDimensions();
+        while (true) {
             size_t i = dims.size()-1;
-            while ((outPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) { 
-                if (i == 0) { 
+            while ((outPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) {
+                if (i == 0) {
                     hasCurrent = false;
                     return;
                 }
@@ -202,7 +202,7 @@ namespace scidb
             array.out2in(outPos, inPos);
             inputIterator->setPosition(inPos);
             chunkInitialized = false;
-            if (!getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS)->end()) { 
+            if (!getChunk().getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS)->end()) {
                 return;
             }
         }
@@ -210,9 +210,9 @@ namespace scidb
 
     void ReshapeArrayIterator::reset()
     {
-        Dimensions const& dims = array.getArrayDesc().getDimensions(); 
+        Dimensions const& dims = array.getArrayDesc().getDimensions();
         size_t nDims = dims.size();
-        for (size_t i = 0; i < nDims; i++) { 
+        for (size_t i = 0; i < nDims; i++) {
             outPos[i] = dims[i].getStartMin();
         }
         outPos[nDims-1] -= dims[nDims-1].getChunkInterval();
@@ -231,8 +231,8 @@ namespace scidb
 
     bool ReshapeArrayIterator::setPosition(Coordinates const& newPos)
     {
-        Dimensions const& dims = array.getArrayDesc().getDimensions(); 
-        for (size_t i = 0, nDims = dims.size(); i < nDims; i++) { 
+        Dimensions const& dims = array.getArrayDesc().getDimensions();
+        for (size_t i = 0, nDims = dims.size(); i < nDims; i++) {
             if (newPos[i] < dims[i].getStartMin() || newPos[i] > dims[i].getEndMax()) {
                 return hasCurrent = false;
             }
@@ -241,11 +241,11 @@ namespace scidb
         chunkInitialized = false;
         array.getArrayDesc().getChunkPositionFor(outPos);
         array.out2in(outPos, inPos);
-        inputIterator->setPosition(inPos); 
+        inputIterator->setPosition(inPos);
         return hasCurrent = true;
     }
 
-    ReshapeArrayIterator::ReshapeArrayIterator(ReshapeArray const& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator)
+    ReshapeArrayIterator::ReshapeArrayIterator(ReshapeArray const& arr, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator)
     : DelegateArrayIterator(arr, attrID, inputIterator),
       array(arr),
       inPos(arr.inDims.size()),
@@ -258,23 +258,23 @@ namespace scidb
     // Reshape array methods
     //
 
-    inline void convertCoordinates(Coordinates const& srcPos, Dimensions const& srcDims, Coordinates& dstPos, Dimensions const& dstDims) 
+    inline void convertCoordinates(Coordinates const& srcPos, Dimensions const& srcDims, Coordinates& dstPos, Dimensions const& dstDims)
     {
         dstPos = PhysicalBoundaries::reshapeCoordinates(srcPos, srcDims, dstDims);
-        if(dstPos[0] == MAX_COORDINATE)
+        if(dstPos[0] == CoordinateBounds::getMax())
         {
             //assert-like; should never happen
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal inconsistency reshaping coordinates";
         }
-    }         
-        
+    }
+
     void ReshapeArray::in2out(Coordinates const& inPos, Coordinates& outPos)  const
-    { 
+    {
         convertCoordinates(inPos, inDims, outPos, outDims);
     }
 
     void ReshapeArray::out2in(Coordinates const& outPos, Coordinates& inPos)  const
-    { 
+    {
         convertCoordinates(outPos, outDims, inPos, inDims);
     }
 
@@ -286,13 +286,13 @@ namespace scidb
     DelegateArrayIterator* ReshapeArray::createArrayIterator(AttributeID id) const
     {
         return new ReshapeArrayIterator(*this, id, inputArray->getConstIterator(id));
-    }    
+    }
 
-    ReshapeArray::ReshapeArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array)
+    ReshapeArray::ReshapeArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array)
     : DelegateArray(desc, array),
       inDims(array->getArrayDesc().getDimensions()),
       outDims(desc.getDimensions())
     {
-    } 
+    }
 }
 

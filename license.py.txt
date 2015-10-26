@@ -1,8 +1,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2015-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -17,4 +17,4 @@
 # along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 #
 # END_COPYRIGHT
-#      
+#

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -47,11 +47,17 @@ namespace scidb { namespace arena {
  *              which the actual pages of storage are allocated - is specified
  *              with the 'parent' field of the structure. For example:
  *  @code
- *                  b = newArena(Options("B").pagesize(1024).parent(a));
+ *                  b = newArena(Options("B").parent(a).pagesize(64*KiB));
  *  @endcode
- *              creates a new arena 'b' that allocates memory 1024 bytes at a
- *              time from the arena 'a', then sub-allocates from within these
+ *              creates a new arena 'b' that allocates memory 64KiB bytes at a
+ *              time from the arena 'a',  then sub-allocates from within these
  *              fixed size pages.
+ *
+ *              Alternatively, one can also write:
+ *  @code
+ *                  b = newArena(Options("B").limited(a,1*GB));
+ *  @endcode
+ *              which does exactly the same thing.
  *
  *              While it is perfectly fine to return an allocation to an arena
  *              by calling recycle(), you should be aware that the ScopedArena
@@ -95,7 +101,7 @@ class ScopedArena : public LimitedArena
             bool              consistent()         const;
 
  protected:                // Representation
-       std::deque<void*>       _list;                    // The list of blocks
+       std::deque<void*>      _list;                     // The list of blocks
             size_t      const _size;                     // The size of a page
             byte_t*           _next;                     // The next available
             byte_t*           _last;                     // The last in page

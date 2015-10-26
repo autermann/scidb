@@ -25,46 +25,46 @@ SCIDB QUERY : <show(A2)>
 {0} 'A2<val1:double,val2:int64,val3:string,val4:int64> [x=0:3,2,0,y=0:3,2,0]'
 
 SCIDB QUERY : <aggregate(A1,approxdc(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 0
 
 SCIDB QUERY : <aggregate(A2,approxdc(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val2))>
-{i} val2_ApproxDC
+{i} val2_approxdc
 {0} 4
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val3))>
-{i} val3_ApproxDC
+{i} val3_approxdc
 {0} 16
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val4))>
-{i} val4_ApproxDC
+{i} val4_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val1), ApproxDC(val2))>
-{i} val1_ApproxDC,val2_ApproxDC
+{i} val1_approxdc,val2_approxdc
 {0} 7,4
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val1), ApproxDC(val2),  ApproxDC(val3), ApproxDC(val4))>
-{i} val1_ApproxDC,val2_ApproxDC,val3_ApproxDC,val4_ApproxDC
+{i} val1_approxdc,val2_approxdc,val3_approxdc,val4_approxdc
 {0} 7,4,16,7
 
 SCIDB QUERY : <aggregate(A2,ApproxDC(val1), ApproxDC(val2),  ApproxDC(val3), ApproxDC(val4),sum(val1),count(val2))>
-{i} val1_ApproxDC,val2_ApproxDC,val3_ApproxDC,val4_ApproxDC,val1_sum,val2_count
+{i} val1_approxdc,val2_approxdc,val3_approxdc,val4_approxdc,val1_sum,val2_count
 {0} 7,4,16,7,88,16
 
 SCIDB QUERY : <select ApproxDC(A2)>
 [An error expected at this place for the query "select ApproxDC(A2)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SINGLE_ATTRIBUTE_IN_INPUT_EXPECTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_SINGLE_ATTRIBUTE_IN_INPUT_EXPECTED.]
 
 SCIDB QUERY : <select ApproxDC(A1)>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 0
 
 SCIDB QUERY : <select ApproxDC(val1),ApproxDC(val2),ApproxDC(val3),ApproxDC(val4),ApproxDC(val3) from A2>

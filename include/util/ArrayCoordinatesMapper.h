@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,6 @@
 #define ARRAY_COORDINATES_MAPPER_H_
 
 #include <assert.h>
-#include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <array/Metadata.h>
 
@@ -108,7 +107,7 @@ public:
             const Coordinate low  = std::max(Coordinate(chunkPos[i] - _dims[i].getChunkOverlap()),
                                              _dims[i].getStartMin());
 
-            const Coordinate high = std::min(Coordinate(chunkPos[i] + _dims[i].getChunkInterval() + 
+            const Coordinate high = std::min(Coordinate(chunkPos[i] + _dims[i].getChunkInterval() +
                                                            _dims[i].getChunkOverlap() - 1),
                                              _dims[i].getEndMax());
 

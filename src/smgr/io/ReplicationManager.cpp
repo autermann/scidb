@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,7 +34,7 @@ namespace scidb
 {
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.replication"));
 
-void ReplicationManager::start(const boost::shared_ptr<JobQueue>& jobQueue)
+void ReplicationManager::start(const std::shared_ptr<JobQueue>& jobQueue)
 {
     ScopedMutexLock cs(_repMutex);
     assert(!_lsnrId);
@@ -44,12 +44,12 @@ void ReplicationManager::start(const boost::shared_ptr<JobQueue>& jobQueue)
     assert(_lsnrId);
 
     // initialize inbound replication queue
-    uint64_t size = Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE);
+    int size = Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE);
     assert(size>0);
-    size = (size<1) ? 1 : size;
+    size = (size<1) ? 4 : size+4; // allow some minimal extra space to tolerate mild overflows
     // this queue is single-threaded because the order of replicas is important (per source)
     // and CachedStorage serializes everything anyway via THE mutex.
-    _inboundReplicationQ = boost::make_shared<WorkQueue>(jobQueue, 1, size);
+    _inboundReplicationQ = std::make_shared<WorkQueue>(jobQueue, 1, static_cast<uint64_t>(size));
     InjectedErrorListener<ReplicaSendInjectedError>::start();
     InjectedErrorListener<ReplicaWaitInjectedError>::start();
 }
@@ -65,16 +65,16 @@ void ReplicationManager::stop()
     _repEvent.signal();
 }
 
-void ReplicationManager::send(const boost::shared_ptr<Item>& item)
+void ReplicationManager::send(const std::shared_ptr<Item>& item)
 {
     assert(item);
     assert(!item->isDone());
     assert(_lsnrId);
 
     ScopedMutexLock cs(_repMutex);
-    shared_ptr<RepItems>& ri = _repQueue[item->getInstanceId()];
+    std::shared_ptr<RepItems>& ri = _repQueue[item->getInstanceId()];
     if (!ri) {
-        ri = shared_ptr<RepItems>(new RepItems);
+        ri = std::shared_ptr<RepItems>(new RepItems);
     }
     ri->push_back(item);
     if (ri->size() == 1) {
@@ -83,7 +83,7 @@ void ReplicationManager::send(const boost::shared_ptr<Item>& item)
     }
 }
 
-void ReplicationManager::wait(const boost::shared_ptr<Item>& item)
+void ReplicationManager::wait(const std::shared_ptr<Item>& item)
 {
     ScopedMutexLock cs(_repMutex);
 
@@ -94,7 +94,7 @@ void ReplicationManager::wait(const boost::shared_ptr<Item>& item)
         return;
     }
 
-    shared_ptr<RepItems>& ri = _repQueue[item->getInstanceId()];
+    std::shared_ptr<RepItems>& ri = _repQueue[item->getInstanceId()];
     assert(ri);
 
     Event::ErrorChecker ec = bind(&ReplicationManager::checkItemState, item);
@@ -165,16 +165,16 @@ bool ReplicationManager::sendItem(RepItems& ri)
 {
     ScopedMutexLock cs(_repMutex);
 
-    const boost::shared_ptr<Item>& item = ri.front();
+    const std::shared_ptr<Item>& item = ri.front();
 
     if (item->isDone()) {
         ri.pop_front();
         return true;
     }
     try {
-        shared_ptr<Query> q(Query::getValidQueryPtr(item->getQuery()));
+        std::shared_ptr<Query> q(Query::getValidQueryPtr(item->getQuery()));
 
-        boost::shared_ptr<MessageDesc> chunkMsg(item->getChunkMsg());
+        std::shared_ptr<MessageDesc> chunkMsg(item->getChunkMsg());
         NetworkManager::getInstance()->sendPhysical(item->getInstanceId(), chunkMsg,
                                                    NetworkManager::mqtReplication);
         LOG4CXX_TRACE(logger, "ReplicationManager::sendItem: successful replica chunk send to instance="
@@ -198,7 +198,7 @@ void ReplicationManager::clear()
 {
     // mutex must be locked
     for (RepQueue::iterator iter = _repQueue.begin(); iter != _repQueue.end(); ++iter) {
-        shared_ptr<RepItems>& ri = iter->second;
+        std::shared_ptr<RepItems>& ri = iter->second;
         assert(ri);
         for (RepItems::iterator i=ri->begin(); i != ri->end(); ++i) {
             (*i)->setDone(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_REPLICATION, SCIDB_LE_UNKNOWN_ERROR));

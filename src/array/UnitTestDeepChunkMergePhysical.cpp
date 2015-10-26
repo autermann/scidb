@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <array/Metadata.h>
 #include <system/Cluster.h>
 #include <query/Query.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
 #include <log4cxx/logger.h>
@@ -51,7 +51,7 @@ public:
     {
     }
 
-    void preSingleExecute(shared_ptr<Query> query)
+    void preSingleExecute(std::shared_ptr<Query> query)
     {
     }
 
@@ -127,13 +127,13 @@ public:
      * @param[in]    m      the map of Coordinate --> Value
      * @param[in]    whetherAttachBitmap  whether the bitmap itself should be attached to the end of the data chunk
      */
-    void insertMapDataIntoArray(shared_ptr<Query>& query, MemArray& array, CoordValueMap const& m, bool whetherAttachBitmap)
+    void insertMapDataIntoArray(std::shared_ptr<Query>& query, MemArray& array, CoordValueMap const& m, bool whetherAttachBitmap)
     {
-        shared_ptr<ArrayIterator> arrayIter = array.getIterator(0);
+        std::shared_ptr<ArrayIterator> arrayIter = array.getIterator(0);
         Coordinates coord(1), coordZero(1);
         coordZero[0] = 0;
         MemChunk& chunk = (MemChunk&)arrayIter->newChunk(coordZero);
-        shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE);
+        std::shared_ptr<ChunkIterator> chunkIter = chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE);
         BOOST_FOREACH(CoordValueMapEntry const& p, m) {
             coord[0] = p.first;
             chunkIter->setPosition(coord);
@@ -166,7 +166,7 @@ public:
      *
      * @throw SCIDB_SE_INTERNAL::SCIDB_LE_UNITTEST_FAILED
      */
-    void testOnce_DeepChunkMerge(boost::shared_ptr<Query>& query, TypeId const& type,
+    void testOnce_DeepChunkMerge(std::shared_ptr<Query>& query, TypeId const& type,
             Coordinate start, Coordinate end, int64_t chunkInterval)
     {
         const int percentAttachBitmap = 90;
@@ -179,7 +179,7 @@ public:
         attributes[0] = AttributeDesc((AttributeID)0, "dummy_attribute",  type, AttributeDesc::IS_NULLABLE, 0);
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), start, end, chunkInterval, 0);
-        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions);
+        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
 
         // Define two one-chunk arrays, simulating fragments appearing in different instances.
         MemArray arrayInstOne(schema,query), arrayInstTwo(schema,query);
@@ -205,10 +205,10 @@ public:
         for (AttributeID attrId=0; attrId<2; ++attrId ) {
             Coordinates coord(1);
             coord[0] = 0;
-            shared_ptr<ArrayIterator> arrayIterInstOne = arrayInstOne.getIterator(attrId);
+            std::shared_ptr<ArrayIterator> arrayIterInstOne = arrayInstOne.getIterator(attrId);
             arrayIterInstOne->setPosition(coord);
             MemChunk& chunkInstOne = (MemChunk&)arrayIterInstOne->updateChunk();
-            shared_ptr<ConstArrayIterator> constArrayIterInstTwo = arrayInstTwo.getConstIterator(attrId);
+            std::shared_ptr<ConstArrayIterator> constArrayIterInstTwo = arrayInstTwo.getConstIterator(attrId);
             constArrayIterInstTwo->setPosition(coord);
             MemChunk const& chunkInstTwo = (MemChunk const&)constArrayIterInstTwo->getChunk();
 
@@ -220,13 +220,13 @@ public:
         // - Retrieve all data from the first array. This is the merged result.
         // - Make sure the truth and the merged result are equal.
         CoordValueMap mergedResult, expectedResult;
-        shared_ptr<ConstArrayIterator> constArrayIterInstOne = arrayInstOne.getConstIterator(0);
+        std::shared_ptr<ConstArrayIterator> constArrayIterInstOne = arrayInstOne.getConstIterator(0);
         constArrayIterInstOne->reset();
         MemChunk& chunkInstOne = (MemChunk&)constArrayIterInstOne->getChunk();
-        shared_ptr<ConstChunkIterator> const& constChunkIterInstOne = chunkInstOne.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
+        std::shared_ptr<ConstChunkIterator> const& constChunkIterInstOne = chunkInstOne.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS);
         while (!constChunkIterInstOne->end()) {
             Coordinates const& coord = constChunkIterInstOne->getPosition();
-            Value& v = constChunkIterInstOne->getItem();
+            Value const& v = constChunkIterInstOne->getItem();
             mergedResult[coord[0]] = v;
             ++(*constChunkIterInstOne);
         }
@@ -283,7 +283,7 @@ public:
         }
      }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         srand(time(NULL));
 
@@ -295,7 +295,7 @@ public:
             }
         }
 
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 
 };

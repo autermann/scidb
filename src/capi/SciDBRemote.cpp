@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,10 +31,10 @@
 
 #include <stdlib.h>
 #include <string>
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
+
 
 #include "SciDBAPI.h"
 #include "network/Connection.h"
@@ -43,6 +43,18 @@
 #include "system/Exceptions.h"
 #include "util/PluginManager.h"
 #include "util/Singleton.h"
+
+#include <boost/bind.hpp>
+
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
+
+#include <fstream>
+
+
 
 using namespace std;
 using namespace boost;
@@ -155,13 +167,126 @@ void fillProgramOptions(std::string& programOptions)
     programOptions = getModuleFileName() + " " + getCommandLineOptions();
 }
 
+
 /**
  * Remote implementation of the SciDBAPI interface
  */
 class SciDBRemote: public scidb::SciDB
 {
+private:
+
+    /**
+     * Free all memory associated with the BIO.
+     */
+    static void releaseBio(
+        BIO **ppBioBase64,
+        BIO **ppBioMem)
+    {
+        if(*ppBioMem)
+        {
+            BIO *pBioMem = *ppBioMem;
+            BIO_free(pBioMem);
+            *ppBioMem = NULL;
+        }
+
+        if(*ppBioBase64)
+        {
+            BIO *pBioBase64 = *ppBioBase64;
+            BIO_free_all(pBioBase64);
+            *ppBioBase64 = NULL;
+        }
+    }
+
+    /**
+     * @brief Convert the data in "buffer" into base64 format.
+     */
+    std::string _convertToBase64(
+        uint8_t *   buffer,
+        int         length) const
+    {
+        BIO         *bioMem = NULL;
+        BIO         *bioBase64 = NULL;
+        BUF_MEM     *bptr = NULL;
+        int         ret;
+
+        if(!buffer)
+        {
+            throw SYSTEM_EXCEPTION(
+                SCIDB_SE_INTERNAL,
+                SCIDB_LE_UNRECOGNIZED_PARAMETER)
+                << "buffer = NULL";
+        }
+
+        if(!length)
+        {
+            throw SYSTEM_EXCEPTION(
+                SCIDB_SE_INTERNAL,
+                SCIDB_LE_UNRECOGNIZED_PARAMETER)
+                << "length = 0";
+        }
+
+        boost::function<void()> func = boost::bind(
+            &SciDBRemote::releaseBio, &bioBase64, &bioMem);
+        Destructor<boost::function<void()> > fqd(func);
+
+        std::string resultB64;
+
+        do
+        {
+            bioBase64 = BIO_new(BIO_f_base64());
+            if(bioBase64 == NULL) break;
+
+            bioMem = BIO_new(BIO_s_mem());
+            if(bioMem == NULL) break;
+
+            BIO *b64 = BIO_push(bioBase64, bioMem);
+            if(b64 == NULL) break;
+            bioMem = NULL;
+            bioBase64 = b64;
+
+            ret = BIO_write(bioBase64, buffer, length);
+            if(ret != length) break;
+
+            ret = BIO_flush(bioBase64);
+            if(1 != ret) break;
+
+            BIO_get_mem_ptr(bioBase64, &bptr);
+            if(bptr == NULL) break;
+
+            std::vector<char> buff(bptr->length);
+            memcpy(buff.data(), bptr->data, bptr->length - 1);
+            buff[bptr->length - 1] = '\0';
+            resultB64 = buff.data();
+        } while(0);
+
+        return resultB64;
+    }
+
+    /**
+     * @brief Use SHA512 to hash the password and then convert to Base64.
+     * @param password - password to be converted
+     */
+    std::string _hashPassword(
+        const std::string &password,
+        uint32_t           maxIterations = 1) const
+    {
+        SHA512_CTX              ctx;
+        std::vector<uint8_t>    digest(SHA512_DIGEST_LENGTH);
+
+        SHA512_Init(&ctx);
+        for(uint32_t iteration=0; iteration < maxIterations; ++iteration)
+        {
+            SHA512_Update(&ctx, password.c_str(), password.length());
+        }
+        SHA512_Final(digest.data(), &ctx);
+
+        return _convertToBase64(digest.data(), digest.size());
+    }
+
 public:
     virtual ~SciDBRemote() {}
+
+
     void* connect(const std::string& connectionString, uint16_t port) const
     {
         StatisticsScope sScope;
@@ -169,6 +294,7 @@ public:
         connection->connect(connectionString, port);
         return connection;
     }
+
 
     void disconnect(void* connection) const
     {
@@ -183,7 +309,7 @@ public:
     void prepareQuery(const std::string& queryString, bool afl, const std::string&, QueryResult& queryResult, void* connection) const
     {
         StatisticsScope sScope;
-        boost::shared_ptr<MessageDesc> queryMessage = boost::make_shared<MessageDesc>(mtPrepareQuery);
+        std::shared_ptr<MessageDesc> queryMessage = std::make_shared<MessageDesc>(mtPrepareQuery);
         queryMessage->getRecord<scidb_msg::Query>()->set_query(queryString);
         queryMessage->getRecord<scidb_msg::Query>()->set_afl(afl);
 
@@ -193,7 +319,7 @@ public:
 
         LOG4CXX_TRACE(logger, "Send " << (afl ? "AFL" : "AQL") << " for preparation " << queryString);
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(queryMessage);
+        std::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(queryMessage);
 
         if (resultMessage->getMessageType() != mtQueryResult) {
             assert(resultMessage->getMessageType() == mtError);
@@ -201,7 +327,7 @@ public:
             makeExceptionFromErrorMessageAndThrow(resultMessage);
         }
 
-        boost::shared_ptr<scidb_msg::QueryResult> queryResultRecord =
+        std::shared_ptr<scidb_msg::QueryResult> queryResultRecord =
             resultMessage->getRecord<scidb_msg::QueryResult>();
 
         SciDBWarnings::getInstance()->associateWarnings(resultMessage->getQueryID(), &queryResult);
@@ -233,7 +359,7 @@ public:
     void executeQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
     {
         StatisticsScope sScope;
-        boost::shared_ptr<MessageDesc> queryMessage = boost::make_shared<MessageDesc>(mtExecuteQuery);
+        std::shared_ptr<MessageDesc> queryMessage = std::make_shared<MessageDesc>(mtExecuteQuery);
         queryMessage->getRecord<scidb_msg::Query>()->set_query(queryString);
         queryMessage->getRecord<scidb_msg::Query>()->set_afl(afl);
         std::string programOptions;
@@ -248,7 +374,7 @@ public:
             LOG4CXX_TRACE(logger, "Send prepared query " << queryResult.queryID << " for execution");
         }
 
-        boost::shared_ptr<MessageDesc> resultMessage = static_cast<BaseConnection*>(connection)->sendAndReadMessage<MessageDesc>(queryMessage);
+        std::shared_ptr<MessageDesc> resultMessage = static_cast<BaseConnection*>(connection)->sendAndReadMessage<MessageDesc>(queryMessage);
 
         if (resultMessage->getMessageType() != mtQueryResult) {
             assert(resultMessage->getMessageType() == mtError);
@@ -257,7 +383,7 @@ public:
         }
 
         // Processing result message
-        boost::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
+        std::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
 
         queryResult.queryID = resultMessage->getQueryID();
 
@@ -323,9 +449,9 @@ public:
             queryResult.explainLogical = queryResultRecord->explain_logical();
             queryResult.explainPhysical = queryResultRecord->explain_physical();
 
-            const ArrayDesc arrayDesc(queryResultRecord->array_name(), attributes, dimensions);
+            const ArrayDesc arrayDesc(queryResultRecord->array_name(), attributes, dimensions, defaultPartitioning());
 
-            queryResult.array = boost::shared_ptr<Array>(new ClientArray(( BaseConnection*)connection,
+            queryResult.array = std::shared_ptr<Array>(new ClientArray(( BaseConnection*)connection,
                                                                          arrayDesc, queryResult.queryID, queryResult));
         }
     }
@@ -333,16 +459,16 @@ public:
     void cancelQuery(QueryID queryID, void* connection) const
     {
         StatisticsScope sScope;
-        boost::shared_ptr<MessageDesc> cancelQueryMessage = boost::make_shared<MessageDesc>(mtCancelQuery);
+        std::shared_ptr<MessageDesc> cancelQueryMessage = std::make_shared<MessageDesc>(mtCancelQuery);
         cancelQueryMessage->setQueryID(queryID);
 
         LOG4CXX_TRACE(logger, "Canceling query for execution " << queryID);
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(cancelQueryMessage);
+        std::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(cancelQueryMessage);
 
         //  assert(resultMessage->getMessageType() == mtError);
         if (resultMessage->getMessageType() == mtError) {
-            boost::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
+            std::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
             if (error->short_error_code() != SCIDB_E_NO_ERROR)
                 makeExceptionFromErrorMessageAndThrow(resultMessage);
         } else {
@@ -353,21 +479,154 @@ public:
     void completeQuery(QueryID queryID, void* connection) const
     {
         StatisticsScope sScope;
-        boost::shared_ptr<MessageDesc> completeQueryMessage = boost::make_shared<MessageDesc>(mtCompleteQuery);
+        std::shared_ptr<MessageDesc> completeQueryMessage = std::make_shared<MessageDesc>(mtCompleteQuery);
         completeQueryMessage->setQueryID(queryID);
 
         LOG4CXX_TRACE(logger, "Completing query for execution " << queryID);
 
-        boost::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(completeQueryMessage);
+        std::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(completeQueryMessage);
 
         if (resultMessage->getMessageType() == mtError) {
-            boost::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
+            std::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
             if (error->short_error_code() != SCIDB_E_NO_ERROR)
                 makeExceptionFromErrorMessageAndThrow(resultMessage);
         } else {
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_MESSAGE_TYPE2) << resultMessage->getMessageType();
         }
     }
+
+    void newClientStart(
+        void* connection,
+        const std::string &name,
+        const std::string &password) const
+    {
+        log4cxx::LoggerPtr logger = log4cxx::Logger::getRootLogger();
+
+        LOG4CXX_DEBUG(logger,
+            "newClientStart("
+                << "  name="     << name     << ","
+                << "  password=********)");
+
+        scidb::BaseConnection *baseConnection =
+            static_cast<scidb::BaseConnection*>(connection);
+
+        // --- send newClientStart message --- //
+        std::shared_ptr<scidb::MessageDesc> msgNewClientStart =
+            std::make_shared<scidb::MessageDesc>(scidb::mtNewClientStart);
+
+        LOG4CXX_DEBUG(logger, "Sending newClientStart");
+
+        std::shared_ptr<scidb::MessageDesc> resultMessage;
+
+
+        resultMessage = baseConnection->
+            sendAndReadMessage<scidb::MessageDesc>(
+                msgNewClientStart);
+
+        bool done = false;
+        do
+        {
+            switch(resultMessage->getMessageType())
+            {
+                case scidb::mtSecurityMessage:
+                {
+                    std::string   strMessage;
+                    uint32_t      messageType;
+                    std::string   userResponse;
+
+                    // --- display the information in the SecurityMessage --- //
+                    {
+                        std::shared_ptr<scidb_msg::SecurityMessage> record =
+                            resultMessage->getRecord<scidb_msg::SecurityMessage>();
+
+                        strMessage   = record->msg();
+                        messageType  = record->msg_type();
+
+                        LOG4CXX_DEBUG(logger,
+                            "newClientStart message="
+                            << strMessage
+                            << " type=" << (uint32_t) messageType);
+
+                        LOG4CXX_DEBUG(logger,
+                            "newClientStart getInputFromFile("
+                            << strMessage << ", "
+                            << "  name=" << name << ", "
+                            << "  password=********)");
+
+                        transform(
+                            strMessage.begin(),
+                            strMessage.end(),
+                            strMessage.begin(),
+                            ::tolower );
+                        if(strMessage.compare("login:") == 0) {
+                            userResponse = name;
+                        } else if(strMessage.compare("password:") == 0) {
+                            userResponse = _hashPassword(password);
+                        } else {
+                            userResponse = "Unknown request";
+                        }
+
+                        LOG4CXX_DEBUG(logger, "newClientStart"
+                            << "  message=" << strMessage
+                            << "  response=" << userResponse);
+
+                        if(0 == userResponse.length())
+                        {
+                            LOG4CXX_ERROR(logger, "invalid buffer length");
+                            throw USER_EXCEPTION(
+                                scidb::SCIDB_SE_INTERNAL,
+                                scidb::SCIDB_LE_INVALID_BUFFER_LENGTH);
+                        }
+                    }
+
+
+                    // --- send SecurityMessageResponse --- //
+                    {
+                        std::shared_ptr<scidb::MessageDesc> msgSecurityMessageResponse =
+                            std::make_shared<scidb::MessageDesc>(
+                                scidb::mtSecurityMessageResponse);
+
+                        std::shared_ptr<scidb_msg::SecurityMessageResponse> record =
+                            msgSecurityMessageResponse->getRecord<
+                                scidb_msg::SecurityMessageResponse>();
+
+                        record->set_response(userResponse.c_str());
+
+                        LOG4CXX_DEBUG(logger,
+                            "newClientStart sendResponse(\""
+                                << record->response()
+                                << "\""
+                                << ")");
+
+                        resultMessage =
+                            baseConnection->sendAndReadMessage<scidb::MessageDesc>(
+                                msgSecurityMessageResponse);
+                    }
+                } break;
+
+                case scidb::mtNewClientComplete:
+                {
+                    std::shared_ptr<scidb_msg::NewClientComplete> record =
+                        resultMessage->getRecord<scidb_msg::NewClientComplete>();
+
+                    LOG4CXX_DEBUG(logger,
+                        "newClient mtNewClientComplete"
+                        << " Authenticated="
+                        << (record->authenticated() ? "true" : "false"));
+                    done=true;
+                } break;
+
+                case scidb::mtError:
+                    LOG4CXX_ERROR(logger, "newClient mtError");
+                    throw USER_EXCEPTION(
+                        scidb::SCIDB_SE_INITIALIZATION,
+                        scidb::SCIDB_LE_CONNECTION_SETUP);
+                break;
+            }  // switch(resultMessage->getMessageType()) { ... }
+        } while(!done);
+    }
+
+
 
 } _sciDB;
 
@@ -379,13 +638,13 @@ ConstChunk const* ClientArray::nextChunk(AttributeID attId, MemChunk& chunk)
 {
     StatisticsScope sScope;
     LOG4CXX_TRACE(logger, "Fetching next chunk of " << attId << " attribute");
-    boost::shared_ptr<MessageDesc> fetchDesc = boost::make_shared<MessageDesc>(mtFetch);
+    std::shared_ptr<MessageDesc> fetchDesc = std::make_shared<MessageDesc>(mtFetch);
     fetchDesc->setQueryID(_queryID);
-    shared_ptr<scidb_msg::Fetch> fetchDescRecord = fetchDesc->getRecord<scidb_msg::Fetch>();
+    std::shared_ptr<scidb_msg::Fetch> fetchDescRecord = fetchDesc->getRecord<scidb_msg::Fetch>();
     fetchDescRecord->set_attribute_id(attId);
     fetchDescRecord->set_array_name(getArrayDesc().getName());
 
-    boost::shared_ptr<MessageDesc> chunkDesc = _connection->sendAndReadMessage<MessageDesc>(fetchDesc);
+    std::shared_ptr<MessageDesc> chunkDesc = _connection->sendAndReadMessage<MessageDesc>(fetchDesc);
 
     if (chunkDesc->getMessageType() != mtChunk) {
         assert(chunkDesc->getMessageType() == mtError);
@@ -393,7 +652,7 @@ ConstChunk const* ClientArray::nextChunk(AttributeID attId, MemChunk& chunk)
         makeExceptionFromErrorMessageAndThrow(chunkDesc);
     }
 
-    boost::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
+    std::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();
 
     if (!chunkMsg->eof())
     {
@@ -408,7 +667,7 @@ ConstChunk const* ClientArray::nextChunk(AttributeID attId, MemChunk& chunk)
         }
 
         chunk.initialize(this, &desc, firstElem, compMethod);
-        boost::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(chunkDesc->getBinary());
+        std::shared_ptr<CompressedBuffer> compressedBuffer = dynamic_pointer_cast<CompressedBuffer>(chunkDesc->getBinary());
         compressedBuffer->setCompressionMethod(compMethod);
         compressedBuffer->setDecompressedSize(decompressedSize);
         chunk.decompress(*compressedBuffer);

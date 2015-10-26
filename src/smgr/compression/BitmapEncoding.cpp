@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -58,15 +58,15 @@ namespace scidb {
         uint8_t *bmPosition;
         uint8_t bitSetter = _bitSetters[idx % 8];
         jump = idx / 8;
-  
-        /**** originally 
+
+        /**** originally
               bitOffset = 7 - idx % 8; // left to right, 0-indexed
               bitSetter = bitSetter << bitOffset;
         */
 
         bmPosition = bitmap + jump;
         *bmPosition = *bmPosition |  bitSetter; // bitwise and to set the bit
-  
+
     }
 
 // bm and # of indexes
@@ -89,13 +89,13 @@ namespace scidb {
         }
     }
 
-  
+
     bool BitmapEncoding::Bitmap::getBit(uint8_t byte, uint8_t offset)
     {
         return (byte & _bitSetters[offset]) > 0;
     }
- 
-    void BitmapEncoding::Bitmap::decodeBitmap(uint8_t const * const baseValue, uint8_t const * const bitmap, uint8_t * const target) 
+
+    void BitmapEncoding::Bitmap::decodeBitmap(uint8_t const * const baseValue, uint8_t const * const bitmap, uint8_t * const target)
     {
         uint32_t i;
         uint8_t *writePtr = target;
@@ -110,14 +110,14 @@ namespace scidb {
                 memcpy(writePtr, baseValue, _elementSize);
             }
             writePtr += _elementSize;
-      
+
             ++offset;
             if(offset == 8)
             {
                 ++readPtr;
                 offset = 0;
             }
-       
+
         }
 
     }
@@ -125,15 +125,15 @@ namespace scidb {
     /// Returns the number of bytes in the compressed target array.
     ///
 
-    size_t BitmapEncoding::compress(void* dst, const ConstChunk& chunk, size_t size) 
+    size_t BitmapEncoding::compress(void* dst, const ConstChunk& chunk, size_t size)
     {
         return size;
     }
 
-    size_t BitmapEncoding::Bitmap::compress(void* dst, const ConstChunk& chunk, size_t chunkSize) 
+    size_t BitmapEncoding::Bitmap::compress(void* dst, const ConstChunk& chunk, size_t chunkSize)
     {
         char const* dataSrc = (char const*)chunk.getData();
-        TypeId type = chunk.getAttributeDesc().getType();        
+        TypeId type = chunk.getAttributeDesc().getType();
         _elementSize = TypeLibrary::getType(type).byteSize();
 
         /* No more immutable arrays, to keep consistent with old code, always treat data as string
@@ -152,7 +152,7 @@ namespace scidb {
 
         clearBitmapCache();
 
-        // make the key of our hash a string so that 
+        // make the key of our hash a string so that
         // we can compare variable-length element sizes
 
         size_t bitmapEntryLength = bucketSize + _elementSize;
@@ -165,7 +165,7 @@ namespace scidb {
         }
 
         for(i = 0; i < _bitmapElements; ++i)
-        { 
+        {
             key.clear();
 
             for(uint32_t j = 0; j < _elementSize; ++j)
@@ -186,10 +186,10 @@ namespace scidb {
                     return chunkSize;
                 }
 
-                // create a new one             
+                // create a new one
                 bucket = new uint8_t[bucketSize];
                 _bitmaps[key] = bucket;
-                for(uint32_t k = 0; k < bucketSize; ++k) { *(bucket+k) = 0;} 
+                for(uint32_t k = 0; k < bucketSize; ++k) { *(bucket+k) = 0;}
 
             } else {
                 bucket = iter->second;
@@ -213,7 +213,7 @@ namespace scidb {
     size_t BitmapEncoding::Bitmap::decompress(void const* src, size_t size, Chunk& chunk)
     {
         size_t chunkSize = chunk.getSize();
-        TypeId type = chunk.getAttributeDesc().getType();        
+        TypeId type = chunk.getAttributeDesc().getType();
         _elementSize = TypeLibrary::getType(type).byteSize();
 
         /* No more immutable arrays, to keep consistent with old code, always treat data as string
@@ -239,7 +239,7 @@ namespace scidb {
         for(uint32_t i = 0; i < bitmaps; ++i)
         {
             if(in.getArray(baseValue, _elementSize) == -1) { return 0; }
-            if(in.getArray(bitmap, bmLength)== -1) { return 0; } 
+            if(in.getArray(bitmap, bmLength)== -1) { return 0; }
             decodeBitmap(baseValue, bitmap, dst);
         }
         return chunkSize;

@@ -21,11 +21,11 @@ store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)
 
 
 # clean abort for insert
---shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 2  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*5 + 13), v1), v1, v), ABRTEST)' 1> /tmp/${HPID}_4.stdout || echo FAILURE"
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 2  2 'insert(project(apply(project(apply(filter(ABRTEST, I <> 0), v1, v*5 + 13), v1), v, v1), v), ABRTEST)' 1> /tmp/${HPID}_4.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_4.stdout"
 
---shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 9  2 'insert(attribute_rename(project(apply(filter(ABRTEST, I <> 0), v1, v*v), v1), v1, v), ABRTEST)' 1> /tmp/${HPID}_5.stdout || echo FAILURE"
+--shell --store --command "${TEST_UTILS_DIR}/killquery.sh -afl 9  2 'insert(project(apply(project(apply(filter(ABRTEST, I <> 0), v1, v*v), v1), v, v1), v), ABRTEST)' 1> /tmp/${HPID}_5.stdout || echo FAILURE"
 # log the output
 --shell --command "cat /tmp/${HPID}_5.stdout"
 
@@ -34,7 +34,7 @@ store (build (<v : int64> [I=0:2000,1,0], I), ABRTEST)
 subarray(ABRTEST, 0, 10)
 
 # This should now succeed. 
---igdata "insert(attribute_rename(project(apply(filter(ABRTEST, I/2 <> 0), v1, v*v), v1), v1, v), ABRTEST)"
+--igdata "insert(project(apply(project(apply(filter(ABRTEST, I/2 <> 0), v1, v*v), v1), v, v1), v), ABRTEST)"
 --igdata --aql "update ABRTEST set v=3"
 
 aggregate(versions(ABRTEST),count(*))

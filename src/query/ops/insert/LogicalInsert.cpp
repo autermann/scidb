@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -48,10 +48,14 @@ namespace scidb
  *   insert( sourceArray, targetArrayName )
  *
  * @par Summary:
- *   Inserts all data from left array into the persistent targetArray. targetArray must exist with matching dimensions and attributes.
- *   targetArray must also be mutable. The operator shall create a new version of targetArray that contains all data of the array that would have
- *   been received by merge(sourceArray, targetArrayName). In other words, new data is inserted between old data and overwrites any overlapping old values.
- *   The resulting array is then returned.
+ *   Inserts all data from left array into the persistent
+ *   targetArray.  targetArray must exist with matching dimensions and
+ *   attributes.  targetArray must also be mutable. The operator shall
+ *   create a new version of targetArray that contains all data of the
+ *   array that would have been received by merge(sourceArray,
+ *   targetArrayName). In other words, new data is inserted between
+ *   old data and overwrites any overlapping old values.  The
+ *   resulting array is then returned.
  *
  * @par Input:
  *   - sourceArray the array or query that provides inserted data
@@ -68,10 +72,11 @@ namespace scidb
  *   n/a
  *
  * @par Notes:
- *   Some might wonder - if this returns the same result as merge(sourceArray, targetArrayName), then why not use store(merge())? The answer is that
+ *   Some might wonder - if this returns the same result as
+ *   merge(sourceArray, targetArrayName), then why not use
+ *   store(merge())? The answer is that
  *   1. this runs a lot faster - it does not perform a full scan of targetArray
  *   2. this also generates less chunk headers
- *
  */
 class LogicalInsert: public  LogicalOperator
 {
@@ -95,21 +100,30 @@ public:
      * Calls requestLock with the write lock over the target array (array inserted into)
      * @param query the query context
      */
-    void inferArrayAccess(boost::shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
-        assert(_parameters.size() > 0);
-        assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        assert(ArrayDesc::isNameUnversioned(arrayName));
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
-                                                                                     query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalInstanceId(),
-                                                                                     SystemCatalog::LockDesc::COORD,
-                                                                                     SystemCatalog::LockDesc::WR));
-        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
-        assert(resLock);
-        assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
+        SCIDB_ASSERT(_parameters.size() > 0);
+        SCIDB_ASSERT(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
+        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayName));
+
+        ArrayDesc srcDesc;
+        SCIDB_ASSERT(!srcDesc.isTransient());
+
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION, srcDesc);
+
+        const SystemCatalog::LockDesc::LockMode lockMode =
+            srcDesc.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
+
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(arrayName,
+                                                                                       query->getQueryID(),
+                                                                                       Cluster::getInstance()->getLocalInstanceId(),
+                                                                                       SystemCatalog::LockDesc::COORD,
+                                                                                       lockMode));
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        SCIDB_ASSERT(resLock);
+        SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
     }
 
     /**
@@ -118,77 +132,31 @@ public:
      * @param schemas the shapes of the input arrays
      * @param query the query context
      */
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
-        assert(schemas.size() == 1);
-        assert(_parameters.size() == 1);
+        SCIDB_ASSERT(schemas.size() == 1);
+        SCIDB_ASSERT(_parameters.size() == 1);
 
-        string arrayName = ((shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        string arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
         ArrayDesc const& srcDesc = schemas[0];
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayName));
 
         //Ensure attributes names uniqueness.
         ArrayDesc dstDesc;
-        if (!SystemCatalog::getInstance()->getArrayDesc(arrayName, dstDesc, false))
-        {
+        if (!SystemCatalog::getInstance()->getArrayDesc(arrayName,
+                                                        query->getCatalogVersion(arrayName),
+                                                        dstDesc, false)) {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
         }
+        ArrayDesc::checkConformity(srcDesc, dstDesc,
+                                   ArrayDesc::IGNORE_PSCHEME |
+                                   ArrayDesc::IGNORE_OVERLAP |
+                                   ArrayDesc::IGNORE_INTERVAL); // allows auto-repart()
 
-        Dimensions const& srcDims = srcDesc.getDimensions();
-        Dimensions const& dstDims = dstDesc.getDimensions();
-
-        if (srcDims.size() != dstDims.size())
-        {
-            //TODO: this will get lifted when we allow redimension+insert in the same op
-            //and when we DO implement redimension+insert - we will need to match attributes/dimensions by name, not position.
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION)
-                    << "Temporary restriction: target of INSERT must have same dimensions as the source";
-        }
-
-        for (size_t i = 0, n = srcDims.size(); i < n; i++)
-        {
-            //TODO: we can also allow arrays that are smaller whose length is not evenly divided by chunk interval
-            //but then we have to detect "edge chunks" and rewrite them cleverly
-            if( srcDims[i].getStartMin() != dstDims[i].getStartMin() ||
-                srcDims[i].getChunkInterval() != dstDims[i].getChunkInterval() ||
-                srcDims[i].getChunkOverlap() != dstDims[i].getChunkOverlap() ||
-                srcDims[i].getEndMax() > dstDims[i].getEndMax() ||
-                ( srcDims[i].getEndMax() < dstDims[i].getEndMax() &&
-                  srcDims[i].getLength() % srcDims[i].getChunkInterval() != 0))
-            {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSIONS_DONT_MATCH)
-                        << srcDims[i].getBaseName() << dstDims[i].getBaseName();
-            }
-        }
-
-        Attributes const& srcAttrs = srcDesc.getAttributes(true);
-        Attributes const& dstAttrs = dstDesc.getAttributes(true);
-
-        if (srcAttrs.size() != dstAttrs.size())
-        {
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ILLEGAL_OPERATION)
-                    << "Temporary restriction: target of INSERT must have same attributes as the source";
-        }
-        for (size_t i = 0, n = srcAttrs.size(); i < n; i++)
-        {
-            if(srcAttrs[i].getType() != dstAttrs[i].getType())
-            {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_TYPE)
-                    << srcAttrs[i].getName() << srcAttrs[i].getType() << dstAttrs[i].getType();
-            }
-
-            //can't store nulls into a non-nullable attribute
-            if(!dstAttrs[i].isNullable() && srcAttrs[i].isNullable())
-            {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_FLAGS)
-                   << srcAttrs[i].getName();
-            }
-        }
-
-        //Note: let us NOT add arrayID numbers to the schema - because we do not have our ArrayID yet.
-        //We will get our ArrayID when we execute and create the array. Until then - don't bother.
-        //Old store code adds the arrayID to the schema - but that's the arrayID of the previous version,
-        //not the new version created by the op. A dangerous fallacy - stupid and unnecessary.
-        return ArrayDesc(arrayName, dstDesc.getAttributes(), dstDesc.getDimensions(), dstDesc.getFlags());
+        SCIDB_ASSERT(dstDesc.getId() == dstDesc.getUAId());
+        SCIDB_ASSERT(dstDesc.getName() == arrayName);
+        SCIDB_ASSERT(dstDesc.getUAId() > 0);
+        return dstDesc;
     }
 };
 

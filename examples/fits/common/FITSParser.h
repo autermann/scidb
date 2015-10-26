@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -45,10 +45,10 @@ public:
 
     int                 getNumberOfHDUs();
 
-    bool                moveToHDU(uint32_t hdu, string& error);
+    bool                moveToHDU(uint32_t hdu, std::string& error);
     int                 getBitPix() const;
     int                 getBitPixType() const;
-    const vector<int>&  getAxisSizes() const;
+    const std::vector<int>&  getAxisSizes() const;
     float               getBZero() const;
     float               getBScale() const;
 
@@ -58,21 +58,21 @@ public:
     float               readFloat32();
 
 private:
-    bool                validateHDU(uint32_t hdu, string& error);
+    bool                validateHDU(uint32_t hdu, std::string& error);
 
-    string              readKeyword();
+    std::string              readKeyword();
     void                readAndIgnoreValue();
-    bool                hasKey(string const& key);
+    bool                hasKey(std::string const& key);
 
-    bool                readFixedLogicalKeyword(string const& key);
-    int                 readFixedIntegerKeyword(string const& key);
-    void                readFreeStringKeyword(string const& key, string &value, bool &undefined);
+    bool                readFixedLogicalKeyword(std::string const& key);
+    int                 readFixedIntegerKeyword(std::string const& key);
+    void                readFreeStringKeyword(std::string const& key, std::string &value, bool &undefined);
     float               readFreeFloatingValue();
     int                 readFreeIntegerValue();
 
     static const int    kBlockSize = 2880;
 
-    string              filePath;
+    std::string              filePath;
     uint32_t            hdu;
 
     char                buffer[kBlockSize];
@@ -85,15 +85,15 @@ private:
     int                 bitpixsize;             // bitpix converted to bytes
     BitPixType          bitpixtype;
     int                 naxis;
-    vector<int>         axissize;
+    std::vector<int>         axissize;
     bool                scale;                  // Set to true only if bscale/bzero are present
     float               bscale;
     float               bzero;
     int                 pcount;
     int                 gcount;
-    string              xtension;
+    std::string              xtension;
 };
-    
+
 }
 
 #endif

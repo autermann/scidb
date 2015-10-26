@@ -626,28 +626,6 @@ SCIDB QUERY : <cross_join(a1,a6)>
 {7,6} null,null
 {7,7} null,null
 
-SCIDB QUERY : <merge(a6,reverse(a1))>
-{x} p
-{0} 1
-{1} 4
-{2} 16
-{3} 10
-{4} 13
-{5} 16
-{6} null
-{7} null
-
-SCIDB QUERY : <merge(reverse(a1),a6)>
-{x} p
-{0} null
-{1} null
-{2} 16
-{3} 13
-{4} 10
-{5} 7
-{6} 4
-{7} 1
-
 SCIDB QUERY : <cross_join(a3,a4)>
 {x,x} r,r
 {0,10} 0,'201'
@@ -723,17 +701,6 @@ SCIDB QUERY : <merge(a5,a4)>
 {13} '261'
 {14} '281'
 {15} '301'
-{16} '321'
-{17} '341'
-
-SCIDB QUERY : <merge(a5,reverse(a4))>
-{x} r
-{10} '201'
-{11} '221'
-{12} '241'
-{13} '281'
-{14} '261'
-{15} '241'
 {16} '321'
 {17} '341'
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -45,7 +45,9 @@ Semaphore::Semaphore()
 {
 	if (sem_init(_sem, 0, 0) == -1)
 	{
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SEMAPHORE_ERROR)
+        throw SYSTEM_EXCEPTION(
+            SCIDB_SE_INTERNAL,
+            SCIDB_LE_SEMAPHORE_ERROR)
                 << "initialize" << ::strerror(errno) << errno;
 	}
 }
@@ -54,7 +56,8 @@ Semaphore::~Semaphore()
 {
 	if (sem_destroy(_sem) == -1)
 	{
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SEMAPHORE_ERROR)
+        throw SYSTEM_EXCEPTION(
+            SCIDB_SE_INTERNAL, SCIDB_LE_SEMAPHORE_ERROR)
                 << "destroy" << ::strerror(errno) << errno;
 	}
 }
@@ -67,23 +70,36 @@ void Semaphore::enter()
             return;
     } while (errno == EINTR);
 
-    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SEMAPHORE_ERROR)
-        << "wait" << ::strerror(errno) << errno;
+    throw SYSTEM_EXCEPTION(
+        SCIDB_SE_INTERNAL,
+        SCIDB_LE_SEMAPHORE_ERROR)
+            << "wait" << ::strerror(errno) << errno;
 }
 
-bool Semaphore::enter(ErrorChecker& errorChecker)
+void Semaphore::enter(int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        enter();
+    }
+}
+
+bool Semaphore::enter(
+    ErrorChecker&   errorChecker,
+    time_t          timeoutSeconds /* = 10 */ )
 {
     if (errorChecker && !errorChecker()) {
         return false;
     }
-    const time_t TIMEOUT_SEC = 10;
 
     timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         assert(false);
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+        throw SYSTEM_EXCEPTION(
+            SCIDB_SE_INTERNAL,
+            SCIDB_LE_CANT_GET_SYSTEM_TIME);
     }
-    ts.tv_sec += TIMEOUT_SEC;
+    ts.tv_sec += timeoutSeconds;
 
     while (true)
     {
@@ -95,18 +111,35 @@ bool Semaphore::enter(ErrorChecker& errorChecker)
         }
         if (errno != ETIMEDOUT) {
             assert(false);
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SEMAPHORE_ERROR)
-                << "timedwait" << ::strerror(errno) << errno;
+            throw SYSTEM_EXCEPTION(
+                SCIDB_SE_INTERNAL,
+                SCIDB_LE_SEMAPHORE_ERROR)
+                    << "timedwait" << ::strerror(errno) << errno;
         }
         if (errorChecker && !errorChecker()) {
            return false;
         }
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
             assert(false);
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
+            throw SYSTEM_EXCEPTION(
+                SCIDB_SE_INTERNAL,
+                SCIDB_LE_CANT_GET_SYSTEM_TIME);
         }
-        ts.tv_sec += TIMEOUT_SEC;
+        ts.tv_sec += timeoutSeconds;
     }
+}
+
+bool Semaphore::enter(
+    int             count,
+    ErrorChecker&   errorChecker,
+    time_t          timeoutSeconds /* = 10 */)
+{
+    for (int i = 0; i < count; i++) {
+        if (!enter(errorChecker)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Semaphore::tryEnter()
@@ -117,14 +150,41 @@ bool Semaphore::tryEnter()
 		if (sem_trywait(_sem) != -1)
 			return true;
 	} while (errno == EINTR);
-	
+
 	if (errno == EAGAIN)
 		return false;
 
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SEMAPHORE_ERROR)
-            << "trywait" << ::strerror(errno) << errno;
+        throw SYSTEM_EXCEPTION(
+            SCIDB_SE_INTERNAL,
+            SCIDB_LE_SEMAPHORE_ERROR)
+                << "trywait" << ::strerror(errno) << errno;
 
 	return false;	// Shutdown warning
+}
+
+void Semaphore::release(int count /* = 1 */)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (sem_post(_sem) == -1)
+        {
+            // XXX TODO: this must be an error
+            ASSERT_EXCEPTION_FALSE(false);
+        }
+    }
+}
+
+void Semaphore::release(bool &result, int count /* = 1 */)
+{
+    result = false;
+    for (int i = 0; i < count; i++)
+    {
+        if (sem_post(_sem) == 0)
+        {
+            result = true;
+            return;
+        }
+    }
 }
 
 #else
@@ -134,7 +194,7 @@ Semaphore::Semaphore(): _count(0)
 }
 
 Semaphore::~Semaphore()
-{ 
+{
 }
 
 
@@ -146,7 +206,7 @@ bool Semaphore::enter(int n, ErrorChecker& errorChecker)
         n -= _count;
         _count = 0;
         // wait for new releases
-        if (!_cond.wait(_cs, errorChecker)) { 
+        if (!_cond.wait(_cs, errorChecker)) {
             return false;
         }
     }

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,16 +54,16 @@ class PhysicalTileApply: public PhysicalOperator
         return inputBoundaries[0];
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
-                                     boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
+                                     std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size()%2 == 0);
 
         size_t numAttrs = _schema.getAttributes().size();
         assert(numAttrs >0);
-        shared_ptr< vector<shared_ptr<Expression> > > expPtr = boost::make_shared< vector< shared_ptr< Expression> > >(numAttrs);
-        vector<shared_ptr<Expression> >& expressions = *expPtr;
+        std::shared_ptr< vector<std::shared_ptr<Expression> > > expPtr = std::make_shared< vector< std::shared_ptr< Expression> > >(numAttrs);
+        vector<std::shared_ptr<Expression> >& expressions = *expPtr;
         assert(expressions.size() == numAttrs);
 
         size_t currentParam = 0;
@@ -74,11 +74,11 @@ class PhysicalTileApply: public PhysicalOperator
             assert(_parameters[currentParam+1]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
 
             string const& schemaAttName = _schema.getAttributes()[i].getName();
-            string const& paramAttName  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[currentParam])->getObjectName();
+            string const& paramAttName  = ((std::shared_ptr<OperatorParamReference>&)_parameters[currentParam])->getObjectName();
 
             if(schemaAttName == paramAttName)
             {
-                expressions[i] = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[currentParam+1])->getExpression();
+                expressions[i] = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[currentParam+1])->getExpression();
                 currentParam+=2;
             }
             if(currentParam == _parameters.size())
@@ -91,8 +91,8 @@ class PhysicalTileApply: public PhysicalOperator
         assert(expressions.size() == _schema.getAttributes().size());
 
         assert(!_tileMode); // we dont run in old tile mode
-        boost::shared_ptr<Array> input = inputArrays[0];
-        return boost::make_shared<TileApplyArray>(_schema, input, expPtr, query);
+        std::shared_ptr<Array> input = inputArrays[0];
+        return std::make_shared<TileApplyArray>(_schema, input, expPtr, query);
     }
 };
 

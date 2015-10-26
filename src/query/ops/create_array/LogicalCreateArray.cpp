@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@
 namespace scidb {
 
 using namespace std;
-using boost::shared_ptr;
+using std::shared_ptr;
 /**
  * @brief Implements the create_array() operator.
  *
@@ -165,47 +165,51 @@ struct LogicalCreateArray : LogicalOperator
         ADD_PARAM_CONSTANT(TID_BOOL);                    // The temporary flag
     }
 
-    ArrayDesc inferSchema(vector<ArrayDesc>,shared_ptr<Query> query)
+    ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query> query)
     {
         assert(param<OperatorParam>(0)->getParamType() == PARAM_ARRAY_REF);
         assert(param<OperatorParam>(1)->getParamType() == PARAM_SCHEMA);
 
-        string n(param<OperatorParamArrayReference>(0)->getObjectName());
+        string arrayName(param<OperatorParamArrayReference>(0)->getObjectName());
 
-        if (SystemCatalog::getInstance()->containsArray(n))
+        if (SystemCatalog::getInstance()->containsArray(arrayName))
         {
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_ALREADY_EXIST,_parameters[0]->getParsingContext()) << n;
+            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
+                                       SCIDB_LE_ARRAY_ALREADY_EXIST,
+                                       _parameters[0]->getParsingContext()) << arrayName;
         }
 
-        return ArrayDesc();
+        ArrayDesc arrDesc;
+        arrDesc.setPartitioningSchema(defaultPartitioning());
+        return arrDesc;
     }
 
-    void inferArrayAccess(shared_ptr<Query>& query)
+    void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
 
-        assert(param<OperatorParam>(0)->getParamType() == PARAM_ARRAY_REF);
+        SCIDB_ASSERT(param<OperatorParam>(0)->getParamType() == PARAM_ARRAY_REF);
 
-        string n(param<OperatorParamArrayReference>(0)->getObjectName());
+        string arrayName(param<OperatorParamArrayReference>(0)->getObjectName());
 
-        assert(!n.empty() && n.find('@')==string::npos);  // no version number
+        SCIDB_ASSERT(!arrayName.empty() && arrayName.find('@')==string::npos);  // no version number
 
-        shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(n,
-                                                                                    query->getQueryID(),
-                                                                                    Cluster::getInstance()->getLocalInstanceId(),
-                                                                                    SystemCatalog::LockDesc::COORD,
-                                                                                    SystemCatalog::LockDesc::CRT));
-        shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
-        assert(resLock);
-        assert(resLock->getLockMode() >= SystemCatalog::LockDesc::CRT);
+        std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(arrayName,
+                                                                                      query->getQueryID(),
+                                                                                      Cluster::getInstance()->getLocalInstanceId(),
+                                                                                      SystemCatalog::LockDesc::COORD,
+                                                                                      SystemCatalog::LockDesc::XCL));
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        SCIDB_ASSERT(resLock);
+        SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::XCL);
     }
 
     template<class t>
-    shared_ptr<t>& param(size_t i) const
+    std::shared_ptr<t>& param(size_t i) const
     {
-        assert(i < _parameters.size());
+        SCIDB_ASSERT(i < _parameters.size());
 
-        return (shared_ptr<t>&)_parameters[i];
+        return (std::shared_ptr<t>&)_parameters[i];
     }
 };
 
@@ -218,10 +222,10 @@ struct LogicalCreateArray : LogicalOperator
 struct LogicalCreateArrayUsing : LogicalCreateArray
 {
     LogicalCreateArrayUsing(const string& logicalName,const string& alias)
-     : LogicalCreateArray(logicalName,alias,true)       // 2 axtra arrays at front
+     : LogicalCreateArray(logicalName,alias,true)       // 2 extra arrays at front
     {}
 
-    ArrayDesc inferSchema(vector<ArrayDesc> schema,shared_ptr<Query> query)
+    ArrayDesc inferSchema(vector<ArrayDesc> schema,std::shared_ptr<Query> query)
     {
         assert(schema.size() == 2);
 
@@ -236,7 +240,7 @@ struct LogicalCreateArrayUsing : LogicalCreateArray
             fail(SCIDB_LE_UNKNOWN_ERROR) << "expecting exactly one dimension";
         }
 
-        if (schema[0].getDimensions()[0].getLength() !=
+        if (schema[0].getDimensions()[0].getLength() <
            param<OperatorParamSchema>(1)->getSchema().getDimensions().size())
         {
             fail(SCIDB_LE_UNKNOWN_ERROR) << "bad array length";
@@ -263,7 +267,9 @@ struct LogicalCreateArrayUsing : LogicalCreateArray
 
     /** DLL commands are non-nestable, and always return a null array...*/
 
-        return ArrayDesc();
+        ArrayDesc arrDesc;
+        arrDesc.setPartitioningSchema(defaultPartitioning());
+        return arrDesc;
     }
 };
 

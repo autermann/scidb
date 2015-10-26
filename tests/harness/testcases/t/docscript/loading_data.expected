@@ -13,27 +13,6 @@ marathon,2000,Abera,7811
 marathon,2004,Baldini,7855
 marathon,2008,Wanjiru,7596
 
-SCIDB QUERY : <csv2scidb -h>
-csv2scidb: Convert CSV file to SciDB input text format.
-Usage:   csv2scidb [options] [ < input-file ] [ > output-file ]
-Default: -f 0 -c 1000000 -q
-Options:
-  -v        version information
-  -i PATH   input file
-  -o PATH   output file
-  -a PATH   appended output file
-  -c INT    length of chunk
-  -f INT    starting coordinate
-  -n INT    number of instances
-  -d CHAR   delimiter: defaults to ,
-  -p STR    type pattern: N number, S string, s nullable-string,
-            C char, c nullable-char
-  -q        quote the input line exactly by wrapping it in ()
-  -s N      skip N lines at the beginning of the file
-  -h        prints this helpful message
-
-Note: the -q and -p options are mutually exclusive.
-
 SCIDB QUERY : <cat $DOC_DATA/olympic_data.scidb>
 {0}[
 ("dash",1996,"Bailey",9.84),
@@ -52,13 +31,6 @@ SCIDB QUERY : <cat $DOC_DATA/olympic_data.scidb>
 
 SCIDB QUERY : <CREATE ARRAY winnersFlat < event:string, year:int64, person:string, time:double > [i=0:*,1000000,0]>
 [Query was executed successfully, ignoring data output by this query.]
-
-SCIDB QUERY : <SELECT * FROM analyze(winnersFlat)>
-{attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} 'event','dash','steeplechase',3,12
-{1} 'year','1996','2008',4,12
-{2} 'person','Abera','Wanjiru',12,12
-{3} 'time','9.69','7956',12,12
 
 SCIDB QUERY : <CREATE ARRAY winners <person:string, time:double> [year=1996:2008,1000,0, event_id=0:3,1000,0]>
 [Query was executed successfully, ignoring data output by this query.]
@@ -137,12 +109,6 @@ SCIDB QUERY : <SELECT exposure, strlen(exposure) FROM intensityFlat>
 {21} 'Low',3
 {22} 'Low',3
 {23} 'Low',3
-
-SCIDB QUERY : <SELECT * FROM analyze(intensityFlat)>
-{attribute_number} attribute_name,min,max,distinct_count,non_null_count
-{0} 'exposure','High','Medium',3,24
-{1} 'elapsedTime','0','7',8,24
-{2} 'measuredIntensity','29','100',16,20
 
 SCIDB QUERY : <create array exposure_index <exposure:string>[exposure_id=0:*,10,0]>
 [Query was executed successfully, ignoring data output by this query.]

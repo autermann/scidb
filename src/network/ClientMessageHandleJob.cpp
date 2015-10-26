@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,14 +21,18 @@
 */
 
 /*
- * MessageHandleJob.cpp
+ * ClientMessageHandleJob.cpp
+ *
+ *  Modified on: May 18, 2015
+ *      Author: mcorbett@paradigm4.com
+ *      Purpose:  Basic Security enhancements
  *
  *  Created on: Jan 12, 2010
  *      Author: roman.simakov@gmail.com
  */
 
 #include "log4cxx/logger.h"
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <time.h>
 
@@ -40,6 +44,13 @@
 #include <query/Serialize.h>
 #include <array/Metadata.h>
 #include <query/executor/SciDBExecutor.h>
+#include <util/Mutex.h>
+#include <util/session/Session.h>
+
+#include <usr_namespace/ConnectionClientCommunicator.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/SecurityCommunicator.h>
+
 
 using namespace std;
 using namespace boost;
@@ -49,11 +60,32 @@ namespace scidb
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.network"));
 
-ClientMessageHandleJob::ClientMessageHandleJob(boost::shared_ptr< Connection > connection,
-                                               const boost::shared_ptr<MessageDesc>& messageDesc)
-: MessageHandleJob(messageDesc), _connection(connection)
+ClientMessageHandleJob::ClientMessageHandleJob(
+    const std::shared_ptr<Connection>  & connection,
+    const std::shared_ptr<MessageDesc> & messageDesc)
+    : MessageHandleJob(messageDesc)
+    , _connection(connection)
 {
     assert(connection); //XXX TODO: convert to exception
+}
+
+
+std::string ClientMessageHandleJob::getUserName() const
+{
+    std::stringstream ssName;
+
+    assert(_connection);
+    if(_connection->getSession())
+    {
+        ssName
+            << "["
+            << "user=" << _connection->getSession()->getUser().getName()
+            << "]";
+    } else {
+        ssName << "[user=Not initialized]";
+    }
+
+    return ssName.str();
 }
 
 void ClientMessageHandleJob::run()
@@ -81,8 +113,8 @@ string ClientMessageHandleJob::getProgramOptions(std::string const& programOptio
 }
 
 void
-ClientMessageHandleJob::executeSerially(shared_ptr<WorkQueue>& serialQueue,
-                                        weak_ptr<WorkQueue>& initialQueue,
+ClientMessageHandleJob::executeSerially(std::shared_ptr<WorkQueue>& serialQueue,
+                                        std::weak_ptr<WorkQueue>& initialQueue,
                                        const scidb::Exception* error)
 {
     static const char *funcName="ClientMessageHandleJob::handleReschedule: ";
@@ -91,7 +123,7 @@ ClientMessageHandleJob::executeSerially(shared_ptr<WorkQueue>& serialQueue,
         serialQueue->stop();
         LOG4CXX_TRACE(logger, funcName << "Serial queue "<<serialQueue.get()<<" is stopped");
         serialQueue.reset();
-        if (shared_ptr<WorkQueue> q = initialQueue.lock()) {
+        if (std::shared_ptr<WorkQueue> q = initialQueue.lock()) {
             q->unreserve();
         }
         return;
@@ -102,7 +134,7 @@ ClientMessageHandleJob::executeSerially(shared_ptr<WorkQueue>& serialQueue,
         getQuery()->handleError(error->copy());
     }
 
-    shared_ptr<Job> fetchJob(shared_from_this());
+    std::shared_ptr<Job> fetchJob(shared_from_this());
     WorkQueue::WorkItem work = boost::bind(&Job::executeOnQueue, fetchJob, _1, _2);
     assert(work);
     try
@@ -117,11 +149,11 @@ ClientMessageHandleJob::executeSerially(shared_ptr<WorkQueue>& serialQueue,
 }
 
 ClientMessageHandleJob::RescheduleCallback
-ClientMessageHandleJob::getSerializeCallback(shared_ptr<WorkQueue>& serialQueue)
+ClientMessageHandleJob::getSerializeCallback(std::shared_ptr<WorkQueue>& serialQueue)
 {
-    shared_ptr<WorkQueue> thisQ(_wq.lock());
-    ASSERT_EXCEPTION(thisQ, "ClientMessageHandleJob::getSerializeCallback: current work queue is deallocated");
-    shared_ptr<ClientMessageHandleJob> thisJob(boost::dynamic_pointer_cast<ClientMessageHandleJob>(shared_from_this()));
+    std::shared_ptr<WorkQueue> thisQ(_wq.lock());
+    ASSERT_EXCEPTION(thisQ.get()!=nullptr, "ClientMessageHandleJob::getSerializeCallback: current work queue is deallocated");
+    std::shared_ptr<ClientMessageHandleJob> thisJob(std::dynamic_pointer_cast<ClientMessageHandleJob>(shared_from_this()));
 
     const uint32_t cuncurrency = 1;
     const uint32_t depth = 2;
@@ -158,7 +190,7 @@ ClientMessageHandleJob::fetchChunk()
         _query = Query::getQueryByID(queryID);
         _query->validate();
 
-        boost::shared_ptr<scidb_msg::Fetch> fetchRecord = _messageDesc->getRecord<scidb_msg::Fetch>();
+        std::shared_ptr<scidb_msg::Fetch> fetchRecord = _messageDesc->getRecord<scidb_msg::Fetch>();
 
         ASSERT_EXCEPTION((fetchRecord->has_attribute_id()), funcName);
         AttributeID attributeId = fetchRecord->attribute_id();
@@ -166,7 +198,7 @@ ClientMessageHandleJob::fetchChunk()
 
         LOG4CXX_TRACE(logger, funcName << "Fetching chunk attId= " << attributeId << ", queryID=" << queryID );
 
-        boost::shared_ptr<Array> fetchArray = _query->getCurrentResultArray();
+        std::shared_ptr<Array> fetchArray = _query->getCurrentResultArray();
 
         const uint32_t invalidArrayType(~0);
         validateRemoteChunkInfo(fetchArray.get(),
@@ -175,9 +207,9 @@ ClientMessageHandleJob::fetchChunk()
                                 attributeId,
                                 CLIENT_INSTANCE);
 
-        shared_ptr<RemoteMergedArray> mergedArray = boost::dynamic_pointer_cast<RemoteMergedArray>(fetchArray);
+        std::shared_ptr<RemoteMergedArray> mergedArray = std::dynamic_pointer_cast<RemoteMergedArray>(fetchArray);
         if (mergedArray != NULL) {
-            shared_ptr<WorkQueue> serialQueue;
+            std::shared_ptr<WorkQueue> serialQueue;
             Notification<scidb::Exception>::ListenerID queryErrorListenerID;
             // Set up this job for async execution
             RemoteMergedArray::RescheduleCallback cb;
@@ -217,8 +249,8 @@ ClientMessageHandleJob::fetchChunk()
             return;
         }
 
-        boost::shared_ptr<MessageDesc> chunkMsg;
-        boost::shared_ptr< ConstArrayIterator> iter = fetchArray->getConstIterator(attributeId);
+        std::shared_ptr<MessageDesc> chunkMsg;
+        std::shared_ptr< ConstArrayIterator> iter = fetchArray->getConstIterator(attributeId);
         if (!iter->end()) {
             const ConstChunk* chunk = &iter->getChunk();
             assert(chunk);
@@ -241,12 +273,12 @@ ClientMessageHandleJob::fetchChunk()
         if (_query) {
             _query->handleError(e.copy());
         }
-        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
         sendMessageToClient(msg);
     }
 }
 
-void ClientMessageHandleJob::fetchMergedChunk(boost::shared_ptr<RemoteMergedArray>& fetchArray,
+void ClientMessageHandleJob::fetchMergedChunk(std::shared_ptr<RemoteMergedArray>& fetchArray,
                                               AttributeID attributeId,
                                               Notification<scidb::Exception>::ListenerID queryErrorListenerID)
 {
@@ -260,7 +292,7 @@ void ClientMessageHandleJob::fetchMergedChunk(boost::shared_ptr<RemoteMergedArra
         _query->validate();
 
         const string arrayName = _messageDesc->getRecord<scidb_msg::Fetch>()->array_name();
-        boost::shared_ptr<MessageDesc> chunkMsg;
+        std::shared_ptr<MessageDesc> chunkMsg;
 
         LOG4CXX_TRACE(logger,
                       funcName << "Processing chunk of arrayName= " << arrayName
@@ -268,7 +300,7 @@ void ClientMessageHandleJob::fetchMergedChunk(boost::shared_ptr<RemoteMergedArra
                       << " queryID=" << queryID);
         try
         {
-            boost::shared_ptr< ConstArrayIterator> iter = 
+            std::shared_ptr< ConstArrayIterator> iter =
                 fetchArray->getConstIterator(attributeId);
             if (!iter->end()) {
                 const ConstChunk* chunk = &iter->getChunk();
@@ -281,7 +313,7 @@ void ClientMessageHandleJob::fetchMergedChunk(boost::shared_ptr<RemoteMergedArra
         catch (const scidb::MultiStreamArray::RetryException& )
         {
             LOG4CXX_TRACE(logger,
-                          funcName << " reschedule arrayName= " << arrayName 
+                          funcName << " reschedule arrayName= " << arrayName
                           << ", attId="<<attributeId
                           <<" queryID="<<queryID);
             return;
@@ -320,7 +352,7 @@ void ClientMessageHandleJob::fetchMergedChunk(boost::shared_ptr<RemoteMergedArra
         if (_query) {
             _query->handleError(e.copy());
         }
-        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
         sendMessageToClient(msg);
     }
 }
@@ -328,17 +360,17 @@ void ClientMessageHandleJob::fetchMergedChunk(boost::shared_ptr<RemoteMergedArra
 void ClientMessageHandleJob::populateClientChunk(const std::string& arrayName,
                                                  AttributeID attributeId,
                                                  const ConstChunk* chunk,
-                                                 boost::shared_ptr<MessageDesc>& chunkMsg)
+                                                 std::shared_ptr<MessageDesc>& chunkMsg)
 {
     static const char *funcName="ClientMessageHandleJob::populateClientChunk: ";
-    boost::shared_ptr<scidb_msg::Chunk> chunkRecord;
+    std::shared_ptr<scidb_msg::Chunk> chunkRecord;
     if (chunk)
     {
         checkChunkMagic(*chunk);
-        boost::shared_ptr<CompressedBuffer> buffer = boost::make_shared<CompressedBuffer>();
-        boost::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
+        std::shared_ptr<CompressedBuffer> buffer = std::make_shared<CompressedBuffer>();
+        std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
         chunk->compress(*buffer, emptyBitmap);
-        chunkMsg = boost::make_shared<MessageDesc>(mtChunk, buffer);
+        chunkMsg = std::make_shared<MessageDesc>(mtChunk, buffer);
         chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
         chunkRecord->set_eof(false);
         chunkRecord->set_compression_method(buffer->getCompressionMethod());
@@ -353,7 +385,7 @@ void ClientMessageHandleJob::populateClientChunk(const std::string& arrayName,
     }
     else
     {
-        chunkMsg = boost::make_shared<MessageDesc>(mtChunk);
+        chunkMsg = std::make_shared<MessageDesc>(mtChunk);
         chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
         chunkMsg->setQueryID(_query->getQueryID());
         chunkRecord->set_eof(true);
@@ -384,17 +416,20 @@ void ClientMessageHandleJob::populateClientChunk(const std::string& arrayName,
 
 void ClientMessageHandleJob::prepareClientQuery()
 {
+    assert(_connection);
+    ASSERT_EXCEPTION(_connection.get()!=nullptr, "NULL connection");
+    ASSERT_EXCEPTION(_connection->getSession().get()!=nullptr, "NULL session");
+
     scidb::QueryResult queryResult;
     const scidb::SciDB& scidb = getSciDBExecutor();
     try
     {
         queryResult.queryID = Query::generateID();
         assert(queryResult.queryID > 0);
-        assert(_connection);
         _connection->attachQuery(queryResult.queryID);
 
         // Getting needed parameters for execution
-        boost::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
+        std::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
         const string queryString = record->query();
         bool afl = record->afl();
         const string programOptions = record->program_options();
@@ -402,11 +437,18 @@ void ClientMessageHandleJob::prepareClientQuery()
         assert(queryResult.queryID > 0);
         try
         {
-            scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
+            scidb.prepareQuery(
+                queryString,
+                afl,
+                getProgramOptions(programOptions),
+                queryResult,
+                &_connection);
         }
         catch (const scidb::SystemCatalog::LockBusyException& e)
         {
-            _currHandler=boost::bind(&ClientMessageHandleJob::retryPrepareQuery, this, queryResult/*copy*/);
+            _currHandler=boost::bind(
+                &ClientMessageHandleJob::retryPrepareQuery,
+                this, queryResult/*copy*/);
             assert(_currHandler);
             reschedule(Query::getLockTimeoutNanoSec()/1000);
             return;
@@ -421,13 +463,14 @@ void ClientMessageHandleJob::prepareClientQuery()
     }
 }
 
+
 void ClientMessageHandleJob::retryPrepareQuery(scidb::QueryResult& queryResult)
 {
     assert(queryResult.queryID > 0);
     const scidb::SciDB& scidb = getSciDBExecutor();
     try {
         // Getting needed parameters for execution
-        boost::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
+        std::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
         const string queryString = record->query();
         bool afl = record->afl();
         const string programOptions = record->program_options();
@@ -459,8 +502,8 @@ void ClientMessageHandleJob::postPrepareQuery(scidb::QueryResult& queryResult)
     _timer.reset();
 
     // Creating message with result for sending to client
-    shared_ptr<MessageDesc> resultMessage = make_shared<MessageDesc>(mtQueryResult);
-    shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
+    std::shared_ptr<MessageDesc> resultMessage = make_shared<MessageDesc>(mtQueryResult);
+    std::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
     resultMessage->setQueryID(queryResult.queryID);
     queryResultRecord->set_explain_logical(queryResult.explainLogical);
     queryResultRecord->set_selective(queryResult.selective);
@@ -508,11 +551,17 @@ void ClientMessageHandleJob::handleExecuteOrPrepareError(const Exception& err,
             }
         }
     }
-    shared_ptr<MessageDesc> msg(makeErrorMessageFromException(err));
+
+    reportErrorToClient(err);
+}
+
+void ClientMessageHandleJob::reportErrorToClient(const Exception& err)
+{
+    std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(err));
     sendMessageToClient(msg);
 }
 
-void ClientMessageHandleJob::sendMessageToClient(shared_ptr<MessageDesc>& msg)
+void ClientMessageHandleJob::sendMessageToClient(std::shared_ptr<MessageDesc>& msg)
 {
     assert(_connection);
     assert(msg);
@@ -530,7 +579,18 @@ void ClientMessageHandleJob::executeClientQuery()
     scidb::QueryResult queryResult;
     try
     {
-        boost::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
+        ASSERT_EXCEPTION(_connection.get()!=nullptr, "NULL connection");
+        ASSERT_EXCEPTION(_connection->getSession().get()!=nullptr, "NULL session");
+
+        if( _connection->getSession()->getAuthenticatedState() !=
+            scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZED)
+        {
+            _connection->disconnect();
+            return;
+        }
+
+        std::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
+
         const string queryString = record->query();
         bool afl = record->afl();
         queryResult.queryID = _messageDesc->getQueryID();
@@ -542,11 +602,26 @@ void ClientMessageHandleJob::executeClientQuery()
             _connection->attachQuery(queryResult.queryID);
             try
             {
-                scidb.prepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
+                scidb.prepareQuery(
+                    queryString,
+                    afl,
+                    getProgramOptions(programOptions),
+                    queryResult,
+                    &_connection);
+
+                std::shared_ptr<Query> query = Query::getQueryByID(
+                    queryResult.queryID);
+
+                ASSERT_EXCEPTION(query.get()!=nullptr, "NULL query");
+                ASSERT_EXCEPTION(
+                    query->isCoordinator(),
+                    "NULL query->isCoordinator()");
             }
             catch (const scidb::SystemCatalog::LockBusyException& e)
             {
-                _currHandler=boost::bind(&ClientMessageHandleJob::retryExecuteQuery, this, queryResult/*copy*/);
+                _currHandler=boost::bind(
+                    &ClientMessageHandleJob::retryExecuteQuery,
+                    this, queryResult/*copy*/);
                 assert(_currHandler);
                 reschedule(Query::getLockTimeoutNanoSec()/1000);
                 return;
@@ -572,7 +647,7 @@ void ClientMessageHandleJob::retryExecuteQuery(scidb::QueryResult& queryResult)
     const scidb::SciDB& scidb = getSciDBExecutor();
     try
     {
-        boost::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
+        std::shared_ptr<scidb_msg::Query> record = _messageDesc->getRecord<scidb_msg::Query>();
         const string queryString = record->query();
         bool afl = record->afl();
         const string programOptions = record->program_options();
@@ -602,6 +677,146 @@ void ClientMessageHandleJob::retryExecuteQuery(scidb::QueryResult& queryResult)
     }
 }
 
+void ClientMessageHandleJob::sendNewClientCompleteToClient(
+  bool authenticated)
+{
+    assert(_connection);
+    assert(_connection->getSession());
+
+    LOG4CXX_DEBUG(logger,
+        "ClientMessageHandleJob::sendNewClientCompleteToClient()");
+
+    std::shared_ptr<MessageDesc> msg =
+        std::make_shared<MessageDesc>(mtNewClientComplete);
+
+    std::shared_ptr<scidb_msg::NewClientComplete> record =
+        msg->getRecord<scidb_msg::NewClientComplete>();
+
+    LOG4CXX_DEBUG(logger,
+        "ClientMessageHandleJob::sendNewClientCompleteToClient()"
+          << " Authenticated=" << (authenticated ? "true" : "false") );
+    record->set_authenticated(authenticated);
+
+    sendMessageToClient(msg);
+}
+
+void ClientMessageHandleJob::handleNewClientStart()
+{
+    ASSERT_EXCEPTION(_connection.get()!=nullptr, "NULL connection");
+    ASSERT_EXCEPTION(_connection->getSession().get()!=nullptr, "NULL session");
+    std::shared_ptr<Session> session = _connection->getSession();
+
+    try
+    {
+        // -- Complete authentication by sending newClientComplete -- //
+        // --               if in 'trust' mode ...                 -- //
+
+        if(session->getSecurityMode().compare("trust") == 0)
+        {
+           LOG4CXX_DEBUG(logger, "Mode=trust name=" << getUserName());
+            sendNewClientCompleteToClient(true);
+            return;
+        }
+
+        // -- Extra check to verify securityMode is valid -- //
+
+        if(!session->isValidSecurityMode(session->getSecurityMode()))
+        {
+            throw SYSTEM_EXCEPTION(
+                SCIDB_SE_NETWORK,
+                SCIDB_LE_AUTHENTICATION_ERROR);
+        }
+
+        // -- Set the authentication state to AUTHORIZING -- //
+
+        session->setAuthenticatedState(
+            scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZING);
+
+        // -- Create communicators -- //
+
+        session->setClientCommunicator(
+            std::make_shared<ConnectionClientCommunicator>(
+                _connection));
+
+        session->setSecurityCommunicator(
+            std::make_shared<security::Communicator>());
+
+        session->setNamespacesCommunicator(
+            std::make_shared<namespaces::Communicator>());
+
+
+        // -- Get authentication from the security library -- //
+
+        std::shared_ptr<security::Communicator>
+            securityCommunicator =
+                session->getSecurityCommunicator();
+
+        ASSERT_EXCEPTION(
+            securityCommunicator.get()!=nullptr,
+            "NULL securityCommunicator");
+
+        LOG4CXX_DEBUG(logger, "ClientMessageHandleJob::handleNewClientStart() - call getAuthorization()");
+        // securityCommunicator->getAuthorization() throws on error
+        securityCommunicator->getAuthorization(session);
+        LOG4CXX_DEBUG(logger, "After getAuth name=" << getUserName());
+
+        // -- Set the authentication state to AUTHORIZED -- //
+
+        session->setAuthenticatedState(
+            scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZED);
+
+        LOG4CXX_DEBUG(logger, "Authenticated - "
+            << session->getUser().getName());
+
+        // -- Complete authentication by sending newClientComplete -- //
+
+        LOG4CXX_DEBUG(logger, "Pre sendNewClientComplete name=" << getUserName());
+        sendNewClientCompleteToClient(true);
+    }
+    catch (const Exception& e)
+    {
+        LOG4CXX_ERROR(logger,
+            "handleNewClientStart failed to complete: "
+            << e.what());
+
+        session->setUser(UserDesc(""));
+        session->setAuthenticatedState(
+            scidb::Session::AUTHENTICATION_STATE_E_NOT_AUTHORIZED);
+
+        sendNewClientCompleteToClient(false);
+        _connection->disconnect();
+        return;
+    }
+}
+
+void ClientMessageHandleJob::handleSecurityMessageResponse()
+{
+    static const char *funcName=
+        "ClientMessageHandleJob::handleSecurityMessageResponse: ";
+    LOG4CXX_DEBUG(logger, funcName);
+
+    assert(_connection);
+    assert(_connection->getSession());
+    std::shared_ptr<Session> session = _connection->getSession();
+
+    if( session->getAuthenticatedState() !=
+        scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZING)
+    {
+        throw SYSTEM_EXCEPTION(
+            SCIDB_SE_NETWORK,
+            SCIDB_LE_AUTHENTICATION_ERROR);
+    }
+
+    std::shared_ptr<scidb_msg::SecurityMessageResponse> record =
+        _messageDesc->getRecord<scidb_msg::SecurityMessageResponse>();
+
+    std::shared_ptr<ClientCommunicator> clientCommunicator(
+        _connection->getSession()->getClientCommunicator());
+    ASSERT_EXCEPTION(clientCommunicator.get()!=nullptr, "NULL clientCommunicator");
+    clientCommunicator->setResponse(record->response());
+}
+
+
 void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryResult)
 {
     _timer.reset();
@@ -609,8 +824,8 @@ void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryR
     assert(queryResult.queryID>0);
 
     // Creating message with result for sending to client
-    boost::shared_ptr<MessageDesc> resultMessage = boost::make_shared<MessageDesc>(mtQueryResult);
-    boost::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
+    std::shared_ptr<MessageDesc> resultMessage = std::make_shared<MessageDesc>(mtQueryResult);
+    std::shared_ptr<scidb_msg::QueryResult> queryResultRecord = resultMessage->getRecord<scidb_msg::QueryResult>();
     resultMessage->setQueryID(queryResult.queryID);
     queryResultRecord->set_execution_time(queryResult.executionTime);
     queryResultRecord->set_explain_logical(queryResult.explainLogical);
@@ -651,7 +866,7 @@ void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryR
         }
     }
 
-    boost::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
+    std::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
 
     vector<Warning> v = query->getWarnings();
     for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
@@ -691,14 +906,14 @@ void ClientMessageHandleJob::cancelQuery()
     {
         scidb.cancelQuery(queryID);
         _connection->detachQuery(queryID);
-        boost::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
+        std::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
         sendMessageToClient(msg);
         LOG4CXX_TRACE(logger, "The query " << queryID << " execution was canceled")
     }
     catch (const Exception& e)
     {
         LOG4CXX_ERROR(logger, e.what()) ;
-        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
         sendMessageToClient(msg);
     }
 }
@@ -712,20 +927,20 @@ void ClientMessageHandleJob::completeQuery()
     {
         scidb.completeQuery(queryID);
         _connection->detachQuery(queryID);
-        boost::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
+        std::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
         sendMessageToClient(msg);
         LOG4CXX_TRACE(logger, "The query " << queryID << " execution was completed")
     }
     catch (const Exception& e)
     {
         LOG4CXX_ERROR(logger, e.what()) ;
-        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
         sendMessageToClient(msg);
     }
 }
 
-void ClientMessageHandleJob::dispatch(boost::shared_ptr<WorkQueue>& requestQueue,
-                                      boost::shared_ptr<WorkQueue>& workQueue)
+void ClientMessageHandleJob::dispatch(std::shared_ptr<WorkQueue>& requestQueue,
+                                      std::shared_ptr<WorkQueue>& workQueue)
 {
     assert(workQueue);
     assert(requestQueue);
@@ -734,6 +949,39 @@ void ClientMessageHandleJob::dispatch(boost::shared_ptr<WorkQueue>& requestQueue
     LOG4CXX_TRACE(logger, "Dispatching client message type=" << messageType);
     const QueryID queryID = _messageDesc->getQueryID();
     try {
+        switch (messageType)
+        {
+        case mtNewClientStart:
+        {
+            LOG4CXX_DEBUG(logger, "ClientMessageHandleJob::dispatch newClientStart");
+
+            _currHandler=boost::bind(&ClientMessageHandleJob::handleNewClientStart, this);
+            // can potentially block
+            enqueue(requestQueue);
+            return;
+        } break;
+        case mtSecurityMessageResponse:
+        {
+            LOG4CXX_DEBUG(logger, "ClientMessageHandleJob::dispatch SecurityMessageResponse");
+            handleSecurityMessageResponse();
+            return;
+        } break;
+        default:
+        break;
+        }
+
+        ASSERT_EXCEPTION(_connection.get()!=nullptr, "NULL connection");
+        ASSERT_EXCEPTION(_connection->getSession().get()!=nullptr, "NULL session");
+        std::shared_ptr<Session> session = _connection->getSession();
+        if(session->getAuthenticatedState() !=
+            scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZED)
+        {
+            throw SYSTEM_EXCEPTION(
+                SCIDB_SE_NETWORK,
+                SCIDB_LE_AUTHENTICATION_ERROR);
+        }
+
+
         switch (messageType)
         {
         case mtPrepareQuery:
@@ -784,14 +1032,14 @@ void ClientMessageHandleJob::dispatch(boost::shared_ptr<WorkQueue>& requestQueue
                       << ", for queryID=" << _messageDesc->getQueryID()
                       << ", from CLIENT"
                       << " because "<<e.what());
-        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
         sendMessageToClient(msg);
     }
 }
 
 // Note: No operations mutating this object are allowed to be called
 // after enqueue() returns.
-void ClientMessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
+void ClientMessageHandleJob::enqueue(std::shared_ptr<WorkQueue>& q)
 
 {
     LOG4CXX_TRACE(logger, "ClientMessageHandleJob::enqueue message of type="
@@ -799,7 +1047,7 @@ void ClientMessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
                   << ", for queryID=" << _messageDesc->getQueryID()
                   << ", from CLIENT");
 
-    shared_ptr<Job> thisJob(shared_from_this());
+    std::shared_ptr<Job> thisJob(shared_from_this());
     WorkQueue::WorkItem work = boost::bind(&Job::executeOnQueue, thisJob, _1, _2);
     assert(work);
     try
@@ -810,15 +1058,15 @@ void ClientMessageHandleJob::enqueue(boost::shared_ptr<WorkQueue>& q)
     {
         LOG4CXX_ERROR(logger, "Overflow exception from the message queue ("
                       << q.get() << "): " << e.what());
-        boost::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, _messageDesc->getQueryID()));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, _messageDesc->getQueryID()));
         sendMessageToClient(msg);
     }
 }
 
 void ClientMessageHandleJob::enqueueOnErrorQueue(QueryID queryID)
 {
-    boost::shared_ptr<Query> query = Query::getQueryByID(queryID);
-    boost::shared_ptr<WorkQueue> q = query->getErrorQueue();
+    std::shared_ptr<Query> query = Query::getQueryByID(queryID);
+    std::shared_ptr<WorkQueue> q = query->getErrorQueue();
     if (!q) {
         // if errorQueue is gone, the query must be deallocated at this point
         throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_NOT_FOUND) << queryID;
@@ -828,4 +1076,5 @@ void ClientMessageHandleJob::enqueueOnErrorQueue(QueryID queryID)
     enqueue(q);
 }
 
-} // namespace
+
+} // namespace scidb

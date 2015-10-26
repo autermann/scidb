@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
  *      Author: poliocough@gmail.com
  */
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 
 #include <query/Operator.h>
@@ -98,9 +98,9 @@ public:
         ADD_PARAM_VARIES();
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() == 1)
         {
@@ -113,20 +113,20 @@ public:
 
         return res;
     }
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         ArrayDesc const& input = schemas[0];
 
         assert(schemas.size() == 1);
 
         uint32_t numQuantilesPlusOne = 1 +
-                evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_UINT32).getUint32();
+                evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_UINT32).getUint32();
         if (numQuantilesPlusOne < 2) {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DLA_ERROR17,
                 _parameters[0]->getParsingContext());
         }
 
-        string attName = _parameters.size() > 1 ? ((boost::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName() :
+        string attName = _parameters.size() > 1 ? ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName() :
                                                     input.getAttributes()[0].getName();
 
         bool found = false;
@@ -153,14 +153,14 @@ public:
             size_t i, j;
             for (i = 0; i < _parameters.size() - 2; i++)
             {
-                const string& dimName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getObjectName();
-                const string& dimAlias = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getArrayName();
+                const string& dimName = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getObjectName();
+                const string& dimAlias = ((std::shared_ptr<OperatorParamReference>&)_parameters[i + 2])->getArrayName();
                 for (j = 0; j < input.getDimensions().size(); j++)
                 {
                     DimensionDesc const& dim = input.getDimensions()[j];
                     if (dim.hasNameAndAlias(dimName, dimAlias))
                     {
-                        if (dim.getEndMax() == MAX_COORDINATE) {
+                        if (dim.getEndMax() == CoordinateBounds::getMax()) {
                             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_QUANTILE_REQUIRES_BOUNDED_ARRAY);
                         }
 
@@ -192,7 +192,7 @@ public:
                 0);                    // chunkOverlap
         outputDims.push_back(quantileDim);
 
-        return ArrayDesc(input.getName()+"_quantile", outputAttrs, outputDims);
+        return ArrayDesc(input.getName()+"_quantile", outputAttrs, outputDims, defaultPartitioning());
     }
 };
 

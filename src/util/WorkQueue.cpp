@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -45,20 +45,20 @@ SerializationCtx::~SerializationCtx()
     // no lock must be held
     for (QList::reverse_iterator ri=_queuesToRelease.rbegin();
          ri != _queuesToRelease.rend(); ++ri) {
-        boost::shared_ptr<scidb::WorkQueue> wq = (*ri).lock();
+        std::shared_ptr<scidb::WorkQueue> wq = (*ri).lock();
         if (wq) {
             wq->release();
         }
     }
 }
 
-void SerializationCtx::record(boost::weak_ptr<scidb::WorkQueue>& wq)
+void SerializationCtx::record(std::weak_ptr<scidb::WorkQueue>& wq)
 {
     _queuesToRelease.push_back(wq);
     assert(_queuesToRelease.size() < MAX_QUEUES);
 }
 
-WorkQueue::WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue)
+WorkQueue::WorkQueue(const std::shared_ptr<JobQueue>& jobQueue)
 : _jobQueue(jobQueue),
   _maxOutstanding(DEFAULT_MAX_OUTSTANDING),
   _maxSize(DEFAULT_MAX_SIZE),
@@ -71,7 +71,7 @@ WorkQueue::WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue)
     }
 }
 
-WorkQueue::WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue,
+WorkQueue::WorkQueue(const std::shared_ptr<JobQueue>& jobQueue,
                      uint32_t maxOutstanding)
 : _jobQueue(jobQueue),
   _maxOutstanding(maxOutstanding),
@@ -85,7 +85,7 @@ WorkQueue::WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue,
     }
 }
 
-WorkQueue::WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue,
+WorkQueue::WorkQueue(const std::shared_ptr<JobQueue>& jobQueue,
                      uint32_t maxOutstanding,
              uint32_t maxSize)
 : _jobQueue(jobQueue),
@@ -103,7 +103,7 @@ WorkQueue::WorkQueue(const boost::shared_ptr<JobQueue>& jobQueue,
 void WorkQueue::spawn()
 {
     std::deque<InternalWorkItem> q;
-    std::deque<boost::weak_ptr<WorkQueue> > wq;
+    std::deque<std::weak_ptr<WorkQueue> > wq;
     {
         ScopedMutexLock lock(_mutex);
 
@@ -117,7 +117,7 @@ void WorkQueue::spawn()
         while(_size() < _maxSize && !_overflowQueue.empty()) {
             _workQueue.push_back(InternalWorkItem());
             _workQueue.back().swap(_overflowQueue.front().first);
-            wq.push_back(boost::weak_ptr<WorkQueue>());
+            wq.push_back(std::weak_ptr<WorkQueue>());
             wq.back().swap(_overflowQueue.front().second);
             _overflowQueue.pop_front();
         }
@@ -130,9 +130,9 @@ void WorkQueue::spawn()
         }
     }
     // release any queue waiting
-    for (std::deque<boost::weak_ptr<WorkQueue> >::iterator i=wq.begin();
+    for (std::deque<std::weak_ptr<WorkQueue> >::iterator i=wq.begin();
          i!=wq.end(); ++i) {
-        boost::shared_ptr<WorkQueue> q = (*i).lock();
+        std::shared_ptr<WorkQueue> q = (*i).lock();
         if (q) {
             q->release();
         }
@@ -141,14 +141,14 @@ void WorkQueue::spawn()
     for (std::deque<InternalWorkItem>::iterator i=q.begin();
          i!=q.end(); ++i) {
         InternalWorkItem& item = *i;
-        boost::shared_ptr<Job> jobPtr(new WorkQueueJob(item, shared_from_this()));
+        std::shared_ptr<Job> jobPtr(new WorkQueueJob(item, shared_from_this()));
         _jobQueue->pushJob(jobPtr);
     }
 }
 
 void WorkQueue::reEnqueueSerialized(WorkItem& work,
-                                    boost::shared_ptr<WorkQueue>& fromQueue,
-                                    boost::shared_ptr<SerializationCtx>& sCtx )
+                                    std::shared_ptr<WorkQueue>& fromQueue,
+                                    std::shared_ptr<SerializationCtx>& sCtx )
 {
        assert(work);
        if (!fromQueue) {
@@ -164,14 +164,14 @@ void WorkQueue::reEnqueueSerialized(WorkItem& work,
        // when the serialization context is destroyed.
        const bool isSameQueue = (this == fromQueue.get());
        if (!isSameQueue) {
-           boost::weak_ptr<WorkQueue> fromQ(fromQueue);
+           std::weak_ptr<WorkQueue> fromQ(fromQueue);
            sCtx->record(fromQ);
        }
 
        // In case of overflow, we record emptyFromQueue in _overflowQueue
        // because we dont want to let fromQueue release the work item prematurely
        // (the release normally happens when an item is transfered from _overflowQueue to _workQueue).
-       boost::shared_ptr<WorkQueue> emptyFromQueue;
+       std::shared_ptr<WorkQueue> emptyFromQueue;
        reEnqueueInternal(work, emptyFromQueue, sCtx, isSameQueue);
 
        if (!isSameQueue) {
@@ -180,7 +180,7 @@ void WorkQueue::reEnqueueSerialized(WorkItem& work,
        }
 }
 
-void WorkQueue::reEnqueue(WorkItem& work, boost::shared_ptr<WorkQueue>& fromQueue)
+void WorkQueue::reEnqueue(WorkItem& work, std::shared_ptr<WorkQueue>& fromQueue)
 {
     assert(work);
 
@@ -188,15 +188,15 @@ void WorkQueue::reEnqueue(WorkItem& work, boost::shared_ptr<WorkQueue>& fromQueu
         assert(false);
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_INVALID_FUNCTION_ARGUMENT) << "NULL fromQueue");
     }
-    boost::shared_ptr<SerializationCtx> sCtx = boost::make_shared<SerializationCtx>();
+    std::shared_ptr<SerializationCtx> sCtx = std::make_shared<SerializationCtx>();
     const bool isSameQueue = (this == fromQueue.get());
 
     reEnqueueInternal(work, fromQueue, sCtx, isSameQueue);
 }
 
 void WorkQueue::reEnqueueInternal(WorkItem& work,
-                                  boost::shared_ptr<WorkQueue>& fromQueue,
-                                  boost::shared_ptr<SerializationCtx>& sCtx,
+                                  std::shared_ptr<WorkQueue>& fromQueue,
+                                  std::shared_ptr<SerializationCtx>& sCtx,
                                   bool isSameQueue)
 {
     InternalWorkItem item = boost::bind(&invokeWithContext, work, sCtx, _1);
@@ -220,7 +220,7 @@ void WorkQueue::reEnqueueInternal(WorkItem& work,
             throw PushBackException();
         } else {
             // Insert the work item into the overflow queue but dont let fromQueue release it right away.
-            std::pair<InternalWorkItem,boost::weak_ptr<WorkQueue> > fromQCtx(item, fromQueue);
+            std::pair<InternalWorkItem,std::weak_ptr<WorkQueue> > fromQCtx(item, fromQueue);
             _overflowQueue.push_back(fromQCtx);
             throw PushBackException();
         }
@@ -230,7 +230,7 @@ void WorkQueue::reEnqueueInternal(WorkItem& work,
 
 
 void WorkQueue::enqueueReserved(WorkItem& work,
-                                boost::shared_ptr<SerializationCtx>& sCtx)
+                                std::shared_ptr<SerializationCtx>& sCtx)
 {
     static const char *funcName="WorkQueue::enqueueReserved: ";
     {
@@ -247,7 +247,7 @@ void WorkQueue::enqueueReserved(WorkItem& work,
             throw InvalidStateException(REL_FILE, __FUNCTION__, __LINE__);
         }
         if (!sCtx) {
-            sCtx = boost::make_shared<SerializationCtx>();
+            sCtx = std::make_shared<SerializationCtx>();
         }
         InternalWorkItem item = boost::bind(&invokeWithContext, work, sCtx, _1);
         _workQueue.push_back(item);
@@ -260,10 +260,10 @@ void WorkQueue::enqueueReserved(WorkItem& work,
 
 
 
-void WorkQueue::transfer(boost::shared_ptr<Job>& job,
-                         boost::shared_ptr<WorkQueue>& toQueue,
-                         boost::weak_ptr<WorkQueue>& fromQueue,
-                         boost::shared_ptr<SerializationCtx>& sCtx)
+void WorkQueue::transfer(std::shared_ptr<Job>& job,
+                         std::shared_ptr<WorkQueue>& toQueue,
+                         std::weak_ptr<WorkQueue>& fromQueue,
+                         std::shared_ptr<SerializationCtx>& sCtx)
 {
     static const char *funcName="WorkQueue::transfer: ";
     assert(job);
@@ -272,7 +272,7 @@ void WorkQueue::transfer(boost::shared_ptr<Job>& job,
                   << toQueue.get()<< " of size="
                   << toQueue->size());
 
-    boost::shared_ptr<WorkQueue> fromQ = fromQueue.lock();
+    std::shared_ptr<WorkQueue> fromQ = fromQueue.lock();
 
     WorkQueue::WorkItem item = boost::bind(&Job::executeOnQueue, job, _1, _2);
     if (!fromQ) {
@@ -280,7 +280,7 @@ void WorkQueue::transfer(boost::shared_ptr<Job>& job,
             toQueue->enqueue(item);
         } catch (const WorkQueue::OverflowException& e) {
 
-            boost::shared_ptr<Query> query(job->getQuery());
+            std::shared_ptr<Query> query(job->getQuery());
             assert(query);
             query->handleError(e.copy());
             LOG4CXX_ERROR(logger, funcName <<
@@ -301,9 +301,9 @@ void WorkQueue::transfer(boost::shared_ptr<Job>& job,
 }
 
 
-void WorkQueue::scheduleReserved(boost::shared_ptr<Job>& job,
-                                 boost::shared_ptr<WorkQueue>& toQueue,
-                                 boost::shared_ptr<SerializationCtx>& sCtx)
+void WorkQueue::scheduleReserved(std::shared_ptr<Job>& job,
+                                 std::shared_ptr<WorkQueue>& toQueue,
+                                 std::shared_ptr<SerializationCtx>& sCtx)
 {
     static const char *funcName="WorkQueue::scheduleReserved: ";
     assert(job);
@@ -318,7 +318,7 @@ void WorkQueue::scheduleReserved(boost::shared_ptr<Job>& job,
     } catch (const Exception& e) {
         toQueue->unreserve();
 
-        boost::shared_ptr<Query> query(job->getQuery());
+        std::shared_ptr<Query> query(job->getQuery());
         assert(query);
         query->handleError(e.copy());
         LOG4CXX_ERROR(logger, funcName <<

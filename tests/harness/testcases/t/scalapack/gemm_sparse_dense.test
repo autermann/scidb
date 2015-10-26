@@ -59,7 +59,7 @@ gemm(M5x5_dense,M5x5_Sparse,M5x5)
 #2.gemm with dense and sparse matrix chunk size more  than 32
 # NOT SUPPORTED at this time
 # Disabled until Linear Algebra operators have auto-repartion. [part of #2200]
-# (#2200 blocked on #2302, "requiresRepart not fully functional")
+# (#2200 blocked on #2302, "requiresRedimensionOrRepartition() not fully functional")
 gemm(M5x5_dense_c2,M5x5_Sparse_c2,M5x5_c2)
 #3.gemm with Dense array and sparse array having Dimensions starting with non zero.
 # NOT SUPPORTED at this time. [part of #2200]

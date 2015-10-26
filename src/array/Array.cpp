@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,6 +51,7 @@
 #include <query/Operator.h>
 #include <array/DeepChunkMerger.h>
 
+using namespace std;
 using namespace boost::assign;
 
 namespace scidb
@@ -88,7 +89,7 @@ namespace scidb
 
     void CompressedBuffer::allocate(size_t size)
     {
-        data = ::malloc(size);
+        data = arena::malloc(size);
         if (data == NULL) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
@@ -99,7 +100,7 @@ namespace scidb
 
     void CompressedBuffer::reallocate(size_t size)
     {
-        void *tmp = ::realloc(data, size);
+        void *tmp = arena::realloc(data, size);
         if (tmp == NULL) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_NO_MEMORY, SCIDB_LE_CANT_ALLOCATE_MEMORY);
         }
@@ -114,7 +115,7 @@ namespace scidb
         if (isDebug() && data && compressedSize) {
             memset(data, 0, compressedSize);
         }
-       ::free(data);
+       arena::free(data);
        data = NULL;
     }
 
@@ -226,7 +227,7 @@ namespace scidb
         return this;
     }
 
-    void ConstChunk::makeClosure(Chunk& closure, boost::shared_ptr<ConstRLEEmptyBitmap> const& emptyBitmap) const
+    void ConstChunk::makeClosure(Chunk& closure, std::shared_ptr<ConstRLEEmptyBitmap> const& emptyBitmap) const
     {
         PinBuffer scope(*this);
         closure.allocate(getSize() + emptyBitmap->packedSize());
@@ -242,11 +243,11 @@ namespace scidb
             }
             materializedChunk->initialize(*this);
             materializedChunk->setBitmapChunk((Chunk*)getBitmapChunk());
-            boost::shared_ptr<ConstChunkIterator> src
+            std::shared_ptr<ConstChunkIterator> src
                 = getConstIterator((getArrayDesc().getEmptyBitmapAttribute() == NULL ?  ChunkIterator::IGNORE_DEFAULT_VALUES : 0 )|ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(materializedChunk->getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
 
-            shared_ptr<Query> emptyQuery;
-            boost::shared_ptr<ChunkIterator> dst
+            std::shared_ptr<Query> emptyQuery;
+            std::shared_ptr<ChunkIterator> dst
                 = materializedChunk->getIterator(emptyQuery,
                                                  (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
             size_t count = 0;
@@ -268,7 +269,7 @@ namespace scidb
         return materializedChunk;
     }
 
-    void ConstChunk::compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+    void ConstChunk::compress(CompressedBuffer& buf, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
     {
         materialize()->compress(buf, emptyBitmap);
     }
@@ -292,12 +293,58 @@ namespace scidb
         assert(typeid(*this) != typeid(ConstChunk));
     }
 
+    void ConstChunk::showInfo(log4cxx::LoggerPtr const &logger, std::string const &prefix) const
+    {
+#ifndef NDEBUG
+        if( isMaterialized() && getSize() ) {
+            std::shared_ptr<ConstChunkIterator> chunkIter = getConstIterator();
+            if(chunkIter)
+            {
+                while (!chunkIter->end()) {
+                    std::stringstream ss;
+
+                    const Coordinates & vCoordinates = chunkIter->getPosition();
+                    switch(vCoordinates.size())
+                    {
+                        case 0:
+                            ss << prefix << " (EMPTY)";
+                            LOG4CXX_DEBUG (logger, ss.str());
+                        break;
+
+                        case 1:
+                            ss << prefix <<  " (" << vCoordinates[0] <<  ")";
+                            LOG4CXX_DEBUG (logger, ss.str());
+                        break;
+
+                        case 2:
+                            ss << prefix << " (" << vCoordinates[0] << "," << vCoordinates[1] << ")";
+                            LOG4CXX_DEBUG (logger, ss.str());
+                        break;
+
+                        default:
+                            std::vector <Coordinate>::const_iterator it;
+                            for(it = vCoordinates.begin();  it != vCoordinates.end();  ++it) {
+                                ss << prefix  << " (" << (*it) << ")";
+                                LOG4CXX_DEBUG (logger, ss.str());
+                                ss.str(std::string());
+                            }
+                        break;
+                    }
+
+                    ++(*chunkIter);
+                }
+            }
+        }
+#endif
+    }
+
+
     void Chunk::decompress(CompressedBuffer const& buf)
     {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Chunk::decompress";
     }
 
-    void Chunk::merge(ConstChunk const& with, boost::shared_ptr<Query> const& query)
+    void Chunk::merge(ConstChunk const& with, std::shared_ptr<Query> const& query)
     {
         Query::validateQueryPtr(query);
 
@@ -320,7 +367,7 @@ namespace scidb
         }
     }
 
-    void Chunk::deepMerge(ConstChunk const& with, boost::shared_ptr<Query> const& query)
+    void Chunk::deepMerge(ConstChunk const& with, std::shared_ptr<Query> const& query)
     {
         assert(isMemChunk() && with.isMemChunk());
 
@@ -330,16 +377,16 @@ namespace scidb
         deepChunkMerger.merge();
     }
 
-    void Chunk::shallowMerge(ConstChunk const& with, boost::shared_ptr<Query> const& query)
+    void Chunk::shallowMerge(ConstChunk const& with, std::shared_ptr<Query> const& query)
     {
         Query::validateQueryPtr(query);
 
-        boost::shared_ptr<ChunkIterator> dstIterator =
+        std::shared_ptr<ChunkIterator> dstIterator =
             getIterator(query,
                         ChunkIterator::APPEND_CHUNK |
                         ChunkIterator::APPEND_EMPTY_BITMAP |
                         ChunkIterator::NO_EMPTY_CHECK);
-        boost::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_DEFAULT_VALUES);
+        std::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_DEFAULT_VALUES);
         if (getArrayDesc().getEmptyBitmapAttribute() != NULL) {
             while (!srcIterator->end()) {
                 if (!dstIterator->setPosition(srcIterator->getPosition()))
@@ -365,7 +412,7 @@ namespace scidb
 
     void Chunk::aggregateMerge(ConstChunk const& with,
                                AggregatePtr const& aggregate,
-                               boost::shared_ptr<Query> const& query)
+                               std::shared_ptr<Query> const& query)
     {
         Query::validateQueryPtr(query);
 
@@ -384,12 +431,12 @@ namespace scidb
         char* dst = (char*)getDataForLoad();
         if (dst != NULL)
         {
-            boost::shared_ptr<ChunkIterator> dstIterator =
+            std::shared_ptr<ChunkIterator> dstIterator =
                 getIterator(query,
                             ChunkIterator::APPEND_CHUNK |
                             ChunkIterator::APPEND_EMPTY_BITMAP |
                             ChunkIterator::NO_EMPTY_CHECK);
-            boost::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_NULL_VALUES);
+            std::shared_ptr<ConstChunkIterator> srcIterator = with.getConstIterator(ChunkIterator::IGNORE_NULL_VALUES);
             while (!srcIterator->end())
             {
                 Value val = srcIterator->getItem();  // We need to make a copy here, because the mergeIfNeeded() call below may change it.
@@ -397,7 +444,7 @@ namespace scidb
                 if (!dstIterator->setPosition(srcIterator->getPosition())) {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
                 }
-                Value& val2 = dstIterator->getItem();
+                Value const& val2 = dstIterator->getItem();
                 aggregate->mergeIfNeeded(val, val2);
                 dstIterator->writeItem(val);
 
@@ -414,7 +461,7 @@ namespace scidb
 
     void Chunk::nonEmptyableAggregateMerge(ConstChunk const& with,
                                            AggregatePtr const& aggregate,
-                                           boost::shared_ptr<Query> const& query)
+                                           std::shared_ptr<Query> const& query)
     {
         Query::validateQueryPtr(query);
 
@@ -439,7 +486,7 @@ namespace scidb
         PinBuffer scope(with);
         if (dst != NULL)
         {
-            boost::shared_ptr<ChunkIterator>dstIterator = getIterator(query,
+            std::shared_ptr<ChunkIterator>dstIterator = getIterator(query,
                                                                       ChunkIterator::APPEND_CHUNK |
                                                                       ChunkIterator::APPEND_EMPTY_BITMAP |
                                                                       ChunkIterator::NO_EMPTY_CHECK);
@@ -465,7 +512,7 @@ namespace scidb
                     mapper.pos2coord(lpos, cpos);
                     if (!dstIterator->setPosition(cpos))
                         throw SYSTEM_EXCEPTION(SCIDB_SE_MERGE, SCIDB_LE_OPERATION_FAILED) << "setPosition";
-                    Value& val2 = dstIterator->getItem();
+                    Value const& val2 = dstIterator->getItem();
                     aggregate->mergeIfNeeded(val, val2);
                     dstIterator->writeItem(val);
                     ++inputIter;
@@ -512,7 +559,7 @@ namespace scidb
         if (materializedChunk) {
             return materializedChunk->count();
         }
-        shared_ptr<ConstChunkIterator> i = getConstIterator();
+        std::shared_ptr<ConstChunkIterator> i = getConstIterator();
         size_t n = 0;
         while (!i->end()) {
             ++(*i);
@@ -597,11 +644,16 @@ namespace scidb
         return false;
     }
 
-    boost::shared_ptr<ConstRLEEmptyBitmap> ConstChunk::getEmptyBitmap() const
+    void ConstChunk::showEmptyBitmap(const std::string & strPrefix) const
+    {
+        // Purposely empty
+    }
+
+    std::shared_ptr<ConstRLEEmptyBitmap> ConstChunk::getEmptyBitmap() const
     {
         if (getAttributeDesc().isEmptyIndicator()/* && isMaterialized()*/) {
             PinBuffer scope(*this);
-            return boost::shared_ptr<ConstRLEEmptyBitmap>(scope.isPinned() ? new ConstRLEEmptyBitmap(*this) : new RLEEmptyBitmap(ConstRLEEmptyBitmap(*this)));
+            return std::shared_ptr<ConstRLEEmptyBitmap>(scope.isPinned() ? new ConstRLEEmptyBitmap(*this) : new RLEEmptyBitmap(ConstRLEEmptyBitmap(*this)));
         }
         AttributeDesc const* emptyAttr = getArrayDesc().getEmptyBitmapAttribute();
         if (emptyAttr != NULL) {
@@ -613,9 +665,9 @@ namespace scidb
             }
             ConstChunk const& bitmapChunk = emptyIterator->getChunk();
             PinBuffer scope(bitmapChunk);
-            return boost::shared_ptr<ConstRLEEmptyBitmap>(new RLEEmptyBitmap(ConstRLEEmptyBitmap((char*)bitmapChunk.getData())));
+            return std::shared_ptr<ConstRLEEmptyBitmap>(new RLEEmptyBitmap(ConstRLEEmptyBitmap((char*)bitmapChunk.getData())));
         }
-        return boost::shared_ptr<ConstRLEEmptyBitmap>();
+        return std::shared_ptr<ConstRLEEmptyBitmap>();
     }
 
 
@@ -638,17 +690,17 @@ namespace scidb
         return getArrayDesc().getId();
     }
 
-    void Array::append(boost::shared_ptr<Array>& input,
+    void Array::append(const std::shared_ptr<Array>& input,
                        bool const vertical,
-                       set<Coordinates, CoordinatesLess>* newChunkCoordinates)
+                       CoordinateSet* newChunkCoordinates)
     {
         if (vertical)
         {
             assert(input->getSupportedAccess() >= MULTI_PASS);
 
             for (size_t i = 0, n = getArrayDesc().getAttributes().size(); i < n; i++) {
-                boost::shared_ptr<ArrayIterator> dst = getIterator(i);
-                boost::shared_ptr<ConstArrayIterator> src = input->getConstIterator(i);
+                std::shared_ptr<ArrayIterator> dst = getIterator(i);
+                std::shared_ptr<ConstArrayIterator> src = input->getConstIterator(i);
                 while (!src->end())
                 {
                     if(newChunkCoordinates && i == 0)
@@ -663,8 +715,8 @@ namespace scidb
         else
         {
             size_t nAttrs = getArrayDesc().getAttributes().size();
-            std::vector< boost::shared_ptr<ArrayIterator> > dstIterators(nAttrs);
-            std::vector< boost::shared_ptr<ConstArrayIterator> > srcIterators(nAttrs);
+            std::vector< std::shared_ptr<ArrayIterator> > dstIterators(nAttrs);
+            std::vector< std::shared_ptr<ConstArrayIterator> > srcIterators(nAttrs);
             for (size_t i = 0; i < nAttrs; i++)
             {
                 dstIterators[i] = getIterator(i);
@@ -678,8 +730,8 @@ namespace scidb
                 }
                 for (size_t i = 0; i < nAttrs; i++)
                 {
-                    boost::shared_ptr<ArrayIterator> dst = dstIterators[i];
-                    boost::shared_ptr<ConstArrayIterator> src = srcIterators[i];
+                    std::shared_ptr<ArrayIterator>& dst = dstIterators[i];
+                    std::shared_ptr<ConstArrayIterator>& src = srcIterators[i];
                     dst->copyChunk(src->getChunk());
                     ++(*src);
                 }
@@ -687,12 +739,12 @@ namespace scidb
         }
     }
 
-    boost::shared_ptr<CoordinateSet> Array::getChunkPositions() const
+    std::shared_ptr<CoordinateSet> Array::getChunkPositions() const
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR) << "calling getChunkPositions on an invalid array";
     }
 
-    shared_ptr<CoordinateSet> Array::findChunkPositions() const
+    std::shared_ptr<CoordinateSet> Array::findChunkPositions() const
     {
         if (hasChunkPositions())
         {
@@ -724,9 +776,9 @@ namespace scidb
         }
         assert(attributeToScan != NULL);
         AttributeID victimId = attributeToScan->getId();
-        boost::shared_ptr<CoordinateSet> result(new CoordinateSet());
+        std::shared_ptr<CoordinateSet> result(new CoordinateSet());
         //Iterate over the target attribute, find the position of each chunk, add all chunk positions to result
-        boost::shared_ptr<ConstArrayIterator> iter = getConstIterator(victimId);
+        std::shared_ptr<ConstArrayIterator> iter = getConstIterator(victimId);
         while( ! iter->end() )
         {
             result->insert(iter->getPosition());
@@ -812,7 +864,7 @@ namespace scidb
         }
 
         size_t nExtracted = 0;
-        for (boost::shared_ptr<ConstArrayIterator> i = getConstIterator(attrID);
+        for (std::shared_ptr<ConstArrayIterator> i = getConstIterator(attrID);
              !i->end(); ++(*i)) {
             size_t j, chunkOffs = 0;
             ConstChunk const& chunk = i->getChunk();
@@ -825,12 +877,12 @@ namespace scidb
                 chunkOffs += chunkPos[j] - first[j];
             }
             if (j == nDims) {
-                for (boost::shared_ptr<ConstChunkIterator> ci =
+                for (std::shared_ptr<ConstChunkIterator> ci =
                          chunk.getConstIterator(ChunkIterator::IGNORE_OVERLAPS |
                                                 ChunkIterator::IGNORE_EMPTY_CELLS |
                                                 ChunkIterator::IGNORE_NULL_VALUES);
                      !ci->end(); ++(*ci)) {
-                    Value& v = ci->getItem();
+                    Value const& v = ci->getItem();
                     if (!v.isNull()) {
                         Coordinates const& itemPos = ci->getPosition();
                         size_t itemOffs = 0;
@@ -869,15 +921,15 @@ namespace scidb
         return nExtracted;
     }
 
-    boost::shared_ptr<ArrayIterator> Array::getIterator(AttributeID attr)
+    std::shared_ptr<ArrayIterator> Array::getIterator(AttributeID attr)
     {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Array::getIterator";
     }
 
 
-    boost::shared_ptr<ConstItemIterator> Array::getItemIterator(AttributeID attrID, int iterationMode) const
+    std::shared_ptr<ConstItemIterator> Array::getItemIterator(AttributeID attrID, int iterationMode) const
     {
-        return boost::shared_ptr<ConstItemIterator>(new ConstItemIterator(*this, attrID, iterationMode));
+        return std::shared_ptr<ConstItemIterator>(new ConstItemIterator(*this, attrID, iterationMode));
     }
 
     bool Array::isCountKnown() const
@@ -922,7 +974,7 @@ namespace scidb
         AttributeID victimId = attributeToScan->getId();
         size_t result = 0;
         //Iterate over the target attribute, find nElements of each chunk, add such values to the result
-        boost::shared_ptr<ConstArrayIterator> iter = getConstIterator(victimId);
+        std::shared_ptr<ConstArrayIterator> iter = getConstIterator(victimId);
         while( ! iter->end() )
         {
             ConstChunk const& curChunk = iter->getChunk();
@@ -939,8 +991,8 @@ namespace scidb
 #ifndef NDEBUG
         size_t nattrs = this->getArrayDesc().getAttributes(true).size();
 
-        vector< shared_ptr<ConstArrayIterator> > arrayIters(nattrs);
-        vector< shared_ptr<ConstChunkIterator> > chunkIters(nattrs);
+        vector< std::shared_ptr<ConstArrayIterator> > arrayIters(nattrs);
+        vector< std::shared_ptr<ConstChunkIterator> > chunkIters(nattrs);
         vector<TypeId> attrTypes(nattrs);
 
         LOG4CXX_DEBUG(logger, "[printArray] name (" << this->getName() << ")");
@@ -968,7 +1020,7 @@ namespace scidb
                 for (size_t i = 0; i < nattrs; i++)
                 {
                     item[i] = chunkIters[i]->getItem();
-                    ssvalue << ValueToString(attrTypes[i], item[i]) << " ";
+                    ssvalue << item[i].toString(attrTypes[i]) << " ";
                 }
                 ssvalue << ")";
 
@@ -1021,9 +1073,9 @@ namespace scidb
         return chunk;
     }
 
-    Chunk& ArrayIterator::copyChunk(ConstChunk const& chunk, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap)
+    Chunk& ArrayIterator::copyChunk(ConstChunk const& chunk, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap)
     {
-        const Coordinates& pos = chunk.getFirstPosition(false);
+        const Coordinates& pos = chunk.getFirstPosition(false/*no overlap*/);
         Chunk& outChunk = newChunk(pos);
 
         //verify that the declared chunk intervals match. Otherwise the copy - could still work - but would either be an implicit reshape or outright dangerous
@@ -1034,7 +1086,7 @@ namespace scidb
         }
 
         try {
-            boost::shared_ptr<Query> query(getQuery());
+            std::shared_ptr<Query> query(getQuery());
 
             // If copying from an emptyable array to an non-emptyable array, we need to fill in the default values.
             size_t nAttrsChunk = chunk.getArrayDesc().getAttributes().size();
@@ -1068,9 +1120,9 @@ namespace scidb
                     chunk.makeClosure(outChunk, emptyBitmap);
                     outChunk.write(query);
                 } else {
-                    boost::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(
+                    std::shared_ptr<ConstChunkIterator> src = chunk.getConstIterator(
                             ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::INTENDED_TILE_MODE|(outChunk.getArrayDesc().hasOverlap() ? 0 : ChunkIterator::IGNORE_OVERLAPS));
-                    boost::shared_ptr<ChunkIterator> dst =
+                    std::shared_ptr<ChunkIterator> dst =
                         outChunk.getIterator(query,
                                              (src->getMode() & ChunkIterator::TILE_MODE)|ChunkIterator::NO_EMPTY_CHECK|ChunkIterator::SEQUENTIAL_WRITE);
                     size_t count = 0;
@@ -1099,17 +1151,17 @@ namespace scidb
         return outChunk;
     }
 
-    int ConstItemIterator::getMode()
+    int ConstItemIterator::getMode() const
     {
         return iterationMode;
     }
 
-     Value& ConstItemIterator::getItem()
+    Value const& ConstItemIterator::getItem()
     {
         return chunkIterator->getItem();
     }
 
-    bool ConstItemIterator::isEmpty()
+    bool ConstItemIterator::isEmpty() const
     {
         return chunkIterator->isEmpty();
     }

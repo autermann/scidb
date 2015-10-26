@@ -3,8 +3,8 @@
 ##
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -24,4 +24,17 @@
 #Load the sample data file into the array trades_flat.
 #This file happens to be a sample of stock trade data, for a few selected stocks, downloaded from NYSE.
 
-zcat trades_small.csv.gz | loadcsv.py -n 1 -s "<symbol:string, ms:int64, volume:uint64, price:double>[i=0:*,1000000,0]" -t SNNN -a trades_flat -x 
+ARRAY="trades_flat"
+SCHEMA='<symbol:string, ms:int64, volume:uint64, price:double>[i=0:*,1000000,0]'
+TMPDIR=$(mktemp -d /tmp/ldtr.XXXXXXXXXX)
+
+trap "rm -rf $TMPDIR" 15 3 2 1 0
+
+mkfifo $TMPDIR/fifo
+
+iquery -aq "remove(trades_flat)" 2>/dev/null
+iquery -aq "create array trades_flat $SCHEMA"
+
+zcat trades_small.csv.gz | sed 1d > $TMPDIR/fifo &
+iquery -naq "load($ARRAY, '"$TMPDIR/fifo"', -2, 'csv')"
+wait

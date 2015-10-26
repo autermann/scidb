@@ -9,6 +9,9 @@ First simple test
 {0} 'one',null
 {1} 'two',null
 
+{i} s1,s2,row_offset
+{1} null,'Too few input record fields at position 9, line 2, column 1',9
+
 Second simple test
 {i} s1,s2
 {0} 'three
@@ -16,18 +19,13 @@ Second simple test
 {1} 'four
 and five',null
 
-Save and reload simple2
-{i} s1,s2
-{0} 'three
-',null
-{1} 'four
-and five',null
+{i} s1,s2,row_offset
+{1} null,'Too few input record fields at position 22, line 2, column 1',22
 
-{i} s1,s2
-{0} 'three
-',null
-{1} 'four
-and five',null
+Save and reload simple2
+[Query was executed successfully, ignoring data output by this query.]
+
+[Query was executed successfully, ignoring data output by this query.]
 
 {i} s1,s2
 {0} 'three
@@ -41,10 +39,6 @@ Query was executed successfully
 Query was executed successfully
 
 {i} s1,s2
-{0} 'three
-',null
-{1} 'four
-and five',null
 
 {i} s1,s2
 {0} 'three
@@ -52,17 +46,13 @@ and five',null
 {1} 'four
 and five',null
 
+Save reloaded simple2 array in .scidb format, should be identical.
 {i} s1,s2
-{0} 'three
-',null
-{1} 'four
-and five',null
 
 Diff output should be empty...
 Was it?
 Tricky embedded newlines
-{i} count
-{0} 3
+Query was executed successfully
 
 {i} name,grade,remarks
 {0} 'Starfish, Patrick',2.7,'Could try harder.'
@@ -70,6 +60,13 @@ Tricky embedded newlines
 staying focused.  Counseling
 is recommended.'
 {2} 'Frakes, Jonathan',4,'Made it so.'
+
+{i} count
+{0} 3
+
+Query was executed successfully
+
+Query was executed successfully
 
 Query was executed successfully
 

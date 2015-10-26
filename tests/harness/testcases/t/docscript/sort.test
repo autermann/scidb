@@ -30,10 +30,10 @@ store(build(<val:double>[i=0:2,3,0, j=0:2,3,0],i%3+j),A)
 sort(apply(A,dim,i),dim)
 --start-igdata
 create array numbers <number:int64 null>[i=0:4,5,0]
---shell  --command="csv2scidb -s 1 -p N < $DOC_DATA/mostNumbers.csv > $DOC_DATA/mostNumbers.scidb "
+--shell  --command="sed 1d $DOC_DATA/mostNumbers.csv > /tmp/mostNumbers.load "
 --set-format dense
 --stop-igdata
---shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odense -aq "load(numbers,'${TEST_DATA_DIR}/doc/mostNumbers.scidb')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -odense -aq "load(numbers,'/tmp/mostNumbers.load', -2, 'csv')""
 sort(numbers, number asc)
 sort(numbers, number desc)
 
@@ -42,6 +42,7 @@ sort(numbers, number desc)
 
 --cleanup
 
+--shell --command " rm -f /tmp/mostNumbers.load "
 remove(winners)
 remove(event)
 remove(year)

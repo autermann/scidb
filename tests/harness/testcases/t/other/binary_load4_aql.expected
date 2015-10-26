@@ -36,14 +36,6 @@ SCIDB QUERY : <select * from show(A11)>
 
 SCIDB QUERY : <save A11 into '/tmp/a11.txt'>
 {x,y,z} num,sum
-{1,1,1} 2,203
-{1,1,2} 2,204
-{1,2,1} 5,207
-{1,2,2} 5,209
-{2,1,1} 3,205
-{2,1,2} 3,207
-{2,2,1} 6,210
-{2,2,2} 6,214
 
 SCIDB QUERY : <load A22 from '/tmp/a11.txt'>
 {x,y,z} num,sum
@@ -58,14 +50,6 @@ SCIDB QUERY : <load A22 from '/tmp/a11.txt'>
 
 SCIDB QUERY : <save A11 into current instance  '/tmp/a11.bin' as '(int64,int64)'>
 {x,y,z} num,sum
-{1,1,1} 2,203
-{1,1,2} 2,204
-{1,2,1} 5,207
-{1,2,2} 5,209
-{2,1,1} 3,205
-{2,1,2} 3,207
-{2,2,1} 6,210
-{2,2,2} 6,214
 
 SCIDB QUERY : <load  A33 from current instance  '/tmp/a11.bin' as '(int64,int64)'>
 {x,y,z} num,sum
@@ -102,6 +86,9 @@ SCIDB QUERY : <load  A33 from  '/tmp/a11.bin' as '(int64,int64)'>
 
 SCIDB QUERY : <save A11 into 0  '/tmp/a11.bin_a' as '(int64,int64)'>
 {x,y,z} num,sum
+
+SCIDB QUERY : <load A11 from 0  '/tmp/a11.bin_a' as '(int64,int64)'>
+{x,y,z} num,sum
 {1,1,1} 2,203
 {1,1,2} 2,204
 {1,2,1} 5,207
@@ -113,14 +100,6 @@ SCIDB QUERY : <save A11 into 0  '/tmp/a11.bin_a' as '(int64,int64)'>
 
 SCIDB QUERY : <save  A33 into  '/tmp/a33.txt' as 'text'>
 {x,y,z} num,sum
-{1,1,1} 2,203
-{1,1,2} 2,204
-{1,2,1} 5,207
-{1,2,2} 5,209
-{2,1,1} 3,205
-{2,1,2} 3,207
-{2,2,1} 6,210
-{2,2,2} 6,214
 
 SCIDB QUERY : <load  A33 from  '/tmp/a33.txt' as 'text'>
 {x,y,z} num,sum
@@ -146,6 +125,9 @@ SCIDB QUERY : <load Unbounded from  '/tmp/a33.txt' as 'text'>
 
 SCIDB QUERY : <save Unbounded into current instance '/tmp/unbound.bin' as '(float,int32)'>
 {x,y,z} num,sum
+
+SCIDB QUERY : <load Unbounded from current instance '/tmp/unbound.bin' as '(float,int32)'>
+{x,y,z} num,sum
 {1,1,1} 2,203
 {1,1,2} 2,204
 {1,2,1} 5,207
@@ -155,7 +137,7 @@ SCIDB QUERY : <save Unbounded into current instance '/tmp/unbound.bin' as '(floa
 {2,2,1} 6,210
 {2,2,2} 6,214
 
-SCIDB QUERY : <load  A44 from current instance '/tmp/unbound.bin' as '(dummy(4),int32)'>
+SCIDB QUERY : <load  A44 from current instance '/tmp/unbound.bin' as '(skip(4),int32)'>
 {x,y,z} sum
 {1,1,1} 203
 {1,1,2} 204
@@ -166,7 +148,7 @@ SCIDB QUERY : <load  A44 from current instance '/tmp/unbound.bin' as '(dummy(4),
 {1,1,7} 210
 {1,1,8} 214
 
-SCIDB QUERY : <load  A55 from  '/tmp/unbound.bin' as '(dummy(4),int32)'>
+SCIDB QUERY : <load  A55 from  '/tmp/unbound.bin' as '(skip(4),int32)'>
 {x,y,z} num
 {1,1,1} 203
 {1,1,2} 204
@@ -177,7 +159,7 @@ SCIDB QUERY : <load  A55 from  '/tmp/unbound.bin' as '(dummy(4),int32)'>
 {2,2,1} 210
 {2,2,2} 214
 
-SCIDB QUERY : <load  A55 from  '/tmp/unbound.bin' as '(float,dummy(4))'>
+SCIDB QUERY : <load  A55 from  '/tmp/unbound.bin' as '(float,skip(4))'>
 {x,y,z} num
 {1,1,1} 2
 {1,1,2} 2
@@ -191,10 +173,10 @@ SCIDB QUERY : <load  A55 from  '/tmp/unbound.bin' as '(float,dummy(4))'>
 SCIDB QUERY : <load A55 from '/tmp/unbound.bin' as 'text'>
 [An error expected at this place for the query "load A55 from '/tmp/unbound.bin' as 'text'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-SCIDB QUERY : <load A55 from '/tmp/a33.txt' as '(dummy(4),int32)'>
-[An error expected at this place for the query "load A55 from '/tmp/a33.txt' as '(dummy(4),int32)'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+SCIDB QUERY : <load A55 from '/tmp/a33.txt' as '(skip(4),int32)'>
+[An error expected at this place for the query "load A55 from '/tmp/a33.txt' as '(skip(4),int32)'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-SCIDB QUERY : <load A55 from '/tmp/a33.txt' as '(dummy(4),int32)' errors 100 shadow array A55_shad>
+SCIDB QUERY : <load A55 from '/tmp/a33.txt' as '(skip(4),int32)' errors 100 shadow array A55_shad>
 {x,y,z} num
 {1,1,1} 8.08594e+08
 {1,1,2} 8.08594e+08
@@ -211,7 +193,7 @@ SCIDB QUERY : <select count(*) from A55_shad>
 {i} count
 {0} 1
 
-SCIDB QUERY : <join(load(A22,'/tmp/a11.txt'),A11)>
+SCIDB QUERY : <join(input(A22,'/tmp/a11.txt'),A11)>
 {x,y,z} num,sum,num,sum
 {1,1,1} 2,203,2,203
 {1,1,2} 2,204,2,204
@@ -222,10 +204,10 @@ SCIDB QUERY : <join(load(A22,'/tmp/a11.txt'),A11)>
 {2,2,1} 6,210,6,210
 {2,2,2} 6,214,6,214
 
-SCIDB QUERY : <join(load(A22,'/tmp/a11.txt'),A66)>
+SCIDB QUERY : <join(input(A22,'/tmp/a11.txt'),A66)>
 {x,y,z} num,sum,num
 
-SCIDB QUERY : <join(load(A33,'/tmp/a33.txt',0, 'text'),load(A55,'/tmp/unbound.bin',0,'(dummy(4),int32)'))>
+SCIDB QUERY : <join(input(A33,'/tmp/a33.txt',0, 'text'),input(A55,'/tmp/unbound.bin',0,'(skip(4),int32)'))>
 {x,y,z} num,sum,num
 {1,1,1} 2,203,203
 {1,1,2} 2,204,204

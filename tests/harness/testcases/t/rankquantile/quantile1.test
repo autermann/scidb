@@ -16,7 +16,6 @@ sort(filter(A, x< 15 and x>12))
 sort(filter(A, x< 15 and x>15))
 sort(filter(A, x<> 14 and x<>16),20)
 sort(filter(A, x<> 14 and x<>16))
-sort(reverse(filter(A, x<> 14 and x<>16)),2)
 
 # reported ticket for worng sort result: ticket#1830
 sort(B,s)
@@ -27,7 +26,6 @@ sort(filter(B, x< 15 and x>12),r)
 sort(filter(B, x< 15 and x>12),s)
 
 rank(A)
-rank(reverse(A))
 rank(filter(A, r> '250'))
 rank(filter(A, x<> 15))
 rank(subarray(A,0,11))

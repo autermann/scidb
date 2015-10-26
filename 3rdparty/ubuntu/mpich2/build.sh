@@ -103,6 +103,10 @@ pushd ${build_dir} > /dev/null
         for patch in $(ls ../*.patch); do
             patch -p1 < ${patch} || die "Patch ${patch} not applied"
 	done
+	# Copy in our own rules file
+	cp "${script_dir}"/patches/rules debian/rules
+	# Copy in our own control file
+	cp "${script_dir}"/patches/control debian/control
 	# Repackage it
         dpkg-buildpackage -rfakeroot -S -us -uc -i.* || die "Can not dpkg-buildpackage"
     popd > /dev/null

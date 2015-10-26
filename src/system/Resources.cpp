@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -73,7 +73,7 @@ public:
 
     ~FileExistsResourcesCollector()  {
         ScopedMutexLock lock(_lock);
-    }    
+    }
 
     map<InstanceID, bool> _instancesMap;
 
@@ -82,7 +82,7 @@ private:
     friend class Resources;
 };
 
-void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesMap, const shared_ptr<Query> &query)
+void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesMap, const std::shared_ptr<Query> &query)
 {
     LOG4CXX_TRACE(logger, "Resources::fileExists. Checking file '" << path << "'");
     NetworkManager* networkManager = NetworkManager::getInstance();
@@ -97,8 +97,8 @@ void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesM
         collector->collect(query->getInstanceID(), checkFileExists(path), false);
     }
 
-    shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
-    shared_ptr<scidb_msg::ResourcesFileExistsRequest> request =
+    std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
+    std::shared_ptr<scidb_msg::ResourcesFileExistsRequest> request =
         msg->getRecord<scidb_msg::ResourcesFileExistsRequest>();
     msg->setQueryID(0);
     request->set_resource_request_id(id);
@@ -134,7 +134,7 @@ void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesM
     }
 }
 
-bool Resources::fileExists(const string &path, InstanceID instanceId, const shared_ptr<Query>& query)
+bool Resources::fileExists(const string &path, InstanceID instanceId, const std::shared_ptr<Query>& query)
 {
     LOG4CXX_TRACE(logger, "Resources::fileExists. Checking file '" << path << "'");
     NetworkManager* networkManager = NetworkManager::getInstance();
@@ -155,8 +155,8 @@ bool Resources::fileExists(const string &path, InstanceID instanceId, const shar
             _resourcesCollectors[id] = collector;
         }
 
-        shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
-        shared_ptr<scidb_msg::ResourcesFileExistsRequest> request =
+        std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
+        std::shared_ptr<scidb_msg::ResourcesFileExistsRequest> request =
             msg->getRecord<scidb_msg::ResourcesFileExistsRequest>();
         msg->setQueryID(0);
         request->set_resource_request_id(id);
@@ -195,22 +195,22 @@ bool Resources::fileExists(const string &path, InstanceID instanceId, const shar
     }
 }
 
-void Resources::handleFileExists(const shared_ptr<MessageDesc>& messageDesc)
+void Resources::handleFileExists(const std::shared_ptr<MessageDesc>& messageDesc)
 {
     NetworkManager* networkManager = NetworkManager::getInstance();
 
     if (mtResourcesFileExistsRequest == messageDesc->getMessageType())
     {
         LOG4CXX_TRACE(logger, "Message is mtResourcesFileExistsRequest");
-        shared_ptr<scidb_msg::ResourcesFileExistsRequest> inMsgRecord =
+        std::shared_ptr<scidb_msg::ResourcesFileExistsRequest> inMsgRecord =
             messageDesc->getRecord<scidb_msg::ResourcesFileExistsRequest>();
         const string& file = inMsgRecord->file_path();
         LOG4CXX_TRACE(logger, "Checking file " << file);
 
-        shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsResponse);
+        std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsResponse);
         msg->setQueryID(0);
 
-        shared_ptr<scidb_msg::ResourcesFileExistsResponse> outMsgRecord =
+        std::shared_ptr<scidb_msg::ResourcesFileExistsResponse> outMsgRecord =
             msg->getRecord<scidb_msg::ResourcesFileExistsResponse>();
         outMsgRecord->set_resource_request_id(inMsgRecord->resource_request_id());
         outMsgRecord->set_exits_flag(Resources::getInstance()->checkFileExists(file));
@@ -221,7 +221,7 @@ void Resources::handleFileExists(const shared_ptr<MessageDesc>& messageDesc)
     else
     {
         LOG4CXX_TRACE(logger, "Message is mtResourcesFileExistsResponse");
-        shared_ptr<scidb_msg::ResourcesFileExistsResponse> inMsgRecord =
+        std::shared_ptr<scidb_msg::ResourcesFileExistsResponse> inMsgRecord =
             messageDesc->getRecord<scidb_msg::ResourcesFileExistsResponse>();
 
         LOG4CXX_TRACE(logger, "Marking file");

@@ -1,23 +1,22 @@
-#Testing csv2scidb:
-# Case 1:   With values for the optional parameters set to 0 for instance ID and 1 for number of instances
+# For some reason it was thought interesting to load this CSV file via csv2scidb and text mode.
+# Now that csv2scidb is gone, just load it directly to prove we can.  The test should no longer
+# care how many instances are involved.
 
-# WARNING: This test is sensitive to SCIDB_INSTANCE_NUM and prefers "4"!!!
+--setup
 
- --setup
- --start-query-logging
+--start-query-logging
+CREATE array Raw_CSVLoad_1 < symbl : string, time : string, price : double, qty : int64 > [ Offset=0:*,10,0 ]
 
-  CREATE array Raw_CSVLoad_1 < symbl : string, time : string, price : double, qty : int64 > [ Offset=0:*,10,0 ]
+--test
 
- --test
- --start-igdata
- --shell --command " cat ${TEST_DATA_DIR}/csv2scidb_1.csv |csv2scidb -c 100 -s 1 -n 1 > /tmp/csv2scidb_test_1.txt  " 
-  load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.txt' )
- --stop-igdata
- sort( Raw_CSVLoad_1,symbl )
- --cleanup
+--start-igdata
+--shell --command " sed 1d ${TEST_DATA_DIR}/csv2scidb_1.csv > /tmp/csv2scidb_1.csv "
+load ( Raw_CSVLoad_1, '/tmp/csv2scidb_1.csv', 0, 'csv')
+--stop-igdata
+sort( Raw_CSVLoad_1,symbl )
+
+--cleanup
+
 remove ( Raw_CSVLoad_1 )
-
- --shell --store --command "rm -rf /tmp/csv2scidb_test_1.txt"
-
- --stop-query-logging
-
+--shell --store --command "rm -rf /tmp/csv2scidb_1.csv"
+--stop-query-logging

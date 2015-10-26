@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -64,17 +64,17 @@ typedef std::vector<SortingAttributeInfo> SortingAttributeInfos;
  */
 class TupleComparator
 {
- private:
+private:
     SortingAttributeInfos   const _sortingAttributeInfos;
     ArrayDesc               const _arrayDesc;
-    vector<FunctionPointer> _leFunctions;
-    vector<FunctionPointer> _eqFunctions;
+    std::vector<FunctionPointer> _leFunctions;
+    std::vector<FunctionPointer> _eqFunctions;
 
     // The types of each key are needed in compare() to call isNullOrNan().
     // The types are acquired in the constructor so that they don't need to be calculated again and again in compare().
-    vector<DoubleFloatOther> _types;
+    std::vector<DoubleFloatOther> _types;
 
-  public:
+ public:
     TupleComparator(PointerRange<const SortingAttributeInfo>, const ArrayDesc&);
 
     /**
@@ -98,7 +98,7 @@ class TupleComparator
     /**
      * Getter for the sorting key.
      */
-    SortingAttributeInfos const& getSortingAttributeInfos()
+    PointerRange<SortingAttributeInfo const> getSortingAttributeInfos()
     {
         return _sortingAttributeInfos;
     }
@@ -113,6 +113,7 @@ class TupleLessThan
      * A pointer to a TupleComparator object.
      */
     TupleComparator* _tupleComparator;
+
 public:
     /**
      * @param tupleComparator  pointer to a tupleComparator object.
@@ -156,12 +157,12 @@ class TupleArray : public Array
     friend class TupleChunk;
     friend class TupleChunkIterator;
     friend class TupleArrayIterator;
-  public:
-    void sort(boost::shared_ptr<TupleComparator> tcomp);
+public:
+    void sort(std::shared_ptr<TupleComparator> tcomp);
 
     virtual ArrayDesc const& getArrayDesc() const;
 
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attId) const;
 
     /**
      * @param outputSchema        the schema of the TupleArray, on the output side.
@@ -176,7 +177,7 @@ class TupleArray : public Array
      * @note The first tuple will have a coordinate = outputSchema.getDimensions()[0].getStartMin().
      */
     TupleArray(ArrayDesc const& outputSchema,
-               vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators,
+               PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators,
                ArrayDesc const& inputSchema,
                size_t nChunks,
                size_t sizeHint,
@@ -199,7 +200,7 @@ class TupleArray : public Array
                arena::ArenaPtr const& parentArena,
                Coordinate offset = 0);
 
-   ~TupleArray();
+    ~TupleArray();
 
     /*
      * Append up-to nChunks of data from given input array iterators.
@@ -207,13 +208,13 @@ class TupleArray : public Array
      * @param arrayIterators the input array iterators.
      * @param nChunks        the number of chunks to read.
      */
-    virtual void append(ArrayDesc const& inputSchema, std::vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t nChunks);
+    virtual void append(ArrayDesc const& inputSchema, PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators, size_t nChunks);
 
     /**
      * Append all data from an input array.
      * @param inputArray an input array.
      */
-    virtual void append(boost::shared_ptr<Array> const& inputArray);
+    virtual void append(std::shared_ptr<Array> const& inputArray);
 
     /**
      * Append a single tuple to the array.
@@ -257,7 +258,7 @@ class TupleArray : public Array
         return getTupleFootprint(_desc.getAttributes());
     }
 
-  protected:
+protected:
     arena::ArenaPtr const _arena;  // used to allocate each tuple
     ArrayDesc             _desc;
     Coordinate            _start;
@@ -287,13 +288,13 @@ class TupleChunk : public ConstChunk
 {
     friend class TupleChunkIterator;
     friend class TupleArrayIterator;
-  public:
+public:
     const ArrayDesc& getArrayDesc() const;
     const AttributeDesc& getAttributeDesc() const;
     int getCompressionMethod() const;
     Coordinates const& getFirstPosition(bool withOverlap) const;
     Coordinates const& getLastPosition(bool withOverlap) const;
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
 
     Array const& getArray() const
     {
@@ -302,7 +303,7 @@ class TupleChunk : public ConstChunk
 
     TupleChunk(TupleArray const& array, AttributeID attrID);
 
- private:
+private:
     TupleArray const&   _array;
     AttributeID         _attrID;
     Coordinates         _firstPos;
@@ -311,7 +312,7 @@ class TupleChunk : public ConstChunk
 
 class TupleArrayIterator : public ConstArrayIterator
 {
-  public:
+public:
     virtual ConstChunk const& getChunk();
     virtual bool end();
     virtual void operator ++();
@@ -321,7 +322,7 @@ class TupleArrayIterator : public ConstArrayIterator
 
     TupleArrayIterator(TupleArray const& array, AttributeID attrID);
 
-  private:
+private:
     TupleArray const& _array;
     AttributeID       _attrID;
     TupleChunk        _chunk;
@@ -331,10 +332,10 @@ class TupleArrayIterator : public ConstArrayIterator
 
 class TupleChunkIterator : public ConstChunkIterator
 {
-  public:
-    int getMode();
-    Value& getItem();
-    bool isEmpty();
+public:
+    int getMode() const;
+    Value const& getItem();
+    bool isEmpty() const;
     bool end();
     void operator ++();
     Coordinates const& getPosition();
@@ -344,7 +345,7 @@ class TupleChunkIterator : public ConstChunkIterator
 
     TupleChunkIterator(TupleChunk const& chunk, int iterationMode);
 
-  private:
+private:
     bool isVisible() const;
 
     TupleChunk const& _chunk;
@@ -356,6 +357,5 @@ class TupleChunkIterator : public ConstChunkIterator
     size_t            _i;
 };
 
-}
-
+} // namespace
 #endif

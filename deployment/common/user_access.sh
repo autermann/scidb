@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -30,7 +30,7 @@ update=0
 function add_public_key ()
 {
     local new_key="${1}"
-    if [ "0" == `cat ${HOME}/.ssh/authorized_keys | grep "${new_key}" | wc -l || true` ]; then 
+    if [ "0" == `cat ${HOME}/.ssh/authorized_keys | grep "${new_key}" | wc -l || true` ]; then
 	echo "${new_key}" >> ${HOME}/.ssh/authorized_keys
 	update=1
     fi;
@@ -59,7 +59,7 @@ function update_rights ()
     chmod a-x,go-rw,u+rw ${HOME}/.ssh/*
     if [ "${OS}" = "CentOS 6" ]; then
 	selinux_home_ssh
-    fi 
+    fi
 
     if [ "${OS}" = "RedHat 6" ]; then
 	selinux_home_ssh

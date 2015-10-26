@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -112,19 +112,20 @@ const char* toString(RepartAlgorithm value)
     }
 }
 
-static po::value_semantic* optTypeToValSem(Config::ConfigOptionType optionType);
+static po::value_semantic* optTypeToValSem(
+    ConfigBase::ConfigOptionType optionType);
 
 static void stringToVector(const string& str, vector<string>& strs);
 
 // For iterating through map::pair<int32_t, Config::ConfigOption*> in BOOST_FOREACH
-typedef pair<int32_t, Config::ConfigOption*> opt_pair;
+typedef pair<int32_t, ConfigBase::ConfigOption*> opt_pair;
 
-Config::ConfigAddOption::ConfigAddOption(Config *owner) :
+ConfigBase::ConfigAddOption::ConfigAddOption(ConfigBase *owner) :
 	_owner(owner)
 {
 }
 
-Config::ConfigAddOption& Config::ConfigAddOption::operator()(
+ConfigBase::ConfigAddOption& ConfigBase::ConfigAddOption::operator()(
 		int32_t option,
 		char shortCmdLineArg,
 		const std::string &longCmdLineArg,
@@ -140,7 +141,7 @@ Config::ConfigAddOption& Config::ConfigAddOption::operator()(
 	return *this;
 }
 
-Config::ConfigAddOption& Config::ConfigAddOption::operator()(
+ConfigBase::ConfigAddOption& ConfigBase::ConfigAddOption::operator()(
         int32_t option,
         char shortCmdLineArg,
         const std::string &longCmdLineArg,
@@ -156,7 +157,7 @@ Config::ConfigAddOption& Config::ConfigAddOption::operator()(
     return *this;
 }
 
-void Config::ConfigOption::init(const boost::any &value)
+void ConfigBase::ConfigOption::init(const boost::any &value)
 {
     if (!value.empty())
     {
@@ -172,7 +173,7 @@ void Config::ConfigOption::init(const boost::any &value)
     }
 }
 
-Config::ConfigOption::ConfigOption(
+ConfigBase::ConfigOption::ConfigOption(
 		char shortCmdLineArg,
 		const std::string &longCmdLineArg,
 		const std::string &configOption,
@@ -193,7 +194,7 @@ Config::ConfigOption::ConfigOption(
     init(value);
 }
 
-Config::ConfigOption::ConfigOption(
+ConfigBase::ConfigOption::ConfigOption(
         char shortCmdLineArg,
         const std::string &longCmdLineArg,
         const std::string &configOption,
@@ -206,7 +207,7 @@ Config::ConfigOption::ConfigOption(
     _long(longCmdLineArg),
     _config(configOption),
     _env(envVariable),
-    _type(Config::SET),
+    _type(ConfigBase::SET),
     _set(envDefinition),
     _required(required),
     _activated(false),
@@ -224,7 +225,7 @@ Config::ConfigOption::ConfigOption(
     init(value);
 }
 
-void Config::ConfigOption::setValue(const std::string& value)
+void ConfigBase::ConfigOption::setValue(const std::string& value)
 {
     switch(_type) {
     case STRING: {
@@ -262,37 +263,38 @@ void Config::ConfigOption::setValue(const std::string& value)
     }
 }
 
-void Config::ConfigOption::setValue(int value)
+void ConfigBase::ConfigOption::setValue(int value)
 {
     SCIDB_ASSERT(_type == INTEGER);
     _value = boost::any(value);
 }
 
-void Config::ConfigOption::setValue(size_t value)
+void ConfigBase::ConfigOption::setValue(size_t value)
 {
     SCIDB_ASSERT(_type == SIZE);
     _value = boost::any(value);
 }
 
-void Config::ConfigOption::setValue(double value)
+void ConfigBase::ConfigOption::setValue(double value)
 {
     SCIDB_ASSERT(_type == REAL);
     _value = boost::any(value);
 }
 
-void Config::ConfigOption::setValue(bool value)
+void ConfigBase::ConfigOption::setValue(bool value)
 {
     SCIDB_ASSERT(_type == BOOLEAN);
     _value = boost::any(value);
 }
 
-void Config::ConfigOption::setValue(const std::vector< std::string >& value)
+void ConfigBase::ConfigOption::setValue(
+    const std::vector< std::string >& value)
 {
     SCIDB_ASSERT(_type == STRING_LIST);
     _value = boost::any(value);
 }
 
-void Config::ConfigOption::setValue(const boost::any &value)
+void ConfigBase::ConfigOption::setValue(const boost::any &value)
 {
     // Just runtime check of values types which will be stored in boost::any.
     // Exception will be thrown if value type in any not match specified.
@@ -323,22 +325,22 @@ void Config::ConfigOption::setValue(const boost::any &value)
     }
 }
 
-std::string Config::ConfigOption::getValueAsString() const
+std::string ConfigBase::ConfigOption::getValueAsString() const
 {
     switch (_type)
     {
-    case Config::BOOLEAN:
+    case ConfigBase::BOOLEAN:
         return boost::lexical_cast<std::string>(boost::any_cast<bool>(_value));
         break;
-    case Config::STRING:
+    case ConfigBase::STRING:
         return boost::any_cast<std::string>(_value);
-    case Config::SET:
+    case ConfigBase::SET:
         return _set[boost::any_cast<int>(_value)];
-    case Config::INTEGER:
+    case ConfigBase::INTEGER:
         return boost::lexical_cast<std::string>(boost::any_cast<int>(_value));
-    case Config::SIZE:
+    case ConfigBase::SIZE:
         return boost::lexical_cast<std::string>(boost::any_cast<size_t>(_value));
-    case Config::REAL:
+    case ConfigBase::REAL:
         return boost::lexical_cast<std::string>(boost::any_cast<double>(_value));
     default:
         SCIDB_UNREACHABLE();
@@ -346,7 +348,7 @@ std::string Config::ConfigOption::getValueAsString() const
     return "";
 }
 
-Config::ConfigAddOption Config::addOption(
+ConfigBase::ConfigAddOption ConfigBase::addOption(
 		int32_t option,
 		char shortCmdLineArg,
 		const std::string &longCmdLineArg,
@@ -362,7 +364,7 @@ Config::ConfigAddOption Config::addOption(
 
 	_longArgToOption[longCmdLineArg] = option;
 
-    _values[option] = new Config::ConfigOption(
+    _values[option] = new ConfigBase::ConfigOption(
                 shortCmdLineArg,
                 longCmdLineArg,
                 configOption,
@@ -374,7 +376,7 @@ Config::ConfigAddOption Config::addOption(
 	return ConfigAddOption(this);
 }
 
-Config::ConfigAddOption Config::addOption(
+ConfigBase::ConfigAddOption ConfigBase::addOption(
         int32_t option,
         char shortCmdLineArg,
         const std::string &longCmdLineArg,
@@ -390,7 +392,7 @@ Config::ConfigAddOption Config::addOption(
 
     _longArgToOption[longCmdLineArg] = option;
 
-    _values[option] = new Config::ConfigOption(
+    _values[option] = new ConfigBase::ConfigOption(
                 shortCmdLineArg,
                 longCmdLineArg,
                 configOption,
@@ -403,7 +405,7 @@ Config::ConfigAddOption Config::addOption(
     return ConfigAddOption(this);
 }
 
-std::string Config::toString()
+std::string ConfigBase::toString()
 {
     stringstream ss;
     BOOST_FOREACH(opt_pair p, _values)
@@ -415,7 +417,7 @@ std::string Config::toString()
     return ss.str();
 }
 
-void Config::parse(int argc, char **argv, const char* configFileName)
+void ConfigBase::parse(int argc, char **argv, const char* configFileName)
 {
     _configFileName = configFileName;
 
@@ -433,23 +435,23 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 
         switch (opt->getType())
         {
-        case Config::BOOLEAN:
+        case ConfigBase::BOOLEAN:
             opt->setValue(lexical_cast<bool>(env));
             break;
-        case Config::STRING:
-        case Config::SET:
+        case ConfigBase::STRING:
+        case ConfigBase::SET:
             opt->setValue(lexical_cast<string>(env));
             break;
-        case Config::INTEGER:
+        case ConfigBase::INTEGER:
             opt->setValue(lexical_cast<int>(env));
             break;
-        case Config::SIZE:
+        case ConfigBase::SIZE:
             opt->setValue(forced_lexical_cast<size_t>(env));
             break;
-        case Config::REAL:
+        case ConfigBase::REAL:
             opt->setValue(lexical_cast<double>(env));
             break;
-        case Config::STRING_LIST:
+        case ConfigBase::STRING_LIST:
             {
                 vector<string> strs;
                 stringToVector(env, strs);
@@ -483,16 +485,16 @@ void Config::parse(int argc, char **argv, const char* configFileName)
         } else {
             arg = opt->getLongName();
         }
-	
+
         switch(opt->getType())
         {
-        case Config::BOOLEAN:
+        case ConfigBase::BOOLEAN:
             helpDesc.add_options()(arg.c_str(),
                                    opt->getDescription().c_str());
             if (!boost::any_cast<bool>(opt->getValue())) {
                 argsDesc.add_options()(arg.c_str(),
                                        opt->getDescription().c_str());
-            } else { 
+            } else {
                 argsDesc.add_options()(arg.c_str(),
                                        optTypeToValSem(opt->getType()),
                                        opt->getDescription().c_str());
@@ -547,7 +549,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 		{
             switch (opt->getType())
             {
-            case Config::BOOLEAN:
+            case ConfigBase::BOOLEAN:
                 // If the default value is false, the presence of the option in the command line indicates a true.
                 // For example, to enable watchdog, the command line has "--no-watchdog".
                 opt->setValue(!boost::any_cast<bool>(opt->getValue()) ?
@@ -555,28 +557,28 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                               cmdLineArgs[opt->getLongName()].empty() || cmdLineArgs[opt->getLongName()].as<bool>()
                     );
                 break;
-            case Config::SET:
-            case Config::STRING:
+            case ConfigBase::SET:
+            case ConfigBase::STRING:
                 opt->setValue(cmdLineArgs[opt->getLongName()].as<string>());
                 break;
-            case Config::INTEGER:
+            case ConfigBase::INTEGER:
                 opt->setValue(cmdLineArgs[opt->getLongName()].as<int>());
                 break;
-            case Config::SIZE:
+            case ConfigBase::SIZE:
                 {
                     checked_size cs = cmdLineArgs[opt->getLongName()].as<checked_size>();
                     opt->setValue(cs.sz);
                 }
                 break;
-            case Config::REAL:
+            case ConfigBase::REAL:
                 opt->setValue(cmdLineArgs[opt->getLongName()].as<double>());
                 break;
-            case Config::STRING_LIST:
+            case ConfigBase::STRING_LIST:
                 opt->setValue(cmdLineArgs[opt->getLongName()].as<std::vector< std::string> >());
             }
 
             opt->setActivated();
-			
+
 			BOOST_FOREACH(void (*hook)(int32_t), _hooks)
 			{
 				hook(p.first);
@@ -641,7 +643,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                         {
                             switch (opt->getType())
                             {
-                                case Config::BOOLEAN:
+                                case ConfigBase::BOOLEAN:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
                                         opt->setValue(bool(root[opt->getConfigName()].asBool()));
@@ -649,8 +651,8 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                                     }
                                     break;
                                 }
-                                case Config::STRING:
-                                case Config::SET:
+                                case ConfigBase::STRING:
+                                case ConfigBase::SET:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
                                         std::string value = root[opt->getConfigName()].asString();
@@ -659,7 +661,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                                     }
                                     break;
                                 }
-                                case Config::INTEGER:
+                                case ConfigBase::INTEGER:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
                                         int value = root[opt->getConfigName()].asInt();
@@ -668,7 +670,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                                     }
                                     break;
                                 }
-                                case Config::SIZE:
+                                case ConfigBase::SIZE:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
                                         size_t value = root[opt->getConfigName()].asUInt();
@@ -677,7 +679,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                                     }
                                     break;
                                 }
-                                case Config::REAL:
+                                case ConfigBase::REAL:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
                                         double value = root[opt->getConfigName()].asDouble();
@@ -686,7 +688,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
                                     }
                                     break;
                                 }
-                                case Config::STRING_LIST:
+                                case ConfigBase::STRING_LIST:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
                                         vector<string> strs;
@@ -717,7 +719,10 @@ void Config::parse(int argc, char **argv, const char* configFileName)
             }
             else
             {
-                throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_ERROR_IN_CONFIGURATION_FILE) << reader.getFormatedErrorMessages();
+                throw USER_EXCEPTION(
+                    SCIDB_SE_CONFIG,
+                    SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
+                        << reader.getFormatedErrorMessages();
             }
         }
         else
@@ -725,7 +730,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
             ifile.close();
         }
     }
-	
+
 	BOOST_FOREACH(opt_pair p, _values)
 	{
 		ConfigOption *opt = p.second;
@@ -741,7 +746,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 				ss << "* Through command line argument ";
                 if (opt->getShortName())
                     ss << "-" << opt->getShortName();
-				
+
                 if (opt->getLongName() != "")
 				{
                     if (opt->getShortName() != 0)
@@ -752,7 +757,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 				}
 				ss << endl;
 			}
-			
+
             if (opt->getEnvName() != "")
 			{
                 ss << "* Through environment variable '" << opt->getEnvName() << "'" << endl;
@@ -769,7 +774,7 @@ void Config::parse(int argc, char **argv, const char* configFileName)
 	}
 }
 
-Config::~Config()
+ConfigBase::~ConfigBase()
 {
 	for(std::map<int32_t, ConfigOption*>::iterator it = _values.begin();
 			it != _values.end(); ++it)
@@ -779,7 +784,7 @@ Config::~Config()
 }
 
 
-void Config::addHook(void (*hook)(int32_t))
+void ConfigBase::addHook(void (*hook)(int32_t))
 {
 	_hooks.push_back(hook);
 }
@@ -787,35 +792,35 @@ void Config::addHook(void (*hook)(int32_t))
 //TODO: Will be good to support more then one config file for loading
 //e.g system configs from /etc and user config from ~/.config/ for different
 //utilites
-void Config::setConfigFileName(const std::string& configFileName)
+void ConfigBase::setConfigFileName(const std::string& configFileName)
 {
     _configFileName = configFileName;
 }
 
-const std::string& Config::getDescription() const
+const std::string& ConfigBase::getDescription() const
 {
     return _description;
 }
 
-const std::string& Config::getConfigFileName() const
+const std::string& ConfigBase::getConfigFileName() const
 {
     return _configFileName;
 }
 
-bool Config::optionActivated(int32_t option)
+bool ConfigBase::optionActivated(int32_t option)
 {
     assert(_values[option]);
     return _values[option]->getActivated();
 }
 
-void Config::setOption(int32_t option, const boost::any &value)
+void ConfigBase::setOption(int32_t option, const boost::any &value)
 {
     assert(_values[option]);
     _values[option]->setValue(value);
 }
 
 
-std::string Config::setOptionValue(std::string const& name, std::string const& newValue)
+std::string ConfigBase::setOptionValue(std::string const& name, std::string const& newValue)
 {
     std::map<std::string, int32_t>::const_iterator i = _longArgToOption.find(name);
     if (i == _longArgToOption.end())
@@ -824,20 +829,20 @@ std::string Config::setOptionValue(std::string const& name, std::string const& n
     std::string oldValue = getOptionValue(name);
     switch (opt->getType())
     {
-      case Config::BOOLEAN:
+      case ConfigBase::BOOLEAN:
         opt->setValue(boost::lexical_cast<bool>(newValue));
         break;
-      case Config::STRING:
-      case Config::SET:
+      case ConfigBase::STRING:
+      case ConfigBase::SET:
         opt->setValue(newValue);
         break;
-      case Config::INTEGER:
+      case ConfigBase::INTEGER:
         opt->setValue(boost::lexical_cast<int>(newValue));
         break;
-      case Config::SIZE:
+      case ConfigBase::SIZE:
         opt->setValue(forced_lexical_cast<size_t>(newValue));
         break;
-      case Config::REAL:
+      case ConfigBase::REAL:
         opt->setValue(boost::lexical_cast<double>(newValue));
         break;
       default:
@@ -846,7 +851,7 @@ std::string Config::setOptionValue(std::string const& name, std::string const& n
     return oldValue;
 }
 
-std::string Config::getOptionValue(std::string const& name)
+std::string ConfigBase::getOptionValue(std::string const& name)
 {
     std::map<std::string, int32_t>::const_iterator i = _longArgToOption.find(name);
     if (i == _longArgToOption.end())
@@ -855,22 +860,22 @@ std::string Config::getOptionValue(std::string const& name)
     return opt->getValueAsString();
 }
 
-static po::value_semantic* optTypeToValSem(Config::ConfigOptionType optionType)
+static po::value_semantic* optTypeToValSem(ConfigBase::ConfigOptionType optionType)
 {
     switch (optionType)
     {
-    case Config::BOOLEAN:
+    case ConfigBase::BOOLEAN:
         return po::value<bool>()->implicit_value(true)->default_value(true);
-    case Config::STRING:
-    case Config::SET:
+    case ConfigBase::STRING:
+    case ConfigBase::SET:
         return po::value<string>();
-    case Config::INTEGER:
+    case ConfigBase::INTEGER:
         return po::value<int>();
-    case Config::SIZE:
+    case ConfigBase::SIZE:
         return po::value<checked_size>();
-    case Config::REAL:
+    case ConfigBase::REAL:
         return po::value<double>();
-    case Config::STRING_LIST:
+    case ConfigBase::STRING_LIST:
         return po::value<vector<string> >()->multitoken();
     default:
         SCIDB_UNREACHABLE();

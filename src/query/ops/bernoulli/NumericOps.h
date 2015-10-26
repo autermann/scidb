@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,11 +21,11 @@
 */
 
 //
-//  About:  
+//  About:
 //
-//    This is the header file for a NumericOps class, which implements random 
+//    This is the header file for a NumericOps class, which implements random
 //    number generators for a variety of distributions.
-//    
+//
 #if !defined(__NUMERIC_OPS_HPP__)
 #define __NUMERIC_OPS_HPP__
 
@@ -34,8 +34,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <float.h>   
-#include <limits.h> 
+#include <float.h>
+#include <limits.h>
 
 #define SHUFFLE_ARRAY_SIZE (32)
 #define MULTIPLIER (16807)
@@ -52,8 +52,8 @@
 
 typedef enum {InitialSeed, LastSeed, NewSeed} SeedType;
 //
-//  These #defines are used to hold the sizes and states of various 
-//  things to do with error handling on the Class. 
+//  These #defines are used to hold the sizes and states of various
+//  things to do with error handling on the Class.
 //
 #define GENVAL_RG_OUT_OF_RANGE  -8
 #define NUMERIC_ERR_STATE_INC_BETA_ITER_OUT -7
@@ -69,11 +69,11 @@ typedef enum {InitialSeed, LastSeed, NewSeed} SeedType;
 #define NUMERIC_ERR_STRING_LEN 80
 
 class NumericOperations
-{ 
+{
 
 public:
 	//
-	// Constructors. 
+	// Constructors.
 	//
 	NumericOperations (const int);
 	~NumericOperations() {};
@@ -82,23 +82,23 @@ public:
 	//
 	void ResetSeed ( const int nSeedArg );
 	//
-	// These methods are useful in computing a variety of internal values 
-	// used wihin this class. We also provide them as public methods. 
+	// These methods are useful in computing a variety of internal values
+	// used wihin this class. We also provide them as public methods.
 	//
 	double 	gammaln       ( const double  );
 	double 	beta	      ( const double, const double );
 	//
-	//  Incomplete Gamma Functions 
+	//  Incomplete Gamma Functions
 	//
 	double	gammap	      ( const double, const double );
 	double	gammaq	      ( const double, const double );
 	//
 	//  Incomplete beta function.
 	//
-	double	betacf		  ( const double z, const double a, 
+	double	betacf		  ( const double z, const double a,
 								const double b);
 
-	double    incbeta       ( const double z, const double a, 
+	double    incbeta       ( const double z, const double a,
 								const double b);
 
 	double	factorialln   ( const int );
@@ -119,13 +119,13 @@ public:
 	//
 	//  Various "table" methods.
 	//
-	//  Computes the dbProb quantile for the normal distribution over the 
-	//	range [0,1]. 
+	//  Computes the dbProb quantile for the normal distribution over the
+	//	range [0,1].
 	//
 	double	qtilenorm	 	( double	dbProb );
 	//
-	// Methods relating to the soopa-doopa random number generator given to 
-	// moi by Peter Haas. 
+	// Methods relating to the soopa-doopa random number generator given to
+	// moi by Peter Haas.
 	//
 	void		ResetSeedRG     ( unsigned g, int s[4] );
 	void		GetStateRG      ( unsigned g, int s[4] );
@@ -144,7 +144,7 @@ public:
 	double	poissondev    ( const double  );
 	double	binomialdev   ( const double, const int );
 
-	double 	zipfdeviate   ( const double, const double, 
+	double 	zipfdeviate   ( const double, const double,
 								const double );
 	double 	zipfdeviate   ( const double );
 
@@ -158,12 +158,12 @@ private :
 	//
 	void		seterr	     ( const int nErr ) { nErrorState = nErr; }
 	//
-	//  Methods used within the public Gamma function methods 
-	//  declared above. 
+	//  Methods used within the public Gamma function methods
+	//  declared above.
 	//
-	void		gammaser      ( double *, const double, 
+	void		gammaser      ( double *, const double,
 					const double, double * );
-	void		gammacf       ( double *, const double, 
+	void		gammacf       ( double *, const double,
 					const double, double * );
 	//
 	// Used for the uniform distribution.
@@ -172,7 +172,7 @@ private :
 	int	 nLastVal;
 	int	 narShuffle[SHUFFLE_ARRAY_SIZE];
 	//
-	// 
+	//
 	//
 	int aw[4], avw[4], a[4], m[4];
 	int Ig[4][MAXGEN+1], Lg[4][MAXGEN+1], Cg[4][MAXGEN+1];
@@ -181,8 +181,8 @@ private :
 	inline int MultModM ( int s, int t, int M );
 	//
 	// Array of pre-calculated factorial values used by the factorialln()
-	// method. The idea is to pre-compute a large number of these 
-	// values to make the most common cases as efficient as possible. 
+	// method. The idea is to pre-compute a large number of these
+	// values to make the most common cases as efficient as possible.
 	//
 	double	dbarFactLn[FACT_ARRAY_LEN];
 	//
@@ -200,7 +200,7 @@ private :
 	//
 	int	nOldTrials;
 	double	dbOldP, dbPc, dbPLog, dbPCLog, dbEn, dbOldGamma;
-	//	
+	//
 	// Used by the gaussian deviation
 	//
 	int	nGPrev;

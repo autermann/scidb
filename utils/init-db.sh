@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -21,7 +21,7 @@
 #
 
 #
-# Script for preparing SciDB catalog database 
+# Script for preparing SciDB catalog database
 #
 
 if [ 4 != $# ]; then
@@ -45,8 +45,8 @@ function read_yn()
 {
     while [ 1 ]; do
         read -p "$1 (y/n): " res
-        case "$res" in        
-            y|Y) 
+        case "$res" in
+            y|Y)
                 return 0
                 ;;
             n|N)
@@ -61,7 +61,7 @@ function user_exists()
     for u in $(echo "select u.usename from pg_catalog.pg_user u" | psql -p $pgPort -q postgres|tail -n+3|head -n-2); do
 	if [[ "$u" = "$1" ]]; then
 	    echo "$u"
-	fi 
+	fi
     done
 }
 
@@ -70,7 +70,7 @@ function db_exists()
     for d in $(echo "select d.datname from pg_catalog.pg_database d" | psql -p $pgPort -q postgres|tail -n+3|head -n-2); do
 	if [[ "$d" = "$1" ]]; then
 	    echo "$d"
-	fi 
+	fi
     done
 }
 
@@ -88,20 +88,20 @@ function plpgsql_exists()
     fi
 }
 
-function db_init() 
+function db_init()
 {
     local owner=$1
     local database=$2
     local password=$3
 
-    createdb --owner "$owner" "$database" || die
+    createdb -p $pgPort --owner "$owner" "$database" || die
     if [ `plpgsql_exists $database` = "0" ]; then
         echo "Creating language plpgsql for database $catalog_name..."
-        createlang plpgsql "$database" || die
+        createlang -p $pgPort plpgsql "$database" || die
     fi
     echo "update pg_language set lanpltrusted = true where lanname = 'c'" | psql -p $pgPort "$database" || die
     echo "grant usage on language c to $owner;" | psql -p $pgPort "$database" || die
-    
+
 #    export PGPASSWORD=$password
 #    echo metadata $metadata
 #    psql -h localhost -f "$metadata" -U "$owner" "$database" || die

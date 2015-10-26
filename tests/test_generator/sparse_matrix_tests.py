@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-# Initialize, start and stop scidb. 
-# Supports single instance and cluster configurations. 
+# Initialize, start and stop scidb.
+# Supports single instance and cluster configurations.
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -47,7 +47,7 @@ def usage():
   sys.exit(2)
 
 # class to define a test
-    
+
 # dictionaries filled with commands
 matrixNames = ["T", "E", "R"]
 matrixSizes = [ [3,4,2,3], [13,21,13,21], [13,21,11,17], [29,29], [29,29,13,12], [1000,200], [1001,201], [1000,1000], [1024,1024,1024,1024], [1024,1024,256,256], [1050,1050], [1001,1001], [1001,999,101,99] ]
@@ -58,10 +58,10 @@ matrixSizes = [ [3,4,2,3], [13,21,13,21], [13,21,11,17], [29,29], [29,29,13,12],
 #matrixSizes = [ [1024,1024,256,256], [1050,1050], [1001,1001], [1001,999,101,99] ]
 #matrixSizes = [ [5,5] ]
 #matrixSizes = [ [13,21], [1001,201], [200,200] ]
-#dataTypes   = ["double", "int64", "int32", "int16", "uint64", "float" ] 
-#dataTypes   = ["double"] 
-dataTypes   = ["double", "int64"] 
-#dataTypes   = ["float"] 
+#dataTypes   = ["double", "int64", "int32", "int16", "uint64", "float" ]
+#dataTypes   = ["double"]
+dataTypes   = ["double", "int64"]
+#dataTypes   = ["float"]
 successString = "Command completed successfully"
 # each test is a sequence of create, fill and comparison (and, of course, cleanup)
 tests = []
@@ -135,6 +135,6 @@ t.setSparseFunction("j-2<i and i<j+2")
 tests.append(t)
 
 # need to add: var
-            
+
 for t in tests:
     runTest(t, matrixNames, matrixSizes, dataTypes)

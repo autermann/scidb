@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,8 +30,7 @@
 #include <signal.h>
 #include <boost/bind.hpp>
 #include <boost/format.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 #include <google/protobuf/message.h>
 #include <google/protobuf/descriptor.h>
 
@@ -61,9 +60,6 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.netw
 /***
  * N e t w o r k M a n a g e r
  */
-
-const time_t RECOVER_TIMEOUT = 2;
-
 volatile bool NetworkManager::_shutdown=false;
 
 NetworkManager::NetworkManager():
@@ -72,26 +68,24 @@ NetworkManager::NetworkManager():
                 Config::getInstance()->getOption<int>(CONFIG_PORT))),
         _input(_ioService),
         _aliveTimer(_ioService),
-        _aliveTimeout(DEFAULT_ALIVE_TIMEOUT),
+        _aliveTimeout(DEFAULT_ALIVE_TIMEOUT_MICRO),
         _selfInstanceID(INVALID_INSTANCE),
         _instances(new Instances),
         _repMessageCount(0),
         _maxRepSendQSize(Config::getInstance()->getOption<int>(CONFIG_REPLICATION_SEND_QUEUE_SIZE)),
         _maxRepReceiveQSize(Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE)),
+        _randInstanceId(0),
+        _aliveRequestCount(0),
         _memUsage(0),
         _msgHandlerFactory(new DefaultNetworkMessageFactory)
 {
     // Note: that _acceptor is 'fully opened', i.e. bind()'d, listen()'d and polled as needed
     _acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-   int64_t reconnTimeout = Config::getInstance()->getOption<int>(CONFIG_RECONNECT_TIMEOUT);
-   Scheduler::Work func = bind(&NetworkManager::handleReconnect);
-   _reconnectScheduler =
-   shared_ptr<ThrottledScheduler>(new ThrottledScheduler(reconnTimeout,
-                                                         func, _ioService));
-   func = bind(&NetworkManager::handleLiveness);
-   _livenessHandleScheduler =
-   shared_ptr<ThrottledScheduler>(new ThrottledScheduler(DEFAULT_LIVENESS_HANDLE_TIMEOUT,
-                                                         func, _ioService));
+
+    Scheduler::Work func = bind(&NetworkManager::handleLiveness);
+    _livenessHandleScheduler =
+       std::shared_ptr<ThrottledScheduler>(new ThrottledScheduler(DEFAULT_LIVENESS_HANDLE_TIMEOUT,
+                                                             func, _ioService));
    LOG4CXX_DEBUG(logger, "Network manager is intialized");
 }
 
@@ -101,7 +95,7 @@ NetworkManager::~NetworkManager()
     _ioService.stop();
 }
 
-void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
+void NetworkManager::run(std::shared_ptr<JobQueue> jobQueue)
 {
     LOG4CXX_DEBUG(logger, "NetworkManager::run()");
 
@@ -141,8 +135,9 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
         if (_selfInstanceID == INVALID_INSTANCE) {
             throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_NOT_REGISTERED);
         }
-        if (cfg->getOption<int>(CONFIG_REDUNDANCY) >= (int)SystemCatalog::getInstance()->getNumberOfInstances())
+        if (cfg->getOption<size_t>(CONFIG_REDUNDANCY) >= SystemCatalog::getInstance()->getNumberOfInstances()) {
             throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_INVALID_REDUNDANCY);
+        }
         catalog->markInstanceOnline(_selfInstanceID, address, port);
     }
     _jobQueue = jobQueue;
@@ -165,7 +160,8 @@ void NetworkManager::run(shared_ptr<JobQueue> jobQueue)
         InstanceLivenessNotification::addPublishListener(listener);
 
     startAccept();
-    _aliveTimer.expires_from_now(posix_time::seconds(_aliveTimeout));
+
+    _aliveTimer.expires_from_now(posix_time::microseconds(0));  //i.e. immediately
     _aliveTimer.async_wait(NetworkManager::handleAlive);
 
     LOG4CXX_DEBUG(logger, "Start connection accepting and async message exchanging");
@@ -228,13 +224,14 @@ void NetworkManager::handleInput(const boost::system::error_code& error, size_t 
 void NetworkManager::startAccept()
 {
    assert(_selfInstanceID != INVALID_INSTANCE);
-   shared_ptr<Connection> newConnection(new Connection(*this, _selfInstanceID));
+   std::shared_ptr<Connection> newConnection(new Connection(*this, _selfInstanceID));
    _acceptor.async_accept(newConnection->getSocket(),
                           bind(&NetworkManager::handleAccept, this,
                                newConnection, boost::asio::placeholders::error));
 }
 
-void NetworkManager::handleAccept(shared_ptr<Connection> newConnection, const boost::system::error_code& error)
+void NetworkManager::handleAccept(std::shared_ptr<Connection>& newConnection,
+                                  const boost::system::error_code& error)
 {
     if (error == boost::system::errc::operation_canceled) {
         return;
@@ -260,7 +257,8 @@ void NetworkManager::handleAccept(shared_ptr<Connection> newConnection, const bo
     }
 }
 
-void NetworkManager::handleMessage(shared_ptr< Connection > connection, const shared_ptr<MessageDesc>& messageDesc)
+void NetworkManager::handleMessage(std::shared_ptr< Connection >& connection,
+                                   const std::shared_ptr<MessageDesc>& messageDesc)
 {
    if (_shutdown) {
       handleShutdown();
@@ -282,12 +280,12 @@ void NetworkManager::handleMessage(shared_ptr< Connection > connection, const sh
 
          if (messageDesc->getSourceInstanceID() == CLIENT_INSTANCE)
          {
-             shared_ptr<ClientMessageHandleJob> job = make_shared<ClientMessageHandleJob>(connection, messageDesc);
+             std::shared_ptr<ClientMessageHandleJob> job = make_shared<ClientMessageHandleJob>(connection, messageDesc);
              job->dispatch(_requestQueue,_workQueue);
          }
          else
          {
-             shared_ptr<MessageHandleJob> job = make_shared<ServerMessageHandleJob>(messageDesc);
+             std::shared_ptr<MessageHandleJob> job = make_shared<ServerMessageHandleJob>(messageDesc);
              job->dispatch(_requestQueue,_workQueue);
          }
          handler = bind(&NetworkManager::publishMessage, _1);
@@ -320,17 +318,17 @@ void NetworkManager::handleMessage(shared_ptr< Connection > connection, const sh
           && instanceId != CLIENT_INSTANCE
           && instanceId < _instances->size())
        {
-          shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, queryId);
+          std::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, queryId);
           _sendPhysical(instanceId, errorMessage);
           LOG4CXX_DEBUG(logger, "Error returned to sender")
        }
    }
 }
 
-void NetworkManager::handleControlMessage(const shared_ptr<MessageDesc>& msgDesc)
+void NetworkManager::handleControlMessage(const std::shared_ptr<MessageDesc>& msgDesc)
 {
     assert(msgDesc);
-    shared_ptr<scidb_msg::Control> record = msgDesc->getRecord<scidb_msg::Control>();
+    std::shared_ptr<scidb_msg::Control> record = msgDesc->getRecord<scidb_msg::Control>();
     assert(record);
 
     InstanceID instanceId = msgDesc->getSourceInstanceID();
@@ -380,7 +378,7 @@ void NetworkManager::handleControlMessage(const shared_ptr<MessageDesc>& msgDesc
     if (iter == _outConnections.end()) {
         return;
     }
-    shared_ptr<Connection>& connection = iter->second;
+    std::shared_ptr<Connection>& connection = iter->second;
     if (!connection) {
         return;
     }
@@ -409,7 +407,7 @@ void NetworkManager::handleControlMessage(const shared_ptr<MessageDesc>& msgDesc
     }
 }
 
-uint64_t NetworkManager::getAvailable(MessageQueueType mqt)
+uint64_t NetworkManager::getAvailable(MessageQueueType mqt, InstanceID forInstanceID)
 {
     // mqtRplication is the only supported type for now
     if (mqt != mqtReplication) {
@@ -417,28 +415,78 @@ uint64_t NetworkManager::getAvailable(MessageQueueType mqt)
         return MAX_QUEUE_SIZE;
     }
     ScopedMutexLock mutexLock(_mutex);
-    return _getAvailable(mqt);
+    return _getAvailable(mqt, forInstanceID);
 }
 
-uint64_t NetworkManager::_getAvailable(MessageQueueType mqt)
+uint64_t NetworkManager::getAvailableRepSlots()
 { // mutex must be locked
-    getInstances(false);
-    uint64_t softLimit = 3*_maxRepReceiveQSize/4;
+
+    const uint64_t messageCount = _repMessageCount;
+    const uint64_t maxReceiveQSize = _maxRepReceiveQSize;
+
+    uint64_t softLimit = 3*maxReceiveQSize/4;
     if (softLimit==0) {
         softLimit=1;
     }
+
+    uint64_t availableSlots = 0;
+    if (softLimit > messageCount) {
+        availableSlots = (softLimit - messageCount);
+    }
+    return availableSlots;
+}
+
+bool NetworkManager::isBufferSpaceLow()
+{
+    // mutex must be locked
+    getInstances(false);
+    const uint64_t numInst = _instances->size();
+    const uint64_t availableSlots = getAvailableRepSlots();
+    return (availableSlots < numInst);
+}
+
+uint64_t NetworkManager::_getAvailable(MessageQueueType mqt, InstanceID forInstanceID)
+{ // mutex must be locked
+
+    assert(mqt==mqtReplication);
+
+    getInstances(false);
+    const uint64_t numInst = _instances->size();
+
+    const uint64_t availableSlots = getAvailableRepSlots();
     uint64_t available = 0;
-    if (softLimit >_repMessageCount) {
-        available = (softLimit -_repMessageCount) / _instances->size();
-        if (available==0) {
-            available=1;
+
+    if (availableSlots>0) {
+
+        available = availableSlots / numInst;
+
+        if (available == 0) {
+            // There is some space for the incoming chunks,
+            // but not enough to accomodate one from each instance.
+            // Since we dont know who is going to send to us, we choose a random instance.
+            // The instances around it (provided the space allows) get a green light.
+            // The same random instance remains the number of instances requests because
+            // a control message typically is broadcast resulting in #instances requests at once.
+            // Empiracally, it seems to work as expected. If an overflow does occur, the query will abort.
+            if ((_aliveRequestCount++ % numInst) == 0) {
+                _randInstanceId  = uint64_t(Query::getRandom()) % numInst;
+            }
+            const uint64_t distLeft  = _randInstanceId > forInstanceID ?
+            _randInstanceId - forInstanceID : forInstanceID - _randInstanceId;
+            const uint64_t distRight = numInst - distLeft;
+            if ( distLeft <= availableSlots/2 ||
+                 distRight < availableSlots/2 ) {
+                available = 1;
+            }
         }
     }
-    LOG4CXX_TRACE(logger, "Available queue size=" << available << " for queue "<<mqt);
+    LOG4CXX_TRACE(logger, "Available queue size=" << available
+                  << " for queue "<< mqt
+                  << " for instanceID="<<forInstanceID);
     return available;
 }
 
-void NetworkManager::registerMessage(const shared_ptr<MessageDesc>& messageDesc,
+void NetworkManager::registerMessage(const std::shared_ptr<MessageDesc>& messageDesc,
                                      MessageQueueType mqt)
 {
     ScopedMutexLock mutexLock(_mutex);
@@ -455,12 +503,13 @@ void NetworkManager::registerMessage(const shared_ptr<MessageDesc>& messageDesc,
 
     ++_repMessageCount;
 
-    LOG4CXX_TRACE(logger, "Registered message " << _repMessageCount << " for queue "<<mqt);
+    LOG4CXX_TRACE(logger, "Registered message " << _repMessageCount
+                  << " for queue "<<mqt << " aliveTimeout="<<_aliveTimeout);
 
-    _aliveTimeout = 1;//sec
+    scheduleAliveNoLater(CONTROL_MSG_TIMEOUT_MICRO);
 }
 
-void NetworkManager::unregisterMessage(const shared_ptr<MessageDesc>& messageDesc,
+void NetworkManager::unregisterMessage(const std::shared_ptr<MessageDesc>& messageDesc,
                                        MessageQueueType mqt)
 {
     ScopedMutexLock mutexLock(_mutex);
@@ -478,13 +527,24 @@ void NetworkManager::unregisterMessage(const shared_ptr<MessageDesc>& messageDes
     }
 
     --_repMessageCount;
-    LOG4CXX_TRACE(logger, "Unregistered message " << _repMessageCount+1 << " for queue "<<mqt);
+    LOG4CXX_TRACE(logger, "Unregistered message " << _repMessageCount+1
+                  << " for queue "<<mqt  << " aliveTimeout="<<_aliveTimeout);
 
-    _aliveTimeout = 1;//sec
+    scheduleAliveNoLater(CONTROL_MSG_TIMEOUT_MICRO);
+}
+
+void
+NetworkManager::scheduleAliveNoLater(const time_t timeoutMicro)
+{
+    if ( _aliveTimeout > timeoutMicro) {
+        _aliveTimeout = timeoutMicro;
+        getIOService().post(boost::bind(&NetworkManager::handleAlive,
+                                        boost::system::error_code()));
+    }
 }
 
 bool
-NetworkManager::handleNonSystemMessage(const shared_ptr<MessageDesc>& messageDesc,
+NetworkManager::handleNonSystemMessage(const std::shared_ptr<MessageDesc>& messageDesc,
                                        NetworkMessageFactory::MessageHandler& handler)
 {
    assert(messageDesc);
@@ -500,22 +560,22 @@ NetworkManager::handleNonSystemMessage(const shared_ptr<MessageDesc>& messageDes
    return true;
 }
 
-void NetworkManager::publishMessage(const shared_ptr<MessageDescription>& msgDesc)
+void NetworkManager::publishMessage(const std::shared_ptr<MessageDescription>& msgDesc)
 {
-   shared_ptr<const MessageDescription> msg(msgDesc);
+   std::shared_ptr<const MessageDescription> msg(msgDesc);
    Notification<MessageDescription> event(msg);
    event.publish();
 }
 
-void NetworkManager::dispatchMessageToListener(const shared_ptr<Connection>& connection,
-                                               const shared_ptr<MessageDesc>& messageDesc,
+void NetworkManager::dispatchMessageToListener(const std::shared_ptr<Connection>& connection,
+                                               const std::shared_ptr<MessageDesc>& messageDesc,
                                                NetworkMessageFactory::MessageHandler& handler)
 {
     // no locks must be held
-    shared_ptr<MessageDescription> msgDesc;
+    std::shared_ptr<MessageDescription> msgDesc;
 
     if (messageDesc->getSourceInstanceID() == CLIENT_INSTANCE) {
-        msgDesc = shared_ptr<MessageDescription>(
+        msgDesc = std::shared_ptr<MessageDescription>(
             new DefaultMessageDescription(connection,
                                           messageDesc->getMessageType(),
                                           messageDesc->getRecord<Message>(),
@@ -523,7 +583,7 @@ void NetworkManager::dispatchMessageToListener(const shared_ptr<Connection>& con
                                           messageDesc->getQueryID()
                                           ));
     } else {
-        msgDesc = shared_ptr<MessageDescription>(
+        msgDesc = std::shared_ptr<MessageDescription>(
             new DefaultMessageDescription(messageDesc->getSourceInstanceID(),
                                           messageDesc->getMessageType(),
                                           messageDesc->getRecord<Message>(),
@@ -537,8 +597,8 @@ void NetworkManager::dispatchMessageToListener(const shared_ptr<Connection>& con
 
 void
 NetworkManager::_sendPhysical(InstanceID targetInstanceID,
-                             shared_ptr<MessageDesc>& messageDesc,
-                             MessageQueueType mqt)
+                             std::shared_ptr<MessageDesc>& messageDesc,
+                             MessageQueueType mqt /* = mqtNone */)
 {
     if (_shutdown) {
         handleShutdown();
@@ -552,36 +612,40 @@ NetworkManager::_sendPhysical(InstanceID targetInstanceID,
     assert(targetInstanceID < _instances->size());
 
     // Opening connection if it's not opened yet
-    shared_ptr<Connection> connection = _outConnections[targetInstanceID];
+    std::shared_ptr<Connection> connection = _outConnections[targetInstanceID];
     if (!connection)
     {
         getInstances(false);
-        connection = shared_ptr<Connection>(new Connection(*this, _selfInstanceID, targetInstanceID));
+        connection = std::shared_ptr<Connection>(new Connection(*this, _selfInstanceID, targetInstanceID));
         assert((*_instances)[targetInstanceID].getInstanceId() == targetInstanceID);
         _outConnections[targetInstanceID] = connection;
         connection->connectAsync((*_instances)[targetInstanceID].getHost(), (*_instances)[targetInstanceID].getPort());
     }
     // Sending message through connection
     connection->sendMessage(messageDesc, mqt);
+
+    if (mqt == mqtReplication) {
+        scheduleAliveNoLater(CONTROL_MSG_TIMEOUT_MICRO);
+    }
 }
 
 void
 NetworkManager::sendPhysical(InstanceID targetInstanceID,
-                            shared_ptr<MessageDesc>& messageDesc,
+                            std::shared_ptr<MessageDesc>& messageDesc,
                             MessageQueueType mqt)
 {
     getInstances(false);
     _sendPhysical(targetInstanceID, messageDesc, mqt);
 }
 
-void NetworkManager::broadcastPhysical(shared_ptr<MessageDesc>& messageDesc)
+void NetworkManager::broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc)
 {
    ScopedMutexLock mutexLock(_mutex);
    getInstances(false);
    _broadcastPhysical(messageDesc);
 }
 
-void NetworkManager::_broadcastPhysical(shared_ptr<MessageDesc>& messageDesc)
+void NetworkManager::_broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc)
 {
    for (Instances::const_iterator i = _instances->begin();
         i != _instances->end(); ++i) {
@@ -592,12 +656,12 @@ void NetworkManager::_broadcastPhysical(shared_ptr<MessageDesc>& messageDesc)
    }
 }
 
-void NetworkManager::broadcastLogical(shared_ptr<MessageDesc>& messageDesc)
+void NetworkManager::broadcastLogical(std::shared_ptr<MessageDesc>& messageDesc)
 {
     if (!messageDesc->getQueryID()) {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MESSAGE_MISSED_QUERY_ID);
     }
-   shared_ptr<Query> query = Query::getQueryByID(messageDesc->getQueryID());
+   std::shared_ptr<Query> query = Query::getQueryByID(messageDesc->getQueryID());
    const size_t instancesCount = query->getInstancesCount();
    InstanceID myInstanceID   = query->getInstanceID();
    assert(instancesCount>0);
@@ -639,14 +703,14 @@ size_t NetworkManager::getPhysicalInstances(std::vector<InstanceID>& instances)
 }
 
 void
-NetworkManager::sendLocal(const shared_ptr<Query>& query,
-                          shared_ptr<MessageDesc>& messageDesc)
+NetworkManager::sendLocal(const std::shared_ptr<Query>& query,
+                          std::shared_ptr<MessageDesc>& messageDesc)
 {
     const InstanceID physicalId = query->mapLogicalToPhysical(query->getInstanceID());
     messageDesc->setSourceInstanceID(physicalId);
-    shared_ptr<MessageHandleJob> job = boost::make_shared<ServerMessageHandleJob>(messageDesc);
-    shared_ptr<WorkQueue> rq = getRequestQueue();
-    shared_ptr<WorkQueue> wq = getWorkQueue();
+    std::shared_ptr<MessageHandleJob> job = std::make_shared<ServerMessageHandleJob>(messageDesc);
+    std::shared_ptr<WorkQueue> rq = getRequestQueue();
+    std::shared_ptr<WorkQueue> wq = getWorkQueue();
     try {
         job->dispatch(rq, wq);
     } catch (const WorkQueue::OverflowException& e) {
@@ -658,26 +722,21 @@ NetworkManager::sendLocal(const shared_ptr<Query>& query,
 
 void
 NetworkManager::send(InstanceID targetInstanceID,
-                     shared_ptr<MessageDesc>& msg)
+                     std::shared_ptr<MessageDesc>& msg)
 {
    assert(msg);
    if (!msg->getQueryID()) {
        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MESSAGE_MISSED_QUERY_ID);
    }
-   shared_ptr<Query> query = Query::getQueryByID(msg->getQueryID());
+   std::shared_ptr<Query> query = Query::getQueryByID(msg->getQueryID());
    InstanceID target = query->mapLogicalToPhysical(targetInstanceID);
    sendPhysical(target, msg);
 }
 
-void NetworkManager::send(InstanceID targetInstanceID, shared_ptr<SharedBuffer> const& data, shared_ptr< Query> & query)
-{
-    shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtBufferSend, data);
-    msg->setQueryID(query->getQueryID());
-    InstanceID target = query->mapLogicalToPhysical(targetInstanceID);
-    sendPhysical(target, msg);
-}
-
-shared_ptr<SharedBuffer> NetworkManager::receive(InstanceID sourceInstanceID, shared_ptr< Query> & query)
+void
+NetworkManager::receive(InstanceID sourceInstanceID,
+                        std::shared_ptr<MessageDesc>& msg,
+                        std::shared_ptr<Query>& query)
 {
     Semaphore::ErrorChecker ec = bind(&Query::validate, query);
     query->_receiveSemaphores[sourceInstanceID].enter(ec);
@@ -685,49 +744,27 @@ shared_ptr<SharedBuffer> NetworkManager::receive(InstanceID sourceInstanceID, sh
     if (query->_receiveMessages[sourceInstanceID].empty()) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INSTANCE_OFFLINE) << sourceInstanceID;
     }
-    shared_ptr<SharedBuffer> res = query->_receiveMessages[sourceInstanceID].front()->getBinary();
+    assert(!query->_receiveMessages[sourceInstanceID].empty());
+    msg = query->_receiveMessages[sourceInstanceID].front();
     query->_receiveMessages[sourceInstanceID].pop_front();
-
-    return res;
 }
 
-void NetworkManager::_handleReconnect()
+void NetworkManager::send(InstanceID targetInstanceID, std::shared_ptr<SharedBuffer> const& data, std::shared_ptr< Query> & query)
 {
-   set<InstanceID> brokenInstances;
-   ScopedMutexLock mutexLock(_mutex);
-   if (_shutdown) {
-      handleShutdown();
-      return;
-   }
-   if(_brokenInstances.size() <= 0 ) {
-      return;
-   }
-
-   getInstances(false);
-
-   brokenInstances.swap(_brokenInstances);
-
-   for (set<InstanceID>::const_iterator iter = brokenInstances.begin();
-        iter != brokenInstances.end(); ++iter) {
-      const InstanceID& i = *iter;
-      assert(i < _instances->size());
-      assert((*_instances)[i].getInstanceId() == i);
-      ConnectionMap::iterator connIter = _outConnections.find(i);
-
-      if (connIter == _outConnections.end()) {
-         continue;
-      }
-      shared_ptr<Connection>& connection = (*connIter).second;
-
-      if (!connection) {
-         _outConnections.erase(connIter);
-         continue;
-      }
-      connection->connectAsync((*_instances)[i].getHost(), (*_instances)[i].getPort());
-   }
+    std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtBufferSend, data);
+    msg->setQueryID(query->getQueryID());
+    InstanceID target = query->mapLogicalToPhysical(targetInstanceID);
+    sendPhysical(target, msg);
 }
 
-void NetworkManager::_handleLivenessNotification(shared_ptr<const InstanceLiveness>& liveInfo)
+std::shared_ptr<SharedBuffer> NetworkManager::receive(InstanceID sourceInstanceID, std::shared_ptr< Query> & query)
+{
+    std::shared_ptr<MessageDesc> msg;
+    receive(sourceInstanceID, msg, query);
+    return msg->getBinary();
+}
+
+void NetworkManager::_handleLivenessNotification(std::shared_ptr<const InstanceLiveness>& liveInfo)
 {
     if (logger->isDebugEnabled()) {
         ViewID viewId = liveInfo->getViewId();
@@ -762,7 +799,7 @@ void NetworkManager::_handleLivenessNotification(shared_ptr<const InstanceLivene
            _instanceLiveness->getVersion() < liveInfo->getVersion());
     _instanceLiveness = liveInfo;
 
-    _livenessHandleScheduler->schedule();
+    _handleLiveness();
 }
 
 void NetworkManager::_handleLiveness()
@@ -781,7 +818,7 @@ void NetworkManager::_handleLiveness()
          continue;
       }
 
-      shared_ptr<Connection>& connection = (*connIter).second;
+      std::shared_ptr<Connection>& connection = (*connIter).second;
       if (connection) {
          connection->disconnect();
          connection.reset();
@@ -796,34 +833,46 @@ void NetworkManager::_handleLiveness()
 void NetworkManager::_handleAlive(const boost::system::error_code& error)
 {
     if (error == boost::asio::error::operation_aborted) {
-       return;
+        LOG4CXX_TRACE(logger, "NetworkManager::_handleAlive: aborted");
+        return;
     }
 
-    shared_ptr<MessageDesc> messageDesc = make_shared<MessageDesc>(mtAlive);
+    std::shared_ptr<MessageDesc> messageDesc = make_shared<MessageDesc>(mtAlive);
 
     ScopedMutexLock mutexLock(_mutex);
     if (_shutdown) {
        handleShutdown();
+       LOG4CXX_WARN(logger, "NetworkManager::_handleAlive: shutdown");
        return;
     }
 
     _broadcastPhysical(messageDesc);
 
-    _aliveTimer.expires_from_now(posix_time::seconds(_aliveTimeout));
+    LOG4CXX_TRACE(logger, "NetworkManager::_handleAlive: last timeout="<<_aliveTimeout<<" microsecs"
+                  << ", replication msgCount="<<_repMessageCount);
+
+    if (!isBufferSpaceLow()) {
+        _aliveTimeout = DEFAULT_ALIVE_TIMEOUT_MICRO;
+    } else if (_repMessageCount <= 0 ) {
+        _aliveTimeout += CONTROL_MSG_TIME_STEP_MICRO; //+10msec
+        // In DEFAULT_ALIVE_TIMEOUT_MICRO / CONTROL_MSG_TIME_STEP_MICRO * CONTROL_MSG_TIMEOUT_MICRO ~= 50 sec
+        // of quiet the timeout will increase from CONTROL_MSG_TIMEOUT_MICRO to DEFAULT_ALIVE_TIMEOUT_MICRO
+    }
+
+    if (_aliveTimeout >= DEFAULT_ALIVE_TIMEOUT_MICRO) {
+        _aliveTimeout = DEFAULT_ALIVE_TIMEOUT_MICRO;
+        _aliveTimer.expires_from_now(posix_time::microseconds(DEFAULT_ALIVE_TIMEOUT_MICRO));
+    } else {
+        _aliveTimer.expires_from_now(posix_time::microseconds(CONTROL_MSG_TIMEOUT_MICRO));
+    }
     _aliveTimer.async_wait(NetworkManager::handleAlive);
-    _aliveTimeout = DEFAULT_ALIVE_TIMEOUT;
 }
 
 void NetworkManager::reconnect(InstanceID instanceID)
 {
-   {
       ScopedMutexLock mutexLock(_mutex);
-      _brokenInstances.insert(instanceID);
-      if (_brokenInstances.size() > 1) {
-         return;
-      }
-      _reconnectScheduler->schedule();
-   }
+      _outConnections.erase(instanceID);
+      // the connection will be restarted on-demand
 }
 
 void NetworkManager::handleClientDisconnect(const QueryID& queryId,
@@ -834,14 +883,14 @@ void NetworkManager::handleClientDisconnect(const QueryID& queryId,
    }
 
    LOG4CXX_WARN(logger, str(format("Client for query %lld disconnected") % queryId));
-   shared_ptr<Query> query = Query::getQueryByID(queryId, false);
+   std::shared_ptr<Query> query = Query::getQueryByID(queryId, false);
 
    if (!query) {
        return;
    }
    if (!dh) {
        assert(query->isCoordinator());
-       shared_ptr<scidb::WorkQueue> errorQ = query->getErrorQueue();
+       std::shared_ptr<scidb::WorkQueue> errorQ = query->getErrorQueue();
 
        if (!errorQ) {
            LOG4CXX_TRACE(logger, "Query " << query->getQueryID()
@@ -878,7 +927,7 @@ void NetworkManager::handleConnectionError(const QueryID& queryID)
    LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
                          "Conection error in query " << queryID);
 
-   shared_ptr<Query> query = Query::getQueryByID(queryID, false);
+   std::shared_ptr<Query> query = Query::getQueryByID(queryID, false);
 
    if (!query) {
       return;
@@ -886,32 +935,85 @@ void NetworkManager::handleConnectionError(const QueryID& queryID)
    query->handleError(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
 }
 
-void Send(void* ctx, InstanceID instance, void const* data, size_t size)
+static void abortQueryOnConnError(const std::shared_ptr<Query>& query)
 {
-    NetworkManager::getInstance()->send(instance, shared_ptr< SharedBuffer>(new MemoryBuffer(data, size)), *(shared_ptr<Query>*)ctx);
+    query->handleError(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
 }
 
+bool NetworkManager::isDead(InstanceID remoteInstanceId) const
+{
+    SCIDB_ASSERT(remoteInstanceId != _selfInstanceID);
+
+    if (_instanceLiveness) {
+        SCIDB_ASSERT(_instanceLiveness->getNumInstances() == _instances->size());
+        return _instanceLiveness->isDead(remoteInstanceId);
+    }
+    return false;
+}
+
+void
+NetworkManager::handleConnectionError(InstanceID remoteInstanceId,
+                                      const set<QueryID>& queries)
+{
+    if (remoteInstanceId == CLIENT_INSTANCE ||
+        isDead(remoteInstanceId)) {
+        for (std::set<QueryID>::const_iterator iter = queries.begin();
+             iter != queries.end(); ++iter) {
+            handleConnectionError(*iter);
+        }
+        return;
+    }
+
+    LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
+                         "Conection error - aborting ALL queries");
+    // When a TCP connection error occurs, there might be some messages
+    // in flight which have already left our queues, so there is no
+    // reliable way to detect which queries are affected without some
+    // registration mechnism. Such a mecahinsm seems an overkill
+    // at this point, so just abort all the queries.
+    // However, for a client connection it does not matter because all queries
+    // attached to that connection will be aborted.
+    // For a "dead" instance, we should not abort all the queries because
+    // the queries which use remoteInstanceId must be notified via the liveness mechanism.
+    size_t qNum = Query::visitQueries(
+                    Query::Visitor(
+                        boost::bind(
+                           &abortQueryOnConnError,_1)));
+
+    LOG4CXX_TRACE(logger, "NetworkManager::handleConnectionError: "
+                  "Aborted " << qNum << " queries");
+}
+
+void Send(void* ctx, InstanceID instance, void const* data, size_t size)
+{
+    std::shared_ptr<SharedBuffer> buf(make_shared<MemoryBuffer>(data, size));
+    NetworkManager::getInstance()->send(instance, buf,
+                                        *(std::shared_ptr<Query>*)ctx);
+}
 
 void Receive(void* ctx, InstanceID instance, void* data, size_t size)
 {
-    shared_ptr< SharedBuffer> buf =  NetworkManager::getInstance()->receive(instance, *(shared_ptr<Query>*)ctx);
-    assert(buf->getSize() == size);
+    NetworkManager* nm = NetworkManager::getInstance();
+    SCIDB_ASSERT(nm);
+    std::shared_ptr<SharedBuffer> buf = nm->receive(instance,
+                                               *(std::shared_ptr<Query>*)ctx);
+    SCIDB_ASSERT(buf->getSize() == size);
     memcpy(data, buf->getData(), buf->getSize());
 }
 
-void BufSend(InstanceID target, shared_ptr<SharedBuffer> const& data, shared_ptr<Query>& query)
+void BufSend(InstanceID target, std::shared_ptr<SharedBuffer> const& data, std::shared_ptr<Query>& query)
 {
     NetworkManager::getInstance()->send(target, data, query);
 }
 
-shared_ptr<SharedBuffer> BufReceive(InstanceID source, shared_ptr<Query>& query)
+std::shared_ptr<SharedBuffer> BufReceive(InstanceID source, std::shared_ptr<Query>& query)
 {
     return NetworkManager::getInstance()->receive(source,query);
 }
 
-void BufBroadcast(shared_ptr<SharedBuffer> const& data, shared_ptr<Query>& query)
+void BufBroadcast(std::shared_ptr<SharedBuffer> const& data, std::shared_ptr<Query>& query)
 {
-    shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtBufferSend, data);
+    std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtBufferSend, data);
     msg->setQueryID(query->getQueryID());
     NetworkManager::getInstance()->broadcastLogical(msg);
 }
@@ -972,7 +1074,7 @@ NetworkManager::DefaultNetworkMessageFactory::getMessageHandler(const MessageID&
 /**
  * @see Network.h
  */
-shared_ptr<NetworkMessageFactory> getNetworkMessageFactory()
+std::shared_ptr<NetworkMessageFactory> getNetworkMessageFactory()
 {
    return NetworkManager::getInstance()->getNetworkMessageFactory();
 }
@@ -985,18 +1087,18 @@ boost::asio::io_service& getIOService()
    return NetworkManager::getInstance()->getIOService();
 }
 
-shared_ptr<MessageDesc> prepareMessage(MessageID msgID,
+std::shared_ptr<MessageDesc> prepareMessage(MessageID msgID,
                                        MessagePtr record,
                                        boost::asio::const_buffer& binary)
 {
-   shared_ptr<SharedBuffer> payload;
+   std::shared_ptr<SharedBuffer> payload;
    if (boost::asio::buffer_size(binary) > 0) {
       assert(boost::asio::buffer_cast<const void*>(binary));
-      payload = shared_ptr<SharedBuffer>(new MemoryBuffer(boost::asio::buffer_cast<const void*>(binary),
+      payload = std::shared_ptr<SharedBuffer>(new MemoryBuffer(boost::asio::buffer_cast<const void*>(binary),
                                                           boost::asio::buffer_size(binary)));
    }
-   shared_ptr<MessageDesc> msgDesc =
-      shared_ptr<Connection::ServerMessageDesc>(new Connection::ServerMessageDesc(payload));
+   std::shared_ptr<MessageDesc> msgDesc =
+      std::shared_ptr<Connection::ServerMessageDesc>(new Connection::ServerMessageDesc(payload));
 
    msgDesc->initRecord(msgID);
    MessagePtr msgRecord = msgDesc->getRecord<Message>();
@@ -1020,7 +1122,7 @@ void sendAsyncPhysical(InstanceID targetInstanceID,
                MessagePtr record,
                boost::asio::const_buffer& binary)
 {
-   shared_ptr<MessageDesc> msgDesc = prepareMessage(msgID,record,binary);
+   std::shared_ptr<MessageDesc> msgDesc = prepareMessage(msgID,record,binary);
    assert(msgDesc);
    NetworkManager::getInstance()->sendPhysical(targetInstanceID, msgDesc);
 }
@@ -1038,12 +1140,12 @@ void sendAsyncClient(ClientContext::Ptr& clientCtx,
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_CTX)
                << typeid(*clientCtx).name());
     }
-    shared_ptr<MessageDesc> msgDesc = prepareMessage(msgID,record,binary);
+    std::shared_ptr<MessageDesc> msgDesc = prepareMessage(msgID,record,binary);
     assert(msgDesc);
     conn->sendMessage(msgDesc);
 }
 
-boost::shared_ptr<WorkQueue> getWorkQueue()
+std::shared_ptr<WorkQueue> getWorkQueue()
 {
     return NetworkManager::getInstance()->getWorkQueue();
 }
@@ -1053,7 +1155,7 @@ uint32_t getLivenessTimeout()
    return Config::getInstance()->getOption<int>(CONFIG_LIVENESS_TIMEOUT);
 }
 
-shared_ptr<Scheduler> getScheduler(Scheduler::Work& workItem, time_t period)
+std::shared_ptr<Scheduler> getScheduler(Scheduler::Work& workItem, time_t period)
 {
    if (!workItem) {
       throw USER_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_SHEDULER_WORK_ITEM);
@@ -1061,13 +1163,13 @@ shared_ptr<Scheduler> getScheduler(Scheduler::Work& workItem, time_t period)
    if (period < 1) {
       throw USER_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_SHEDULER_PERIOD);
    }
-   shared_ptr<scidb::Scheduler> scheduler(new ThrottledScheduler(period, workItem,
+   std::shared_ptr<scidb::Scheduler> scheduler(new ThrottledScheduler(period, workItem,
                                           NetworkManager::getInstance()->getIOService()));
    return scheduler;
 }
 
-void resolveComplete(shared_ptr<asio::ip::tcp::resolver>& resolver,
-                     shared_ptr<asio::ip::tcp::resolver::query>& query,
+void resolveComplete(std::shared_ptr<asio::ip::tcp::resolver>& resolver,
+                     std::shared_ptr<asio::ip::tcp::resolver::query>& query,
                      ResolverFunc& cb,
                      const system::error_code& error,
                      asio::ip::tcp::resolver::iterator endpoint_iterator)
@@ -1082,8 +1184,8 @@ void resolveComplete(shared_ptr<asio::ip::tcp::resolver>& resolver,
 
 void resolveAsync(const string& address, const string& service, ResolverFunc& cb)
 {
-    shared_ptr<asio::ip::tcp::resolver> resolver(new asio::ip::tcp::resolver(NetworkManager::getInstance()->getIOService()));
-    shared_ptr<asio::ip::tcp::resolver::query> query =
+    std::shared_ptr<asio::ip::tcp::resolver> resolver(new asio::ip::tcp::resolver(NetworkManager::getInstance()->getIOService()));
+    std::shared_ptr<asio::ip::tcp::resolver::query> query =
        make_shared<asio::ip::tcp::resolver::query>(address, service);
     resolver->async_resolve(*query,
                             boost::bind(&scidb::resolveComplete,

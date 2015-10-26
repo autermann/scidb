@@ -48,8 +48,6 @@ filter (Timeseries_Example, Total_Qty > 150 )
 
 join (Timeseries_Example as A, Timeseries_Example as B )
 
-lookup ( Timeseries_Lookup,Timeseries_Example)
-
 --error "merge ( filter ( Timeseries_Example, Total_Qty < 100 ) as A, filter ( Timeseries_Example, Total_Qty > 200 ) as B )"
 
 multiply ( substitute (transpose ( project (Timeseries_Example, Avg_Price )), Sub_Val) AS A, substitute (project ( Timeseries_Example, Avg_Price), Sub_Val) AS B ) 
@@ -57,8 +55,6 @@ multiply ( substitute (transpose ( project (Timeseries_Example, Avg_Price )), Su
 project ( Timeseries_Example, Avg_Price, Total_Qty )
 
 repart ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (Timeseries_Example)
 
 --igdata "bernoulli (Timeseries_Example, 0.85, 1)"
 
@@ -69,8 +65,6 @@ sort (slice ( Timeseries_Example, Symbol, 'Mug' ), Total_Qty, Avg_Price )
 subarray (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' )
 
 join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
-
-thin (Timeseries_Example, 0, 2, 0, 2)
 
 transpose (Timeseries_Example)
 
@@ -96,8 +90,6 @@ filter (bernoulli (Timeseries_Example, 0.85, 1), Total_Qty > 150 )
 
 join (bernoulli (Timeseries_Example, 0.85, 1) as A, bernoulli (Timeseries_Example, 0.85, 1) as B )
 
-lookup ( Timeseries_Lookup,bernoulli (Timeseries_Example, 0.85, 1))
-
 --error "merge ( filter ( bernoulli (Timeseries_Example, 0.85, 1), Total_Qty < 100 ) as A, filter ( bernoulli (Timeseries_Example, 0.85, 1), Total_Qty > 200 ) as B )"
 
 multiply ( substitute (transpose ( project (bernoulli (Timeseries_Example, 0.85, 1), Avg_Price )), Sub_Val) AS A, substitute (project ( bernoulli (Timeseries_Example, 0.85, 1), Avg_Price), Sub_Val) AS B ) 
@@ -105,8 +97,6 @@ multiply ( substitute (transpose ( project (bernoulli (Timeseries_Example, 0.85,
 project ( bernoulli (Timeseries_Example, 0.85, 1), Avg_Price, Total_Qty )
 
 repart ( bernoulli (Timeseries_Example, 0.85, 1), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (bernoulli (Timeseries_Example, 0.85, 1))
 
 --igdata "bernoulli (bernoulli (Timeseries_Example, 0.85, 1), 0.85, 1)"
 
@@ -118,7 +108,7 @@ subarray (bernoulli (Timeseries_Example, 0.85, 1), 'Foo', 'T_003', 'Wump', 'T_00
 
 join ( substitute ( project (bernoulli (Timeseries_Example, 0.85, 1), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (bernoulli (Timeseries_Example, 0.85, 1), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (bernoulli (Timeseries_Example, 0.85, 1), 0, 2, 0, 2)
+bernoulli (Timeseries_Example, 0.85, 1)
 
 transpose (bernoulli (Timeseries_Example, 0.85, 1))
 
@@ -144,8 +134,6 @@ filter (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Total_Qt
 
 join (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ) as A, between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ) as B )
 
-lookup ( Timeseries_Lookup,between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ))
-
 --error "merge ( filter ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Total_Qty < 100 ) as A, filter ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Total_Qty > 200 ) as B )"
 
 multiply ( substitute (transpose ( project (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price )), Sub_Val) AS A, substitute (project ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price), Sub_Val) AS B )
@@ -153,8 +141,6 @@ multiply ( substitute (transpose ( project (between (Timeseries_Example, 'Foo', 
 project ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price, Total_Qty )
 
 repart ( between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ))
 
 --igdata "bernoulli (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), 0.85, 1)"
 
@@ -166,7 +152,7 @@ subarray (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), 'Foo',
 
 join ( substitute ( project (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ), 0, 2, 0, 2)
+between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' )
 
 transpose (between (Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' ))
 
@@ -190,8 +176,6 @@ filter (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 
 
 join (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]) as A, cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]) as B )
 
-lookup ( Timeseries_Lookup,cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]))
-
 --error "merge ( filter ( cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Total_Qty < 100 ) as A, filter ( cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Total_Qty > 200 ) as B )"
 
 # ERROR4
@@ -202,8 +186,6 @@ project ( cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int6
 repart ( cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
 
 # #1542
-reverse (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]))
-
 --igdata "bernoulli (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), 0.85, 1)"
 
 # NO_MAPPING
@@ -217,7 +199,7 @@ subarray (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int6
 join ( substitute ( project (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
 # #1543
-thin (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]), 0, 2, 0, 2)
+cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ])
 
 transpose (cast ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ TS(string)=*,4,0, Symbol(string)=*,14,0 ]))
 
@@ -241,8 +223,6 @@ filter (Timeseries_Example, Total_Qty > 150 )
 
 join (Timeseries_Example as A, Timeseries_Example as B )
 
-lookup ( Timeseries_Lookup, Timeseries_Example)
-
 --error "merge ( filter ( Timeseries_Example, Total_Qty < 100 ) as A, filter ( Timeseries_Example, Total_Qty > 200 ) as B )"
 
 # ERROR8 (formerly)
@@ -251,8 +231,6 @@ multiply ( substitute (transpose ( project ( Timeseries_Example, Avg_Price )), S
 project ( Timeseries_Example, Avg_Price, Total_Qty )
 
 repart ( Timeseries_Example, < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (Timeseries_Example)
 
 --igdata "bernoulli ( Timeseries_Example, 0.85, 1)"
 
@@ -263,8 +241,6 @@ sort (slice ( Timeseries_Example, Symbol, 'Mug' ), Total_Qty, Avg_Price )
 subarray ( Timeseries_Example, 'Foo', 'T_003', 'Wump', 'T_006' )
 
 join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
-
-thin (Timeseries_Example, 0, 2, 0, 2)
 
 transpose (Timeseries_Example)
 
@@ -290,8 +266,6 @@ filter (filter (Timeseries_Example, Total_Qty > 150 ), Total_Qty > 150 )
 
 join (filter (Timeseries_Example, Total_Qty > 150 ) as A, filter (Timeseries_Example, Total_Qty > 150 ) as B )
 
-lookup ( Timeseries_Lookup,filter (Timeseries_Example, Total_Qty > 150 ))
-
 --error "merge ( filter ( filter (Timeseries_Example, Total_Qty > 150 ), Total_Qty < 100 ) as A, filter ( filter (Timeseries_Example, Total_Qty > 150 ), Total_Qty > 200 ) as B )"
 
 # ERROR8 (formerly)
@@ -300,8 +274,6 @@ multiply ( substitute (transpose ( project (filter (Timeseries_Example, Total_Qt
 project ( filter (Timeseries_Example, Total_Qty > 150 ), Avg_Price, Total_Qty )
 
 repart ( filter (Timeseries_Example, Total_Qty > 150 ), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (filter (Timeseries_Example, Total_Qty > 150 ))
 
 --igdata "bernoulli (filter (Timeseries_Example, Total_Qty > 150 ), 0.85, 1)"
 
@@ -313,7 +285,7 @@ subarray (filter (Timeseries_Example, Total_Qty > 150 ), 'Foo', 'T_003', 'Wump',
 
 join ( substitute ( project (filter (Timeseries_Example, Total_Qty > 150 ), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (filter (Timeseries_Example, Total_Qty > 150 ), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (filter (Timeseries_Example, Total_Qty > 150 ), 0, 2, 0, 2)
+filter (Timeseries_Example, Total_Qty > 150 )
 
 transpose (filter (Timeseries_Example, Total_Qty > 150 ))
 
@@ -339,8 +311,6 @@ filter (project ( Timeseries_Example, Avg_Price, Total_Qty ), Total_Qty > 150 )
 
 join (project ( Timeseries_Example, Avg_Price, Total_Qty ) as A, project ( Timeseries_Example, Avg_Price, Total_Qty ) as B )
 
-lookup ( Timeseries_Lookup,project ( Timeseries_Example, Avg_Price, Total_Qty ))
-
 --error "merge ( filter ( project ( Timeseries_Example, Avg_Price, Total_Qty ), Total_Qty < 100 ) as A, filter ( project ( Timeseries_Example, Avg_Price, Total_Qty ), Total_Qty > 200 ) as B )"
 
 # ERROR8 (formerly)
@@ -349,8 +319,6 @@ multiply ( substitute (transpose ( project (project ( Timeseries_Example, Avg_Pr
 project ( project ( Timeseries_Example, Avg_Price, Total_Qty ), Avg_Price, Total_Qty )
 
 repart ( project ( Timeseries_Example, Avg_Price, Total_Qty ), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (project ( Timeseries_Example, Avg_Price, Total_Qty ))
 
 --igdata "bernoulli (project ( Timeseries_Example, Avg_Price, Total_Qty ), 0.85, 1)"
 
@@ -362,7 +330,7 @@ subarray (project ( Timeseries_Example, Avg_Price, Total_Qty ), 'Foo', 'T_003', 
 
 join ( substitute ( project (project ( Timeseries_Example, Avg_Price, Total_Qty ), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (project ( Timeseries_Example, Avg_Price, Total_Qty ), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (project ( Timeseries_Example, Avg_Price, Total_Qty ), 0, 2, 0, 2)
+project ( Timeseries_Example, Avg_Price, Total_Qty )
 
 transpose (project ( Timeseries_Example, Avg_Price, Total_Qty ))
 
@@ -390,8 +358,6 @@ filter (bernoulli (Timeseries_Example, 0.85, 1), Total_Qty > 150 )
 
 join (bernoulli (Timeseries_Example, 0.85, 1) as A, bernoulli (Timeseries_Example, 0.85, 1) as B )
 
-lookup ( Timeseries_Lookup,bernoulli (Timeseries_Example, 0.85, 1))
-
 --error "merge ( filter ( bernoulli (Timeseries_Example, 0.85, 1), Total_Qty < 100 ) as A, filter ( bernoulli (Timeseries_Example, 0.85, 1), Total_Qty > 200 ) as B )"
 
 # ERROR8 (formerly)
@@ -400,8 +366,6 @@ multiply ( substitute (transpose ( project (bernoulli (Timeseries_Example, 0.85,
 project ( bernoulli (Timeseries_Example, 0.85, 1), Avg_Price, Total_Qty )
 
 repart ( bernoulli (Timeseries_Example, 0.85, 1), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (bernoulli (Timeseries_Example, 0.85, 1))
 
 bernoulli (bernoulli (Timeseries_Example, 0.85, 1), 0.85, 1)
 
@@ -413,7 +377,7 @@ subarray (bernoulli (Timeseries_Example, 0.85, 1), 'Foo', 'T_003', 'Wump', 'T_00
 
 join ( substitute ( project (bernoulli (Timeseries_Example, 0.85, 1), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (bernoulli (Timeseries_Example, 0.85, 1), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (bernoulli (Timeseries_Example, 0.85, 1), 0, 2, 0, 2)
+bernoulli (Timeseries_Example, 0.85, 1)
 
 transpose (bernoulli (Timeseries_Example, 0.85, 1))
 
@@ -441,8 +405,6 @@ filter (scan (Timeseries_Example), Total_Qty > 150 )
 
 join (scan (Timeseries_Example) as A, scan (Timeseries_Example) as B )
 
-lookup ( Timeseries_Lookup,scan (Timeseries_Example))
-
 --error "merge ( filter ( scan (Timeseries_Example), Total_Qty < 100 ) as A, filter ( scan (Timeseries_Example), Total_Qty > 200 ) as B )"
 
 # ERROR8 (formerly)
@@ -451,8 +413,6 @@ multiply ( substitute (transpose ( project (scan (Timeseries_Example), Avg_Price
 project ( scan (Timeseries_Example), Avg_Price, Total_Qty )
 
 repart ( scan (Timeseries_Example), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (scan (Timeseries_Example))
 
 --igdata "bernoulli (scan (Timeseries_Example), 0.85, 1)"
 
@@ -464,7 +424,7 @@ subarray (scan (Timeseries_Example), 'Foo', 'T_003', 'Wump', 'T_006' )
 
 join ( substitute ( project (scan (Timeseries_Example), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (scan (Timeseries_Example), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (scan (Timeseries_Example), 0, 2, 0, 2)
+scan (Timeseries_Example)
 
 transpose (scan (Timeseries_Example))
 
@@ -490,8 +450,6 @@ filter (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg
 
 join (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))) as A, join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))) as B )
 
-lookup ( Timeseries_Lookup,join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))))
-
 --error "merge ( filter ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Total_Qty < 100 ) as A, filter ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Total_Qty > 200 ) as B )"
 
 multiply ( transpose ( project (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price )) AS A, project ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price) AS B ) 
@@ -499,8 +457,6 @@ multiply ( transpose ( project (join ( substitute ( project (Timeseries_Example,
 project ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price, Total_Qty )
 
 repart ( join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))))
 
 --igdata "bernoulli (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), 0.85, 1)"
 
@@ -512,7 +468,7 @@ subarray (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<A
 
 join ( substitute ( project (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))), 0, 2, 0, 2)
+join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
 transpose (join ( substitute ( project (Timeseries_Example, Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (Timeseries_Example, Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10)))))
 
@@ -539,9 +495,6 @@ filter (transpose (Timeseries_Example), Total_Qty > 150 )
 
 join (transpose (Timeseries_Example) as A, transpose (Timeseries_Example) as B )
 
-# NO_MAPPING
---error "lookup ( Timeseries_Lookup,transpose (Timeseries_Example))"
-
 --error "merge ( filter ( transpose (Timeseries_Example), Total_Qty < 100 ) as A, filter ( transpose (Timeseries_Example), Total_Qty > 200 ) as B )"
 
 # ERROR8 (formerly)
@@ -550,8 +503,6 @@ multiply ( substitute (transpose ( project (transpose (Timeseries_Example), Avg_
 project ( transpose (Timeseries_Example), Avg_Price, Total_Qty )
 
 repart ( transpose (Timeseries_Example), < Avg_Price : double NULL, Total_Qty : int64 NULL > [ Symbol(string)=*,2,0, TS(string)=*,7,0 ])
-
-reverse (transpose (Timeseries_Example))
 
 --igdata "bernoulli (transpose (Timeseries_Example), 0.85, 1)"
 
@@ -563,7 +514,7 @@ subarray (transpose (Timeseries_Example), 'Foo', 'T_003', 'Wump', 'T_006' )
 
 join ( substitute ( project (transpose (Timeseries_Example), Avg_Price ), build(<Avg_Price : double> [x=0:1,2,0], iif( x = 0, 20.0, 30.0))), substitute ( project (transpose (Timeseries_Example), Total_Qty), build(<Total_Qty : int64> [x=0:1,2,0], iif( x = 0, 100, 10))))
 
-thin (transpose (Timeseries_Example), 0, 2, 0, 2)
+transpose (Timeseries_Example)
 
 transpose (transpose (Timeseries_Example))
 

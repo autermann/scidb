@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,9 +36,9 @@
 #include <libgen.h>
 #include <unistd.h>
 
-#include "system/Config.h"
-#include "system/SystemCatalog.h"
-#include "system/SciDBConfigOptions.h"
+#include <system/Config.h>
+#include <system/SystemCatalog.h>
+#include <system/SciDBConfigOptions.h>
 
 // enum
 // {
@@ -50,16 +50,16 @@
 //  };
 
 // Included tests
-//#include "services/catalog/catalog_unit_tests.h"
+//#include <services/catalog/catalog_unit_tests.h>
 
-#include "query/ExpressionUnitTests.h"
-//#include "smgr/delta/DeltaUnitTests.h"
-#include "query/TypeLibraryUnitTests.h"
-#include "query/FunctionLibraryUnitTests.h"
-#include "query/optimizer/OptUnitTests.h"
-#include "query/AggregateUnitTests.h"
-#include "array/BitmaskUnitTests.h"
-#include "query/AuxUnitTests.h"
+#include <query/ExpressionUnitTests.h>
+//#include <smgr/delta/DeltaUnitTests.h>
+#include <query/TypeLibraryUnitTests.h>
+#include <query/FunctionLibraryUnitTests.h>
+#include <query/optimizer/OptUnitTests.h>
+#include <query/AggregateUnitTests.h>
+#include <array/BitmaskUnitTests.h>
+#include <query/AuxUnitTests.h>
 //#include "system/ExceptionUnitTests.h"
 #include "PointerRangeUnitTests.h"
 #include "ArenaUnitTests.h"
@@ -106,7 +106,7 @@ int main(int argc,char* argv[])
         cfg->setOption(CONFIG_PORT,0);
 
         SystemCatalog* catalog = SystemCatalog::getInstance();
-        catalog->connect(cfg->getOption<string>(CONFIG_CATALOG), false);
+        catalog->connect(false); // No catalog upgrade please!
 
         TypeLibrary::registerBuiltInTypes();
         FunctionLibrary::getInstance()->registerBuiltInFunctions();
@@ -115,16 +115,20 @@ int main(int argc,char* argv[])
         CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
         runner.addTest(registry.makeTest());
         const bool wasSuccessful = runner.run("", false);
-        return wasSuccessful ? 0 : 3;
+        cout.flush();
+        ::_exit( wasSuccessful ? 0 : 3);
     }
     catch(const std::exception& e)
     {
         cout << "Unhandled std::exception: " << e.what() << endl;
-        return 1;
+        cout.flush();
+        ::_exit(1);
     }
     catch(...)
     {
         cout << "Unhandled exception" << endl;
-        return 2;
+        cout.flush();
+        ::_exit(2);
     }
+    ::_exit(4);
 }

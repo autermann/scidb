@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -45,7 +45,7 @@ using namespace scidb;
 
 // Useful local shorthand.
 #define Parm(_n) \
-    ((shared_ptr<OperatorParamPhysicalExpression>&)_parameters[(_n)])
+    ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[(_n)])
 #define ParmExpr(_n)    (Parm(_n)->getExpression())
 
 namespace scidb
@@ -74,7 +74,7 @@ public:
         if (_parameters.size() >= 2)
         {
             assert(_parameters[1]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
-            boost::shared_ptr<OperatorParamPhysicalExpression> parm1 = Parm(1);
+            std::shared_ptr<OperatorParamPhysicalExpression> parm1 = Parm(1);
             assert(parm1->isConstant());
             return parm1->getExpression()->evaluate().getInt64();
         }
@@ -84,25 +84,12 @@ public:
 
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
-        InstanceID sourceInstanceID = getSourceInstanceID();
-        if (sourceInstanceID == ALL_INSTANCE_MASK)
-        {
-            return DistributionRequirement(DistributionRequirement::Any);
-        }
-        else
-        {
-            vector<ArrayDistribution> requiredDistribution(1);
-            requiredDistribution[0] = ArrayDistribution(
-                psLocalInstance,
-                boost::shared_ptr<DistributionMapper>(),
-                sourceInstanceID);
-            return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
-        }
+        return DistributionRequirement(DistributionRequirement::Any);
     }
 
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
-                                     boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
+                                     std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size() >= 1);
@@ -113,19 +100,58 @@ public:
         if (_parameters.size() >= 3) {
             format = ParmExpr(2)->evaluate().getString();
         }
+        const bool isOpaque = (format == "opaque");
         InstanceID sourceInstanceID = getSourceInstanceID();
         if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) {
             sourceInstanceID = (query->isCoordinator() ? query->getInstanceID() : query->getCoordinatorID());
         }
-        InstanceID myInstanceID = query->getInstanceID();
+        const ArrayDesc& inputArrayDesc = inputArrays[0]->getArrayDesc();
         bool parallel = (sourceInstanceID == ALL_INSTANCE_MASK);
-        if (parallel || sourceInstanceID == myInstanceID) {
-            ArrayWriter::setPrecision(Config::getInstance()->getOption<int>(CONFIG_PRECISION));
-            ArrayWriter::save(*inputArrays[0], fileName, query, format,
-                              (parallel ? ArrayWriter::F_PARALLEL : 0));
+        std::shared_ptr<Array> tmpRedistedInput;
+
+        if (!parallel) {
+
+            const Attributes& attribs = inputArrayDesc.getAttributes();
+            std::set<AttributeID> attributeOrdering;
+            for  ( Attributes::const_iterator a = attribs.begin(); a != attribs.end(); ++a ) {
+                if (!a->isEmptyIndicator() || isOpaque) {
+                    SCIDB_ASSERT(inputArrayDesc.getEmptyBitmapAttribute()==NULL ||
+                                 isOpaque ||
+                                 // if emptyable, make sure the attribute is not the last
+                                 // the last must be the empty bitmap
+                                 (a->getId()+1) != attribs.size());
+                    attributeOrdering.insert(a->getId());
+                }
+            }
+            tmpRedistedInput = pullRedistributeInAttributeOrder(inputArrays[0],
+                                                                attributeOrdering,
+                                                                query,
+                                                                psLocalInstance,
+                                                                sourceInstanceID,
+                                                                std::shared_ptr<CoordinateTranslator>(),
+                                                                0,
+                                                                std::shared_ptr<PartitioningSchemaData>());
+        } else {
+            tmpRedistedInput = inputArrays[0];
         }
 
-        return inputArrays[0];
+        // only when redistribute was actually done (sometimes optimized away)
+        const bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;
+
+        const InstanceID myInstanceID = query->getInstanceID();
+
+        if (parallel || sourceInstanceID == myInstanceID) {
+            ArrayWriter::setPrecision(Config::getInstance()->getOption<int>(CONFIG_PRECISION));
+            ArrayWriter::save(*tmpRedistedInput, fileName, query, format,
+                              (parallel ? ArrayWriter::F_PARALLEL : 0));
+        } // else dont need to pull
+
+        if (wasConverted) {
+            SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
+            syncArray->sync();
+        }
+
+        return make_shared<MemArray>(inputArrayDesc, query); //empty array
     }
 };
 

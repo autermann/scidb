@@ -8,7 +8,7 @@ create array A_newdim <v:int64>[i=1:3,2,0, j=1:3,2,0, synthetic=0:*,3,0]
 --shell  --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A,'${TEST_DATA_DIR}/redimension_threeconflicthandling.txt')""
 
 --test
-store(redimension(A, A_rand), A_rand)
+store(redimension(A, A_rand, false), A_rand)
 store(redimension(A, A_aggr, count(v) as countV, sum(v) as sumV), A_aggr)
 store(redimension(A, A_newdim), A_newdim)
 

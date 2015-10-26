@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -111,35 +111,36 @@ class NetworkManager: public Singleton<NetworkManager>
     /**
      *  A pool of connections to other instances.
      */
-    typedef std::map<InstanceID, boost::shared_ptr<Connection> > ConnectionMap;
+    typedef std::map<InstanceID, std::shared_ptr<Connection> > ConnectionMap;
     ConnectionMap _outConnections;
 
     // Job queue for processing received messages
-    boost::shared_ptr< JobQueue> _jobQueue;
+    std::shared_ptr< JobQueue> _jobQueue;
 
-    boost::shared_ptr<Instances> _instances;
+    std::shared_ptr<Instances> _instances;
 
-    boost::shared_ptr<const InstanceLiveness> _instanceLiveness;
+    std::shared_ptr<const InstanceLiveness> _instanceLiveness;
 
     Mutex _mutex;
 
     static volatile bool _shutdown;
 
-    // If > 0 handler of reconnect is added
-    std::set<InstanceID> _brokenInstances;
+    // A timer to handle dead instances
+    std::shared_ptr<ThrottledScheduler> _livenessHandleScheduler;
 
-    // A timer to handle reconnects
-    boost::shared_ptr<ThrottledScheduler> _reconnectScheduler;
-    static const time_t DEFAULT_RECONNECT_TIMEOUT = 3; //sec
-
-    // A timer to handle reconnects
-    boost::shared_ptr<ThrottledScheduler> _livenessHandleScheduler;
     static const time_t DEFAULT_LIVENESS_HANDLE_TIMEOUT = 60; //sec
-    static const time_t DEFAULT_ALIVE_TIMEOUT = 5; //sec
+    static const time_t DEFAULT_ALIVE_TIMEOUT_MICRO = 5*1000*1000; // 5sec
+    static const time_t CONTROL_MSG_TIMEOUT_MICRO = 100*1000; // 100 msec
+    static const time_t CONTROL_MSG_TIME_STEP_MICRO = 10*1000; // 10 msec
+
 
     uint64_t _repMessageCount;
     uint64_t _maxRepSendQSize;
     uint64_t _maxRepReceiveQSize;
+
+    uint64_t _randInstanceId;
+    uint64_t _aliveRequestCount;
+
     uint64_t _memUsage;
 
     class DefaultMessageDescription : virtual public ClientMessageDescription
@@ -148,21 +149,30 @@ class NetworkManager: public Singleton<NetworkManager>
     DefaultMessageDescription( InstanceID instanceID,
                                MessageID msgID,
                                MessagePtr msgRec,
-                               boost::shared_ptr<SharedBuffer> bin,
+                               std::shared_ptr<SharedBuffer> bin,
                                QueryID qId )
-    : _instanceID(instanceID), _msgID(msgID), _msgRecord(msgRec), _binary(bin), _queryId(qId)
-        {
-            assert(msgRec.get());
-        }
+    : _instanceID(instanceID),
+        _msgID(msgID),
+        _msgRecord(msgRec),
+        _binary(bin),
+        _queryId(qId)
+    {
+        SCIDB_ASSERT(msgRec.get());
+    }
     DefaultMessageDescription( const ClientContext::Ptr& clientCtx,
                                MessageID msgID,
                                MessagePtr msgRec,
-                               boost::shared_ptr<SharedBuffer> bin,
+                               std::shared_ptr<SharedBuffer> bin,
                                QueryID qId )
-    : _instanceID(CLIENT_INSTANCE), _clientCtx(clientCtx), _msgID(msgID), _msgRecord(msgRec), _binary(bin), _queryId(qId)
+    : _instanceID(CLIENT_INSTANCE),
+        _clientCtx(clientCtx),
+        _msgID(msgID),
+        _msgRecord(msgRec),
+        _binary(bin),
+        _queryId(qId)
         {
-            assert(clientCtx);
-            assert(msgRec.get());
+            SCIDB_ASSERT(clientCtx);
+            SCIDB_ASSERT(msgRec.get());
         }
         virtual InstanceID getSourceInstanceID() const   {return _instanceID; }
         virtual MessagePtr getRecord()                   {return _msgRecord; }
@@ -172,9 +182,9 @@ class NetworkManager: public Singleton<NetworkManager>
         virtual boost::asio::const_buffer getBinary()
         {
             if (_binary) {
-                return asio::const_buffer(_binary->getData(), _binary->getSize());
+                return boost::asio::const_buffer(_binary->getData(), _binary->getSize());
             }
-            return asio::const_buffer(NULL, 0);
+            return boost::asio::const_buffer(NULL, 0);
         }
         virtual ~DefaultMessageDescription() {}
     private:
@@ -185,7 +195,7 @@ class NetworkManager: public Singleton<NetworkManager>
         ClientContext::Ptr _clientCtx;
         MessageID _msgID;
         MessagePtr _msgRecord;
-        boost::shared_ptr<SharedBuffer> _binary;
+        std::shared_ptr<SharedBuffer> _binary;
         QueryID _queryId;
     };
 
@@ -211,52 +221,60 @@ class NetworkManager: public Singleton<NetworkManager>
        Mutex _mutex;
     };
 
-    boost::shared_ptr<DefaultNetworkMessageFactory>  _msgHandlerFactory;
-    boost::shared_ptr<WorkQueue> _workQueue;
-    boost::shared_ptr<WorkQueue> _requestQueue;
+    std::shared_ptr<DefaultNetworkMessageFactory>  _msgHandlerFactory;
+    std::shared_ptr<WorkQueue> _workQueue;
+    std::shared_ptr<WorkQueue> _requestQueue;
 
     void startAccept();
-    void handleAccept(boost::shared_ptr<Connection> newConnection, const boost::system::error_code& error);
+    void handleAccept(std::shared_ptr<Connection>& newConnection,
+                      const boost::system::error_code& error);
 
     void startInputWatcher();
     void handleInput(const boost::system::error_code& error, size_t bytes_transferr);
 
-    void _handleReconnect();
-    static void handleReconnect() {
-        getInstance()->_handleReconnect();
-    }
-
     void _handleAlive(const boost::system::error_code& error);
-    static void handleAlive(const boost::system::error_code& error) {
+    static void handleAlive(const boost::system::error_code& error)
+    {
         getInstance()->_handleAlive(error);
     }
-
+    /**
+     * Immediately run & reschedule the next "alive" broadcast
+     * if the current broadcast period is smaller than the given one
+     * @param timeoutMicro set _aliveTimout to this value
+     */
+    void scheduleAliveNoLater(const time_t timeoutMicro);
     /**
      * internal use only
      */
-    void handleControlMessage(const boost::shared_ptr<MessageDesc>& msgDesc);
+    void handleControlMessage(const std::shared_ptr<MessageDesc>& msgDesc);
 
     void _sendPhysical(InstanceID physicalInstanceID,
-                      boost::shared_ptr<MessageDesc>& messageDesc,
+                      std::shared_ptr<MessageDesc>& messageDesc,
                       MessageQueueType flowControlType = mqtNone);
 
-    static void handleLivenessNotification(boost::shared_ptr<const InstanceLiveness> liveInfo) {
+    static void handleLivenessNotification(std::shared_ptr<const InstanceLiveness> liveInfo)
+    {
        getInstance()->_handleLivenessNotification(liveInfo);
     }
-    void _handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>& liveInfo);
-    static void handleLiveness() {
+    void _handleLivenessNotification(std::shared_ptr<const InstanceLiveness>& liveInfo);
+    static void handleLiveness()
+    {
        getInstance()->_handleLiveness();
     }
     void _handleLiveness();
 
-    static void publishMessage(const boost::shared_ptr<MessageDescription>& msgDesc);
+    bool isDead(InstanceID remoteInstanceId) const ;
+
+    static void publishMessage(const std::shared_ptr<MessageDescription>& msgDesc);
 
     /// Helper that finds a handler for a given message
-    void dispatchMessageToListener(const shared_ptr<Connection>& connection,
-                                   const boost::shared_ptr<MessageDesc>& messageDesc,
+    void dispatchMessageToListener(const std::shared_ptr<Connection>& connection,
+                                   const std::shared_ptr<MessageDesc>& messageDesc,
                                    NetworkMessageFactory::MessageHandler& handler);
     /// Helper that notifies a given query of a connection error
     void handleConnectionError(const QueryID& queryId);
+    /// Helper that notifies a set of queries of a connection error
+    void handleConnectionError(InstanceID remoteInstanceId, const std::set<QueryID>& queries);
 
     /**
      * Helper that does the necessary cleanup when a client disconnects
@@ -273,7 +291,7 @@ class NetworkManager: public Singleton<NetworkManager>
      * @param handler gets assigned if the return value is true
      * @return true if the message is handled, false if it is a system message
      */
-    bool handleNonSystemMessage(const boost::shared_ptr<MessageDesc>& messageDesc,
+    bool handleNonSystemMessage(const std::shared_ptr<MessageDesc>& messageDesc,
                                 NetworkMessageFactory::MessageHandler& handler);
 
     /**
@@ -289,7 +307,7 @@ class NetworkManager: public Singleton<NetworkManager>
      * @return liveness or NULL if not yet known
      * @see scidb::Cluster::getInstanceLiveness()
      */
-    boost::shared_ptr<const InstanceLiveness> getInstanceLiveness()
+    std::shared_ptr<const InstanceLiveness> getInstanceLiveness()
     {
        ScopedMutexLock mutexLock(_mutex);
        getInstances(false);
@@ -305,8 +323,10 @@ class NetworkManager: public Singleton<NetworkManager>
 
     void reconnect(InstanceID instanceID);
     void handleShutdown();
-    uint64_t _getAvailable(MessageQueueType mqt);
-    void _broadcastPhysical(shared_ptr<MessageDesc>& messageDesc);
+    uint64_t getAvailableRepSlots();
+    bool isBufferSpaceLow();
+    uint64_t _getAvailable(MessageQueueType mqt, InstanceID forInstanceID);
+    void _broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc);
 
 public:
     NetworkManager();
@@ -322,7 +342,7 @@ public:
      * Request information about instances from system catalog.
      * @return an immutable array of currently registered instance descriptors
      */
-    boost::shared_ptr<const Instances> getInstances()
+    std::shared_ptr<const Instances> getInstances()
     {
         ScopedMutexLock mutexLock(_mutex);
         getInstances(false);
@@ -336,28 +356,31 @@ public:
      *  @param mqt the queue to use for this message
      *  @package waitSent waits when until message is sent then return
      */
-    void sendPhysical(InstanceID physicalInstanceID, boost::shared_ptr<MessageDesc>& messageDesc,
+    void sendPhysical(InstanceID physicalInstanceID,
+                      std::shared_ptr<MessageDesc>& messageDesc,
                      MessageQueueType mqt = mqtNone);
 
     /**
-     *  This method sends out an asynchronous message to every logical instance except this instance (using per-query instance ID maps)
+     *  This method sends out an asynchronous message to every logical instance
+     *  except this instance (using per-query instance ID maps)
      *  @param MessageDesc contains Google Protocol Buffer message and octet data.
      *  @param waitSent waits when until message is sent then return
      */
-    void broadcastLogical(boost::shared_ptr<MessageDesc>& messageDesc);
+    void broadcastLogical(std::shared_ptr<MessageDesc>& messageDesc);
 
     /**
      *  This method sends out asynchronous message to every physical instance except this instance
      *  @param MessageDesc contains Google Protocol Buffer message and octet data.
      *
      */
-    void broadcastPhysical(boost::shared_ptr<MessageDesc>& messageDesc);
+    void broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc);
 
     /// This method handle messages received by connections. Called by Connection class
-    void handleMessage(boost::shared_ptr< Connection > connection, const boost::shared_ptr<MessageDesc>& messageDesc);
+    void handleMessage(std::shared_ptr< Connection >& connection,
+                       const std::shared_ptr<MessageDesc>& messageDesc);
 
     /// This method block own thread
-    void run(boost::shared_ptr<JobQueue> jobQueue);
+    void run(std::shared_ptr<JobQueue> jobQueue);
 
     /**
      * @return a queue suitable for running tasks that can always make progress
@@ -365,7 +388,8 @@ public:
      * @note the progress requirement is to ensure there is no deadlock
      * @note No new threads are created as a result of adding work to the queue
      */
-    boost::shared_ptr<WorkQueue> getWorkQueue() {
+    std::shared_ptr<WorkQueue> getWorkQueue()
+    {
         return _workQueue;
     }
 
@@ -376,7 +400,8 @@ public:
      * @note HOWEVER, these conditions must be satisfied by jobs/work items NOT executed on this queue (to avoid deadlock).
      * @note No new threads are created as a result of adding work to the queue
      */
-    boost::shared_ptr<WorkQueue> getRequestQueue() {
+    std::shared_ptr<WorkQueue> getRequestQueue()
+    {
         return _requestQueue;
     }
 
@@ -388,8 +413,9 @@ public:
      *       The items on this queue may not out-live the queue itself, i.e.
      *       once the queue is destroyed an unspecified number of elements may not get to run.
      */
-    boost::shared_ptr<WorkQueue> createWorkQueue() {
-        return boost::make_shared<WorkQueue>(_jobQueue);
+    std::shared_ptr<WorkQueue> createWorkQueue()
+    {
+        return std::make_shared<WorkQueue>(_jobQueue);
     }
 
     /**
@@ -401,15 +427,17 @@ public:
      * @param maxOutstanding max number of concurrent work items (the actual number of threads may be fewer)
      * @param maxSize max queue length including maxOutstanding
      */
-    boost::shared_ptr<WorkQueue> createWorkQueue(uint32_t maxOutstanding, uint32_t maxSize)
+    std::shared_ptr<WorkQueue> createWorkQueue(uint32_t maxOutstanding, uint32_t maxSize)
     {
-        return boost::make_shared<WorkQueue>(_jobQueue, maxOutstanding, maxSize);
+        return std::make_shared<WorkQueue>(_jobQueue, maxOutstanding, maxSize);
     }
 
     /// Register incoming message for control flow purposes against a given queue
-    void registerMessage(const boost::shared_ptr<MessageDesc>& messageDesc, MessageQueueType mqt);
+    void registerMessage(const std::shared_ptr<MessageDesc>& messageDesc,
+                         MessageQueueType mqt);
     /// Unregister incoming message for control flow purposes against a given queue when it is deallocated
-    void unregisterMessage(const boost::shared_ptr<MessageDesc>& messageDesc, MessageQueueType mqt);
+    void unregisterMessage(const std::shared_ptr<MessageDesc>& messageDesc,
+                           MessageQueueType mqt);
 
     /**
      * Get available receive buffer space for a given channel
@@ -418,9 +446,10 @@ public:
      * (currently the accounting is done in terms of the number of messages rather than bytes
      *  and no memory is pre-allocated for the messages)
      * @param mqt the channel ID
+     * @param forInstanceID the ID of the destination
      * @return number of messages the receiver is willing to accept currently (per sender)
      */
-    uint64_t getAvailable(MessageQueueType mqt);
+    uint64_t getAvailable(MessageQueueType mqt, InstanceID forInstanceID);
 
     /// internal
     uint64_t getSendQueueLimit(MessageQueueType mqt)
@@ -429,10 +458,10 @@ public:
         if (mqt == mqtReplication) {
             ScopedMutexLock mutexLock(_mutex);
             getInstances(false);
-            assert(_instances->size()>0);
+            SCIDB_ASSERT(_instances->size()>0);
             return (_maxRepSendQSize / _instances->size());
         }
-        assert(mqt==mqtNone);
+        SCIDB_ASSERT(mqt==mqtNone);
         return MAX_QUEUE_SIZE;
     }
 
@@ -442,10 +471,10 @@ public:
         if (mqt == mqtReplication) {
             ScopedMutexLock mutexLock(_mutex);
             getInstances(false);
-            assert(_instances->size()>0);
+            SCIDB_ASSERT(_instances->size()>0);
             return (_maxRepReceiveQSize / _instances->size());
         }
-        assert(mqt==mqtNone);
+        SCIDB_ASSERT(mqt==mqtNone);
         return MAX_QUEUE_SIZE;
     }
 
@@ -455,24 +484,36 @@ public:
     }
 
     // Network Interface for operators
-    void send(InstanceID logicalTargetID, boost::shared_ptr<MessageDesc>& msg);
+
+    void send(InstanceID logicalTargetID,
+              std::shared_ptr<MessageDesc>& msg);
+
+    void receive(InstanceID logicalSourceID,
+                 std::shared_ptr<MessageDesc>& msg,
+                 std::shared_ptr<Query>& query);
 
     /**
      * Send a message to the local instance (from the local instance)
      * @throw NetworkManager::OverflowException currently not thrown, but is present for API completeness
      */
-    void sendLocal(const boost::shared_ptr<Query>& query, boost::shared_ptr<MessageDesc>& messageDesc);
+    void sendLocal(const std::shared_ptr<Query>& query,
+                   std::shared_ptr<MessageDesc>& messageDesc);
 
 
     // MPI-like functions
-    void send(InstanceID logicalTargetID, boost::shared_ptr< SharedBuffer> const& data, boost::shared_ptr<Query> & query);
+    void send(InstanceID logicalTargetID,
+              std::shared_ptr< SharedBuffer> const& data,
+              std::shared_ptr<Query> & query);
 
-    boost::shared_ptr< SharedBuffer> receive(InstanceID source, boost::shared_ptr<Query> & query);
+    std::shared_ptr<SharedBuffer> receive(InstanceID logicalSourceID,
+                                            std::shared_ptr<Query> & query);
 
-    static void shutdown() {
+    static void shutdown()
+    {
        _shutdown = true;
     }
-    static bool isShutdown() {
+    static bool isShutdown()
+    {
        return _shutdown;
     }
 
@@ -481,9 +522,9 @@ public:
      * to retrieve already registered message handlers.
      * @return the message factory
      */
-    boost::shared_ptr<NetworkMessageFactory> getNetworkMessageFactory()
+    std::shared_ptr<NetworkMessageFactory> getNetworkMessageFactory()
     {
-       boost::shared_ptr<NetworkMessageFactory> ptr(_msgHandlerFactory);
+       std::shared_ptr<NetworkMessageFactory> ptr(_msgHandlerFactory);
        return ptr;
     }
 
@@ -512,7 +553,7 @@ public:
     ConnectionStatus(InstanceID instanceId, MessageQueueType mqt, uint64_t queueSize)
     : _instanceId(instanceId), _queueType(mqt), _queueSize(queueSize)
         {
-            assert(instanceId != INVALID_INSTANCE);
+            SCIDB_ASSERT(instanceId != INVALID_INSTANCE);
         }
         ~ConnectionStatus() {}
         InstanceID   getPhysicalInstanceId()    const { return _instanceId; }

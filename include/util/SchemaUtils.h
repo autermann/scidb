@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,7 +30,7 @@
 #ifndef SCHEMAUTILS_H_
 #define SCHEMAUTILS_H_
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <array/Array.h>
 
 namespace scidb
@@ -45,7 +45,7 @@ namespace scidb
  */
 struct SchemaUtils
 {
-    boost::shared_ptr<Array> const& _array;
+    std::shared_ptr<Array> const _array;
     ArrayDesc const& _schema;
     Attributes const& _attrsWithET;
     Attributes const& _attrsWithoutET;
@@ -53,7 +53,7 @@ struct SchemaUtils
     const size_t _nAttrsWithET;
     const size_t _nAttrsWithoutET;
 
-    SchemaUtils(boost::shared_ptr<Array> const& inputArray)
+    SchemaUtils(std::shared_ptr<Array> const& inputArray)
     : _array(inputArray),
       _schema(inputArray->getArrayDesc()),
       _attrsWithET(inputArray->getArrayDesc().getAttributes(false)),
@@ -65,7 +65,7 @@ struct SchemaUtils
     }
 
     SchemaUtils(ArrayDesc const& schema)
-    : _array(boost::shared_ptr<Array>()),
+    : _array(std::shared_ptr<Array>()),
       _schema(schema),
       _attrsWithET(schema.getAttributes(false)),
       _attrsWithoutET(schema.getAttributes(true)),
@@ -82,14 +82,14 @@ struct SchemaUtils
  */
 struct CommonVariablesInExecute
 {
-    boost::shared_ptr<Query> const& _query;
+    std::shared_ptr<Query> const& _query;
     SchemaUtils const _input;
     SchemaUtils const _output;
 
     CommonVariablesInExecute(
-            boost::shared_ptr<Array> const& inputArray,
-            boost::shared_ptr<Array> const& outputArray,
-            boost::shared_ptr<Query> const& query
+            std::shared_ptr<Array> const& inputArray,
+            std::shared_ptr<Array> const& outputArray,
+            std::shared_ptr<Query> const& query
             )
     : _query(query),
       _input(inputArray),

@@ -1,8 +1,8 @@
 ##############################################################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -114,12 +114,12 @@ set(qproc_src
     RemoteArray.cpp
     Operator.cpp
     OperatorProfiling.cpp
-    SGChunkReceiver.cpp
     PullSGContext.cpp
+    PullSGArrayUtil.cpp
     PullSGArray.cpp
 )
 
 set_source_files_properties(${query_parser_src} ${lexer_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses")
 add_library(qproc_lib STATIC ${qproc_src} ${query_parser_src} ${lexer_fixed_src}  ${qproc_include})
 target_link_libraries(qproc_lib ${Boost_LIBRARIES})
-target_link_libraries(qproc_lib scalar_proc_lib compression_lib array_lib ops_lib system_lib)
+target_link_libraries(qproc_lib usr_namespace_lib scalar_proc_lib compression_lib array_lib ops_lib system_lib)

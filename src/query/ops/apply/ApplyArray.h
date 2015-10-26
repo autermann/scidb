@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,7 +41,6 @@ namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class ApplyArray;
 class ApplyArrayIterator;
@@ -57,19 +56,19 @@ public:
     virtual bool setPosition(Coordinates const& pos);
     ApplyChunkIterator(ApplyArrayIterator const& arrayIterator, DelegateChunk const* chunk, int iterationMode);
     bool isNull();
-    virtual boost::shared_ptr<Query> getQuery() { return _query; }
+    virtual std::shared_ptr<Query> getQuery() { return _query; }
 
 private:
     ApplyArray const& _array;
     AttributeID _outAttrId;
-    vector<BindInfo> const& _bindings;
-    vector< boost::shared_ptr<ConstChunkIterator> > _iterators;
+    std::vector<BindInfo> const& _bindings;
+    std::vector< std::shared_ptr<ConstChunkIterator> > _iterators;
     ExpressionContext _params;
     int _mode;
     Value* _value;
     bool _applied;
     bool _nullable;
-    shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
 
 };
 
@@ -83,7 +82,7 @@ class ApplyArrayIterator : public DelegateArrayIterator
     ApplyArrayIterator(ApplyArray const& array, AttributeID attrID, AttributeID inputAttrID);
 
   private:
-    vector< boost::shared_ptr<ConstArrayIterator> > iterators;
+    std::vector< std::shared_ptr<ConstArrayIterator> > iterators;
     AttributeID inputAttrID;
 };
 
@@ -96,15 +95,15 @@ class ApplyArray : public DelegateArray
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    ApplyArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array,
-               vector <shared_ptr<Expression> > expressions,
-               const boost::shared_ptr<Query>& query, bool tile);
+    ApplyArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array,
+            std::vector <std::shared_ptr<Expression> > expressions,
+            const std::shared_ptr<Query>& query, bool tile);
 
   private:
-    vector <shared_ptr<Expression> > _expressions;
-    vector <bool> _attributeNullable;
-    vector <bool> _runInTileMode;
-    vector <vector<BindInfo> > _bindingSets;
+    std::vector <std::shared_ptr<Expression> > _expressions;
+    std::vector <bool> _attributeNullable;
+    std::vector <bool> _runInTileMode;
+    std::vector <std::vector<BindInfo> > _bindingSets;
 
 };
 

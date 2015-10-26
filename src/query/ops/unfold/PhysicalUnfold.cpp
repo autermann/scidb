@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,6 +30,8 @@
 #include <query/Operator.h>
 #include "UnfoldArray.h"
 
+using namespace std;
+
 namespace scidb
 {
 
@@ -42,11 +44,11 @@ namespace scidb
 		   ArrayDesc const& schema)
       : PhysicalOperator(logicalName, physicalName, parameters, schema) {}
 
-    virtual ArrayDistribution
-    getOutputDistribution(vector<ArrayDistribution> const& inputDistributions,
+    virtual RedistributeContext
+    getOutputDistribution(vector<RedistributeContext> const& inputDistributions,
 			  vector<ArrayDesc> const& inputSchemas) const {
       // Distribution is undefined.
-      return ArrayDistribution(psUndefined);
+      return RedistributeContext(psUndefined);
     }
 
     virtual bool
@@ -59,16 +61,16 @@ namespace scidb
      * Unfold transforms the input array into a 2-d matrix whose columns
      * correspond to the input array attributes. The output matrix row dimension
      * will have a chunk size equal to the input array, and column chunk size
-     * equal to the number of columns. 
+     * equal to the number of columns.
      */
-    shared_ptr<Array>
-    execute(vector<shared_ptr<Array> >& inputArrays,
-	    shared_ptr<Query> query) {
+    std::shared_ptr<Array>
+    execute(vector<std::shared_ptr<Array> >& inputArrays,
+	    std::shared_ptr<Query> query) {
       // This operator never takes more than one input array.
       assert(inputArrays.size() == 1);
 
       // Return an UnfoldArray which defers the work to the "pull" phase.
-      return boost::make_shared<UnfoldArray> (_schema, inputArrays[0],
+      return std::make_shared<UnfoldArray> (_schema, inputArrays[0],
 					      query);
     }
   };

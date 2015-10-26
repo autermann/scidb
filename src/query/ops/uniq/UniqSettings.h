@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -56,12 +56,12 @@ public:
      * @param logical true if clled with Logical parameters, else physical
      * @param query the query context
      */
-    UniqSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
+    UniqSettings(std::vector<std::shared_ptr<OperatorParam> > const& operatorParameters,
                  bool logical,
-                 shared_ptr<Query>& query):
+                 std::shared_ptr<Query>& query):
        _outputChunkSize(DEFAULT_CHUNK_SIZE)
     {
-        string const chunkSizeParamHeader = "chunk_size=";
+        std::string const chunkSizeParamHeader = "chunk_size=";
         size_t nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
@@ -70,26 +70,26 @@ public:
         }
         for (size_t i= 0; i<nParams; ++i)
         {
-            shared_ptr<OperatorParam>const& param = operatorParameters[i];
-            string parameterString;
+            std::shared_ptr<OperatorParam>const& param = operatorParameters[i];
+            std::string parameterString;
             if (logical)
             {
-                parameterString = evaluate(((shared_ptr<OperatorParamLogicalExpression>&) param)->getExpression(),query, TID_STRING).getString();
+                parameterString = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&) param)->getExpression(),query, TID_STRING).getString();
             }
             else
             {
-                parameterString = ((shared_ptr<OperatorParamPhysicalExpression>&) param)->getExpression()->evaluate().getString();
+                parameterString = ((std::shared_ptr<OperatorParamPhysicalExpression>&) param)->getExpression()->evaluate().getString();
             }
-            if (starts_with(parameterString, chunkSizeParamHeader))
+            if (boost::starts_with(parameterString, chunkSizeParamHeader))
             {
-                string paramContent = parameterString.substr(chunkSizeParamHeader.size());
-                trim(paramContent);
+                std::string paramContent = parameterString.substr(chunkSizeParamHeader.size());
+                boost::algorithm::trim(paramContent);
                 int64_t sval;
                 try
                 {
-                    sval = lexical_cast<int64_t> (paramContent);
+                    sval = boost::lexical_cast<int64_t> (paramContent);
                 }
-                catch (bad_lexical_cast const& exn)
+                catch (boost::bad_lexical_cast const& exn)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_CANNOT_PARSE_INTEGER_PARAMETER) << parameterString;
                 }

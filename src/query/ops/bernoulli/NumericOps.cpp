@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,67 +21,67 @@
 */
 // About:
 //
-//   This file contains the implementation of the methods making up the 
-//   NumericOperations class. The idea is to provide an object that implements 
-//   a number of common, useful numeric operations.  
+//   This file contains the implementation of the methods making up the
+//   NumericOperations class. The idea is to provide an object that implements
+//   a number of common, useful numeric operations.
 //
-//   They're either a) taken from "Numerical Recipes in 'C'", and adapted to 
-//   our needs, or else they're implemented based on other examples we found on 
-//   the web. None of this is in any way origonal. 
+//   They're either a) taken from "Numerical Recipes in 'C'", and adapted to
+//   our needs, or else they're implemented based on other examples we found on
+//   the web. None of this is in any way origonal.
 //
 //   NOTES:
 //
-//  1. Implements a set of numeric functions such; gamma, gamma-log, beta, 
-//     factorial, factorial-log, and the binomial coeffcient. 
+//  1. Implements a set of numeric functions such; gamma, gamma-log, beta,
+//     factorial, factorial-log, and the binomial coeffcient.
 //
-//  2. Implements a uniform distribution random number generator which is both 
-//     fast and 'good enough' for most purposes. This uniform random number 
-//     generator is then used in the generation of other random, non-uniform 
-//     distributions, such as the exponential, normal (or gaussian), gamma, 
-//     poisson and binomial. 
+//  2. Implements a uniform distribution random number generator which is both
+//     fast and 'good enough' for most purposes. This uniform random number
+//     generator is then used in the generation of other random, non-uniform
+//     distributions, such as the exponential, normal (or gaussian), gamma,
+//     poisson and binomial.
 //
-//  3. Internally, the class maintains several values which help either in the 
-//     question of function--for example, we maintain an array of random 
-//     values allocated by the uniform() method and "shuffle" them to return a 
-//     value on a particular call--or else for efficiency--the gaussian 
-//     distribution generator actually generates two values for each call, so 
-//     we keep one of them, only computing a pair of values every other call. 
+//  3. Internally, the class maintains several values which help either in the
+//     question of function--for example, we maintain an array of random
+//     values allocated by the uniform() method and "shuffle" them to return a
+//     value on a particular call--or else for efficiency--the gaussian
+//     distribution generator actually generates two values for each call, so
+//     we keep one of them, only computing a pair of values every other call.
 //
-//  4. For non-uniform deviates (Exponential, Normal (Gaussian), Gamma, 
-//     Poisson, Binomial) we build upon this uniform deviate method. The idea 
-//     is either to transform the uniform deviate, or else to use what is 
-//     known as the 'rejection method', where the idea is that each time we 
+//  4. For non-uniform deviates (Exponential, Normal (Gaussian), Gamma,
+//     Poisson, Binomial) we build upon this uniform deviate method. The idea
+//     is either to transform the uniform deviate, or else to use what is
+//     known as the 'rejection method', where the idea is that each time we
 //     want to generate a random value according to a non-uniform distribution,
-//     we first pick a uniform random variable (over, say [0.0, 1.0) ) and 
-//     then test that variable to see if it also complies with the non-uniform 
-//     distribution. If it fails the inclusion test, we try again with a new 
-//     random value. 
+//     we first pick a uniform random variable (over, say [0.0, 1.0) ) and
+//     then test that variable to see if it also complies with the non-uniform
+//     distribution. If it fails the inclusion test, we try again with a new
+//     random value.
 //
-//  5. All of these random variants are 'standard': that is, they do not 
-//     include the 'location', and 'scale' arguments, which are typically 
-//     needed by any particular application. 
+//  5. All of these random variants are 'standard': that is, they do not
+//     include the 'location', and 'scale' arguments, which are typically
+//     needed by any particular application.
 //
 #include "NumericOps.h"
 
 //
 //  Constructor:
 //
-//   The basic idea of this class is to use a good 'uniform deviate' random 
-//   number generator as the basis for a set of random number generator for 
-//   non-uniform distributions. 
+//   The basic idea of this class is to use a good 'uniform deviate' random
+//   number generator as the basis for a set of random number generator for
+//   non-uniform distributions.
 //
-//   To make the uniform deviate work well, we need to initialize an array and 
-//   place into that array a set of random values. Then, at run-time, we pick 
-//   a value from that array (and replace it) more or less at random. The idea 
-//   is that the 'simple' generator of uniform deviates has a potential problem 
-//   relating to correlations in the values of subsequent random values. Using 
-//   the array and 'shuffling' its values eliminates this problem. 
+//   To make the uniform deviate work well, we need to initialize an array and
+//   place into that array a set of random values. Then, at run-time, we pick
+//   a value from that array (and replace it) more or less at random. The idea
+//   is that the 'simple' generator of uniform deviates has a potential problem
+//   relating to correlations in the values of subsequent random values. Using
+//   the array and 'shuffling' its values eliminates this problem.
 //
-//   Hence: The constructor method populates the shuffle array. Then the 
-//   uniform() method grabs values from the array, replacing them as it 
-//   proceeds. 
+//   Hence: The constructor method populates the shuffle array. Then the
+//   uniform() method grabs values from the array, replacing them as it
+//   proceeds.
 //
-NumericOperations::NumericOperations ( const int nSeedArg ) 
+NumericOperations::NumericOperations ( const int nSeedArg )
 {
 	int	nI;
 
@@ -90,11 +90,11 @@ NumericOperations::NumericOperations ( const int nSeedArg )
 	nGPrev    =    0;
 
 	//
-	//  Plonk zeroes into the Factorial Table. As the factorial function is 
-	//  called, it will populate this table with the results it has already 
-	//  computed, if the value already in this table is zero. That is, each 
-	//  calculation of a factorial-log or a factorial is done once for up 
-	//  to FACT_ARRAY_LEN. 
+	//  Plonk zeroes into the Factorial Table. As the factorial function is
+	//  called, it will populate this table with the results it has already
+	//  computed, if the value already in this table is zero. That is, each
+	//  calculation of a factorial-log or a factorial is done once for up
+	//  to FACT_ARRAY_LEN.
 	//
 	for(nI=0;nI<FACT_ARRAY_LEN;nI++)
 		dbarFactLn[nI]=0.0;
@@ -102,46 +102,46 @@ NumericOperations::NumericOperations ( const int nSeedArg )
 	//  Populate the gamma log coefficients table.
 	//
 	dbCoef[0] = 76.18009172947146;
-	dbCoef[1] = -86.50532032941677; 
+	dbCoef[1] = -86.50532032941677;
 	dbCoef[2] = 24.01409824083091;
-	dbCoef[3] = -1.231739572450155; 
+	dbCoef[3] = -1.231739572450155;
 	dbCoef[4] = 0.1208650973866179e-2;
 	dbCoef[5] = -0.5395239384953e-5;
 	//
-	// Populate the random number generator's a[], and m[] arrays. 
+	// Populate the random number generator's a[], and m[] arrays.
 	//
 	a[0]      =  45991;
 	a[1]      = 207707;
 	a[2]      = 138556;
 	a[3]      =  49689;
 	//
-	// Populate the 
+	// Populate the
 	//
 	m[0]  = 2147483647;
-	m[1]  = 2147483543; 
-	m[2]  = 2147483423; 
+	m[1]  = 2147483543;
+	m[2]  = 2147483423;
 	m[3]  = 2147483323;
 
 	ResetSeed ( nSeedArg );
 }
 //
-//  NumericOperations::ResetSeed() - reset the seed of the generator. 
+//  NumericOperations::ResetSeed() - reset the seed of the generator.
 //
-//	 For a given seed, the generator produces the same sequence of values. 
-//  It might be useful, from time to time, to be able to reset the seed of the 
-//  generator either to generate a new set of random values, or else to replay 
-//  the same ones again. 
+//	 For a given seed, the generator produces the same sequence of values.
+//  It might be useful, from time to time, to be able to reset the seed of the
+//  generator either to generate a new set of random values, or else to replay
+//  the same ones again.
 //
 //	This method accomplishes a reset.
 //
 void
 NumericOperations::ResetSeed ( const int nSeedArg )
-{ 
+{
 	int	j,k;
 
-	if (0 > nSeedArg) 
+	if (0 > nSeedArg)
 		nSeed = -1 * nSeedArg;
-	else if (0 == nSeedArg) 
+	else if (0 == nSeedArg)
 		nSeed = 1;
 	else
 		nSeed = nSeedArg;
@@ -162,20 +162,20 @@ NumericOperations::ResetSeed ( const int nSeedArg )
 //
 //  NumericOperations::gammaln(const double) - ln(gamma(xx))
 //
-//  The Gamma Function is widely used in the kinds of numerical operations we 
-//  are struggling with in this class. As we usually do, we defer to the good 
-//  people at Numerical Necipes in 'C' for our design, which is due to 
-//  Lanczos (apparently). 
+//  The Gamma Function is widely used in the kinds of numerical operations we
+//  are struggling with in this class. As we usually do, we defer to the good
+//  people at Numerical Necipes in 'C' for our design, which is due to
+//  Lanczos (apparently).
 //
-//  When dealing with integers, the Gamma Function is just the factorial 
-//  function, offset by one.  That is; 
-//     n! = gamma ( n + 1 ); 
+//  When dealing with integers, the Gamma Function is just the factorial
+//  function, offset by one.  That is;
+//     n! = gamma ( n + 1 );
 //
-//  However, the Gamma function extends over the domain of reals (and complex 
-//  numbers, according to Mathematica, but that concept just gives me a 
-//  headache.) It turns out that conmputing the natural log of the gamma 
-//  function is both easier, and yields a result that can be used in a variety 
-//  of other operations. 
+//  However, the Gamma function extends over the domain of reals (and complex
+//  numbers, according to Mathematica, but that concept just gives me a
+//  headache.) It turns out that conmputing the natural log of the gamma
+//  function is both easier, and yields a result that can be used in a variety
+//  of other operations.
 //
 double
 NumericOperations::gammaln(const double xx)
@@ -189,20 +189,20 @@ NumericOperations::gammaln(const double xx)
 
 	tmp -= (x+0.5)*log(tmp);
 
-	for (j=0;j<=5;j++) 
+	for (j=0;j<=5;j++)
 		ser += dbCoef[j]/++y;
 
 	return -tmp+log(2.5066282746310005*ser/x);
 }
 //
-//  NumericOperations::beta ( const double, const double ) - 
+//  NumericOperations::beta ( const double, const double ) -
 //                                             beta function B(z,w)
 //
 //  The beta function (AKA Euler's First Integral) is;
 //
-//    Beta (z, w) = Beta (w, z) = Gamma( z ) . Gamma ( w ) / Gamma ( z + w ) 
+//    Beta (z, w) = Beta (w, z) = Gamma( z ) . Gamma ( w ) / Gamma ( z + w )
 //
-//   So we can compute it from the gammaln() function as follows. (Remember how 
+//   So we can compute it from the gammaln() function as follows. (Remember how
 //   we said that gamma-log was often more useful than just gamma?)
 //
 double
@@ -211,9 +211,9 @@ NumericOperations::beta( const double z, const double w)
 	return exp(gammaln(z)+gammaln(w)-gammaln(z+w));
 }
 //
-//  Continued function evaluation. 
+//  Continued function evaluation.
 //
-//  This method is used in the incomplete beta function, incbeta(). 
+//  This method is used in the incomplete beta function, incbeta().
 //
 #define MAX_ITERATIONS 100
 
@@ -228,7 +228,7 @@ NumericOperations::betacf(const double z, const double a, const double b )
 	qap=a+1.0;
     c=1.0;
     d=1.0-qab*z/qap;
-    if (fabs(d) < DBL_MIN) 
+    if (fabs(d) < DBL_MIN)
         d=DBL_MIN;
     d=1.0/d;
     h=d;
@@ -236,35 +236,35 @@ NumericOperations::betacf(const double z, const double a, const double b )
         m2=2*m;
         aa=m*(b-m)*z/((qam+m2)*(a+m2));
         d=1.0+aa*d;
-        if (fabs(d) < DBL_MIN) 
+        if (fabs(d) < DBL_MIN)
             d=DBL_MIN;
         c=1.0+aa/c;
-        if (fabs(c) < DBL_MIN) 
+        if (fabs(c) < DBL_MIN)
             c=DBL_MIN;
         d=1.0/d;
         h *= d*c;
         aa = -(a+m)*(qab+m)*z/((a+m2)*(qap+m2));
         d=1.0+aa*d;
-        if (fabs(d) < DBL_MIN) 
+        if (fabs(d) < DBL_MIN)
             d=DBL_MIN;
         c=1.0+aa/c;
-        if (fabs(c) < DBL_MIN) 
+        if (fabs(c) < DBL_MIN)
             c=DBL_MIN;
         d=1.0/d;
         del=d*c;
         h *= del;
-        if (fabs(del-1.0) < DBL_EPSILON) 
+        if (fabs(del-1.0) < DBL_EPSILON)
             break;
     }
-    if (m > MAX_ITERATIONS) 
+    if (m > MAX_ITERATIONS)
 		seterr ( NUMERIC_ERR_STATE_INC_BETA_ITER_OUT );
     return h;
 }
 //
-//  NumericOperations::incbeta (z, a, b) - incomplete beta function. 
+//  NumericOperations::incbeta (z, a, b) - incomplete beta function.
 //
 //  Returns the incomplete beta function Iz(a, b).
-// 
+//
 double
 NumericOperations::incbeta(const double z, const double a, const double b)
 {
@@ -272,11 +272,11 @@ NumericOperations::incbeta(const double z, const double a, const double b)
 	double	bt;
 	if (z < 0.0 || z > 1.0)
 		seterr ( NUMERIC_ERR_STATE_BAD_ARGS );
-	else { 
+	else {
 
-		if (z == 0.0 || z == 1.0) 
+		if (z == 0.0 || z == 1.0)
 			bt=0.0;
-		else 
+		else
 			bt=exp(gammaln(a+b)-gammaln(a)-gammaln(b)+a*log(z)+b*log(1.0-z));
 
 		if (z < (a+1.0)/(a+b+2.0))
@@ -288,11 +288,11 @@ NumericOperations::incbeta(const double z, const double a, const double b)
 }
 //
 
-//  NumericOperations::gammaser(double *, double, double, double *)  - 
+//  NumericOperations::gammaser(double *, double, double, double *)  -
 //  							gamma series
 //
 void
-NumericOperations::gammaser ( double * gamser, const double a, 
+NumericOperations::gammaser ( double * gamser, const double a,
 							  const double x, double *gln )
 {
 	int n;
@@ -301,7 +301,7 @@ NumericOperations::gammaser ( double * gamser, const double a,
     *gln=gammaln(a);
 
     if (x <= 0.0) {
-        if (x < 0.0) 
+        if (x < 0.0)
 			seterr( NUMERIC_ERR_STATE_BAD_ARGS );
         *gamser=0.0;
         return;
@@ -324,11 +324,11 @@ NumericOperations::gammaser ( double * gamser, const double a,
 //
 // NumericOperations::gammacf ( double *, double, double, double *)  - gamma series
 //
-// Returns the incomplete gamma function Q(a, x) evaluated by its continued fraction 
+// Returns the incomplete gamma function Q(a, x) evaluated by its continued fraction
 // representation as gammacf. Also returns ln(a) as gln.
 //
-void 
-NumericOperations::gammacf( double *gammcf, const double a, 
+void
+NumericOperations::gammacf( double *gammcf, const double a,
 			    		    const double x, double *gln )
 {
     int  i;
@@ -373,10 +373,10 @@ NumericOperations::gammap(const double a, const double x)
 		return gamser;
 	} else {
 		gammacf(&gammcf,a,x,&gln);
-		return 1.0-gammcf; 
+		return 1.0-gammcf;
  	}
 	//
-	// here to shut up compiler warnings. 
+	// here to shut up compiler warnings.
 	//
 	return 0.0;
 }
@@ -389,40 +389,40 @@ double
 NumericOperations::gammaq(const double a, const double x)
 {
         double gamser,gammcf,gln;
-        if (x < 0.0 || a <= 0.0) { 
+        if (x < 0.0 || a <= 0.0) {
 				seterr(NUMERIC_ERR_STATE_GAMMA_Q_BAD_ARGS);
         } else if (x < (a+1.0)) {
                 gammaser(&gamser,a,x,&gln);
-                return 1.0-gamser; 
+                return 1.0-gamser;
         } else {
                 gammacf(&gammcf,a,x,&gln);
                 return gammcf;
         }
 	//
-	// here to shut up compiler warnings. 
+	// here to shut up compiler warnings.
 	//
 	return 0.0;
 }
 //
-//  NumericOperations::factorialln(int) - log(arg!) 
+//  NumericOperations::factorialln(int) - log(arg!)
 //
-//  The factorial of an integer, n, is the product of that number and every number 
-//  less than it. That is: 
-//  
-//   n! = n. (n-1). (n-2). (n-3).  ...  2.1 
+//  The factorial of an integer, n, is the product of that number and every number
+//  less than it. That is:
 //
-//  What we do here is to use the gamma-log function (see above) to compute the 
-//  factorial-log. Later, we use the factorial-log to compute the factorial. 
+//   n! = n. (n-1). (n-2). (n-3).  ...  2.1
 //
-//  Computing factorial-log ain't cheap or easy. so what we do here is to compute 
-//  the thing only once, and to store it in a table for later use. The idea is that we 
+//  What we do here is to use the gamma-log function (see above) to compute the
+//  factorial-log. Later, we use the factorial-log to compute the factorial.
+//
+//  Computing factorial-log ain't cheap or easy. so what we do here is to compute
+//  the thing only once, and to store it in a table for later use. The idea is that we
 //  want to provide fast answers for those cases where we computed the answer multiple
-//  times. 
+//  times.
 //
 double
 NumericOperations::factorialln( const int n)
 {
-	if (n <= 1) 
+	if (n <= 1)
 		return 0.0;
 	else if (n <= FACT_ARRAY_LEN)
 		return (0.0 != dbarFactLn[n]) ? dbarFactLn[n] : (dbarFactLn[n]=gammaln(n+1.0));
@@ -432,10 +432,10 @@ NumericOperations::factorialln( const int n)
 //
 // NumericOperations::factorial ( int ) - return arg!
 //
-// This is the same function as the factorialln(), only it computes the exponent of the 
-// factorial before returning. 
-// 
-double 
+// This is the same function as the factorialln(), only it computes the exponent of the
+// factorial before returning.
+//
+double
 NumericOperations::factorial(const int n)
 {
 	return floor(0.5 + exp(factorialln(n)));
@@ -443,41 +443,41 @@ NumericOperations::factorial(const int n)
 //
 //  NumericalOperations::binomialcoef ( int, int) - n!k as FLOAT
 //
-//  The binomial coefficient is a basic building block in combinatorial 
-//  mathematics. The idea is that you want to figure out how many ways there 
-//  are to (say) pick 5 cards from a deck of 52. This method does that 
-//  calculation. 
+//  The binomial coefficient is a basic building block in combinatorial
+//  mathematics. The idea is that you want to figure out how many ways there
+//  are to (say) pick 5 cards from a deck of 52. This method does that
+//  calculation.
 //
 //  binomialcoef(n,k) returns the number of ways that k values can be choosen
-//  from n. 
+//  from n.
 //
 //
-double 
+double
 NumericOperations::binomialcoef( const int n, const int k )
 {
-	if (k > n) 
+	if (k > n)
 		return 0.0;
 	else
 		return floor(0.5+exp(factorialln(n)-factorialln(k)-factorialln(n-k)));
 }
 //
-//  NumericalOperations::poissoncum( int k, int x) - cumulative 
+//  NumericalOperations::poissoncum( int k, int x) - cumulative
 //                                                               poisson distr
 //
-//  The probability that the number of Poisson Random Events occuring will be 
-//  between 0 and k, given that the expected number is x. 
+//  The probability that the number of Poisson Random Events occuring will be
+//  between 0 and k, given that the expected number is x.
 //
-double        
-NumericOperations::poissoncum ( const int k, const int x) 
+double
+NumericOperations::poissoncum ( const int k, const int x)
 {
 	return gammaq((double)k, (double)x );
 }
 //
-//  NumericOperations::chisqrdistp( const double dbCS, const int nDF) - 
+//  NumericOperations::chisqrdistp( const double dbCS, const int nDF) -
 //					chi-squared dist (for degrees of freedom nDF)
 //
-// This method computes the probability that an observed Chi^2 statistic is 
-// less than the value dbCS, given nDF degrees of freedom. We also compute the 
+// This method computes the probability that an observed Chi^2 statistic is
+// less than the value dbCS, given nDF degrees of freedom. We also compute the
 // complement (the probability that an observed Chi^2 *exceeds* the dbCS.)
 //
 double
@@ -493,81 +493,81 @@ NumericOperations::chisqrdistq( const double dbCS, const int nDF)
 //
 //   NumericOperations::uniform() - uniform distribution random numbers.
 //
-//	This method is a source of random values over the range [0.0 1.0). It 
-//  needs to be both fast (as it is used as a building block for a number of 
-//  other methods) and it needs to produce good quality random-ness.  
+//	This method is a source of random values over the range [0.0 1.0). It
+//  needs to be both fast (as it is used as a building block for a number of
+//  other methods) and it needs to produce good quality random-ness.
 //
-//  According to _Numerical_Recipes_in_C_, you can make a multiplicative 
-//  congruent random number generator (that is, a random number generator 
+//  According to _Numerical_Recipes_in_C_, you can make a multiplicative
+//  congruent random number generator (that is, a random number generator
 //  which works on the principle;
 //
 //	 Val (next) = ( MULTIPLIER * Val (prev) + CONSTANT ) MOD Max
 //
-//  work well enough if you are very careful about your selection of 
-//  multiplier, constant and modulus. Unhappily, the best multiplier and 
-//  modulus are such that is is impossible to compute the result and still 
-//  stay within a 32-bit integer, so they recommend using a variation on the 
-//  theme owing to one Schrage for performing the multiply. 
-// 
-//  They also recommend using an array of pre-computed random numbers (called 
-//  here the shuffle array) to avoid correlations in values in the low-order 
-//  bits. The idea is to pre-compute the shuffle array, and then, at run-time, 
-//  to pick values from the array more or less at random, replacing them as 
-//  we go. 
+//  work well enough if you are very careful about your selection of
+//  multiplier, constant and modulus. Unhappily, the best multiplier and
+//  modulus are such that is is impossible to compute the result and still
+//  stay within a 32-bit integer, so they recommend using a variation on the
+//  theme owing to one Schrage for performing the multiply.
 //
-//   NOTE: Peter H. shipped me better code for this. See below. 
+//  They also recommend using an array of pre-computed random numbers (called
+//  here the shuffle array) to avoid correlations in values in the low-order
+//  bits. The idea is to pre-compute the shuffle array, and then, at run-time,
+//  to pick values from the array more or less at random, replacing them as
+//  we go.
+//
+//   NOTE: Peter H. shipped me better code for this. See below.
 //
 double
-NumericOperations::uniform() 
+NumericOperations::uniform()
 {
 	int	j,k;
 	double	dbTmp;
 
 	k=nSeed/SCHRAGE_Q;
 
-	nSeed=MULTIPLIER*(nSeed-k*SCHRAGE_Q)-SCHRAGE_R*k; 
+	nSeed=MULTIPLIER*(nSeed-k*SCHRAGE_Q)-SCHRAGE_R*k;
 
-	if (nSeed < 0)  
+	if (nSeed < 0)
 		nSeed += INT_MAX;
 
 	j=nLastVal/(1 + ((INT_MAX - 1)/SHUFFLE_ARRAY_SIZE));
 	nLastVal=narShuffle[j];
 	narShuffle[j] = nSeed;
 
-	if ((dbTmp=(1.0/INT_MAX)*nLastVal) > RANDOM_MAX) 
+	if ((dbTmp=(1.0/INT_MAX)*nLastVal) > RANDOM_MAX)
 		return RANDOM_MAX;
-	else 
+	else
 		return dbTmp;
 }
 //
-// This is a slight variation on the above theme. The loop ensures that we do 
-// not have the corner cases in the unform deviate: [0,1). That is, p > 0.0 
-// and p < 1.0. We call it the 'no tails' uniform. 
+// This is a slight variation on the above theme. The loop ensures that we do
+// not have the corner cases in the unform deviate: [0,1). That is, p > 0.0
+// and p < 1.0. We call it the 'no tails' uniform.
 //
 double
 NumericOperations::ntuniform()
 {
 	double	dbRetVal;
-	do { 
+	do {
 		dbRetVal = uniform();
 	} while ((0.0 == dbRetVal) || (RANDOM_MAX == dbRetVal));
 	return dbRetVal;
 }
 //
-//  Computes the dbProp quantile of a normal distribution. 
+//  Computes the dbProp quantile of a normal distribution.
 //
 double
 NumericOperations::qtilenorm(double prob)
-{                               
+{
     double p = 0, x = 0;
 	//
-	// Checks. 
+	// Checks.
 	//
-	
-	if ((0.0 >= prob) || 
+
+	if ((0.0 >= prob) ||
 		(1.0 <= prob)) {
 		//
-		// It makes no sense for the p to be out of the range [0,1]. 
+		// It makes no sense for the p to be out of the range [0,1].
 		//
 	} else if (0.5 == prob) {
 		x = 0.0;
@@ -588,18 +588,18 @@ NumericOperations::qtilenorm(double prob)
         	  );
 	}
 	return ((0.5 >= prob ) ? ( -1.0 * x ) : ( x ) );
-} 
+}
 //
-// NumericOperations::MultModM(s,t,M) -  Returns (s*t) MOD M.  
-//                                       Assumes that -M < s < M and 
+// NumericOperations::MultModM(s,t,M) -  Returns (s*t) MOD M.
+//                                       Assumes that -M < s < M and
 //                                       -M < t < M.
 //
-// Taken from Pierre L'Ecuyer and Serge Cote, "Implementing a Random Number 
-// Package with Splitting Facilities": ACM TOMACS, no. 1, vol. 17, pp. 98-111, 
+// Taken from Pierre L'Ecuyer and Serge Cote, "Implementing a Random Number
+// Package with Splitting Facilities": ACM TOMACS, no. 1, vol. 17, pp. 98-111,
 // March, 1991.
 //
-int 
-NumericOperations::MultModM( int s, int t, int M) 
+int
+NumericOperations::MultModM( int s, int t, int M)
 {
   int R, S0, S1, q, qh, rh, k;
 
@@ -632,37 +632,37 @@ NumericOperations::MultModM( int s, int t, int M)
   return R;
 }
 
-void        
+void
 NumericOperations::ResetSeedRG     ( unsigned g, int s[4] )
 {
-	if( g>MAXGEN) 
+	if( g>MAXGEN)
 		seterr ( GENVAL_RG_OUT_OF_RANGE  );
-	else { 
-  		for( int j=0; j<4; j++) 
+	else {
+  		for( int j=0; j<4; j++)
 			Ig[j][g]=s[j];
   		InitGeneratorRG( g, InitialSeed);
 	}
 }
 
-void        
+void
 NumericOperations::GetStateRG      ( unsigned g, int s[4] )
 {
 	for(int j=0; j<4; j++) s[j]=Cg[j][g];
 }
 
-void        
+void
 NumericOperations::InitGeneratorRG ( unsigned g, SeedType  st   )
 {
-	if( g>MAXGEN) 
+	if( g>MAXGEN)
 		seterr ( GENVAL_RG_OUT_OF_RANGE  );
-	else { 
+	else {
 		for( int j=0; j<4; j++) {
 			switch (st) {
 				case InitialSeed :
-					Lg[j][g]=Ig[j][g]; 
+					Lg[j][g]=Ig[j][g];
 				 break;
 				case NewSeed :
-					Lg[j][g]=MultModM( aw[j], Lg[j][g], m[j]); 
+					Lg[j][g]=MultModM( aw[j], Lg[j][g], m[j]);
 				 break;
 				case LastSeed :
 				 break;
@@ -672,22 +672,22 @@ NumericOperations::InitGeneratorRG ( unsigned g, SeedType  st   )
 	}
 }
 
-void        
+void
 NumericOperations::SetSeedInitRG ( int s[4] )
 {
 	unsigned g;
-    
+
 	for( int j=0; j<4; j++) Ig[j][0]=s[j];
 		InitGeneratorRG( 0, InitialSeed);
 
 	for( g=1; g<=MAXGEN; g++) {
-		for( int j=0; j<4; j++) 
+		for( int j=0; j<4; j++)
 			Ig[j][g]=MultModM( avw[j], Ig[j][g-1], m[j]);
 		InitGeneratorRG( g, InitialSeed );
-	} 
+	}
 }
 
-void        
+void
 NumericOperations::InitRG          ( int v, int w)
 {
 	int    sd[4];
@@ -702,24 +702,24 @@ NumericOperations::InitRG          ( int v, int w)
 	sd[3]=w^0X55595555;
 
 	for( j=0; j<4; j++) {
-		for( aw[j]=a[j],i=1;i<=wc; i++) 
+		for( aw[j]=a[j],i=1;i<=wc; i++)
 			aw[j]=MultModM( aw[j], aw[j], m[j]);
-		for( avw[j]=aw[j],i=1; i<=vc; i++) 
+		for( avw[j]=aw[j],i=1; i<=vc; i++)
 			avw[j]=MultModM( avw[j], avw[j], m[j]);
 	}
 
 	SetSeedInitRG (sd);
 }
 
-double 
+double
 NumericOperations::uniformRG   	   ( unsigned g )
 {
 	int k,s;
 	double     u=0.0;
 
-	if( g>MAXGEN) 
+	if( g>MAXGEN)
 		seterr ( GENVAL_RG_OUT_OF_RANGE  );
-	else { 
+	else {
 
   		s=Cg[0][g]; k=s/46693;
 		s=45991*(s-k*46693)-k*25884;
@@ -749,14 +749,14 @@ NumericOperations::uniformRG   	   ( unsigned g )
 		if( u<0) u+=1.0;
 	}
 	return (u);
-} 
+}
 //
 // NumericOperations::exponentialdev() - random values, exponential distribution
 //
-//  This method returns random values that follow an exponential distribution 
-//  of unit (1.0) mean. 
+//  This method returns random values that follow an exponential distribution
+//  of unit (1.0) mean.
 //
-double 
+double
 NumericOperations::exponentialdev()
 {
 	double dbRan;
@@ -769,10 +769,10 @@ NumericOperations::exponentialdev()
 //
 //   RandomNumerGenerator::gammadev(nWait) - random values, gamma distribution
 //
-//   The gamma distribution of integer order (nWait) is the waiting time to the 
-//  nWait-th event in a Poisson random process of unit (1.0) mean. This method 
+//   The gamma distribution of integer order (nWait) is the waiting time to the
+//  nWait-th event in a Poisson random process of unit (1.0) mean. This method
 //  computes the 'standard' Gamma deviate: that is, the shape paramater is 1.0,
-//  the location parameter is 0.0, and the scale parameter is 1.0. 
+//  the location parameter is 0.0, and the scale parameter is 1.0.
 //
 //
 double
@@ -783,7 +783,7 @@ NumericOperations::gammadev( const int nWait )
 
  	if (6 > nWait) {
 		x=1.0;
-		for (j=1;j<=nWait;j++) 
+		for (j=1;j<=nWait;j++)
 			x *= uniform();
  			x = -log(x);
 	} else {
@@ -806,15 +806,15 @@ NumericOperations::gammadev( const int nWait )
 //
 //  NumericOperations::poissondev() - random ints values, poisson dist.
 //
-//   The Poisson Distribution (not named after the fish) is conceptually 
-//   similar to the Gamma Distribution. It reports the probability of a certain 
-//   numnber of unit rate Poisson random events occur during a given interval 
-//   of time. 
+//   The Poisson Distribution (not named after the fish) is conceptually
+//   similar to the Gamma Distribution. It reports the probability of a certain
+//   numnber of unit rate Poisson random events occur during a given interval
+//   of time.
 //
-//   This method (styled after the Numerical Recipes function) reports an 
-//   integer which is a random value from from a Poisson distribution of mean 
+//   This method (styled after the Numerical Recipes function) reports an
+//   integer which is a random value from from a Poisson distribution of mean
 //   dbMean
-//   
+//
 double
 NumericOperations::poissondev(const double dbMean)
 {
@@ -851,10 +851,10 @@ NumericOperations::poissondev(const double dbMean)
 		return em;
 }
 //
-// NumericOperations::binomialdev( double prob, int nTrials) 
+// NumericOperations::binomialdev( double prob, int nTrials)
 //
-//  This function computes a binomial random deviate. That is, given nTrials 
-//  with probability dbProb, this function returns a random integer variable 
+//  This function computes a binomial random deviate. That is, given nTrials
+//  with probability dbProb, this function returns a random integer variable
 //  with over the range [0, nTrials) with an expected value of (dbPP * nTrials).
 //
 double
@@ -862,9 +862,9 @@ NumericOperations::binomialdev( const double dbPP, const int nTrials )
 {
 	int j;
 	double  dbAMean,em,g,angle,p,bnl,sq,t,y;
- 
-	p=(dbPP <= 0.5 ? dbPP : 1.0-dbPP); 
-	dbAMean=(double)nTrials*p; 
+
+	p=(dbPP <= 0.5 ? dbPP : 1.0-dbPP);
+	dbAMean=(double)nTrials*p;
 
 	if (25 >= nTrials) {
 		bnl=0.0;
@@ -897,7 +897,7 @@ NumericOperations::binomialdev( const double dbPP, const int nTrials )
 				angle=PI*uniform();
 				y=tan(angle);
 				em=sq*y+dbAMean;
-			} while (em < 0.0 || em >= (dbEn+1.0)); 
+			} while (em < 0.0 || em >= (dbEn+1.0));
 			em=floor(em);
 			t=1.2*sq*(1.0+y*y)*exp(dbOldGamma-gammaln(em+1.0)-
 				gammaln(dbEn-em+1.0)+em*dbPLog+(dbEn-em)*dbPCLog);
@@ -911,12 +911,12 @@ NumericOperations::binomialdev( const double dbPP, const int nTrials )
 	return bnl;
 }
 //
-// NumericOperations::geomdist () - random variable, geometric distribution. 
-// 
-// Generates a random variable that follows a geometric distribution. Given a prob 
-// 'p' for some event, this function returns a (random) number of trials that would be 
-// expected before the event occured. For example, tossing a (weighter) coin, or 
-// rolling a '1' on a single dice, or dealing an Ace of Spades from the top of a 
+// NumericOperations::geomdist () - random variable, geometric distribution.
+//
+// Generates a random variable that follows a geometric distribution. Given a prob
+// 'p' for some event, this function returns a (random) number of trials that would be
+// expected before the event occured. For example, tossing a (weighter) coin, or
+// rolling a '1' on a single dice, or dealing an Ace of Spades from the top of a
 // shuffled deck.
 int
 NumericOperations::geomdist      ( const double p )
@@ -924,36 +924,36 @@ NumericOperations::geomdist      ( const double p )
     return int(floor(log(uniform()) / log ( 1 - p ) )) + 1;
 }
 //
-// NumericOperations::gaussiansdev() - random variable, gaussian (normal) 
+// NumericOperations::gaussiansdev() - random variable, gaussian (normal)
 // 										distribution
 //
-//  This method returns a random variable distributed according to the normal (or 
-//  Gaussian) distribution, with a mean of 0.0 and a variance of 1.0. 
+//  This method returns a random variable distributed according to the normal (or
+//  Gaussian) distribution, with a mean of 0.0 and a variance of 1.0.
 double
 NumericOperations::gaussiandev()
 {
         double fac,rsq,v1,v2;
 
-        if (nGPrev == 0) { 
+        if (nGPrev == 0) {
                 do {
-                        v1=2.0*uniform()-1.0; 
+                        v1=2.0*uniform()-1.0;
                         v2=2.0*uniform()-1.0;
-                        rsq=v1*v1+v2*v2; 
-                } while (rsq >= 1.0 || rsq == 0.0); 
+                        rsq=v1*v1+v2*v2;
+                } while (rsq >= 1.0 || rsq == 0.0);
                 fac=sqrt(-2.0*log(rsq)/rsq);
                 dbGausPrev=v1*fac;
-                nGPrev=1; 
+                nGPrev=1;
                 return v2*fac;
-        } else { 
-                nGPrev=0; 
-                return dbGausPrev; 
+        } else {
+                nGPrev=0;
+                return dbGausPrev;
         }
 }
 //
 //
-double 
-NumericOperations::zipfdeviate ( const double x1, 
-								 const double x2, 
+double
+NumericOperations::zipfdeviate ( const double x1,
+								 const double x2,
 								 const double p )
 {
 	double  x;
@@ -963,7 +963,7 @@ NumericOperations::zipfdeviate ( const double x1,
 	double  HsubV;
 
 	//
-	// Hand calculated a number of HsubV values for 
+	// Hand calculated a number of HsubV values for
 	// the range 1 through 100000
 	//
 	if ((p > 0.0) && (p < 0.5))
@@ -996,26 +996,26 @@ NumericOperations::zipfdeviate ( const double x1,
 		HsubV = 1.64492;
 	else if ((p >= 2.0) && (p < 3.0))
 		HsubV = 1.20206;
-	else 
+	else
 		HsubV = 1.1;
 	//
 	//	V = 20 + (int)(uniform() * 50.0);
 	//
-	// To make this a bit more 'random', we add an epsilon to the 
-	// p. The point being that most folk will give us seed 
-	// numbers that are 1.005 say, and repeatedly finding powers 
+	// To make this a bit more 'random', we add an epsilon to the
+	// p. The point being that most folk will give us seed
+	// numbers that are 1.005 say, and repeatedly finding powers
 	// of such numbers makes a mess of things.
 	//
 	// lp = p + ((V%2)?(-1.0):(1.0))*DBL_EPSILON;
 	// calculate the V-th harmonic number HsubV. WARNING: V>1
 	// HsubV = 0.0;
-	// for(i=1; i<=V; i++) 
+	// for(i=1; i<=V; i++)
 	// 		HsubV += 1.0/pow((double)i, lp);
 	//
 	lp = p;
 	r = uniform()*HsubV;
 
-	sum = 1.0; 
+	sum = 1.0;
 	i=1;
 	while( sum < r ){
 		i++;
@@ -1037,10 +1037,10 @@ NumericOperations::zipfdeviate (const double dbA )
 	return zipfdeviate(0.0,1.0,dbA);
 }
 //
-// NumericOperations::GetErrString( char * ) - get error string. 
+// NumericOperations::GetErrString( char * ) - get error string.
 //
-// If the error status of the object has been set, then this method is 
-// used to retrieve the error string, and to reset the error code. 
+// If the error status of the object has been set, then this method is
+// used to retrieve the error string, and to reset the error code.
 //
 int
 NumericOperations::GetErrString ( char * pchErrMsgBuf )
@@ -1049,7 +1049,7 @@ NumericOperations::GetErrString ( char * pchErrMsgBuf )
 
 	nRetVal = nErrorState;
 
-	if (pchErrMsgBuf) { 
+	if (pchErrMsgBuf) {
 		switch(nRetVal)
 		{
 			case NUMERIC_ERR_STATE_GAMMA_Q_BAD_ARGS:

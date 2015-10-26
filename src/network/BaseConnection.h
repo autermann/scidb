@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -52,11 +52,26 @@ namespace scidb
 {
 
 /**
- * If you are changing the format of the protobuf messages in src/network/protoscidb_msg.proto
+ * If you are changing the format of the protobuf messages in src/network/proto/scidb_msg.proto
  * (especially by adding required message fields), or any structures like MessageType and/or MessagesHeader
  * - you must increment this number. Notice that this will impact all the client tools (by breaking backwards compatibility).
  *
  * Revision history:
+ *
+ * NET_PROTOCOL_CURRENT_VER = 7:
+ *    Author: james
+ *    Date: 7/9/2015
+ *    Ticket: 4535
+ *
+ * NET_PROTOCOL_CURRENT_VER = 6:
+ *    Author: marty
+ *    Date: 5/18/2015
+ *    Ticket: 4294
+ *
+ * NET_PROTOCOL_CURRENT_VER = 5:
+ *    Author: tigor
+ *    Date: 2/XXX/2015
+ *    Ticket: 4422
  *
  * NET_PROTOCOL_CURRENT_VER = 4:
  *    Author: tigor
@@ -70,63 +85,97 @@ namespace scidb
  *    Ticket: ??
  *    Note: Initial implementation dating back some time
  */
-const uint32_t NET_PROTOCOL_CURRENT_VER = 4;
+const uint32_t NET_PROTOCOL_CURRENT_VER = 7;
 
 /**
  * Messageg types
  */
 enum MessageType
 {
-    mtNone=SYSTEM_NONE_MSG_ID,
-    mtExecuteQuery,
-    mtPreparePhysicalPlan,
-    mtUnusedPlus3,
-    mtFetch,
-    mtChunk,
-    mtChunkReplica,
-    mtRecoverChunk,
-    mtReplicaSyncRequest,
-    mtReplicaSyncResponse,
-    mtAggregateChunk,
-    mtQueryResult,
-    mtError,
-    mtSyncRequest,
-    mtSyncResponse,
-    mtCancelQuery,
-    mtRemoteChunk,
-    mtNotify,
-    mtWait,
-    mtBarrier,
-    mtBufferSend,
-    mtAlive,
-    mtPrepareQuery,
-    mtResourcesFileExistsRequest,
-    mtResourcesFileExistsResponse,
-    mtAbort,
-    mtCommit,
-    mtCompleteQuery,
-    mtControl,
+    mtNone                                   = SYSTEM_NONE_MSG_ID + 0,
+    mtExecuteQuery                           = SYSTEM_NONE_MSG_ID + 1,
+    mtPreparePhysicalPlan                    = SYSTEM_NONE_MSG_ID + 2,
+    mtUnusedPlus3                            = SYSTEM_NONE_MSG_ID + 3,
+    mtFetch                                  = SYSTEM_NONE_MSG_ID + 4,
+    mtChunk                                  = SYSTEM_NONE_MSG_ID + 5,
+    mtChunkReplica                           = SYSTEM_NONE_MSG_ID + 6,
+    mtRecoverChunk                           = SYSTEM_NONE_MSG_ID + 7,
+    mtReplicaSyncRequest                     = SYSTEM_NONE_MSG_ID + 8,
+    mtReplicaSyncResponse                    = SYSTEM_NONE_MSG_ID + 9,
+    mtUnusedPlus10                           = SYSTEM_NONE_MSG_ID + 10,
+    mtQueryResult                            = SYSTEM_NONE_MSG_ID + 11,
+    mtError                                  = SYSTEM_NONE_MSG_ID + 12,
+    mtSyncRequest                            = SYSTEM_NONE_MSG_ID + 13,
+    mtSyncResponse                           = SYSTEM_NONE_MSG_ID + 14,
+    mtCancelQuery                            = SYSTEM_NONE_MSG_ID + 15,
+    mtRemoteChunk                            = SYSTEM_NONE_MSG_ID + 16,
+    mtNotify                                 = SYSTEM_NONE_MSG_ID + 17,
+    mtWait                                   = SYSTEM_NONE_MSG_ID + 18,
+    mtBarrier                                = SYSTEM_NONE_MSG_ID + 19,
+    mtBufferSend                             = SYSTEM_NONE_MSG_ID + 20,
+    mtAlive                                  = SYSTEM_NONE_MSG_ID + 21,
+    mtPrepareQuery                           = SYSTEM_NONE_MSG_ID + 22,
+    mtResourcesFileExistsRequest             = SYSTEM_NONE_MSG_ID + 23,
+    mtResourcesFileExistsResponse            = SYSTEM_NONE_MSG_ID + 24,
+    mtAbort                                  = SYSTEM_NONE_MSG_ID + 25,
+    mtCommit                                 = SYSTEM_NONE_MSG_ID + 26,
+    mtCompleteQuery                          = SYSTEM_NONE_MSG_ID + 27,
+    mtControl                                = SYSTEM_NONE_MSG_ID + 28,
+    mtUpdateQueryResult                      = SYSTEM_NONE_MSG_ID + 29,
+    mtNewClientStart                         = SYSTEM_NONE_MSG_ID + 30,
+    mtNewClientComplete                      = SYSTEM_NONE_MSG_ID + 31,
+    mtSecurityMessage                        = SYSTEM_NONE_MSG_ID + 32,
+    mtSecurityMessageResponse                = SYSTEM_NONE_MSG_ID + 33,
     mtSystemMax // must be last, make sure scidb::SYSTEM_MAX_MSG_ID is set to this value
 };
 
 
-struct MessageHeader
+class MessageHeader
 {
-    uint16_t netProtocolVersion;         /** < Version of network protocol */
-    uint16_t messageType;                /** < Type of message */
-    uint32_t recordSize;                 /** < The size of structured part of message to know what buffer size we must allocate */
-    uint32_t binarySize;                 /** < The size of unstructured part of message to know what buffer size we must allocate */
-    InstanceID sourceInstanceID;         /** < The source instance number */
-    uint64_t queryID;                    /** < Query ID */
+private:
+    uint16_t _netProtocolVersion;         /** < Version of network protocol */
+    uint16_t _messageType;                /** < Type of message */
+    uint64_t _recordSize;                 /** < The size of structured part of message to know what buffer size we must allocate */
+    uint64_t _binarySize;                 /** < The size of unstructured part of message to know what buffer size we must allocate */
+    InstanceID _sourceInstanceID;         /** < The source instance number */
+    uint64_t _queryID;                    /** < Query ID */
 
+public:
     MessageHeader()
-        : netProtocolVersion(0),
-          messageType(0),
-          recordSize(0),
-          binarySize(0),
-          sourceInstanceID(0),
-          queryID(0) {}
+        : _netProtocolVersion(0),
+          _messageType(0),
+          _recordSize(0),
+          _binarySize(0),
+          _sourceInstanceID(0),
+          _queryID(0) {}
+
+    uint16_t getNetProtocolVersion() const { return _netProtocolVersion; }
+    uint16_t getMessageType() const { return _messageType; }
+    uint64_t getRecordSize() const { return _recordSize; }
+    uint64_t getBinarySize() const { return _binarySize; }
+    InstanceID getSourceInstanceID() const { return _sourceInstanceID; }
+    uint64_t getQueryID() const { return _queryID; }
+
+    void setNetProtocolVersion(uint16_t v) { _netProtocolVersion = v; }
+    void setRecordSize(uint64_t v) { _recordSize = v; }
+    void setBinarySize(uint64_t v) { _binarySize = v; }
+    void setMessageType(uint16_t v){ _messageType = v; }
+    void setSourceInstanceID(InstanceID v) { _sourceInstanceID = v; }
+    void setQueryID(uint64_t v) { _queryID = v; }
+
+    /**
+     * Convert the MessageHeader to a string optionally prefixing a
+     * string prior to the converted MessageHeader
+     *
+     * @param strPrefix - the prefix string to use (optional)
+     */
+    std::string str(const std::string &strPrefix = "") const;
 };
+
+std::ostream& operator <<(
+    std::ostream& out,
+    const MessageHeader &messsageHeader);
+
 
 
 /**
@@ -137,34 +186,34 @@ class MessageDesc
 public:
    MessageDesc();
    MessageDesc(MessageID messageType);
-   MessageDesc(const boost::shared_ptr< SharedBuffer >& binary);
-   MessageDesc(MessageID messageType, const boost::shared_ptr< SharedBuffer >& binary);
+   MessageDesc(const std::shared_ptr< SharedBuffer >& binary);
+   MessageDesc(MessageID messageType, const std::shared_ptr< SharedBuffer >& binary);
    virtual ~MessageDesc() {}
    void writeConstBuffers(std::vector<boost::asio::const_buffer>& constBuffers);
    bool parseRecord(size_t bufferSize);
    void prepareBinaryBuffer();
 
    InstanceID getSourceInstanceID() {
-      return _messageHeader.sourceInstanceID;
+      return _messageHeader.getSourceInstanceID();
    }
 
    /**
     * This method is not part of the public API
     */
    void setSourceInstanceID(const InstanceID& instanceId) {
-      _messageHeader.sourceInstanceID = instanceId;
+      _messageHeader.setSourceInstanceID( instanceId );
    }
 
    template <class Derived>
-    boost::shared_ptr<Derived> getRecord() {
-        return boost::static_pointer_cast<Derived>(_record);
+    std::shared_ptr<Derived> getRecord() {
+        return std::static_pointer_cast<Derived>(_record);
     }
 
     MessageID getMessageType() {
-       return static_cast<MessageID>(_messageHeader.messageType);
+       return static_cast<MessageID>(_messageHeader.getMessageType());
     }
 
-    boost::shared_ptr< SharedBuffer > getBinary()
+    std::shared_ptr< SharedBuffer > getBinary()
     {
         return _binary;
     }
@@ -173,25 +222,48 @@ public:
 
     size_t getMessageSize() const
     {
-        return _messageHeader.recordSize + _messageHeader.binarySize + sizeof(MessageHeader);
+        return  _messageHeader.getRecordSize() +
+                _messageHeader.getBinarySize() +
+                sizeof(MessageHeader);
     }
 
     QueryID getQueryID() const
     {
-        return _messageHeader.queryID;
+        return _messageHeader.getQueryID();
     }
 
     void setQueryID(QueryID queryID)
     {
-        _messageHeader.queryID = queryID;
+        _messageHeader.setQueryID(queryID);
     }
 
     void initRecord(MessageID messageType)
     {
-       assert( _messageHeader.messageType == mtNone);
+       assert( _messageHeader.getMessageType() == mtNone);
        _record = createRecord(messageType);
-       _messageHeader.messageType = static_cast<uint16_t>(messageType);
+       _messageHeader.setMessageType(
+            static_cast<uint16_t>(messageType));
     }
+
+    /**
+     * Convert the MessageDesc to a string optionally prefixing a
+     * string prior to the converted MessageDesc.
+     *
+     * @param strPrefix - the prefix string to use (optional)
+     */
+    std::string str(const std::string &strPrefix = "") const;
+
+
+    /**
+     * primarily for serialization purposes
+     */
+    MessageHeader & getMessageHeader() {return _messageHeader; }
+    const MessageHeader & getMessageHeader() const { return _messageHeader; }
+
+    /**
+     * primarily for serialization purposes
+     */
+    const MessagePtr &getRecord() const { return _record; }
 
  protected:
 
@@ -205,7 +277,7 @@ private:
     void init(MessageID messageType);
     MessageHeader _messageHeader;   /** < Message header */
     MessagePtr _record;             /** < Structured part of message */
-    boost::shared_ptr< SharedBuffer > _binary;     /** < Buffer for binary data to be transfered */
+    std::shared_ptr< SharedBuffer > _binary;     /** < Buffer for binary data to be transfered */
     boost::asio::streambuf _recordStream; /** < Buffer for serializing Google Protocol Buffers objects */
 
     static MessagePtr createRecordByType(MessageID messageType);
@@ -213,6 +285,12 @@ private:
     friend class BaseConnection;
     friend class Connection;
 };
+
+
+std::ostream& operator <<(
+    std::ostream& out,
+    MessageDesc &messsageDesc);
+
 
 
 /**
@@ -250,14 +328,14 @@ public:
          * @throw System::Exception
          */
         template <class MessageDesc_tt>
-        boost::shared_ptr<MessageDesc_tt> sendAndReadMessage(boost::shared_ptr<MessageDesc>& inMessageDesc);
+        std::shared_ptr<MessageDesc_tt> sendAndReadMessage(std::shared_ptr<MessageDesc>& inMessageDesc);
 
          /**
          * Send message to peer
          * @param inMessageDesc a message descriptor for sending message.
          * @throw System::Exception
          */
-        void send(boost::shared_ptr<MessageDesc>& messageDesc);
+        void send(std::shared_ptr<MessageDesc>& messageDesc);
 
         /**
          * Receive message from peer
@@ -266,26 +344,26 @@ public:
          * @throw System::Exception
          */
         template <class MessageDesc_tt>
-        boost::shared_ptr<MessageDesc_tt> receive();
+        std::shared_ptr<MessageDesc_tt> receive();
 
         static log4cxx::LoggerPtr logger;
 };
 
 template <class MessageDesc_tt>
-boost::shared_ptr<MessageDesc_tt> BaseConnection::sendAndReadMessage(boost::shared_ptr<MessageDesc>& messageDesc)
+std::shared_ptr<MessageDesc_tt> BaseConnection::sendAndReadMessage(std::shared_ptr<MessageDesc>& messageDesc)
 {
     LOG4CXX_TRACE(BaseConnection::logger, "The sendAndReadMessage: begin");
     send(messageDesc);
-    boost::shared_ptr<MessageDesc_tt> resultDesc = receive<MessageDesc_tt>();
+    std::shared_ptr<MessageDesc_tt> resultDesc = receive<MessageDesc_tt>();
     LOG4CXX_TRACE(BaseConnection::logger, "The sendAndReadMessage: end");
     return resultDesc;
 }
 
 template <class MessageDesc_tt>
-boost::shared_ptr<MessageDesc_tt> BaseConnection::receive()
+std::shared_ptr<MessageDesc_tt> BaseConnection::receive()
 {
     LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: begin");
-    boost::shared_ptr<MessageDesc_tt> resultDesc(new MessageDesc_tt());
+    std::shared_ptr<MessageDesc_tt> resultDesc(new MessageDesc_tt());
     try
     {
         // Reading message description
@@ -293,25 +371,40 @@ boost::shared_ptr<MessageDesc_tt> BaseConnection::receive()
         assert(readBytes == sizeof(resultDesc->_messageHeader));
         ASSERT_EXCEPTION((resultDesc->validate()), "BaseConnection::receive:");
         // TODO: This must not be an assert but exception of correct handled backward compatibility
-        ASSERT_EXCEPTION((resultDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER), "BaseConnection::receive:");
+        ASSERT_EXCEPTION(
+            (   resultDesc->_messageHeader.getNetProtocolVersion() ==
+                NET_PROTOCOL_CURRENT_VER),
+            "BaseConnection::receive:");
 
         // Reading serialized structured part
-        readBytes = read(_socket, resultDesc->_recordStream.prepare(resultDesc->_messageHeader.recordSize));
-        assert(readBytes == resultDesc->_messageHeader.recordSize);
-        LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: recordSize=" << resultDesc->_messageHeader.recordSize);
+        readBytes = read(_socket, resultDesc->_recordStream.prepare(
+            resultDesc->_messageHeader.getRecordSize()));
+        assert(readBytes == resultDesc->_messageHeader.getRecordSize());
+
+        LOG4CXX_TRACE(BaseConnection::logger,
+            "BaseConnection::receive: recordSize="
+                << resultDesc->_messageHeader.getRecordSize());
+
         bool rc = resultDesc->parseRecord(readBytes);
         ASSERT_EXCEPTION(rc, "BaseConnection::receive:");
 
         resultDesc->prepareBinaryBuffer();
 
-        if (resultDesc->_messageHeader.binarySize > 0)
+        if (resultDesc->_messageHeader.getBinarySize() > 0)
         {
-            readBytes = read(_socket, boost::asio::buffer(resultDesc->_binary->getData(), resultDesc->_binary->getSize()));
+            readBytes = read(_socket,
+                boost::asio::buffer(
+                    resultDesc->_binary->getData(),
+                    resultDesc->_binary->getSize()));
+
             assert(readBytes == resultDesc->_binary->getSize());
         }
 
-        LOG4CXX_TRACE(BaseConnection::logger, "read message: messageType=" << resultDesc->_messageHeader.messageType <<
-                      " ; binarySize=" << resultDesc->_messageHeader.binarySize);
+        LOG4CXX_TRACE(BaseConnection::logger,
+            "read message: messageType="
+                << resultDesc->_messageHeader.getMessageType()
+                << " ; binarySize="
+                << resultDesc->_messageHeader.getBinarySize());
 
         LOG4CXX_TRACE(BaseConnection::logger, "BaseConnection::receive: end");
     }

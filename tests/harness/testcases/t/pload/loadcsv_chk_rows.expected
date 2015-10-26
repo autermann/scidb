@@ -1,3 +1,9 @@
+SCIDB QUERY : <create array array_sm11 <a:int64,b:int64,c:int64>[i=0:*,3,0]>
+Query was executed successfully
+
+SCIDB QUERY : <load(array_sm11, '/tmp/sm10.csv', -2, 'csv')>
+[Query was executed successfully, ignoring data output by this query.]
+
 SCIDB QUERY : <sort(array_sm11,a)>
 {n} a,b,c
 {0} 1,2,3

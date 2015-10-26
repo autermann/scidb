@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -63,20 +63,20 @@ inline const DimensionDesc& dimSubscript(const Dimensions& dims, size_t idx, boo
 enum RowCol_e {ROW=0, COL=1};
 inline size_t nRow(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, ROW, transpose).getLength(); }
 inline size_t nCol(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, COL, transpose).getLength(); }
-inline size_t chunkRow(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, ROW, transpose).getChunkInterval(); }
-inline size_t chunkCol(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, COL, transpose).getChunkInterval(); }
+inline unsigned int chunkRow(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, ROW, transpose).getChunkInterval(); }
+inline unsigned int chunkCol(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, COL, transpose).getChunkInterval(); }
 
 // operate on ArrayDesc -- handy for LogicalOperator::inferSchema() overloads
 inline size_t nRow(const ArrayDesc& desc, bool transpose=false) { return nRow(desc.getDimensions(), transpose); }
 inline size_t nCol(const ArrayDesc& desc, bool transpose=false) { return nCol(desc.getDimensions(), transpose); }
-inline size_t chunkRow(const ArrayDesc& desc, bool transpose=false) { return chunkRow(desc.getDimensions(), transpose); }
-inline size_t chunkCol(const ArrayDesc& desc, bool transpose=false) { return chunkCol(desc.getDimensions(), transpose); }
+inline unsigned int chunkRow(const ArrayDesc& desc, bool transpose=false) { return chunkRow(desc.getDimensions(), transpose); }
+inline unsigned int chunkCol(const ArrayDesc& desc, bool transpose=false) { return chunkCol(desc.getDimensions(), transpose); }
 
 // operate on Array -- handy for PhysicalOperator::execute() overloads
-inline size_t nRow(boost::shared_ptr<Array>& array, bool transpose=false) { return nRow(array->getArrayDesc(), transpose); }
-inline size_t nCol(boost::shared_ptr<Array>& array, bool transpose=false) { return nCol(array->getArrayDesc(), transpose); }
-inline size_t chunkRow(boost::shared_ptr<Array>& array, bool transpose=false) { return chunkRow(array->getArrayDesc(), transpose); }
-inline size_t chunkCol(boost::shared_ptr<Array>& array, bool transpose=false) { return chunkCol(array->getArrayDesc(), transpose); }
+inline size_t nRow(std::shared_ptr<Array>& array, bool transpose=false) { return nRow(array->getArrayDesc(), transpose); }
+inline size_t nCol(std::shared_ptr<Array>& array, bool transpose=false) { return nCol(array->getArrayDesc(), transpose); }
+inline unsigned int chunkRow(std::shared_ptr<Array>& array, bool transpose=false) { return chunkRow(array->getArrayDesc(), transpose); }
+inline unsigned int chunkCol(std::shared_ptr<Array>& array, bool transpose=false) { return chunkCol(array->getArrayDesc(), transpose); }
 
 } // namespace scidb
 

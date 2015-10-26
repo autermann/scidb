@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,8 +34,9 @@
 #include <deque>
 #include <string>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/unordered_set.hpp>
+#include <memory>
+#include <unordered_set>
+#include <boost/function.hpp>
 
 #include <array/Array.h>
 #include <array/MemChunk.h>
@@ -57,16 +58,11 @@ class PullSGContext : virtual public Query::OperatorContext
 {
 private:
 
-    boost::shared_ptr<Array> _inputSGArray;
+    std::shared_ptr<Array> _inputSGArray;
     bool _isEmptyable;
-    boost::shared_ptr<PullSGArray> _resultArray;
-    PartitioningSchema _ps;
-    boost::shared_ptr<DistributionMapper> _distMapper;
-    size_t _shift;
-    InstanceID _instanceIdMask;
-    boost::shared_ptr<PartitioningSchemaData> _psData;
-
-    typedef std::deque< boost::shared_ptr<MessageDesc> > MessageQueue;
+    std::shared_ptr<PullSGArray> _resultArray;
+    SGInstanceLocator _instanceLocator;
+    typedef std::deque< std::shared_ptr<MessageDesc> > MessageQueue;
     struct InstanceState
     {
         MessageQueue _chunks;
@@ -90,30 +86,44 @@ private:
     // This is the prefetch chunk cache. Each remote request tries to drain iterator until the cache is full
     // and then scatters the chunks eligible for delivery.
     std::vector< std::vector<InstanceState> >  _instanceStates;
-    std::vector<boost::shared_ptr<ConstArrayIterator> >  _attributeIterators;
+    std::vector<std::shared_ptr<ConstArrayIterator> >  _attributeIterators;
     std::vector<AttributeState> _attributeStates;
     size_t _perAttributeMaxSize;
     /// A set of attributes for which the chunks are temporarily unavailable
     /// Generally, SinglePassArray iterators can indicate such a condition
     /// because their attribute chunks have to be consumed "horizontally".
-    boost::unordered_set<size_t> _unavailableAttributes;
+    std::unordered_set<size_t> _unavailableAttributes;
 
     /// true if a data integrity issue has been found
     bool _hasDataIntegrityIssue;
 
 public:
 
+    static InstanceID instanceForChunk(const std::shared_ptr<Query>& query,
+                                       const Coordinates& chunkPosition,
+                                       const ArrayDesc& arrayDesc,
+                                       PartitioningSchema ps,
+                                       std::shared_ptr<CoordinateTranslator>& distMapper,
+                                       size_t shift,
+                                       InstanceID instanceIdMask,
+                                       std::shared_ptr<PartitioningSchemaData>& psData)
+    {
+        const InstanceID destInstance = getInstanceForChunk(query,
+                                                            chunkPosition,
+                                                            arrayDesc,
+                                                            ps,
+                                                            distMapper,
+                                                            shift,
+                                                            instanceIdMask,
+                                                            psData.get());
+        return destInstance;
+    }
+
     /**
      * Constructor
      * @param source array of data to scatter
      * @param result array of data to gather
      * @param instNum number of participating instances
-     * @param attrNum number of attributes in the result array
-     * @param ps a new partitioning schema
-     * @param distMapper
-     * @param shift
-     * @param instanceIdMask
-     * @param psData a pointer to the data that is specific to the particular partitioning schema
      * @param cacheSizePerAttribute the maximum number of input array chunks to be cached per attribute;
      *        CONFIG_SG_SEND_QUEUE_SIZE by default
      * @note
@@ -124,25 +134,21 @@ public:
      * (if the total cache size has to remain constant).
      * However, by default, cacheSizePerAttribute will be set to  the same value for all attributes.
      */
-    PullSGContext(const boost::shared_ptr<Array>& source,
-                  const boost::shared_ptr<PullSGArray>& result,
+    PullSGContext(const std::shared_ptr<Array>& source,
+                  const std::shared_ptr<PullSGArray>& result,
                   const size_t instNum,
-                  PartitioningSchema ps,
-                  const boost::shared_ptr<DistributionMapper>& distMapper,
-                  const size_t shift,
-                  const InstanceID instanceIdMask,
-                  const boost::shared_ptr<PartitioningSchemaData>& psData,
+                  const SGInstanceLocator& instLocator,
                   size_t cacheSizePerAttribute=0);
 
     virtual ~PullSGContext() {}
 
-    boost::shared_ptr<PullSGArray> getResultArray()
+    std::shared_ptr<PullSGArray> getResultArray()
     {
         return _resultArray;
     }
 
     /// A list of network messages with their destinations
-    typedef std::list< std::pair<InstanceID, boost::shared_ptr<MessageDesc> > > ChunksWithDestinations;
+    typedef std::list< std::pair<InstanceID, std::shared_ptr<MessageDesc> > > ChunksWithDestinations;
 
     /**
      * Get the next set of chunks to send to their destinations (i.e. scatter)
@@ -154,7 +160,7 @@ public:
      * @param fetchId the pulling instance message ID for this request
      * @param chunksToSend [out] a list of chunks and their destination instances to scatter
      */
-    void getNextChunks(const boost::shared_ptr<Query>& query,
+    void getNextChunks(const std::shared_ptr<Query>& query,
                        const InstanceID pullingInstance,
                        const AttributeID attrId,
                        const bool positionOnlyOK,
@@ -168,46 +174,46 @@ private:
     // Helpers to manipulate scidb_msg::Chunk messages
 
     void
-    setNextPosition(boost::shared_ptr<MessageDesc>& chunkMsg,
+    setNextPosition(std::shared_ptr<MessageDesc>& chunkMsg,
                     const InstanceID pullingInstance,
-                    boost::shared_ptr<ConstArrayIterator>& inputArrIter,
-                    const boost::shared_ptr<Query>& query);
+                    std::shared_ptr<ConstArrayIterator>& inputArrIter,
+                    const std::shared_ptr<Query>& query);
     void
-    setNextPosition(boost::shared_ptr<MessageDesc>& chunkMsg,
+    setNextPosition(std::shared_ptr<MessageDesc>& chunkMsg,
                     const InstanceID nextDestSGInstance,
                     const Coordinates& nextChunkPosition);
 
     void
-    setNextPosition(boost::shared_ptr<MessageDesc>& chunkMsg,
-                    boost::shared_ptr<MessageDesc>& nextChunkMsg);
+    setNextPosition(std::shared_ptr<MessageDesc>& chunkMsg,
+                    std::shared_ptr<MessageDesc>& nextChunkMsg);
 
-    boost::shared_ptr<MessageDesc>
+    std::shared_ptr<MessageDesc>
     getPositionMesg(const QueryID queryId,
                     const AttributeID attributeId,
                     const InstanceID destSGInstance,
                     const Coordinates& chunkPosition);
 
-    boost::shared_ptr<MessageDesc>
-    getPositionMesg(const shared_ptr<MessageDesc>& fullChunkMsg);
+    std::shared_ptr<MessageDesc>
+    getPositionMesg(const std::shared_ptr<MessageDesc>& fullChunkMsg);
 
-    boost::shared_ptr<MessageDesc>
+    std::shared_ptr<MessageDesc>
     getEOFChunkMesg(const QueryID queryId,
                     const AttributeID attributeId);
 
-    boost::shared_ptr<MessageDesc>
+    std::shared_ptr<MessageDesc>
     getChunkMesg(const QueryID queryId,
                  const AttributeID attributeId,
                  const InstanceID destSGInstance,
                  const ConstChunk& chunk,
                  const Coordinates& chunkPosition,
-                 boost::shared_ptr<CompressedBuffer>& buffer);
+                 std::shared_ptr<CompressedBuffer>& buffer);
     void verifyPositions(ConstChunk const& chunk,
-                         boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap);
+                         std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap);
 
     /**
      * Extract a chunk and/or position message from the chunk cache
      */
-    boost::shared_ptr<MessageDesc>
+    std::shared_ptr<MessageDesc>
     reapChunkMsg(const QueryID queryId,
                  const AttributeID attributeId,
                  InstanceState& destState,
@@ -217,8 +223,8 @@ private:
      * Find the chunks and/or position messages eligible for sending to their destination instances
      */
     bool
-    findCachedChunksToSend(boost::shared_ptr<ConstArrayIterator>& inputArrIter,
-                           const boost::shared_ptr<Query>& query,
+    findCachedChunksToSend(std::shared_ptr<ConstArrayIterator>& inputArrIter,
+                           const std::shared_ptr<Query>& query,
                            const InstanceID pullingInstance,
                            const AttributeID attrId,
                            const bool positionOnly,
@@ -227,8 +233,8 @@ private:
      * Pull on the input array iterator (i.e. produce chunks) and put them into the chunk cache
      */
     bool
-    drainInputArray(boost::shared_ptr<ConstArrayIterator>& inputArrIter,
-                    const boost::shared_ptr<Query>& query,
+    drainInputArray(std::shared_ptr<ConstArrayIterator>& inputArrIter,
+                    const std::shared_ptr<Query>& query,
                     const AttributeID attrId);
     /**
      * Insert EOF messages for every instance into the cache
@@ -242,14 +248,14 @@ private:
      */
     bool
     advanceInputIterator(const AttributeID attrId,
-                         boost::shared_ptr<ConstArrayIterator>& inputArrIter);
+                         std::shared_ptr<ConstArrayIterator>& inputArrIter);
 
     /**
      * Helper method that that attempts to find chunks eligible for delivery
      * only for a given attribute
      */
     void
-    getNextChunksInternal(const boost::shared_ptr<Query>& query,
+    getNextChunksInternal(const std::shared_ptr<Query>& query,
                           const InstanceID pullingInstance,
                           const AttributeID attrId,
                           const bool positionOnlyOK,

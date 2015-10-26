@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <array/Metadata.h>
 #include <system/Cluster.h>
 #include <query/Query.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
 #include <log4cxx/logger.h>
@@ -51,17 +51,17 @@ public:
     {
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         /* Simple test:  create MAX_OPEN_FD + 10 open file objects.  write data into each.  read data
            back and verify.
          */
-        string                       basepath = 
+        string                       basepath =
             getDir(Config::getInstance()->getOption<string>(CONFIG_STORAGE));
 
         uint32_t                     nfileobjs;
         uint32_t                     i;
-        vector< shared_ptr< File > > fileobjs(0);
+        vector< std::shared_ptr< File > > fileobjs(0);
 
         nfileobjs = Config::getInstance()->getOption<int>(CONFIG_MAX_OPEN_FDS) + 10;
 
@@ -82,20 +82,20 @@ public:
                 buf[j] = i;
             }
             fileobjs[i]->writeAll(reinterpret_cast<char*>(buf), (sizeof(uint32_t) * i), 0);
-            
+
             delete [] buf;
         }
 
         for (i = 0; i < nfileobjs; ++i)
         {
             uint32_t* buf = new uint32_t[i];
-            
+
             fileobjs[i]->readAll(reinterpret_cast<char*>(buf), (sizeof(uint32_t) * i), 0);
             for (uint32_t j = 0; j < i; ++j)
             {
                 if (buf[j] != i)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED) 
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
                         << "UnitTestFileIOPhysical" << "read data mismatch";
                 }
             }
@@ -104,7 +104,7 @@ public:
             delete [] buf;
         }
 
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 
 };

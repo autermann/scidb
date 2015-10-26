@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -23,10 +23,10 @@
 MYDIR=`dirname $0`
 NUM_INSTANCES=4 #including coordinator
 DB_NAME="mydb"
-	
+
 check_exit_status()
 {
-	if [ $1 -ne 0 ]; then 
+	if [ $1 -ne 0 ]; then
 		echo "Error above. Exiting. Peace."
 		exit 1;
 	fi
@@ -99,7 +99,7 @@ build_xy_array()
 build_1d()
 {
 	XMAX=$[ $HOR_CHUNKS * $CHUNK_WIDTH + $XMIN - 1 ]
-	
+
 	iquery -a -q "remove($ARR_NAME)" > /dev/null 2>&1
 	iquery -a -q "remove(tmp)" > /dev/null 2>&1
 	iquery -a -q "create array tmp <val:int64>[X=$XMIN:$XMAX,$CHUNK_WIDTH,0]" > /dev/null
@@ -113,7 +113,7 @@ build_1d()
 build_1d_reverse()
 {
 	XMAX=$[ $HOR_CHUNKS * $CHUNK_WIDTH + $XMIN - 1 ]
-	
+
 	iquery -a -q "remove($ARR_NAME)" > /dev/null 2>&1
 	iquery -a -q "remove(tmp)" > /dev/null 2>&1
 	iquery -a -q "create array tmp <val:int64>[X=$XMIN:$XMAX,$CHUNK_WIDTH,0]" > /dev/null
@@ -137,15 +137,15 @@ if [ $? -ne 0 ]; then
 fi
 
 #create dense, distributed array of ints
-#dimensions: 1:2000 x 1:2000 
+#dimensions: 1:2000 x 1:2000
 #chunk size: 1000x1000
-#distro 
+#distro
 # [1,1->1000,1000] [1001,1 -> 2000,1000]
 # [1,1001->1000,2000] [10001,10001->20000,2000]
 
 
 #DATAFILE="/tmp/$ARR_NAME.data"
-#../data_gen/gen_matrix -d $HOR_CHUNKS $VER_CHUNKS $CHUNK_WIDTH $CHUNK_HEIGHT 1.0 N > $DATAFILE 
+#../data_gen/gen_matrix -d $HOR_CHUNKS $VER_CHUNKS $CHUNK_WIDTH $CHUNK_HEIGHT 1.0 N > $DATAFILE
 #check_exit_status $?
 #iquery -a -q "load($ARR_NAME, '$DATAFILE')"
 
@@ -267,7 +267,7 @@ YMIN=0
 build_det_array
 
 ARR_NAME="opt_dense_quad_small_fat"
-HOR_CHUNKS=400   
+HOR_CHUNKS=400
 VER_CHUNKS=400
 CHUNK_WIDTH=1
 CHUNK_HEIGHT=1

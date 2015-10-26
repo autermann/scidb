@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,8 +30,7 @@
 // std C
 
 // de-facto standards
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 
 // SciDB
@@ -80,21 +79,21 @@ public:
     }
 
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return ArrayDistribution(psScaLAPACK);
+        return RedistributeContext(psScaLAPACK);
     }
     // if outputting partial blocks that need to be merged, one needs to override
     // another operator called ???
 
-    virtual shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query);
-    virtual shared_ptr<Array>  invokeMPI(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query>& query,
+    virtual std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query);
+    virtual std::shared_ptr<Array>  invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query>& query,
                                          ArrayDesc& outSchema);
 };
 
-shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& inputArrays,
-                                              shared_ptr<Query>& query,
+std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays,
+                                              std::shared_ptr<Query>& query,
                                               ArrayDesc& outSchema)
 {
     // + intersects the array chunkGrids with the maximum process grid
@@ -120,12 +119,14 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     //
     // Initialize the (emulated) BLACS and get the proces grid info
     //
-    bool isParticipatingInScaLAPACK = doBlacsInit(inputArrays, query, "MPICopyPhysical");
-    slpp::int_t ICTXT=-1, NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+    blacs::context_t blacsContext = doBlacsInit(inputArrays, query, "MPICopyPhysical");
+    bool isParticipatingInScaLAPACK = blacsContext.isParticipating();
     if (isParticipatingInScaLAPACK) {
-        scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
-        checkBlacsInfo(query, ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, "MPICopyPhysical");
+        checkBlacsInfo(query, blacsContext, "MPICopyPhysical");
     }
+
+    slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
+    scidb_blacs_gridinfo_(blacsContext, NPROW, NPCOL, MYPROW, MYPCOL);
 
     //
     // launch MPISlave if we participate
@@ -147,10 +148,10 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
         LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): not participating in MPI");
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
         make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
 
-        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
@@ -159,7 +160,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
         }
         inputArrays[0].reset();
         unlaunchMPISlavesNonParticipating();
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     // REFACTOR: this is a pattern in DLAs
@@ -167,7 +168,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     // get dimension information about the input arrays
     //
     if(DBG) std::cerr << "invokeMPI get dim info" << std::endl ;
-    boost::shared_ptr<Array> Ain = inputArrays[0];
+    std::shared_ptr<Array> Ain = inputArrays[0];
 
     std::ostringstream tmp;
     Ain->getArrayDesc().getDimensions()[0].toString(tmp) ;
@@ -211,7 +212,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
     if(DBG) std::cerr << "scidb_descinit_ DESC_IN" << std::endl;
     slpp::desc_t DESC_IN;
-    scidb_descinit_(DESC_IN, M, N, MB, NB, 0, 0, ICTXT, LLD_IN, descinitINFO);
+    scidb_descinit_(DESC_IN, M, N, MB, NB, 0, 0, blacsContext, LLD_IN, descinitINFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: scidb_descinit(DESC_IN) failed, INFO " << descinitINFO
                                << " DESC_IN " << DESC_IN);
@@ -221,7 +222,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
 
     if(DBG) std::cerr << "scidb_descinit_ DESC_OUT" << std::endl;
     slpp::desc_t DESC_OUT;
-    scidb_descinit_(DESC_OUT, M, N, MB, NB, 0, 0, ICTXT, LLD_OUT, descinitINFO);
+    scidb_descinit_(DESC_OUT, M, N, MB, NB, 0, 0, blacsContext, LLD_OUT, descinitINFO);
     if (descinitINFO != 0) {
         LOG4CXX_ERROR(logger, "MPICopyPhysical::invokeMPI: scidb_descinit(DESC_IN) failed, INFO " << descinitINFO
                                << " DESC_OUT " << DESC_OUT);
@@ -271,10 +272,10 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     shmSharedPtr_t OUTx(shmIpc[resultShmIpcIndx]);
 
     procRowCol_t firstChunkSize = { chunkRow(Ain), chunkCol(Ain) };
-    shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
 
-    shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, schemeData, query, "MPICopyPhysical");
+    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, schemeData, query, "MPICopyPhysical");
 
     bool wasConverted = (tmpRedistedInput != Ain) ;  // only when redistribute was actually done (sometimes optimized away)
 
@@ -300,7 +301,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     //.... Call the master wrapper
     //
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): calling mpiCopyMaster M,N " << M << "," << N << "MB,NB:" << MB << "," << NB);
-    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+    std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
     slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-1 between instanceID and MPI rank
     slpp::int_t INFO = DEFAULT_BAD_INFO ;
     mpiCopyMaster(query.get(), _ctx, slave, _ipcName, argsBuf,
@@ -345,8 +346,10 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
     if(DBG) std::cerr << "MPICopy OUT SplitArray from ("<<first[0]<<","<<first[1]<<") to (" << last[0] <<"," <<last[1]<<") delta:"<<iterDelta[0]<<","<<iterDelta[1]<< std::endl;
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): Creating array ("<<first[0]<<","<<first[1]<<"), (" << last[0] <<"," <<last[1]<<")");
 
-    reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStartMin(), dims[1].getStartMin());
-    shared_ptr<Array> result  = shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
+    reformatOp_t    pdelgetOp(OUTx, DESC_OUT, dims[0].getStartMin(), dims[1].getStartMin(),
+                              NPROW, NPCOL, MYPROW, MYPCOL);
+
+    std::shared_ptr<Array> result  = std::shared_ptr<Array>(new OpArray<reformatOp_t>(outSchema, resPtrDummy, pdelgetOp,
                                                                             first, last, iterDelta, query));
     releaseMPISharedMemoryInputs(shmIpc, resultShmIpcIndx);
     unlaunchMPISlaves();
@@ -355,7 +358,7 @@ shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< shared_ptr<Array> >& 
 }
 
 
-shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
 {
     //
     // + converts inputArray[0] to psScaLAPACK distribution
@@ -381,7 +384,7 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
          throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical must have only one input");
     }
 
-    shared_ptr<Array> input = inputArrays[0];
+    std::shared_ptr<Array> input = inputArrays[0];
     Dimensions const& dims = input->getArrayDesc().getDimensions();
     size_t nRows = dims[0].getLength();
     size_t nCols = dims[1].getLength();
@@ -390,10 +393,10 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         SCIDB_ASSERT(!isParticipating);
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
         make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
 
-        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
@@ -402,7 +405,7 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         }
         inputArrays[0].reset();
         unlaunchMPISlavesNonParticipating();
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     }
 
     //
@@ -411,7 +414,14 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     //
     const ProcGrid* procGrid = query->getProcGrid();
 
-    procRowCol_t MN = { nRows, nCols};
+    const size_t MaxUnsigned = std::numeric_limits<unsigned>::max();
+    ASSERT_EXCEPTION(
+            nRows <= MaxUnsigned &&
+            nCols <= MaxUnsigned &&
+            static_cast<size_t>(dims[0].getChunkInterval()) <= MaxUnsigned &&
+            static_cast<size_t>(dims[1].getChunkInterval()) <= MaxUnsigned,
+            "Narrowing conversion from size_t to unsigned in MPICopyPhysical lost information.");
+    procRowCol_t MN = { static_cast<unsigned>(nRows), static_cast<unsigned>(nCols)};
     procRowCol_t MNB = { procNum_t(dims[0].getChunkInterval()),
                          procNum_t(dims[1].getChunkInterval()) };
 
@@ -433,10 +443,10 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         SCIDB_ASSERT(!isParticipating);
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
+        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
         make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
 
-        shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
@@ -445,7 +455,7 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         }
         inputArrays[0].reset();
         unlaunchMPISlavesNonParticipating();
-        return shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     } else {
         if(DBG) {
             std::cerr << "instID:" << instanceID << " myGridPos.row:" << myGridPos.row
@@ -454,25 +464,24 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
         }
     }
 
-    slpp::int_t ICTXT=-1;
     slpp::int_t IC = query->getInstancesCount();
     slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
 
     if(DBG) {
         std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
-        std::cerr << "(execute) scidb_set_blacs_gridinfo_(ctx:"<< ICTXT
-                                   << ", nprow:"<<blacsGridSize.row
-                                   << ", npcol:"<<blacsGridSize.col << "," << std::endl;
+        std::cerr << "(execute) scidb_set_blacs_gridinfo_(" << "nprow:"<<blacsGridSize.row
+                                                          << ", npcol:"<<blacsGridSize.col << "," << std::endl;
         std::cerr << "(execute)                           myRow:" << myGridPos.row
-                                   << ", myCol:" << myGridPos.col << ")" << std::endl;
+                                                    << ", myCol:" << myGridPos.col << ")" << std::endl;
     }
-    scidb_set_blacs_gridinfo_(ICTXT, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
+    blacs::context_t blacsContext;
+    scidb_set_blacs_gridinfo_(blacsContext, blacsGridSize.row, blacsGridSize.col, myGridPos.row, myGridPos.col);
 
     // check that it worked
     slpp::int_t NPROW=-1, NPCOL=-1, MYPROW=-1 , MYPCOL=-1 ;
-    scidb_blacs_gridinfo_(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL);
+    scidb_blacs_gridinfo_(blacsContext, NPROW, NPCOL, MYPROW, MYPCOL);
     if(DBG) {
-        std::cerr << "scidb_blacs_gridinfo_(ctx:" << ICTXT << ")" << std::endl;
+        std::cerr << "scidb_blacs_gridinfo_()" << std::endl;
         std::cerr << "   -> gridsiz:(" << NPROW  << ", " << NPCOL << ")" << std::endl;
         std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }
@@ -501,7 +510,7 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     last[0] = dims[0].getStartMin() + dims[0].getLength() - 1;
     last[1] = dims[1].getStartMin() + dims[1].getLength() - 1;
 
-    shared_ptr<Array> result = invokeMPI(inputArrays, query, _schema);
+    std::shared_ptr<Array> result = invokeMPI(inputArrays, query, _schema);
 
     // return the scidb array
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::execute(): returning result");
@@ -514,6 +523,6 @@ shared_ptr<Array> MPICopyPhysical::execute(std::vector< shared_ptr<Array> >& inp
     return result;
 }
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(MPICopyPhysical, "mpicopy", "MPICopyPhysical");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(MPICopyPhysical, "_mpicopy", "MPICopyPhysical");
 
 } // namespace

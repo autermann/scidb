@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -51,8 +51,8 @@ class ReplicationManager;
     {
         public:
         Item(InstanceID instanceId,
-             const boost::shared_ptr<MessageDesc>& chunkMsg,
-             const boost::shared_ptr<Query>& query) :
+             const std::shared_ptr<MessageDesc>& chunkMsg,
+             const std::shared_ptr<Query>& query) :
         _instanceId(instanceId), _chunkMsg(chunkMsg), _query(query), _isDone(false)
         {
             assert(instanceId != INVALID_INSTANCE);
@@ -60,9 +60,9 @@ class ReplicationManager;
             assert(query);
         }
         virtual ~Item() {}
-        boost::weak_ptr<Query> getQuery() { return _query; }
+        std::weak_ptr<Query> getQuery() { return _query; }
         InstanceID getInstanceId() { return _instanceId; }
-        boost::shared_ptr<MessageDesc> getChunkMsg() { return _chunkMsg; }
+        std::shared_ptr<MessageDesc> getChunkMsg() { return _chunkMsg; }
         /**
          * @return true if the chunk has been sent to the network manager or an error has occurred
          */
@@ -90,7 +90,7 @@ class ReplicationManager;
             _chunkMsg.reset();
         }
 
-        void setDone(const boost::shared_ptr<scidb::Exception>& e)
+        void setDone(const std::shared_ptr<scidb::Exception>& e)
         {
             setDone();
             _error = e;
@@ -101,29 +101,29 @@ class ReplicationManager;
         Item& operator=(const Item&);
 
         InstanceID _instanceId;
-        boost::shared_ptr<MessageDesc> _chunkMsg;
-        boost::weak_ptr<Query> _query;
+        std::shared_ptr<MessageDesc> _chunkMsg;
+        std::weak_ptr<Query> _query;
         bool _isDone;
-        boost::shared_ptr<scidb::Exception> _error;
+        std::shared_ptr<scidb::Exception> _error;
     };
 
  private:
-    typedef std::deque<boost::shared_ptr<Item> > RepItems;
+    typedef std::deque<std::shared_ptr<Item> > RepItems;
     // XXX TODO: convert this to a set
-    typedef std::map<InstanceID, boost::shared_ptr<RepItems> > RepQueue;
+    typedef std::map<InstanceID, std::shared_ptr<RepItems> > RepQueue;
  public:
     ReplicationManager() {}
     virtual ~ReplicationManager() {}
     /// start the operations
-    void start(const boost::shared_ptr<JobQueue>& jobQueue);
+    void start(const std::shared_ptr<JobQueue>& jobQueue);
     /// stop the operations and release resources
     void stop();
     /// replicate an item
-    void send(const boost::shared_ptr<Item>& item);
+    void send(const std::shared_ptr<Item>& item);
     /// wait until the item is sent to network manager
-    void wait(const boost::shared_ptr<Item>& item);
-    /// discard the item 
-    void abort(const boost::shared_ptr<Item>& item)
+    void wait(const std::shared_ptr<Item>& item);
+    /// discard the item
+    void abort(const std::shared_ptr<Item>& item)
     {
         assert(item);
         ScopedMutexLock cs(_repMutex);
@@ -144,14 +144,14 @@ class ReplicationManager;
     /// @param job replication job
     /// @return WorkQueue::WorkItem for running on any queue
     /// @throws WorkQueue::OverflowException
-    WorkQueue::WorkItem getInboundReplicationItem(boost::shared_ptr<Job>& job)
+    WorkQueue::WorkItem getInboundReplicationItem(std::shared_ptr<Job>& job)
     {
         // no synchronization is needed because _inboundReplicationQ
         // is initialized at start() time and is never changed later
         assert(isStarted());
         assert(_inboundReplicationQ);
         assert(job);
-        boost::shared_ptr<Reservation> res = boost::make_shared<Reservation>(_inboundReplicationQ, job);
+        std::shared_ptr<Reservation> res = std::make_shared<Reservation>(_inboundReplicationQ, job);
 
         WorkQueue::WorkItem item = boost::bind(&Reservation::enqueue, res, _1, _2);
         return item;
@@ -166,8 +166,8 @@ class ReplicationManager;
         /// Constructor reserves space on a queue
         /// @param queue for reservation
         /// @param job to schedule on the queue
-        Reservation(const boost::shared_ptr<WorkQueue>& queue,
-                    const boost::shared_ptr<Job>& job)
+        Reservation(const std::shared_ptr<WorkQueue>& queue,
+                    const std::shared_ptr<Job>& job)
         : _queue(queue), _job(job)
         {
             assert(queue);
@@ -177,42 +177,42 @@ class ReplicationManager;
         /// Destructor unreserves space on the queue if the job was not enqueued
         ~Reservation()
         {
-            if ( boost::shared_ptr<WorkQueue> q = _queue.lock()) {
+            if ( std::shared_ptr<WorkQueue> q = _queue.lock()) {
                 q->unreserve();
             }
         }
         /// Eqnqueue the job onto the queue
         /// @param fromQueue is the queue invoking this method
-        /// @param sCtx serialization context 
+        /// @param sCtx serialization context
         /// @see scidb::WorkQueue
-        void enqueue(boost::weak_ptr<scidb::WorkQueue>& fromQueue,
-                     boost::shared_ptr<SerializationCtx>& sCtx)
+        void enqueue(std::weak_ptr<scidb::WorkQueue>& fromQueue,
+                     std::shared_ptr<SerializationCtx>& sCtx)
         {
-            if ( boost::shared_ptr<WorkQueue> q = _queue.lock()) {
+            if ( std::shared_ptr<WorkQueue> q = _queue.lock()) {
                 // sCtx is ignored because _inboundReplicationQ is single-threaded,
                 // and there is no need to hold up fromQueue,
                 // which just transfers its jobs to _inboundReplicationQ.
-                boost::shared_ptr<SerializationCtx> emptySCtx;
+                std::shared_ptr<SerializationCtx> emptySCtx;
                 WorkQueue::scheduleReserved(_job, q, emptySCtx);
             }
             _queue.reset();
         }
     private:
-        boost::weak_ptr<WorkQueue> _queue;
-        boost::shared_ptr<Job> _job;
+        std::weak_ptr<WorkQueue> _queue;
+        std::shared_ptr<Job> _job;
     };
 
     void handleConnectionStatus(Notification<NetworkManager::ConnectionStatus>::MessageTypePtr connStatus);
     bool sendItem(RepItems& ri);
     void clear();
-    static bool checkItemState(const boost::shared_ptr<Item>& item)
+    static bool checkItemState(const std::shared_ptr<Item>& item)
     {
         // _repMutex must be locked
         assert(item);
         if (item->isDone()) {
             return false;
         }
-        return Query::getValidQueryPtr(item->getQuery());
+        return Query::isValidQueryPtr(item->getQuery());
     }
 
     ReplicationManager(const ReplicationManager&);
@@ -223,7 +223,7 @@ class ReplicationManager;
     Event    _repEvent;
     Notification<NetworkManager::ConnectionStatus>::ListenerID _lsnrId;
 
-    boost::shared_ptr<WorkQueue> _inboundReplicationQ;
+    std::shared_ptr<WorkQueue> _inboundReplicationQ;
 };
 }
 #endif

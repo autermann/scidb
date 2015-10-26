@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@ public class ByteBufferExtensions
     {
         byte[] b = new byte[8];
         buf.get(b);
-        
+
         if (buf.order() == ByteOrder.BIG_ENDIAN)
         {
             return new BigInteger(1, b);

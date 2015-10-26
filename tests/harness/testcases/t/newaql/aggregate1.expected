@@ -340,55 +340,40 @@ SCIDB QUERY : <select * from A,repart(B,<a:double> [x=-3:8,4,0])>
 {7} 14,14
 {8} 16,16
 
-SCIDB QUERY : <select * from A,reverse(A)>
+SCIDB QUERY : <select * from A,repart(B,<a:double> [x=-3:8,4,0])>
 {x} a,a
-{-3} -6,16
-{-2} -4,14
-{-1} -2,12
-{0} 0,10
-{1} 2,8
-{2} 4,6
-{3} 6,4
-{4} 8,2
-{5} 10,0
-{6} 12,-2
-{7} 14,-4
-{8} 16,-6
+{-3} -6,-6
+{-2} -4,-4
+{-1} -2,-2
+{0} 0,0
+{1} 2,2
+{2} 4,4
+{3} 6,6
+{4} 8,8
+{5} 10,10
+{6} 12,12
+{7} 14,14
+{8} 16,16
 
-SCIDB QUERY : <select * from A,reverse(repart(B,<a:double> [x=-3:8,4,0]))>
+SCIDB QUERY : <select * from A,reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0])>
 {x} a,a
-{-3} -6,16
-{-2} -4,14
-{-1} -2,12
-{0} 0,10
-{1} 2,8
-{2} 4,6
-{3} 6,4
-{4} 8,2
-{5} 10,0
-{6} 12,-2
-{7} 14,-4
-{8} 16,-6
+{-3} -6,-6
+{-2} -4,-4
+{-1} -2,-2
+{0} 0,0
+{1} 2,2
+{2} 4,4
+{3} 6,6
+{4} 8,8
+{5} 10,10
+{6} 12,12
+{7} 14,14
+{8} 16,16
 
-SCIDB QUERY : <select * from A,reverse(A),reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0])>
-{x} a,a,a
-{-3} -6,16,-6
-{-2} -4,14,-4
-{-1} -2,12,-2
-{0} 0,10,0
-{1} 2,8,2
-{2} 4,6,4
-{3} 6,4,6
-{4} 8,2,8
-{5} 10,0,10
-{6} 12,-2,12
-{7} 14,-4,14
-{8} 16,-6,16
-
-SCIDB QUERY : <select * from A,reverse(A),reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0]) where x>0 and x<3>
-{x} a,a,a
-{1} 2,8,2
-{2} 4,6,4
+SCIDB QUERY : <select * from A,reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0]) where x>0 and x<3>
+{x} a,a
+{1} 2,2
+{2} 4,4
 
 SCIDB QUERY : <select Arr.x + 10 from A as Arr>
 {x} expr

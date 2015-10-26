@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,18 +35,18 @@
 using namespace std;
 using namespace boost;
 
-namespace scidb 
+namespace scidb
 {
     //
     // Chunk iterator
     //
-    inline bool JoinChunkIterator::join() 
-    { 
+    inline bool JoinChunkIterator::join()
+    {
         return joinIterator->setPosition(inputIterator->getPosition());
     }
 
     bool JoinChunkIterator::isEmpty()
-    {    
+    {
         return inputIterator->isEmpty() || !join();
     }
 
@@ -55,10 +55,10 @@ namespace scidb
         return !hasCurrent;
     }
 
-    void JoinChunkIterator::alignIterators() 
-    { 
+    void JoinChunkIterator::alignIterators()
+    {
         while (!inputIterator->end()) {
-            if (!(mode & IGNORE_EMPTY_CELLS) || join()) { 
+            if (!(mode & IGNORE_EMPTY_CELLS) || join()) {
                 hasCurrent = true;
                 return;
             }
@@ -76,7 +76,7 @@ namespace scidb
 
     bool JoinChunkIterator::setPosition(Coordinates const& pos)
     {
-        if (inputIterator->setPosition(pos)) { 
+        if (inputIterator->setPosition(pos)) {
             return hasCurrent = !(mode & IGNORE_EMPTY_CELLS) || join();
         }
         return hasCurrent = false;
@@ -95,7 +95,7 @@ namespace scidb
     {
         alignIterators();
     }
-    
+
      Value& JoinBitmapChunkIterator::getItem()
     {
         value.setBool(inputIterator->getItem().getBool() && joinIterator->getItem().getBool());
@@ -113,7 +113,7 @@ namespace scidb
     //
     bool JoinEmptyableArrayIterator::setPosition(Coordinates const& pos)
     {
-        chunkInitialized = false;        
+        chunkInitialized = false;
         _hasCurrent = inputIterator->setPosition(pos) && _joinIterator->setPosition(pos);
         return _hasCurrent;
     }
@@ -159,8 +159,8 @@ namespace scidb
 
     JoinEmptyableArrayIterator::JoinEmptyableArrayIterator(JoinEmptyableArray const& array,
                                                            AttributeID attrID,
-                                                           boost::shared_ptr<ConstArrayIterator> input,
-                                                           boost::shared_ptr<ConstArrayIterator> join,
+                                                           std::shared_ptr<ConstArrayIterator> input,
+                                                           std::shared_ptr<ConstArrayIterator> join,
                                                            bool chunkLevelJoin)
     : DelegateArrayIterator(array, attrID, input),
       _joinIterator(join),
@@ -192,8 +192,8 @@ namespace scidb
 
     DelegateArrayIterator* JoinEmptyableArray::createArrayIterator(AttributeID attrID) const
     {
-        boost::shared_ptr<ConstArrayIterator> inputIterator;
-        boost::shared_ptr<ConstArrayIterator> joinIterator;
+        std::shared_ptr<ConstArrayIterator> inputIterator;
+        std::shared_ptr<ConstArrayIterator> joinIterator;
         bool chunkLevelJoin = true;
         AttributeID inputAttrID = attrID;
 
@@ -267,7 +267,7 @@ namespace scidb
         return new JoinEmptyableArrayIterator(*this, attrID, inputIterator, joinIterator, chunkLevelJoin);
     }
 
-    JoinEmptyableArray::JoinEmptyableArray(ArrayDesc const& desc, boost::shared_ptr<Array> leftArr, boost::shared_ptr<Array> rightArr)
+    JoinEmptyableArray::JoinEmptyableArray(ArrayDesc const& desc, std::shared_ptr<Array> leftArr, std::shared_ptr<Array> rightArr)
     : DelegateArray(desc, leftArr), left(leftArr), right(rightArr)
     {
         ArrayDesc const& leftDesc = left->getArrayDesc();

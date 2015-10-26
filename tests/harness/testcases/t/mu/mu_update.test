@@ -8,49 +8,72 @@
 --shell --command "touch  /tmp/$HPID.mu_setup.sh"
 --shell --command "touch  /tmp/$HPID.mu_cleanup.sh"
 
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_ARRAY, a<>100),count(*))\''  > /tmp/$HPID.mu_tests.sh"
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_M1024x1024, x=100),count(*))\''  > /tmp/$HPID.mu_tests.sh"
+# Read load
 
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -naq $'\'store(project(apply(MU_TEST_ARRAY, b, a+1),b), MU_TEST_ARRAY)\''  >> /tmp/$HPID.mu_tests.sh"
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -naq $'\'store(project(apply(MU_TEST_M1024x1024, b, x+1),b), MU_TEST_M1024x1024)\''  >> /tmp/$HPID.mu_tests.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239+1} -aq $'\'aggregate(filter(join(MU_TEST_ARRAY as L, MU_TEST_ARRAY as R), L.a=R.a),count(*))\' | grep \'{0} 1000\' &&'  >> /tmp/$HPID.mu_tests_1.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239}   -aq $'\'aggregate(filter(join(MU_TEST_M1024x1024 as L, MU_TEST_M1024x1024 as R), L.x=R.x),count(*))\' | grep \'{0} 1048576\' &&' >> /tmp/$HPID.mu_tests_1.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239}   -aq $'\'aggregate(filter(join(MU_TEST_ARRAY as L, MU_TEST_ARRAY as R), L.a<>R.a),count(*))\' | grep \'{0} 0\' &&'  >> /tmp/$HPID.mu_tests_1.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239+1} -aq $'\'aggregate(filter(join(MU_TEST_M1024x1024 as L, MU_TEST_M1024x1024 as R), L.x<>R.x),count(*))\' | grep \'{0} 0\'' >> /tmp/$HPID.mu_tests_1.sh"
 
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -aq $'\'aggregate(filter(MU_TEST_ARRAY, a=100),count(*))\''  >> /tmp/$HPID.mu_tests.sh"
---shell --command "echo iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -aq $'\'aggregate(filter(MU_TEST_M1024x1024, x<>100),count(*))\''  >> /tmp/$HPID.mu_tests.sh"
+--shell --command "echo [multi_query_test]                    > /tmp/$HPID.mu_1.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$HPID.mu_1.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=127.0.0.1} >> /tmp/$HPID.mu_1.cfg"
 
---shell --command "echo [multi_query_test]                    > /tmp/$HPID.mu.cfg"
---shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$HPID.mu.cfg"
---shell --command "echo target-host=${IQUERY_HOST:=localhost} >> /tmp/$HPID.mu.cfg"
+--shell --command "echo setup=/tmp/$HPID.mu_setup.sh          >> /tmp/$HPID.mu_1.cfg"
+--shell --command "echo cleanup=/tmp/$HPID.mu_cleanup.sh      >> /tmp/$HPID.mu_1.cfg"
+--shell --command "echo tests=/tmp/$HPID.mu_tests_1.sh        >> /tmp/$HPID.mu_1.cfg"
+--shell --command "echo num-clients=50                        >> /tmp/$HPID.mu_1.cfg"
+--shell --command "echo num-iterations=4                      >> /tmp/$HPID.mu_1.cfg"
 
---shell --command "echo setup=/tmp/$HPID.mu_setup.sh          >> /tmp/$HPID.mu.cfg"
---shell --command "echo cleanup=/tmp/$HPID.mu_cleanup.sh      >> /tmp/$HPID.mu.cfg"
---shell --command "echo tests=/tmp/$HPID.mu_tests.sh          >> /tmp/$HPID.mu.cfg"
---shell --command "echo num-clients=100                       >> /tmp/$HPID.mu.cfg"
---shell --command "echo num-iterations=1                      >> /tmp/$HPID.mu.cfg"
+# Write load
+
+--shell --command "echo iquery -c ${IQUERY_HOST:=127.0.0.1} -p $((${IQUERY_PORT:=1239})) -naq $'\'store(project(apply(MU_TEST_M1024x1024, b, x+1),b), MU_TEST_M1024x1024)\' &&'  >> /tmp/$HPID.mu_tests_2.sh"
+--shell --command "echo iquery -c ${IQUERY_HOST:=127.0.0.1} -p $((${IQUERY_PORT:=1239}+1)) -naq $'\'insert(redimension(apply(MU_TEST_ARRAY, b, a+1), <b:int64> [I=0:999,10,0] ), MU_TEST_ARRAY)\' ' >> /tmp/$HPID.mu_tests_2.sh"
+
+--shell --command "echo [multi_query_test]                    > /tmp/$HPID.mu_2.cfg"
+--shell --command "echo base-port=${IQUERY_PORT:=1239}        >> /tmp/$HPID.mu_2.cfg"
+--shell --command "echo target-host=${IQUERY_HOST:=127.0.0.1} >> /tmp/$HPID.mu_2.cfg"
+
+--shell --command "echo setup=/tmp/$HPID.mu_setup.sh          >> /tmp/$HPID.mu_2.cfg"
+--shell --command "echo cleanup=/tmp/$HPID.mu_cleanup.sh      >> /tmp/$HPID.mu_2.cfg"
+--shell --command "echo tests=/tmp/$HPID.mu_tests_2.sh        >> /tmp/$HPID.mu_2.cfg"
+--shell --command "echo num-clients=50                        >> /tmp/$HPID.mu_2.cfg"
+--shell --command "echo num-iterations=1                      >> /tmp/$HPID.mu_2.cfg"
 
 --test
 
-# if interrupted, this shell command will kill the current process group (typically scidbtestharness+children).
+# Run read+write concurrently
+# Note: if interrupted, this shell command will kill the current process group (typically scidbtestharness+children).
 # this way the background iquery started here does not stay behind - best effort cleanup attempt.
 
---shell --command "trap 'kill 0' SIGINT SIGTERM SIGHUP SIGQUIT ; python ${TEST_BIN_DIR}/mu_driver.py /tmp/$HPID.mu.cfg 1> /tmp/$HPID.stdout 2> /tmp/$HPID.stderr"
+--shell --store --command "trap 'kill 0' SIGINT SIGTERM SIGHUP SIGQUIT ; ( python ${TEST_BIN_DIR}/mu_driver.py /tmp/$HPID.mu_2.cfg 1> /tmp/$HPID.2.stdout 2> /tmp/$HPID.2.stderr ) & export pid=$! ; export rc=0 ;  python ${TEST_BIN_DIR}/mu_driver.py /tmp/$HPID.mu_1.cfg 1> /tmp/$HPID.1.stdout 2> /tmp/$HPID.1.stderr || export rc=${rc}1 ; wait $pid || export rc=${rc}2 ; [ $rc == 0 ] && echo SUCCESS ;"
 
-aggregate(filter(MU_TEST_ARRAY, a<>100),count(*))
-aggregate(filter(MU_TEST_ARRAY, a=100),count(*))
+# Verify the final state
 
-aggregate(filter(MU_TEST_M1024x1024,x<>100),count(*))
-aggregate(filter(MU_TEST_M1024x1024,x=100),count(*))
+aggregate(filter(MU_TEST_ARRAY, a<>50),count(*))
+aggregate(filter(MU_TEST_ARRAY, a=50),count(*))
+
+aggregate(filter(MU_TEST_M1024x1024,x<>50),count(*))
+aggregate(filter(MU_TEST_M1024x1024,x=50),count(*))
 
 --cleanup
 
---shell --command "cat /tmp/$HPID.stderr"
---shell --store --command "cat /tmp/$HPID.stdout"
+--shell --command "cat /tmp/$HPID.2.stderr"
+--shell --store --command "cat /tmp/$HPID.2.stdout"
+
+--shell --command "cat /tmp/$HPID.1.stderr"
+--shell --store --command "cat /tmp/$HPID.1.stdout"
 
 remove(MU_TEST_ARRAY)
 remove(MU_TEST_M1024x1024)
 
 --shell --command "rm /tmp/$HPID.mu_setup.sh"
 --shell --command "rm /tmp/$HPID.mu_cleanup.sh"
---shell --command "rm /tmp/$HPID.mu_tests.sh"
---shell --command "rm /tmp/$HPID.mu.cfg"
---shell --command "rm /tmp/$HPID.stdout"
---shell --command "rm /tmp/$HPID.stderr"
+--shell --command "rm /tmp/$HPID.mu_tests_1.sh"
+--shell --command "rm /tmp/$HPID.mu_tests_2.sh"
+--shell --command "rm /tmp/$HPID.mu_1.cfg"
+--shell --command "rm /tmp/$HPID.mu_2.cfg"
+--shell --command "rm /tmp/$HPID.1.stdout"
+--shell --command "rm /tmp/$HPID.1.stderr"
+--shell --command "rm /tmp/$HPID.2.stdout"
+--shell --command "rm /tmp/$HPID.2.stderr"

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -110,6 +110,8 @@ class UbuntuChroot():
     pbuilder_tgz_dir='/var/cache/pbuilder'
     ubuntu_mirror='deb http://archive.ubuntu.com/ubuntu/ %s restricted main multiverse universe'
     scidb_3rdparty_mirror='deb https://downloads.paradigm4.com/ ubuntu12.04/3rdparty/'
+    compiler_mirror='deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main'
+    java_mirror='deb http://ppa.launchpad.net/openjdk-r/ppa/ubuntu precise main'
 
     def __init__(self, release, arch, temp_dir):
         info('Will use pbuilder for chrooting. Checking environment...')
@@ -121,7 +123,15 @@ class UbuntuChroot():
         # trusty is Ubuntu 14.04 release. precise is Ubuntu 12.04 release.
         if self.release == "trusty":
             self.scidb_3rdparty_mirror='deb https://downloads.paradigm4.com/ ubuntu14.04/3rdparty/'
-        self.mirror = '|'.join([(self.ubuntu_mirror % release), self.scidb_3rdparty_mirror])
+            self.compiler_mirror='deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu trusty main'
+            self.java_mirror='deb http://ppa.launchpad.net/openjdk-r/ppa/ubuntu trusty main'
+        elif self.release == "precise":
+            self.scidb_3rdparty_mirror='deb https://downloads.paradigm4.com/ ubuntu12.04/3rdparty/'
+            self.compiler_mirror='deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main'
+            self.java_mirror='deb http://ppa.launchpad.net/openjdk-r/ppa/ubuntu precise main'
+        else:
+            err("Release %s not recognized." % self.release)
+        self.mirror = '|'.join([(self.ubuntu_mirror % release), self.scidb_3rdparty_mirror, self.compiler_mirror, self.java_mirror])
         self.temp_dir=temp_dir
         self.logfile = os.path.join(self.temp_dir,'pbuilder.log')
 
@@ -190,9 +200,10 @@ class CentOSChroot():
         info("Will use mock for chrooting. Checking environment...")
         #if not which('mock'):
         #    err('Can not find mock! Check your PATH and/or run script as root!')
+        self.bin_path=os.path.abspath(os.path.dirname(sys.argv[0]))
         self.release = release
         self.arch = arch
-        self.chroot = '%s-%s-%s' % (self.distroname, release, arch)
+        self.chroot = '%s/%s-%s-%s.cfg' % (self.bin_path, self.distroname, release, arch)
         self.temp_dir=temp_dir
 
     def init(self):
@@ -216,7 +227,7 @@ class CentOSChroot():
         info("Done")
 
     def build(self, sources, jobs, buildresult):
-        build_log = os.path.join(buildresult, "build.log") 
+        build_log = os.path.join(buildresult, "build.log")
         root_log = os.path.join(buildresult, "root.log")
         tail = TailFileToStdout(build_log)
         mockargs = ['mock', '--rebuild',

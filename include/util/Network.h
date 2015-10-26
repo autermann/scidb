@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <google/protobuf/message.h>
 #include <util/Semaphore.h>
 #include <util/WorkQueue.h>
@@ -60,10 +60,10 @@ namespace scidb
    class ClientContext
    {
    public:
-       typedef boost::shared_ptr<ClientContext> Ptr;
+       typedef std::shared_ptr<ClientContext> Ptr;
 
        /// Client connection disconnect handler
-       typedef boost::function<void(const boost::shared_ptr<Query>&)> DisconnectHandler;
+       typedef boost::function<void(const std::shared_ptr<Query>&)> DisconnectHandler;
 
        /**
         * Attach a query specific handler for client's disconnect
@@ -104,7 +104,7 @@ namespace scidb
    {
    public:
       typedef boost::function< MessagePtr(MessageID) > MessageCreator;
-      typedef boost::function< void(const boost::shared_ptr<MessageDescription>& ) > MessageHandler;
+      typedef boost::function< void(const std::shared_ptr<MessageDescription>& ) > MessageHandler;
 
       virtual bool isRegistered(const MessageID& msgID) = 0;
       virtual bool addMessageType(const MessageID& msgID,
@@ -119,7 +119,7 @@ namespace scidb
     * Network message factory access method
     * @return an instance of the factory
     */
-   boost::shared_ptr<NetworkMessageFactory> getNetworkMessageFactory();
+   std::shared_ptr<NetworkMessageFactory> getNetworkMessageFactory();
 
    /**
     * Return a reference to the io service object to schedule timers
@@ -133,7 +133,7 @@ namespace scidb
     * @return a queue suitable for running tasks that are guaranteed to make progress
     * @note No new threads are created as a result of adding work to the queue
     */
-   boost::shared_ptr<WorkQueue> getWorkQueue();
+   std::shared_ptr<WorkQueue> getWorkQueue();
 
    /**
     * A scheduler  that runs *at most* every specified period.
@@ -156,7 +156,7 @@ namespace scidb
     * @param period limiting the max freaquency of execution
     * @throw scidb::UserException if period < 1 or !workItem
     */
-   boost::shared_ptr<Scheduler> getScheduler(Scheduler::Work& workItem, time_t period);
+   std::shared_ptr<Scheduler> getScheduler(Scheduler::Work& workItem, time_t period);
 
    /**
     * Send message to a physical instance asynchronously. The delivery is not guaranteed.
@@ -203,7 +203,7 @@ namespace scidb
 
    /**
     * Receive a block of raw data from another logical instance.
-    * @param ctx             a pointer to shared_ptr<Query>.
+    * @param ctx             a pointer to std::shared_ptr<Query>.
     * @param logicalInstance the instance to receive data from.
     * @param data            a pre-allocated buffer.
     * @param size            the size of the buffer; must be equal to the size of the to-be-received data.
@@ -212,7 +212,7 @@ namespace scidb
 
    /**
     * Send a block of raw data to another logical instance.
-    * @param ctx             a pointer to shared_ptr<Query>.
+    * @param ctx             a pointer to std::shared_ptr<Query>.
     * @param logicalInstance the instance to send data to.
     * @param data            the data to send.
     * @param size            the size of data to send.
@@ -225,22 +225,22 @@ namespace scidb
     * @param data             the data to send.
     * @param query            the query context.
     */
-   void BufSend(InstanceID logicalInstance, boost::shared_ptr<SharedBuffer> const& data, boost::shared_ptr<Query>& query);
+   void BufSend(InstanceID logicalInstance, std::shared_ptr<SharedBuffer> const& data, std::shared_ptr<Query>& query);
 
    /**
     * Receive a SharedBuffer from another logical instance.
     * @param logicalInstance  the instance to receive data from.
     * @param query            the query context.
-    * @return received data in the form of shared_ptr<SharedBuffer>.
+    * @return received data in the form of std::shared_ptr<SharedBuffer>.
     */
-   boost::shared_ptr<SharedBuffer> BufReceive(InstanceID logicalInstance, boost::shared_ptr<Query>& query);
+   std::shared_ptr<SharedBuffer> BufReceive(InstanceID logicalInstance, std::shared_ptr<Query>& query);
 
    /**
     * Send a SharedBuffer to all other logical instances.
     * @param data  the data to send.
     * @param query the query context.
     */
-   void BufBroadcast(boost::shared_ptr<SharedBuffer> const& data, boost::shared_ptr<Query>& query);
+   void BufBroadcast(std::shared_ptr<SharedBuffer> const& data, std::shared_ptr<Query>& query);
 } // namespace scidb
 
 #endif /* NETWORK_H_ */

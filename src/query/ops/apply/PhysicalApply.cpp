@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -52,12 +52,12 @@ class PhysicalApply: public  PhysicalOperator
         return inputBoundaries[0];
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size()%2 == 0);
 
-        vector<shared_ptr<Expression> > expressions(0);
+        vector<std::shared_ptr<Expression> > expressions(0);
 
         size_t currentParam = 0;
         for(size_t i =0; i< _schema.getAttributes().size(); i++)
@@ -66,15 +66,15 @@ class PhysicalApply: public  PhysicalOperator
             assert(_parameters[currentParam+1]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
 
             string const& schemaAttName = _schema.getAttributes()[i].getName();
-            string const& paramAttName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[currentParam])->getObjectName();
+            string const& paramAttName = ((std::shared_ptr<OperatorParamReference>&)_parameters[currentParam])->getObjectName();
 
             if(schemaAttName!=paramAttName)
             {
-                expressions.push_back( shared_ptr<Expression> ());
+                expressions.push_back( std::shared_ptr<Expression> ());
             }
             else
             {
-                expressions.push_back(((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[currentParam+1])->getExpression());
+                expressions.push_back(((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[currentParam+1])->getExpression());
                 currentParam+=2;
             }
 
@@ -82,7 +82,7 @@ class PhysicalApply: public  PhysicalOperator
             {
                 for (size_t j = i+1; j< _schema.getAttributes().size(); j++)
                 {
-                    expressions.push_back( shared_ptr<Expression> () );
+                    expressions.push_back( std::shared_ptr<Expression> () );
                 }
                 break;
             }
@@ -91,8 +91,8 @@ class PhysicalApply: public  PhysicalOperator
         assert(currentParam == _parameters.size());
         assert(expressions.size() == _schema.getAttributes().size());
 
-        boost::shared_ptr<Array> input = inputArrays[0];
-        return boost::shared_ptr<Array>(new ApplyArray(_schema, input, expressions, query, _tileMode));
+        std::shared_ptr<Array> input = inputArrays[0];
+        return std::shared_ptr<Array>(new ApplyArray(_schema, input, expressions, query, _tileMode));
     }
 };
 

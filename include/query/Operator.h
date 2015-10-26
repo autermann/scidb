@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -19,7 +19,6 @@
 *
 * END_COPYRIGHT
 */
-
 
 /**
  * @file Operator.h
@@ -39,19 +38,17 @@
 
 #include <iostream>
 #include <vector>
+#include <set>
 #include <string>
 #include <stdio.h>
 #include <utility>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 #include <boost/format.hpp>
 #include <boost/serialization/serialization.hpp>
-#include <boost/serialization/shared_ptr.hpp>
-#include <boost/serialization/export.hpp>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 
 #include <array/Array.h>
+#include <array/ArrayDistribution.h>
 #include <array/MemArray.h>
 #include <array/StreamArray.h>
 #include <query/TypeSystem.h>
@@ -61,15 +58,13 @@
 #include <system/Config.h>
 #include <util/InjectedError.h>
 #include <util/ThreadPool.h>
-#include <query/SGChunkReceiver.h>
 #include <query/Aggregate.h>
 
 namespace scidb
 {
 
 class Query;
-class DistributionMapper;
-class SGChunkReceiver;
+class CoordinateTranslator;
 
 #define PARAMETERS public: void initParameters()
 
@@ -119,7 +114,7 @@ public:
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Terminate with newline.
      * @param[out] stream to write to
-     * @param[in] indent number of spacer characters to start every line with.
+     * @param[in]  indent number of spacer characters to start every line with.
      */
     virtual void toString(std::ostream &out, int indent = 0) const;
 
@@ -143,24 +138,24 @@ public:
         return _flags;
     }
 
-  private:
+private:
     OperatorParamPlaceholderType _placeholderType;
     Type _requiredType;
     bool _inputSchema;
     int _flags;
 };
 
-typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamPlaceholders;
+typedef std::vector<std::shared_ptr<OperatorParamPlaceholder> > OperatorParamPlaceholders;
 
 #define PARAM_IN_ARRAY_NAME() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_ARRAY_NAME,\
         scidb::TypeLibrary::getType("void"),\
         true,\
         0))
 
 #define PARAM_IN_ARRAY_NAME2(flags) \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_ARRAY_NAME,\
         scidb::TypeLibrary::getType("void"),\
         true,\
@@ -173,7 +168,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
         addParamPlaceholder(PARAM_IN_ARRAY_NAME2(flags));
 
 #define PARAM_OUT_ARRAY_NAME() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_ARRAY_NAME,\
         scidb::TypeLibrary::getType("void"),\
         false,\
@@ -184,7 +179,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
 
 
 #define PARAM_INPUT() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_INPUT,\
         scidb::TypeLibrary::getType("void"),\
         true,\
@@ -195,14 +190,14 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
 
 #define ADD_PARAM_VARIES() \
         addParamPlaceholder(\
-        boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+        std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
             scidb::PLACEHOLDER_VARIES,\
             scidb::TypeLibrary::getType("void"),\
             false,\
             0)));
 
 #define PARAM_OUT_ATTRIBUTE_NAME(type) \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_ATTRIBUTE_NAME,\
         scidb::TypeLibrary::getType(type),\
         false,\
@@ -212,7 +207,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
         addParamPlaceholder(PARAM_OUT_ATTRIBUTE_NAME(type));
 
 #define PARAM_IN_ATTRIBUTE_NAME(type) \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_ATTRIBUTE_NAME,\
         scidb::TypeLibrary::getType(type),\
         true,\
@@ -222,7 +217,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
         addParamPlaceholder(PARAM_IN_ATTRIBUTE_NAME(type));
 
 #define PARAM_IN_DIMENSION_NAME() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_DIMENSION_NAME,\
         scidb::TypeLibrary::getType("void"),\
         true,\
@@ -232,7 +227,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
         addParamPlaceholder(PARAM_IN_DIMENSION_NAME());
 
 #define PARAM_OUT_DIMENSION_NAME() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_DIMENSION_NAME,\
         scidb::TypeLibrary::getType("void"),\
         false,\
@@ -243,7 +238,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
 
 
 #define PARAM_EXPRESSION(type) \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_EXPRESSION,\
         scidb::TypeLibrary::getType(type),\
         false,\
@@ -253,7 +248,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
         addParamPlaceholder(PARAM_EXPRESSION(type));
 
 #define PARAM_CONSTANT(type) \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_CONSTANT,\
         scidb::TypeLibrary::getType(type),\
         false,\
@@ -263,7 +258,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
         addParamPlaceholder(PARAM_CONSTANT(type));
 
 #define PARAM_SCHEMA() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_SCHEMA,\
         scidb::TypeLibrary::getType("void"),\
         false,\
@@ -273,7 +268,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
     addParamPlaceholder(PARAM_SCHEMA());
 
 #define PARAM_AGGREGATE_CALL() \
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_AGGREGATE_CALL,\
         scidb::TypeLibrary::getType("void"),\
         false,\
@@ -283,7 +278,7 @@ typedef std::vector<boost::shared_ptr<OperatorParamPlaceholder> > OperatorParamP
     addParamPlaceholder(PARAM_AGGREGATE_CALL());
 
 #define END_OF_VARIES_PARAMS()\
-    boost::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
+    std::shared_ptr<scidb::OperatorParamPlaceholder>(new scidb::OperatorParamPlaceholder(\
         scidb::PLACEHOLDER_END_OF_VARIES,\
         scidb::TypeLibrary::getType("void"),\
         false,\
@@ -302,28 +297,30 @@ enum OperatorParamType
     PARAM_ASTERISK
 };
 
+/**
+ * If you add a new child class of OperatorParam, you should add the child class to registerLeafDerivedOperatorParams().
+ */
 class OperatorParam
 {
-  public:
+public:
     OperatorParam() :
         _paramType(PARAM_UNKNOWN)
     {
     }
 
     OperatorParam(OperatorParamType paramType,
-                  const boost::shared_ptr<ParsingContext>& parsingContext) :
+                  const std::shared_ptr<ParsingContext>& parsingContext) :
         _paramType(paramType),
         _parsingContext(parsingContext)
     {
     }
-
 
     OperatorParamType getParamType() const
     {
         return _paramType;
     }
 
-    boost::shared_ptr<ParsingContext> getParsingContext() const
+    std::shared_ptr<ParsingContext> getParsingContext() const
     {
         return _parsingContext;
     }
@@ -333,11 +330,11 @@ class OperatorParam
     {
     }
 
-  protected:
+protected:
     OperatorParamType _paramType;
-    boost::shared_ptr<ParsingContext> _parsingContext;
+    std::shared_ptr<ParsingContext> _parsingContext;
 
-  public:
+public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -357,7 +354,7 @@ class OperatorParam
 
 class OperatorParamReference: public OperatorParam
 {
-  public:
+public:
     OperatorParamReference() : OperatorParam(),
         _arrayName(""),
         _objectName(""),
@@ -369,7 +366,7 @@ class OperatorParamReference: public OperatorParam
 
     OperatorParamReference(
             OperatorParamType paramType,
-            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<ParsingContext>& parsingContext,
             const std::string& arrayName,
             const std::string& objectName, bool inputScheme):
         OperatorParam(paramType, parsingContext),
@@ -415,7 +412,7 @@ class OperatorParamReference: public OperatorParam
         return _inputScheme;
     }
 
-  private:
+private:
     std::string _arrayName;
     std::string _objectName;
 
@@ -424,11 +421,12 @@ class OperatorParamReference: public OperatorParam
 
     bool _inputScheme;
 
-  public:
+public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
         ar & boost::serialization::base_object<OperatorParam>(*this);
+        OperatorParam::serialize(ar, version);
         ar & _arrayName;
         ar & _objectName;
         ar & _inputNo;
@@ -451,13 +449,13 @@ class OperatorParamArrayReference: public OperatorParamReference
 {
 public:
     OperatorParamArrayReference() :
-        OperatorParamReference()
+        OperatorParamReference(), _version(0)
     {
         _paramType = PARAM_ARRAY_REF;
     }
 
     OperatorParamArrayReference(
-            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<ParsingContext>& parsingContext,
             const std::string& arrayName, const std::string& objectName, bool inputScheme,
             VersionID version = 0):
         OperatorParamReference(PARAM_ARRAY_REF, parsingContext, arrayName, objectName, inputScheme),
@@ -490,7 +488,7 @@ private:
 
 class OperatorParamAttributeReference: public OperatorParamReference
 {
-  public:
+public:
     OperatorParamAttributeReference() :
         OperatorParamReference(),
         _sortAscent(true)
@@ -499,7 +497,7 @@ class OperatorParamAttributeReference: public OperatorParamReference
     }
 
     OperatorParamAttributeReference(
-            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<ParsingContext>& parsingContext,
             const std::string& arrayName,
             const std::string& objectName,
             bool inputScheme):
@@ -538,7 +536,7 @@ class OperatorParamAttributeReference: public OperatorParamReference
         _sortAscent = sortAscent;
     }
 
-  private:
+private:
     //Sort quirk
     bool _sortAscent;
 };
@@ -552,7 +550,7 @@ public:
     }
 
     OperatorParamDimensionReference(
-            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<ParsingContext>& parsingContext,
             const std::string& arrayName,
             const std::string& objectName,
             bool inputScheme):
@@ -578,15 +576,15 @@ public:
 
 class OperatorParamLogicalExpression: public OperatorParam
 {
-  public:
+public:
     OperatorParamLogicalExpression() : OperatorParam()
     {
         _paramType = PARAM_LOGICAL_EXPRESSION;
     }
 
     OperatorParamLogicalExpression(
-        const boost::shared_ptr<ParsingContext>& parsingContext,
-        const boost::shared_ptr<LogicalExpression>& expression,  Type expectedType,
+        const std::shared_ptr<ParsingContext>& parsingContext,
+        const std::shared_ptr<LogicalExpression>& expression,  Type expectedType,
         bool constant = false):
             OperatorParam(PARAM_LOGICAL_EXPRESSION, parsingContext),
             _expression(expression),
@@ -596,7 +594,7 @@ class OperatorParamLogicalExpression: public OperatorParam
 
     }
 
-    boost::shared_ptr<LogicalExpression> getExpression() const
+    std::shared_ptr<LogicalExpression> getExpression() const
     {
         return _expression;
     }
@@ -611,12 +609,12 @@ class OperatorParamLogicalExpression: public OperatorParam
         return _constant;
     }
 
-  private:
-    boost::shared_ptr<LogicalExpression> _expression;
+private:
+    std::shared_ptr<LogicalExpression> _expression;
     Type _expectedType;
     bool _constant;
 
-  public:
+public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -643,15 +641,15 @@ public:
     }
 
     OperatorParamPhysicalExpression(
-            const boost::shared_ptr<ParsingContext>& parsingContext,
-            const boost::shared_ptr<Expression>& expression,
+            const std::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<Expression>& expression,
             bool constant = false):
         OperatorParam(PARAM_PHYSICAL_EXPRESSION, parsingContext),
         _expression(expression),
         _constant(constant)
     {}
 
-    boost::shared_ptr<Expression> getExpression() const
+    std::shared_ptr<Expression> getExpression() const
     {
         return _expression;
     }
@@ -661,16 +659,28 @@ public:
         return _constant;
     }
 
-  private:
-    boost::shared_ptr<Expression> _expression;
+private:
+    std::shared_ptr<Expression> _expression;
     bool _constant;
 
-  public:
+public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
         ar & boost::serialization::base_object<OperatorParam>(*this);
-        ar & _expression;
+
+        if (Archive::is_loading::value) {
+            // TO-DO: If the de-serialized pointer may be equivalent to a previously-deserialized pointer,
+            // the trick at PhysicalQueryPlanNode::serialize() may be used.
+            Expression* e;
+            ar & e;
+            _expression = std::shared_ptr<Expression>(e);
+        }
+        else {
+            Expression* e = _expression.get();
+            ar & e;
+        }
+
         ar & _constant;
     }
 
@@ -688,14 +698,14 @@ public:
 
 class OperatorParamSchema: public OperatorParam
 {
-  public:
+public:
     OperatorParamSchema() : OperatorParam()
     {
         _paramType = PARAM_SCHEMA;
     }
 
     OperatorParamSchema(
-            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<ParsingContext>& parsingContext,
             const ArrayDesc& schema):
         OperatorParam(PARAM_SCHEMA, parsingContext),
         _schema(schema)
@@ -706,10 +716,10 @@ class OperatorParamSchema: public OperatorParam
         return _schema;
     }
 
-  private:
+private:
     ArrayDesc _schema;
 
-  public:
+public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
@@ -730,16 +740,16 @@ class OperatorParamSchema: public OperatorParam
 
 class OperatorParamAggregateCall: public OperatorParam
 {
-  public:
+public:
     OperatorParamAggregateCall() : OperatorParam()
     {
         _paramType = PARAM_AGGREGATE_CALL;
     }
 
     OperatorParamAggregateCall(
-            const boost::shared_ptr<ParsingContext>& parsingContext,
+            const std::shared_ptr<ParsingContext>& parsingContext,
             const std::string& aggregateName,
-            boost::shared_ptr <OperatorParam> const& inputAttribute,
+            std::shared_ptr <OperatorParam> const& inputAttribute,
             const std::string& alias):
         OperatorParam(PARAM_AGGREGATE_CALL, parsingContext),
         _aggregateName(aggregateName),
@@ -752,12 +762,12 @@ class OperatorParamAggregateCall: public OperatorParam
         return _aggregateName;
     }
 
-    boost::shared_ptr<OperatorParam> const& getInputAttribute() const
+    std::shared_ptr<OperatorParam> const& getInputAttribute() const
     {
         return _inputAttribute;
     }
 
-    void setAlias(const string& alias)
+    void setAlias(const std::string& alias)
     {
         _alias = alias;
     }
@@ -767,18 +777,30 @@ class OperatorParamAggregateCall: public OperatorParam
         return _alias;
     }
 
-  private:
+private:
     std::string _aggregateName;
-    boost::shared_ptr <OperatorParam> _inputAttribute;
+    std::shared_ptr <OperatorParam> _inputAttribute;
     std::string _alias;
 
-  public:
+public:
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
     {
         ar & boost::serialization::base_object<OperatorParam>(*this);
         ar & _aggregateName;
-        ar & _inputAttribute;
+
+        if (Archive::is_loading::value) {
+            // TO-DO: If the de-serialized pointer may be equivalent to a previously-deserialized pointer,
+            // the trick at PhysicalQueryPlanNode::serialize() may be used.
+            OperatorParam* op;
+            ar & op;
+            _inputAttribute = std::shared_ptr<OperatorParam>(op);
+        }
+        else {
+            OperatorParam* op = _inputAttribute.get();
+            ar & op;
+        }
+
         ar & _alias;
     }
 
@@ -798,14 +820,14 @@ class OperatorParamAggregateCall: public OperatorParam
  */
 class OperatorParamAsterisk: public OperatorParam
 {
-  public:
+public:
     OperatorParamAsterisk(): OperatorParam()
     {
         _paramType = PARAM_ASTERISK;
     }
 
     OperatorParamAsterisk(
-            const boost::shared_ptr<ParsingContext>& parsingContext
+            const std::shared_ptr<ParsingContext>& parsingContext
             ) :
         OperatorParam(PARAM_ASTERISK, parsingContext)
     {
@@ -828,6 +850,19 @@ class OperatorParamAsterisk: public OperatorParam
     virtual void toString(std::ostream &out, int indent = 0) const;
 };
 
+template<class Archive>
+void registerLeafDerivedOperatorParams(Archive& ar)
+{
+    ar.register_type(static_cast<OperatorParamArrayReference*>(NULL));
+    ar.register_type(static_cast<OperatorParamAttributeReference*>(NULL));
+    ar.register_type(static_cast<OperatorParamDimensionReference*>(NULL));
+    ar.register_type(static_cast<OperatorParamLogicalExpression*>(NULL));
+    ar.register_type(static_cast<OperatorParamPhysicalExpression*>(NULL));
+    ar.register_type(static_cast<OperatorParamSchema*>(NULL));
+    ar.register_type(static_cast<OperatorParamAggregateCall*>(NULL));
+    ar.register_type(static_cast<OperatorParamAsterisk*>(NULL));
+}
+
 /**
  * This is pure virtual class for all logical operators. It provides API of logical operator.
  * In order to add new logical operator we must inherit new class and implement all methods in it.
@@ -836,18 +871,17 @@ class OperatorParamAsterisk: public OperatorParam
 class LogicalOperator
 {
 public:
-    typedef std::vector< boost::shared_ptr<OperatorParam> > Parameters;
+    typedef std::vector< std::shared_ptr<OperatorParam> > Parameters;
 
     struct Properties
     {
         bool ddl;
         bool exclusive;
         bool tile;
-        bool secondPhase;
         bool noNesting;
-        Properties() : ddl(false), exclusive(false), tile(false), secondPhase(false), noNesting(false)
-        {
-        }
+        Properties()
+            : ddl(false), exclusive(false), tile(false), noNesting(false)
+        {}
     };
 
 public:
@@ -865,17 +899,6 @@ public:
         return _logicalName;
     }
 
-    /**
-     * @return logical and physical operator names for the global phase if empty this is single-phase operator
-     *
-     * @todo actually logical name don't need for global operator because it will be inserted by
-     * optimizer so need reconsider it later
-     */
-    const std::pair<std::string, std::string>& getGlobalOperatorName() const
-    {
-        return _globalOperatorName;
-    }
-
     const Parameters& getParameters() const
     {
         return _parameters;
@@ -886,7 +909,7 @@ public:
         _parameters = parameters;
     }
 
-    virtual void addParameter(const boost::shared_ptr<OperatorParam>& parameter)
+    virtual void addParameter(const std::shared_ptr<OperatorParam>& parameter)
     {
         _parameters.push_back(parameter);
     }
@@ -894,7 +917,7 @@ public:
     /**
      *  @return vector containing a list of the parameters types that can be "next" in a variadic operator
      */
-    virtual std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    virtual std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_UNHANDLED_VAR_PARAMETER) << _logicalName;
     }
@@ -932,7 +955,7 @@ public:
         return false;
     }
 
-    virtual ArrayDesc inferSchema(std::vector< ArrayDesc>, boost::shared_ptr< Query> query) = 0;
+    virtual ArrayDesc inferSchema(std::vector< ArrayDesc>, std::shared_ptr< Query> query) = 0;
 
     /**
      * This is where the logical operator can request array level locks for any of the arrays specified
@@ -946,9 +969,9 @@ public:
      * @note the locks are not acquired in this method - only requested
      * @param query the current query context
      */
-    virtual void inferArrayAccess(boost::shared_ptr<Query>& query);
+    virtual void inferArrayAccess(std::shared_ptr<Query>& query);
 
-    void addParamPlaceholder(const boost::shared_ptr<OperatorParamPlaceholder> paramPlaceholder)
+    void addParamPlaceholder(const std::shared_ptr<OperatorParamPlaceholder> paramPlaceholder)
     {
         if (_paramPlaceholders.size() > 0 &&
                 _paramPlaceholders[_paramPlaceholders.size() - 1]->getPlaceholderType() != PLACEHOLDER_INPUT &&
@@ -990,7 +1013,6 @@ protected:
     Parameters _parameters;
     Properties _properties;
     std::string _usage;
-    std::pair<std::string, std::string> _globalOperatorName;
 
 private:
     std::string _logicalName;
@@ -1000,26 +1022,26 @@ private:
 };
 
 /**
- * DistributionMapper stores a DimensionVector, and helps shifting a Coordinates by adding the offset.
+ * CoordinateTranslator stores a DimensionVector, and helps shifting a Coordinates by adding the offset.
  * @example
  * Let the offset vector be <4,6>. We have: translate(<1,1>) = <5,7>.
  *
  */
-class DistributionMapper
+class CoordinateTranslator
 {
 private:
     // The offset vector.
     DimensionVector _distOffsetVector;
 
     // Private constructor.
-    DistributionMapper(DimensionVector const& offset)
+    CoordinateTranslator(DimensionVector const& offset)
     {
         _distOffsetVector = offset;
     }
 
 public:
 
-    virtual ~DistributionMapper()
+    virtual ~CoordinateTranslator()
     {}
 
     const DimensionVector& getOffsetVector() {
@@ -1039,13 +1061,13 @@ public:
         return result;
     }
 
-    static boost::shared_ptr<DistributionMapper> createOffsetMapper(DimensionVector const& offset)
+    static std::shared_ptr<CoordinateTranslator> createOffsetMapper(DimensionVector const& offset)
     {
-        return boost::shared_ptr<DistributionMapper> (new DistributionMapper(offset));
+        return std::shared_ptr<CoordinateTranslator> (new CoordinateTranslator(offset));
     }
 
     //careful: this is not commutative
-    boost::shared_ptr<DistributionMapper> combine(boost::shared_ptr<DistributionMapper> previous)
+    std::shared_ptr<CoordinateTranslator> combine(std::shared_ptr<CoordinateTranslator> previous)
     {
         if (previous.get() == NULL)
         {
@@ -1056,17 +1078,17 @@ public:
         return createOffsetMapper(newOffset);
     }
 
-    friend bool operator== (const DistributionMapper& lhs, const DistributionMapper& rhs)
+    friend bool operator== (const CoordinateTranslator& lhs, const CoordinateTranslator& rhs)
     {
         return lhs._distOffsetVector == rhs._distOffsetVector;
     }
 
-    friend bool operator!= (const DistributionMapper& lhs, const DistributionMapper& rhs)
+    friend bool operator!= (const CoordinateTranslator& lhs, const CoordinateTranslator& rhs)
     {
         return ! (lhs == rhs);
     }
 
-    friend std::ostream& operator<<(std::ostream& stream, const DistributionMapper& dm)
+    friend std::ostream& operator<<(std::ostream& stream, const CoordinateTranslator& dm)
     {
         stream << "offset [" ;
         for (size_t i = 0; i < dm._distOffsetVector.numDimensions(); i++)
@@ -1080,24 +1102,28 @@ public:
 };
 
 
-class ArrayDistribution
+class RedistributeContext
 {
 private:
     PartitioningSchema _partitioningSchema;
-    boost::shared_ptr <DistributionMapper> _distMapper;
+    std::shared_ptr <CoordinateTranslator> _distMapper;
     int64_t _instanceId;
 
 public:
-    ArrayDistribution(PartitioningSchema ps = psHashPartitioned,
-                      boost::shared_ptr <DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper>(),
+    RedistributeContext(PartitioningSchema ps = psHashPartitioned,
+                      std::shared_ptr <CoordinateTranslator> distMapper = std::shared_ptr<CoordinateTranslator>(),
                       int64_t instanceId = 0):
         _partitioningSchema(ps), _distMapper(distMapper), _instanceId(instanceId)
     {
+        if(!isValidPartitioningSchema(ps, true)) {
+             ASSERT_EXCEPTION_FALSE("RedistributeContext: invalid PartitioningSchema")
+        }
+
         if(_distMapper.get() != NULL && _partitioningSchema == psUndefined)
             throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER);
     }
 
-    ArrayDistribution(const ArrayDistribution& other):
+    RedistributeContext(const RedistributeContext& other):
         _partitioningSchema(other._partitioningSchema),
         _distMapper(other._distMapper),
         _instanceId(other._instanceId)
@@ -1106,10 +1132,10 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER);
     }
 
-    virtual ~ArrayDistribution()
+    virtual ~RedistributeContext()
     {}
 
-    ArrayDistribution& operator= (const ArrayDistribution& rhs)
+    RedistributeContext& operator= (const RedistributeContext& rhs)
     {
         if (this != &rhs)
         {
@@ -1140,7 +1166,7 @@ public:
         return _partitioningSchema;
     }
 
-    boost::shared_ptr <DistributionMapper> getMapper() const
+    std::shared_ptr <CoordinateTranslator> getMapper() const
     {
         return _distMapper;
     }
@@ -1150,13 +1176,13 @@ public:
         return _instanceId;
     }
 
-    friend bool operator== (ArrayDistribution const& lhs, ArrayDistribution const& rhs);
-    friend bool operator!= (ArrayDistribution const& lhs, ArrayDistribution const& rhs)
+    friend bool operator== (RedistributeContext const& lhs, RedistributeContext const& rhs);
+    friend bool operator!= (RedistributeContext const& lhs, RedistributeContext const& rhs)
     {
         return !(lhs == rhs);
     }
 
-    friend std::ostream& operator<<(std::ostream& stream, const ArrayDistribution& dist);
+    friend std::ostream& operator<<(std::ostream& stream, const RedistributeContext& dist);
 };
 
 /**
@@ -1186,7 +1212,7 @@ public:
      * @param chunkCoordinates a set of array chunk coordinates
      * @return boundaries with coordinates at edges of inputArray
      */
-    static PhysicalBoundaries createFromChunkList(boost::shared_ptr<Array>& inputArray,
+    static PhysicalBoundaries createFromChunkList(std::shared_ptr<Array>& inputArray,
                                                   const std::set<Coordinates, CoordinatesLess>& chunkCoordinates);
 
 
@@ -1214,7 +1240,7 @@ public:
 
     /**
      * Compute the number of logical cells that are enclosed in the bounding box between start and end.
-     * @return the product of (end[i] - start[i] + 1) for all i from 0 to end.size(), not to exceed INFINITE_LENGTH
+     * @return the product of (end[i] - start[i] + 1) for all i from 0 to end.size(), not to exceed CoordinateBounds::getMaxLength()
      */
     static uint64_t getNumCells (Coordinates const& start, Coordinates const& end);
 
@@ -1226,7 +1252,7 @@ public:
      * @param newDims another list of array dimensions
      * @return the coordinates of the cell C that corresponds to in in newDims, if possible. The result may be incorrect
      * if the volume of the region specified by newDims is lower than the volume of currentDims. The result may be
-     * a set of MAX_COORDINATE values if currentDims are unbounded.
+     * a set of CoordinateBounds::getMax() values if currentDims are unbounded.
      */
     static Coordinates reshapeCoordinates (Coordinates const& in, Dimensions const& currentDims, Dimensions const& newDims);
 
@@ -1234,7 +1260,7 @@ public:
      * Within the space given by dims, compute the row-major-order number of the cell at coords.
      * @param coords the position of a cell
      * @param dims a set of dimensions
-     * @return the row-major-order position of coords, not to exceed INFINITE_LENGTH
+     * @return the row-major-order position of coords, not to exceed CoordinateBounds::getMaxLength()
      */
     static uint64_t getCellNumber (Coordinates const& coords, Dimensions const& dims);
 
@@ -1244,7 +1270,7 @@ public:
      * @param dims a set of dimensions
      * @param strictCheck if true will throw an assert-like exception if cellNum exceeds the volume provided by dims,
      *                    if false - silently return a partial result.
-     * @return the coordinates obtained by wrapping cellNum around the space of dims, at most a set of MAX_COORDINATE
+     * @return the coordinates obtained by wrapping cellNum around the space of dims, at most a set of CoordinateBounds::getMax()
      *         positions; divides cellNum appropriately so the remaining component, if not 0, can be examined
      */
     static Coordinates getCoordinates(uint64_t& cellNum, Dimensions const& dims, bool strictCheck = true);
@@ -1306,7 +1332,7 @@ public:
     /**
      * Compute the number of logical cells that are enclosed in the bounding box between getStartCoords() and
      * getEndCoords()
-     * @return the volume of the bounding box, not to exceed INFINITE_LENGTH
+     * @return the volume of the bounding box, not to exceed CoordinateBounds::getMaxLength()
      */
     uint64_t getNumCells() const;
 
@@ -1340,7 +1366,7 @@ public:
     PhysicalBoundaries unionWith (PhysicalBoundaries const& other) const;
 
     /**
-     * Compute the cartesian product of tis and other and return the result as a new object.
+     * Compute the cartesian product of this and other and return the result as a new object.
      * @param other a different bounding box.
      * @return the bounding box cartesian product, with the product of the densities
      */
@@ -1358,13 +1384,13 @@ public:
      * Write this into a buffer
      * @return the serialized form
      */
-    shared_ptr<SharedBuffer> serialize() const;
+    std::shared_ptr<SharedBuffer> serialize() const;
 
     /**
      * Construct a PhysicalBoundaries from a buffer
      * @param buf the result of a previous PhysicalBoundaries::serialize call
      */
-    static PhysicalBoundaries deSerialize(shared_ptr<SharedBuffer> const& buf);
+    static PhysicalBoundaries deSerialize(std::shared_ptr<SharedBuffer> const& buf);
 
     /**
      * Expand the boundaries to include data from the given chunk. By default, has a
@@ -1405,10 +1431,10 @@ class StoreJob : public Job, protected SelfStatistics
 private:
     size_t _shift;
     size_t _step;
-    shared_ptr<Array> _dstArray;
-    shared_ptr<Array> _srcArray;
-    vector<shared_ptr<ArrayIterator> > _dstArrayIterators;
-    vector<shared_ptr<ConstArrayIterator> > _srcArrayIterators;
+    std::shared_ptr<Array> _dstArray;
+    std::shared_ptr<Array> _srcArray;
+    std::vector<std::shared_ptr<ArrayIterator> > _dstArrayIterators;
+    std::vector<std::shared_ptr<ConstArrayIterator> > _srcArrayIterators;
 
     /// @return true if srcChunk has values anywhere in its body or overlap
     bool hasValues(ConstChunk const& srcChunk);
@@ -1422,11 +1448,11 @@ public:
     /**
      * Coordinates of all the chunks that were created by this job.
      */
-    set<Coordinates, CoordinatesLess> createdChunks;
+    std::set<Coordinates, CoordinatesLess> createdChunks;
 
-    StoreJob(size_t id, size_t nJobs, shared_ptr<Array> dst,
-            shared_ptr<Array> src, size_t nDims, size_t nAttrs,
-            shared_ptr<Query> query) :
+    StoreJob(size_t id, size_t nJobs, std::shared_ptr<Array> dst,
+            std::shared_ptr<Array> src, size_t nDims, size_t nAttrs,
+            std::shared_ptr<Query> query) :
             Job(query), _shift(id), _step(nJobs), _dstArray(dst), _srcArray(src), _dstArrayIterators(
                     nAttrs), _srcArrayIterators(nAttrs), bounds(
                     PhysicalBoundaries::createEmpty(nDims))
@@ -1444,7 +1470,7 @@ public:
      * Get the coordinates of all the chunks created by this job.
      * @return the set of chunk coordinates
      */
-    set<Coordinates, CoordinatesLess> const& getCreatedChunks()
+    std::set<Coordinates, CoordinatesLess> const& getCreatedChunks()
     {
         return createdChunks;
     }
@@ -1460,7 +1486,7 @@ public:
         SpecificAnyOrder
     };
 
-    DistributionRequirement (reqType rt = Any, vector<ArrayDistribution> specificRequirements = vector<ArrayDistribution>(0)):
+    DistributionRequirement (reqType rt = Any, std::vector<RedistributeContext> specificRequirements = std::vector<RedistributeContext>(0)):
         _requiredType(rt), _specificRequirements(specificRequirements)
     {
         if ((_requiredType == SpecificAnyOrder || _specificRequirements.size() != 0)
@@ -1478,14 +1504,14 @@ public:
         return _requiredType;
     }
 
-    vector<ArrayDistribution> const& getSpecificRequirements()
+    std::vector<RedistributeContext> const& getSpecificRequirements()
     {
         return _specificRequirements;
     }
 
 private:
-    reqType                   const _requiredType;
-    vector<ArrayDistribution> const _specificRequirements;
+    reqType                     const _requiredType;
+    std::vector<RedistributeContext> const _specificRequirements;
 };
 
 class DimensionGrouping
@@ -1502,14 +1528,14 @@ public:
         for (size_t i=0,n=groupedDimensions.size(); i!=n ; ++i)
         {
             DimensionDesc d = groupedDimensions[i];
-            string const& baseName = d.getBaseName();
+            std::string const& baseName = d.getBaseName();
             ObjectNames::NamesType const& aliases = d.getNamesAndAliases();
             for (size_t j=0,k=originalDimensions.size(); j!=k ; ++j)
             {
                 DimensionDesc dO = originalDimensions[j];
                 if (dO.getBaseName() == baseName &&
                     dO.getNamesAndAliases() == aliases &&
-                    (dO.getLength()==INFINITE_LENGTH || dO.getLength()==d.getLength()))
+                    (dO.getLength()==CoordinateBounds::getMaxLength() || dO.getLength()==d.getLength()))
                 {
                     _dimensionMask.push_back(j);
                 }
@@ -1540,10 +1566,10 @@ public:
     }
 
 private:
-    vector<size_t> _dimensionMask;
+    std::vector<size_t> _dimensionMask;
 };
 
-typedef boost::shared_ptr < std::pair<Coordinates, InstanceID> > ChunkLocation;
+typedef std::shared_ptr < std::pair<Coordinates, InstanceID> > ChunkLocation;
 
 /**
  * A map that describes which chunks exist on which instances for the purpose of searching along an axis.
@@ -1560,8 +1586,9 @@ private:
 
     size_t _numChunks;
 
-    boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > > _chunkLocations;
-    boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::iterator _outerIter;
+    typedef std::unordered_map<Coordinates, std::shared_ptr< std::map<Coordinate, InstanceID> >, CoordinatesHash> Coords2Map;
+    Coords2Map _chunkLocations;
+    Coords2Map::iterator _outerIter;
     std::map<Coordinate, InstanceID>::iterator _innerIter;
 
     template <int SEARCH_MODE>
@@ -1572,29 +1599,29 @@ private:
         Coordinate inner = copy[_axis];
         copy[_axis]=0;
 
-        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter = _chunkLocations.find(copy);
+        Coords2Map::const_iterator outerIter = _chunkLocations.find(copy);
         if (outerIter == _chunkLocations.end())
-        {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+        {   return std::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
 
         std::map<Coordinate, InstanceID>::const_iterator iter = outerIter->second->find(inner);
         if (iter == outerIter->second->end())
-        {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+        {   return std::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
 
         if (SEARCH_MODE == 1)
         {
             iter++;
             if (iter == outerIter->second->end())
-            {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+            {   return std::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
         }
         else if (SEARCH_MODE == 2)
         {
             if (iter == outerIter->second->begin())
-            {   return boost::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
+            {   return std::shared_ptr < std::pair<Coordinates,InstanceID> >(); }
             iter--;
         }
 
         copy[_axis]=iter->first;
-        return boost::shared_ptr <std::pair<Coordinates,InstanceID> > ( new std::pair<Coordinates,InstanceID> (copy,iter->second) );
+        return std::make_shared<std::pair<Coordinates,InstanceID> >(copy,iter->second);
     }
 
 public:
@@ -1634,7 +1661,11 @@ public:
         _outerIter=_chunkLocations.find(copy);
         if(_outerIter==_chunkLocations.end())
         {
-            _outerIter=_chunkLocations.insert( std::pair<Coordinates, boost::shared_ptr<std::map<Coordinate, InstanceID> > >(copy, boost::shared_ptr<map<Coordinate,uint64_t> >(new map <Coordinate, uint64_t> ()))).first;
+            _outerIter=_chunkLocations.insert(
+                    std::pair<Coordinates, std::shared_ptr<std::map<Coordinate, InstanceID> > >(
+                            copy,
+                            std::make_shared<std::map<Coordinate,uint64_t> >()
+                            )).first;
         }
 
         if (_outerIter->second->find(inner) != _outerIter->second->end())
@@ -1646,10 +1677,10 @@ public:
         _numChunks++;
     }
 
-    inline vector<Coordinates> getAxesList() const
+    inline std::vector<Coordinates> getAxesList() const
     {
-        vector<Coordinates> result;
-        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter = _chunkLocations.begin();
+        std::vector<Coordinates> result;
+        Coords2Map::const_iterator outerIter = _chunkLocations.begin();
         while (outerIter != _chunkLocations.end())
         {
             result.push_back(outerIter->first);
@@ -1669,7 +1700,7 @@ public:
             return stream;
         }
 
-        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter;
+        Coords2Map::const_iterator outerIter;
         std::map<Coordinate, InstanceID>::const_iterator innerIter;
 
         std::vector<Coordinates> key;
@@ -1709,7 +1740,7 @@ public:
     {
     private:
         ChunkInstanceMap const& _cm;
-        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator _outer;
+        Coords2Map::const_iterator _outer;
         std::map<Coordinate, InstanceID>::const_iterator _inner;
 
     public:
@@ -1731,7 +1762,7 @@ public:
 
             Coordinates coords = _outer->first;
             coords[_cm._axis]=_inner->first;
-            result = boost::shared_ptr <std::pair<Coordinates,InstanceID> > ( new std::pair<Coordinates,InstanceID> (coords,_inner->second) );
+            result = std::make_shared<std::pair<Coordinates,InstanceID> >(coords,_inner->second);
             ++_inner;
             moreChunksInAxis = true;
             if(_inner==_outer->second->end())
@@ -1755,7 +1786,7 @@ public:
             }
             else if(_inner==_outer->second->end())
             {
-                boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator i = _outer;
+                Coords2Map::const_iterator i = _outer;
                 i++;
                 if(i==_cm._chunkLocations.end())
                 {
@@ -1842,15 +1873,15 @@ public:
      * Marshall map into a buffer.
      * @return buffer of getBufferedSize() that completely describes the map.
      */
-    boost::shared_ptr<SharedBuffer> serialize() const
+    std::shared_ptr<SharedBuffer> serialize() const
     {
         if(_chunkLocations.size()==0)
         {
-            return boost::shared_ptr<SharedBuffer>();
+            return std::shared_ptr<SharedBuffer>();
         }
 
         size_t totalSize = getBufferedSize();
-        boost::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, totalSize));
+        std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, totalSize));
         MemoryBuffer* b = (MemoryBuffer*) buf.get();
         size_t* sizePtr = (size_t*)b->getData();
 
@@ -1865,7 +1896,7 @@ public:
 
         Coordinate* coordPtr = (Coordinate*) sizePtr;
 
-        boost::unordered_map <Coordinates, boost::shared_ptr< std::map<Coordinate, InstanceID> > >::const_iterator outerIter;
+        Coords2Map::const_iterator outerIter;
         std::map<Coordinate, InstanceID>::const_iterator innerIter;
 
         outerIter=_chunkLocations.begin();
@@ -1899,7 +1930,7 @@ public:
      * Merge information from another map into this.
      * @param serializedMap a buffer received as the result of calling serialize() on another ChunkInstanceMap.
      */
-    void merge( boost::shared_ptr<SharedBuffer> const& serializedMap)
+    void merge( std::shared_ptr<SharedBuffer> const& serializedMap)
     {
         if(serializedMap.get() == 0)
         {   return; }
@@ -1946,9 +1977,9 @@ public:
  */
 class PhysicalOperator
 {
-  public:
-    typedef boost::shared_ptr<OperatorParam> Parameter;
-    typedef std::vector<boost::shared_ptr<OperatorParam> > Parameters;
+public:
+    typedef std::shared_ptr<OperatorParam> Parameter;
+    typedef std::vector<std::shared_ptr<OperatorParam> > Parameters;
 
     PhysicalOperator(std::string const& logicalName,
                      std::string const& physicalName,
@@ -1998,13 +2029,13 @@ class PhysicalOperator
         _schema = schema;
     }
 
-    virtual void setQuery(const boost::shared_ptr<Query>&);
+    virtual void setQuery(const std::shared_ptr<Query>&);
 
     /**
      * This method is executed on coordinator instance before sending out plan on remote instances and
      * before local call of execute method.
      */
-    virtual void preSingleExecute(boost::shared_ptr<Query>)
+    virtual void preSingleExecute(std::shared_ptr<Query>)
     {
     }
 
@@ -2012,7 +2043,7 @@ class PhysicalOperator
      * This method is executed on coordinator instance before sending out plan on remote instances and
      * after call of execute method in overall cluster.
      */
-    virtual void postSingleExecute(boost::shared_ptr<Query>)
+    virtual void postSingleExecute(std::shared_ptr<Query>)
     {
     }
 
@@ -2045,11 +2076,11 @@ class PhysicalOperator
      *
      * For arguments, see execute()
      */
-    virtual boost::shared_ptr< Array> executeWrapper(std::vector< boost::shared_ptr< Array> >&,boost::shared_ptr<Query>);
+    virtual std::shared_ptr< Array> executeWrapper(std::vector<std::shared_ptr<Array> >&, std::shared_ptr<Query>);
 
-    virtual boost::shared_ptr< Array> execute(
-            std::vector< boost::shared_ptr< Array> >&,
-            boost::shared_ptr<Query>) = 0;
+    virtual std::shared_ptr< Array> execute(
+            std::vector< std::shared_ptr< Array> >&,
+            std::shared_ptr<Query>) = 0;
 
     /**
      * This routine allows operators to communicate with profiling code
@@ -2063,13 +2094,13 @@ class PhysicalOperator
     virtual double problemScaleNormalization() { return 1; }
 
     /**
-     * this routine allows problemScaleNormaliation() to optionally provide a set of
+     * This routine allows problemScaleNormaliation() to optionally provide a set of
      * units for its normalization measure.  For example, if the execution time would
      * become a constant when divided by the number of cells this might return
      * string("cells").  The profiling code can then use this string to make results
      * much easier to read
      */
-    virtual string problemScaleNormalizationName() { return string("null"); }
+    virtual std::string problemScaleNormalizationName() { return std::string("null"); }
 
     virtual DistributionRequirement getDistributionRequirement(
             std::vector<ArrayDesc> const& sourceSchemas) const
@@ -2106,8 +2137,8 @@ class PhysicalOperator
      *  @param sourceSchemas shapes of all arrays that will given as inputs
      *  @return distribution of the output
      */
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& sourceDistributions,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& sourceDistributions,
             std::vector<ArrayDesc> const& sourceSchemas) const
     {
         if (changesDistribution(sourceSchemas)) {
@@ -2121,7 +2152,7 @@ class PhysicalOperator
         }
 
         if(sourceDistributions.empty()) {
-            return ArrayDistribution(psHashPartitioned);
+            return RedistributeContext(defaultPartitioning());
         } else {
             return sourceDistributions[0];
         }
@@ -2141,26 +2172,42 @@ class PhysicalOperator
     }
 
     /**
-     *  [Optimizer API] Determine if the operator requires repartitioning of any of its inputs.
+     *  [Optimizer API] Determine if the operator requires redimensioning/repartitioning of its inputs.
      *
      *  @param[in] inputSchemas shapes of arrays that will be given as input
-     *  @param[out] repartPtrs pointers to repartitioning schemas for corresponding inputs
+     *  @param[out] modifiedPtrs pointers to redimensioning/repartitioning schemas for corresponding inputs
      *
      *  @description During query optimization the physical operator gets a chance to examine
-     *  its input schemas and decide whether and how each should be repartitioned.  To
-     *  repartition inputSchemas[i], set repartPtrs[i] to be a pointer to the desired ArrayDesc
-     *  schema descriptor---which may be one of the inputSchemas (not well tested), or may be a
-     *  synthesized schema stored locally.  A NULL entry in repartPtrs indicates that the
-     *  corresponding input should not be repartitioned.
+     *  its input schemas and decide whether and how each should be redimensioned/repartitioned.
+     *  To indicate that a modification to inputSchemas[i] is needed, set modifiedPtrs[i] to
+     *  be a pointer to the desired ArrayDesc schema descriptor---which may be one of the
+     *  inputSchemas (not well  tested), or may be a synthesized schema stored locally.  A NULL
+     *  entry in modifiedPtrs indicates that the corresponding input should not be modified.
      *
-     *  Calling code MUST NOT call @c delete on any of the returned repartSchema pointers.
-     *  Operators implementing this method may use the protected _repartSchemas vector below to
-     *  manage schema storage.
+     *  Calling code MUST NOT call @c delete on any of the returned redimensionSchema pointers.
+     *  Operators implementing this method may use the protected _redimRepartSchemas vector
+     *  below to manage schema storage.
      *
-     *  The default is "no repartitioning needed", which is indicated by an empty repartPtrs
-     *  vector.  We also provide a canned repartitioning policy, repartByLeftmost(), intended to
-     *  be the default repartitioning policy for non-unary operators.  Other canned policies are
+     *  The default is "no modification needed", which is indicated by an empty modifiedPtrs
+     *  vector.  We also provide a canned redimension/repartition policy, repartByLeftmost(),
+     *  intended to be the default policy for non-unary operators.  Other canned policies are
      *  possible.
+     *
+     *  Repartition versus redimension selection:
+     *    A repartition operator will be inserted into the physical tree if the schema's
+     *    startMin AND endMax are NOT changed but the chunkOverlap and/or the chunkInterval
+     *    are changed.
+     *
+     *    A redimension operator will be inserted into the physical tree if the schema's
+     *    startMin OR endMax are changed.  Note:  Currently only endMax would change and
+     *    the only operator that would change it is "merge."
+     *
+     *    The insertion of the repartition or redimension operator into the physical tree
+     *    is handled by the HabilisOptimizer.
+     *
+     *  @note Implementations of this method must ensure that the modified input arrays can
+     *  produce the promised output schema, that is, the output schema produced by
+     *  LogicalFoo::inferSchema() and stored locally as PhysicalFoo::_schema.  See ticket #4712.
      *
      *  @note It's difficult to compute the optimal chunk sizes (and overlaps?) over the entire
      *  query.  One day we may have a better solution, but for now we make repartitioning
@@ -2168,14 +2215,15 @@ class PhysicalOperator
      *  repartitioned.
      *
      *  @see PhysicalOperator::repartByLeftmost
-     *  @see PhysicalJoin::requiresRepart
-     *  @see PhysicalWindow::requiresRepart
+     *  @see PhysicalJoin::requiresRedimensionOrRepartition
+     *  @see PhysicalWindow::requiresRedimensionOrRepartition
      *  ...and others.
      */
-    virtual void requiresRepart(vector<ArrayDesc> const& inputSchemas,
-                                vector<ArrayDesc const*>& repartPtrs) const
+    virtual void requiresRedimensionOrRepartition(
+        std::vector<ArrayDesc> const &  inputSchemas,
+        std::vector<ArrayDesc const*> & modifiedPtrs) const
     {
-        repartPtrs.clear();
+        modifiedPtrs.clear();
     }
 
     bool getTileMode() const
@@ -2200,61 +2248,154 @@ class PhysicalOperator
      * @param[in] input an array to output
      * @param[in] logger the logger object to use
      */
-    static void dumpArrayToLog(shared_ptr<Array> const& input, log4cxx::LoggerPtr& logger);
+    static void dumpArrayToLog(std::shared_ptr<Array> const& input, log4cxx::LoggerPtr& logger);
 
     /**
      * Helper: ensures that the given array object can satisfy the Array::RANDOM access pattern.
      * If input already satisfies this, simply return it. Otherwise create and return a new array object.
-     * Note: the input may be reset as the result of calling this function, always use the returned pointer
+     * Note: the input may be reset as the result of calling this function, always use the returned pointer.
      * @param[in|out] input the array; invalidated by the function
      * @param[out] query the query context
      * @return an object with the same data and schema as input that supports Array::RANDOM access.
      */
-    static boost::shared_ptr<Array> ensureRandomAccess(shared_ptr<Array>& input, shared_ptr<Query> const& query);
+    static std::shared_ptr<Array> ensureRandomAccess(std::shared_ptr<Array>& input, std::shared_ptr<Query> const& query);
 
-  protected:
+protected:
     Parameters _parameters;
     ArrayDesc _schema;
     Statistics _statistics;
     arena::ArenaPtr _arena;
     bool _tileMode;
-    boost::weak_ptr<Query> _query;
-    mutable std::vector<boost::shared_ptr<ArrayDesc> > _repartSchemas;
+    std::weak_ptr<Query> _query;
+    mutable std::vector<std::shared_ptr<ArrayDesc> > _redimRepartSchemas;
 
     /**
-     * Canned impl of requiresRepart() for use by most n-ary auto-repartitioning operators.
+     * Canned impl of requiresRedimensionOrRepartition() for use by most n-ary
+     * auto-repartitioning operators.
      *
      * @description Operators whose only requirement is that all inputs have like chunk sizes
      * and overlaps may call this canned implementation.  All input arrays will be repartitioned
      * to match the chunk sizes of inputSchemas[0] (if they do not already match).  Minimum
      * overlap values will be chosen (the 'join' operator insists on this... for now).
+     *
+     * @param[in] inputSchemas shapes of arrays that will be given as input
+     * @param[in,out] modifiedPtrs pointers to repartitioning schemas for corresponding inputs
+     * @throws SCIDB_LE_BAD_EXPLICIT_REPART if an explicit repart prevents correctly partitioned inputs
      */
-    void repartByLeftmost(vector<ArrayDesc> const& inputSchemas,
-                          vector<ArrayDesc const*>& repartPtrs) const;
+    void repartByLeftmost(std::vector<ArrayDesc> const& inputSchemas,
+                          std::vector<ArrayDesc const*>& modifiedPtrs) const;
 
-  private:
+    /**
+     * Help that executes in Debug build only
+     * Asserts that a given array descriptor corresponds to the last committed array version.
+     * If arrayExists == false, asserts if the last version is found in the catalog.
+     * @param arrayName
+     * @param arrayExists if an array has not been found in the catalog prior to this call (desc is undefined)
+     * @param desc array descriptor to be validated (if arrayExists == true)
+     *
+     */
+    void assertLastVersion(std::string const& arrayName,
+                           bool arrayExists,
+                           ArrayDesc const& desc);
+
+
+private:
     std::string _logicalName;
     std::string _physicalName;
     static InjectedErrorListener<OperatorInjectedError> _injectedErrorListener;
 
-  public:
+public:
     /*
      * Get a global queue so as to push operator-based jobs into it.
      * The function, upon first call, will create a ThreadPool of CONFIG_RESULT_PREFETCH_THREADS threads.
      */
-    static boost::shared_ptr<JobQueue>  getGlobalQueueForOperators();
+    static std::shared_ptr<JobQueue>  getGlobalQueueForOperators();
 
-  private:
+private:
     // global thread pool for operators, that is automatically created in getGlobalQueueForOperators()
-    static boost::shared_ptr<ThreadPool> _globalThreadPoolForOperators;
+    static std::shared_ptr<ThreadPool> _globalThreadPoolForOperators;
 
     // global queue for operators
-    static boost::shared_ptr<JobQueue> _globalQueueForOperators;
+    static std::shared_ptr<JobQueue> _globalQueueForOperators;
 
     // mutex that protects the call to getGlobalQueueForOperators
     static Mutex _mutexGlobalQueueForOperators;
 };
 
+/**
+ * A base class for all operators which modify arrays in the system
+ * (currently store(), insert(), _sg(), input()).
+ * It takes care of most of the required steps to maintain the system catalog.
+ */
+class PhysicalUpdate: public PhysicalOperator
+{
+protected:
+    std::string _unversionedArrayName;
+    ArrayUAID _arrayUAID;
+    ArrayID   _arrayID;
+    VersionID _lastVersion;
+    ArrayDesc _unversionedSchema;
+    std::shared_ptr<SystemCatalog::LockDesc> _lock;
+
+public:
+    /// @see scidb::PhysicalOperator::PhysicalOperator
+    PhysicalUpdate(const std::string& logicalName,
+                   const std::string& physicalName,
+                   const Parameters& parameters,
+                   const ArrayDesc& schema,
+                   const std::string& catalogArrayName);
+    /**
+     * Updates the "schema" for the array to be created/updated based on the system catalog
+     * It expects the (coordinator) array lock to be already acquired by the query.
+     * @see scidb::PhysicalOperator::preSingleExecute
+     */
+    virtual void preSingleExecute(std::shared_ptr<Query> query);
+    /**
+     * Performs the necessary steps to update the catalog *if* the query commits
+     * @see scidb::PhysicalOperator::postSingleExecute
+     */
+    virtual void postSingleExecute(std::shared_ptr<Query> query);
+    /**
+     * Must be implemented in a child class
+     * @see scidb::PhysicalOperator::postSingleExecute
+     */
+    virtual std::shared_ptr< Array> execute(
+            std::vector< std::shared_ptr< Array> >&,
+            std::shared_ptr<Query>)
+    {
+        ASSERT_EXCEPTION_FALSE("PhysicalUpdate::execute() must be implemented in a subclass");
+    }
+
+    /**
+     * On the coordinator collect the array boundaries from all the workers,
+     * merge them and record in the versioned array schema.
+     * @param [in/out] schema versioned array schema
+     * @param [in/out] bounds local array boundaries;
+     * on the coordinator contains the global boundaries on exit
+     * @param query context
+     */
+    static void updateSchemaBoundaries(ArrayDesc& schema,
+                                       PhysicalBoundaries& bounds,
+                                       std::shared_ptr<Query>& query);
+
+    /**
+     * Record array in the transient array cache. Implements a callback
+     * that is suitable for use as a query finalizer.
+     * @see scidb::QueryFinalizer
+     */
+    void recordTransient(const std::shared_ptr<Array>& array,
+                         const std::shared_ptr<Query>& query);
+
+protected:
+
+    /**
+     * Implements a callback that is suitable for use as a query finalizer.
+     * Adds the new array/version to the catalog transactionally,
+     * i.e. in a Query::Finalizer if the query commits.
+     */
+    void recordPersistent(const std::shared_ptr<Query>& query);
+
+};
 
 /**
  * It's base class for constructing logical operators. It declares some virtual functions that
@@ -2273,9 +2414,9 @@ public:
         return _logicalName;
     }
 
-    virtual boost::shared_ptr<LogicalOperator> createLogicalOperator(const std::string& alias) = 0;
+    virtual std::shared_ptr<LogicalOperator> createLogicalOperator(const std::string& alias) = 0;
 
-  protected:
+protected:
     void registerFactory();
 
     std::string _logicalName;
@@ -2289,15 +2430,15 @@ public:
 template<class T>
 class LogicalOperatorFactory: public BaseLogicalOperatorFactory
 {
-  public:
+public:
     LogicalOperatorFactory(const std::string& logicalName): BaseLogicalOperatorFactory(logicalName) {
     }
 
     virtual ~LogicalOperatorFactory() {}
 
-    boost::shared_ptr<LogicalOperator> createLogicalOperator(const std::string& alias)
+    std::shared_ptr<LogicalOperator> createLogicalOperator(const std::string& alias)
     {
-        return boost::shared_ptr<LogicalOperator>(new T(_logicalName, alias));
+        return std::shared_ptr<LogicalOperator>(new T(_logicalName, alias));
     }
 };
 
@@ -2305,7 +2446,7 @@ class LogicalOperatorFactory: public BaseLogicalOperatorFactory
 template<class T>
 class UserDefinedLogicalOperatorFactory: public LogicalOperatorFactory<T>
 {
-  public:
+public:
     UserDefinedLogicalOperatorFactory(const std::string& logicalName): LogicalOperatorFactory<T>(logicalName) {
         BaseLogicalOperatorFactory::registerFactory();
     }
@@ -2318,7 +2459,7 @@ class UserDefinedLogicalOperatorFactory: public LogicalOperatorFactory<T>
  */
 class BasePhysicalOperatorFactory
 {
-  public:
+public:
     BasePhysicalOperatorFactory(const std::string& logicalName, const std::string& physicalName):
         _logicalName(logicalName), _physicalName(physicalName) {
     }
@@ -2334,7 +2475,7 @@ class BasePhysicalOperatorFactory
         return _physicalName;
     }
 
-    virtual boost::shared_ptr<PhysicalOperator> createPhysicalOperator(const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema) = 0;
+    virtual std::shared_ptr<PhysicalOperator> createPhysicalOperator(const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema) = 0;
 
 protected:
     void registerFactory();
@@ -2351,23 +2492,23 @@ protected:
 template<class T>
 class PhysicalOperatorFactory: public BasePhysicalOperatorFactory
 {
-  public:
+public:
     PhysicalOperatorFactory(const std::string& logicalName, const std::string& physicalName):
         BasePhysicalOperatorFactory(logicalName, physicalName) {
     }
     virtual ~PhysicalOperatorFactory() {}
 
-    boost::shared_ptr<PhysicalOperator> createPhysicalOperator(const PhysicalOperator::Parameters& parameters,
+    std::shared_ptr<PhysicalOperator> createPhysicalOperator(const PhysicalOperator::Parameters& parameters,
                                                                const ArrayDesc& schema)
     {
-        return boost::shared_ptr<PhysicalOperator>(new T(_logicalName, _physicalName, parameters, schema));
+        return std::shared_ptr<PhysicalOperator>(new T(_logicalName, _physicalName, parameters, schema));
     }
 };
 
 template<class T>
 class UserDefinedPhysicalOperatorFactory: public PhysicalOperatorFactory<T>
 {
-  public:
+public:
     UserDefinedPhysicalOperatorFactory(const std::string& logicalName, const std::string& physicalName)
     : PhysicalOperatorFactory<T>(logicalName, physicalName)
     {
@@ -2376,15 +2517,28 @@ class UserDefinedPhysicalOperatorFactory: public PhysicalOperatorFactory<T>
     virtual ~UserDefinedPhysicalOperatorFactory() {}
 };
 
-#define DECLARE_LOGICAL_OPERATOR_FACTORY(name, uname) static LogicalOperatorFactory<name> _logicalFactory##name(uname); \
-        BaseLogicalOperatorFactory* get_logicalFactory##name() { return &_logicalFactory##name; }
+#define DECLARE_LOGICAL_OPERATOR_FACTORY(name, uname)                   \
+    static LogicalOperatorFactory<name> _logicalFactory##name(uname);   \
+    BaseLogicalOperatorFactory* get_logicalFactory##name()              \
+    {                                                                   \
+        return &_logicalFactory##name;                                  \
+    }
 
-#define DECLARE_PHYSICAL_OPERATOR_FACTORY(name, ulname, upname) static PhysicalOperatorFactory<name> _physicalFactory##name(ulname, upname); \
-        BasePhysicalOperatorFactory* get_physicalFactory##name() { return &_physicalFactory##name; }
+// WARNING: Logical operator MUST be delcared BEFORE any corresponding
+// physical operator(s)!
+//
+#define DECLARE_PHYSICAL_OPERATOR_FACTORY(name, ulname, upname)         \
+    static PhysicalOperatorFactory<name> _physicalFactory##name(ulname, upname); \
+    BasePhysicalOperatorFactory* get_physicalFactory##name()            \
+    {                                                                   \
+        return &_physicalFactory##name;                                 \
+    }
 
-#define REGISTER_LOGICAL_OPERATOR_FACTORY(name, uname) static UserDefinedLogicalOperatorFactory<name> _logicalFactory##name(uname)
+#define REGISTER_LOGICAL_OPERATOR_FACTORY(name, uname) \
+    static UserDefinedLogicalOperatorFactory<name> _logicalFactory##name(uname)
 
-#define REGISTER_PHYSICAL_OPERATOR_FACTORY(name, ulname, upname) static UserDefinedPhysicalOperatorFactory<name> _physicalFactory##name(ulname, upname)
+#define REGISTER_PHYSICAL_OPERATOR_FACTORY(name, ulname, upname) \
+    static UserDefinedPhysicalOperatorFactory<name> _physicalFactory##name(ulname, upname)
 
 /**
  * Computes an instance where a chunk should be sent according to a specific distribution
@@ -2397,133 +2551,27 @@ class UserDefinedPhysicalOperatorFactory: public PhysicalOperatorFactory<T>
  *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
  * @param psData a pointer to the data that is specific to the particular partitioning schema, NULL by default
  */
-InstanceID getInstanceForChunk(boost::shared_ptr<Query> const& query,
+InstanceID getInstanceForChunk(std::shared_ptr<Query> const& query,
                                Coordinates const& chunkPosition,
                                ArrayDesc const& desc,
                                PartitioningSchema ps,
-                               boost::shared_ptr<DistributionMapper> const& distMapper,
+                               std::shared_ptr<CoordinateTranslator> const& distMapper,
                                size_t instanceIdShift,
                                InstanceID destInstanceId,
                                PartitioningSchemaData* psData = NULL);
 
-#ifndef SCIDB_CLIENT
-
-
-/**
- * The redimension info, used when merging two chunks.
- * Case 1: _redimInfo is empty. The query is NOT in the redimension state. No conflict is allowed.
- * Case 2: _redimInfo.hasSynthetic is true. There is a synthetic dimension.
- * Case 3: _redimInfo.hasSynthetic is false. There is no synthetic dimension. Conflict is resolved arbitrarily.
- *
- * RedimInfo is stored in the SGContext (for now, until we migrate OperatorContext to belong to the operators, not the query).
- */
-struct RedimInfo {
-    /**
-     * Whether there is a synthetic dimension.
-     */
-    bool _hasSynthetic;
-
-    /**
-     * Which dimension is the synthetic one.
-     */
-    AttributeID _dimSynthetic;
-
-    /**
-     * A copy of the synthetic dim description
-     */
-    DimensionDesc _dim;
-
-    RedimInfo(bool hasSynthetic, AttributeID dimSynthetic, DimensionDesc const& dim):
-        _hasSynthetic(hasSynthetic), _dimSynthetic(dimSynthetic), _dim(dim)
-    {}
-};
-
-/**
- * Section with data structures used in redistribute functions
- */
-class SGContext : virtual public Query::OperatorContext
-{
-public:
-    /**
-     * SGChunkReceiver handles chunk fragments during SG.
-     */
-    boost::shared_ptr<SGChunkReceiver> _chunkReceiver;
-
-    /**
-     * RedimInfo is specific to redimension.
-     */
-    boost::shared_ptr<RedimInfo> _redimInfo;
-
-    /* Array pointer to SCATTER/GATHER result array.
-    * We must keep it in context because we use it both from
-    * physical operator and from every message handler storing
-    * received chunk.
-    */
-    boost::shared_ptr< Array> _resultSG;
-    std::vector<AggregatePtr> _aggregateList;
-
-    /**
-     * A set of the coordinates of all the chunks that were created
-     * as the result of this SG on this node. This is used to insert
-     * tombstone headers after a storing SG.
-     */
-    set<Coordinates, CoordinatesLess> _newChunks;
-
-    /**
-     * In some cases (shadow and NID array in INPUT) we have to perform SG inside SG. To prevent collision of SG messages we
-     * should postpone second SG till the end of first SG. It is done by associating on-completion callback for SG.
-     */
-    void* callbackArg; /* user provided argument for callback */
-    void (*onSGCompletionCallback)(void* arg); /* if not NULL, then this callback will be invoked after SG completion */
-
-    /**
-     * True if the target array is persistent and versioned (mutable). False otherwise.
-     */
-    bool _targetVersioned;
-
-    SGContext(boost::shared_ptr<SGChunkReceiver>& chunkReceiver,
-            boost::shared_ptr<RedimInfo>& redimInfo,
-            boost::shared_ptr<Array> res,
-            std::vector<AggregatePtr> const& aggregateList)
-    :
-        _chunkReceiver(chunkReceiver),
-        _redimInfo(redimInfo),
-        _resultSG(res),
-        _aggregateList(aggregateList),
-        onSGCompletionCallback(NULL),
-        _targetVersioned(res->getArrayDesc().getId() != 0)
-    {
-    }
-};
-
 const InstanceID ALL_INSTANCE_MASK = -1;
 const InstanceID COORDINATOR_INSTANCE_MASK = -2;
 
-/**
- * This function repartitions the inputArray.
- * @deprecated DEPRECATED as of release 14.11. Use redistributeToRandomAccess(), redistributeToArray() or  pullRedistribute() instead.
- * @param inputArray a pointer to local part of repartitioning array
- * @param query a query context
- * @param ps a new partitioning schema
- * @param resultArrayName a name of array where to store result of repartitioning.
- *      This array must exist.
- * @param psData    a pointer to the data that is specific to the particular partitioning schema
- * @return pointer to new local array with part of array after repart.
- */
-boost::shared_ptr< Array> redistribute(boost::shared_ptr< Array> inputArray,
-                                       boost::shared_ptr< Query> query,
-                                       PartitioningSchema ps,
-                                       const std::string& resultArrayName = "",
-                                       InstanceID instanceID = ALL_INSTANCE_MASK,
-                                       boost::shared_ptr<DistributionMapper> distMapper = boost::shared_ptr<DistributionMapper> (),
-                                       size_t shift = 0,
-                                       PartitioningSchemaData* psData = NULL);
+#ifndef SCIDB_CLIENT
+
+static const bool DEFAULT_INTEGRITY_ENFORCEMENT = true;
 
 /**
- * Reistribute (i.e S/G) a given array without full materialization.
+ * Redistribute (i.e S/G) a given array without full materialization.
  * It returns an array that streams data when pulled (via an ArrayIterator).
  * @note IMPORTANT:
- * The return array has several limitations:
+ * The returned array has several limitations:
  * 1. Each attribute needs to be pulled one at a time. If the input array supports only the SINGLE_PASS access
  * and has more than one attribute, the array returned by pullRedistribute() can be used to pull only one attribute.
  * redistributeToArray()/ToRandomAccess() can be used to pull *all*  attributes from the SINGLE_PASS array.
@@ -2543,18 +2591,97 @@ boost::shared_ptr< Array> redistribute(boost::shared_ptr< Array> inputArray,
  *        while pulling on the output array (either locally or remotely).
  * @return a new SynchableArray if inputArray needs redistribution; otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
-boost::shared_ptr<Array>
-pullRedistribute(boost::shared_ptr<Array>& inputArray,
-                 const boost::shared_ptr<Query>& query,
+std::shared_ptr<Array>
+pullRedistribute(std::shared_ptr<Array>& inputArray,
+                 const std::shared_ptr<Query>& query,
                  PartitioningSchema ps,
                  InstanceID instanceId,
-                 const boost::shared_ptr<DistributionMapper>& distMapper,
+                 const std::shared_ptr<CoordinateTranslator>& distMapper,
                  size_t instanceIdShift,
-                 const boost::shared_ptr<PartitioningSchemaData>& psData,
-                 bool enforceDataIntegrity=false); //XXX TODO: remove default
+                 const std::shared_ptr<PartitioningSchemaData>& psData,
+                 bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT); //XXX TODO: remove default
 
 /**
- * Reistribute (i.e S/G) a given array into an array with the RANDOM access support
+ * Functor type to map chunks to their destination instances
+ *
+ * @parm Query the current query context
+ * @parm Coordinates chunk coordinates
+ * @parm ArrayDesc of the array being distributed
+ * @return InstanceID where to send the chunk
+ */
+typedef boost::function <
+    InstanceID ( const std::shared_ptr<Query>&,
+                 const Coordinates&,
+                 const ArrayDesc& )
+              > SGInstanceLocator;
+
+/**
+ * Redistribute (i.e S/G) a given array without full materialization.
+ * It returns an array that streams data when pulled (via an ArrayIterator).
+ * @note IMPORTANT:
+ * The returned array has several limitations:
+ * 1. Each attribute needs to be pulled one at a time. If the input array supports only the SINGLE_PASS access
+ * and has more than one attribute, the array returned by pullRedistribute() can be used to pull only one attribute.
+ * redistributeToArray()/ToRandomAccess() can be used to pull *all*  attributes from the SINGLE_PASS array.
+ * 2. All desired attributes must be pulled *completely* before pullRedistribute()/redistributeXXX()
+ * can be called again. An attribute must either be pulled completely or not at all.
+ * 3. After all selected attributes are completely consumed,
+ * the SynchableArray::sync() method must be called on the returned array.
+ * @param inputArray to redistribute, must support at least MULTI_PASS access or have only a single attribute
+ * @param query context
+ * @param instanceLocator a functor to map chunks to their destination instances
+ * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
+ *        while pulling on the output array (either locally or remotely).
+ * @return a new SynchableArray if inputArray needs redistribution; otherwise inputArray is returned and enforceDataIntegrity has no effect
+ */
+std::shared_ptr<Array> pullRedistribute(std::shared_ptr<Array>& inputArray,
+                                   const std::shared_ptr<Query>& query,
+                                   SGInstanceLocator& instanceLocator,
+                                   bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
+
+/**
+ * A vector of partial chunk merger pointers
+ */
+typedef std::vector<std::shared_ptr<MultiStreamArray::PartialChunkMerger> > PartialChunkMergerList;
+
+/**
+ * Redistribute (i.e S/G) a given array without full materialization.
+ * It returns an array that streams data when pulled (via an ArrayIterator).
+ * It delivers the chunks in the order of attribute IDs specified by attributesOrdered.
+ * It is not necessary to specify all the input array attributes; the ommitted ones will not be delivered.
+ * @note IMPORTANT:
+ * The returned array has several limitations:
+ * 1. The chunks need to be pulled 'horizontally' in the order specified by attributesOrdered.
+ * 2. All specified attributes must be pulled *completely* before pullRedistribute()/redistributeXXX()
+ * can be called again. All attributes must either be pulled completely or not at all.
+ * 3. After all selected attributes are completely consumed,
+ * the SynchableArray::sync() method must be called on the returned array.
+ * @param inputArray to redistribute, must support at least MULTI_PASS access or have only a single attribute
+ *
+ * @param attributesOrdered
+ * @param query context
+ * @param ps new partitioning schema
+ * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
+ *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
+ * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
+ * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
+ * @param psData a pointer to the data that is specific to the particular partitioning schema
+ * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
+ *        while pulling on the output array (either locally or remotely).
+ * @return a new SynchableArray if inputArray needs redistribution; otherwise inputArray is returned and enforceDataIntegrity has no effect
+ */
+std::shared_ptr<Array> pullRedistributeInAttributeOrder(std::shared_ptr<Array>& inputArray,
+                                                          std::set<AttributeID>& attributeOrdering,
+                                                          const std::shared_ptr<Query>& query,
+                                                          PartitioningSchema ps,
+                                                          InstanceID destInstanceId,
+                                                          const std::shared_ptr<CoordinateTranslator>& distMapper,
+                                                          size_t instanceIdShift,
+                                                          const std::shared_ptr<PartitioningSchemaData>& psData,
+                                                          bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
+
+/**
+ * Redistribute (i.e S/G) a given array into an array with the RANDOM access support
  * @param inputArray to redistribute
  * @param query context
  * @param ps new partitioning schema
@@ -2568,17 +2695,18 @@ pullRedistribute(boost::shared_ptr<Array>& inputArray,
  * @return a new Array with RANDOM access if inputArray needs redistribution;
  *         otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
-boost::shared_ptr<Array>
-redistributeToRandomAccess(boost::shared_ptr<Array>& inputArray,
-                           const boost::shared_ptr<Query>& query,
+std::shared_ptr<Array>
+redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                           const std::shared_ptr<Query>& query,
                            PartitioningSchema ps,
                            InstanceID destInstanceId,
-                           const boost::shared_ptr<DistributionMapper > & distMapper,
+                           const std::shared_ptr<CoordinateTranslator > & distMapper,
                            size_t shift,
-                           const boost::shared_ptr<PartitioningSchemaData>& psData,
-                           bool enforceDataIntegrity=false);  //XXX TODO: remove default
+                           const std::shared_ptr<PartitioningSchemaData>& psData,
+                           bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);  //XXX TODO: remove default
+
 /**
- * Reistribute (i.e S/G) a given AGGREGATE array into another AGGREGATE array with the RANDOM access support.
+ * Redistribute (i.e S/G) a given AGGREGATE array into another AGGREGATE array with the RANDOM access support.
  * An aggregate array is an array of intermediate aggregate states.
  * @see Aggregate.h
  * @param inputArray an aggregate array to redistribute
@@ -2596,23 +2724,17 @@ redistributeToRandomAccess(boost::shared_ptr<Array>& inputArray,
  * @return a new Array with RANDOM access if inputArray needs redistribution;
  *         otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
-shared_ptr<Array> redistributeToRandomAccess(shared_ptr<Array>& inputArray,
-                                             const shared_ptr<Query>& query,
+std::shared_ptr<Array> redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                                             const std::shared_ptr<Query>& query,
                                              const std::vector<AggregatePtr>& aggregates,
                                              PartitioningSchema ps,
                                              InstanceID destInstanceId,
-                                             const shared_ptr<DistributionMapper>& distMapper,
+                                             const std::shared_ptr<CoordinateTranslator>& distMapper,
                                              size_t shift,
-                                             const shared_ptr<PartitioningSchemaData>& psData,
-                                             bool enforceDataIntegrity=false);
-
+                                             const std::shared_ptr<PartitioningSchemaData>& psData,
+                                             bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
 /**
- * A vector of partial chunk merger pointers
- */
-typedef std::vector<boost::shared_ptr<MultiStreamArray::PartialChunkMerger> > PartialChunkMergerList;
-
-/**
- * Reistribute (i.e S/G) a given array into an array with the RANDOM access support.
+ * Redistribute (i.e S/G) a given array into an array with the RANDOM access support.
  * The caller can specify a custom partial chunk merger for each attribute.
  * @param inputArray to redistribute
  * @param query context
@@ -2629,17 +2751,17 @@ typedef std::vector<boost::shared_ptr<MultiStreamArray::PartialChunkMerger> > Pa
  * @return a new Array with RANDOM access if inputArray needs redistribution;
  *         otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
-boost::shared_ptr<Array> redistributeToRandomAccess(boost::shared_ptr<Array>& inputArray,
-                                                    const boost::shared_ptr<Query>& query,
+std::shared_ptr<Array> redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                                                    const std::shared_ptr<Query>& query,
                                                     PartialChunkMergerList& mergers,
                                                     PartitioningSchema ps,
                                                     InstanceID destInstanceId,
-                                                    const boost::shared_ptr<DistributionMapper>& distMapper,
+                                                    const std::shared_ptr<CoordinateTranslator>& distMapper,
                                                     size_t shift,
-                                                    const boost::shared_ptr<PartitioningSchemaData>& psData,
+                                                    const std::shared_ptr<PartitioningSchemaData>& psData,
                                                     bool enforceDataIntegrity);
 /**
- * Reistribute (i.e S/G) from a given input array into a given output array
+ * Redistribute (i.e S/G) from a given input array into a given output array
  * @param inputArray to redistribute from
  * @param outputArray to redistribute into
  * @param newChunkCoordinates [in/out] if not NUll on entry, a set of all chunk positions added to outputArray
@@ -2654,19 +2776,19 @@ boost::shared_ptr<Array> redistributeToRandomAccess(boost::shared_ptr<Array>& in
  *        while pulling on the output array (either locally or remotely). If inputArray does not require redistribution,
  *        enforceDataIntegrity has no effect and the method is equivalent to Array::append()
  */
-void redistributeToArray(boost::shared_ptr<Array>& inputArray,
-                         boost::shared_ptr<Array>& outputArray,
+void redistributeToArray(std::shared_ptr<Array>& inputArray,
+                         std::shared_ptr<Array>& outputArray,
                          std::set<Coordinates, CoordinatesLess>* newChunkCoordinates,
-                         const boost::shared_ptr<Query>& query,
+                         const std::shared_ptr<Query>& query,
                          PartitioningSchema ps,
                          InstanceID destInstanceId,
-                         const boost::shared_ptr<DistributionMapper > & distMapper,
+                         const std::shared_ptr<CoordinateTranslator > & distMapper,
                          size_t shift,
-                         const boost::shared_ptr<PartitioningSchemaData>& psData,
-                         bool enforceDataIntegrity=false);  //XXX TODO: remove default
+                         const std::shared_ptr<PartitioningSchemaData>& psData,
+                         bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);  //XXX TODO: remove default
 
 /**
- * Reistribute (i.e S/G) from a given input array into a given output array
+ * Redistribute (i.e S/G) from a given input array into a given output array
  * @param inputArray to redistribute from
  * @param outputArray to redistribute into
  * @param mergers [in/out] a list of mergers for each attribute, a merger can be NULL if the default merger is desired.
@@ -2683,31 +2805,31 @@ void redistributeToArray(boost::shared_ptr<Array>& inputArray,
  *        while pulling on the output array (either locally or remotely). If inputArray does not require redistribution,
  *        enforceDataIntegrity has no effect and the method is equivalent to Array::append()
  */
-void redistributeToArray(boost::shared_ptr<Array>& inputArray,
-                         boost::shared_ptr<Array>& outputArray,
+void redistributeToArray(std::shared_ptr<Array>& inputArray,
+                         std::shared_ptr<Array>& outputArray,
                          PartialChunkMergerList& mergers,
                          std::set<Coordinates, CoordinatesLess>* newChunkCoordinates,
-                         const boost::shared_ptr<Query>& query,
+                         const std::shared_ptr<Query>& query,
                          PartitioningSchema ps,
                          InstanceID destInstanceId,
-                         const boost::shared_ptr<DistributionMapper > & distMapper,
+                         const std::shared_ptr<CoordinateTranslator > & distMapper,
                          size_t shift,
-                         const boost::shared_ptr<PartitioningSchemaData>& psData,
-                         bool enforceDataIntegrity=false);  //XXX TODO: remove default
+                         const std::shared_ptr<PartitioningSchemaData>& psData,
+                         bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);  //XXX TODO: remove default
 
-void syncBarrier(uint64_t barrierId, const boost::shared_ptr<scidb::Query>& query);
+void syncBarrier(uint64_t barrierId, const std::shared_ptr<scidb::Query>& query);
 
 /**
  * For internal use only. Flushes any outgoing SG related messages.
  */
-void syncSG(const boost::shared_ptr<Query>& query);
+void syncSG(const std::shared_ptr<Query>& query);
 
 #endif // SCIDB_CLIENT
 
-AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
+AggregatePtr resolveAggregate(std::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
                               Attributes const& inputAttributes,
                               AttributeID* inputAttributeID = NULL,
-                              string* outputName = NULL);
+                              std::string* outputName = NULL);
 
 /**
  * This function is called by a LogicalOperator's inferSchema, if the operator takes aggregated attributes.
@@ -2716,15 +2838,10 @@ AggregatePtr resolveAggregate(boost::shared_ptr <OperatorParamAggregateCall>cons
  * @param outputDesc      the schema of the output array.
  * @param operatorDoesAggregateInOrder  whether the operator guarantees to make aggregate calls in some deterministic order of the values.
  */
-void addAggregatedAttribute (boost::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
+void addAggregatedAttribute (std::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
                              ArrayDesc const& inputDesc,
                              ArrayDesc& outputDesc,
                              bool operatorDoesAggregationInOrder);
-
-PhysicalBoundaries findArrayBoundaries(shared_ptr<Array> srcArray,
-                                       boost::shared_ptr<Query> query,
-                                       bool global = true);
 } // namespace
-
 
 #endif /* OPERATOR_H_ */

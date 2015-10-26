@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@
 #define NOTIFICATION_H_
 
 #include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <util/Mutex.h>
 
 namespace scidb
@@ -44,13 +44,13 @@ namespace scidb
     * The usual usage is as follows:
     *
     * Publisher:
-    * shared_ptr<SomMessageClassInstance> msg = ...
+    * std::shared_ptr<SomMessageClassInstance> msg = ...
     * <... msg initialization goes here ...>
     * Notification<SomMessageClassInstance> event(msg);
     * event.publish();
     *
     * Subscriber:
-    * void receiver(shared_ptr<SomMessageClassInstance> msg)
+    * void receiver(std::shared_ptr<SomMessageClassInstance> msg)
     * {
     * ...
     * }
@@ -87,7 +87,7 @@ class Notification
 {
  public:
    /// Message pointer type
-   typedef boost::shared_ptr<const MessageType> MessageTypePtr;
+   typedef std::shared_ptr<const MessageType> MessageTypePtr;
 
    /// A listener functor for published messages
    typedef boost::function<void(MessageTypePtr)> PublishListener;
@@ -96,7 +96,7 @@ class Notification
    typedef boost::function<void()> SubscribeListener;
 
    /// Opaque registered listener ID
-   typedef boost::shared_ptr<bool> ListenerID;
+   typedef std::shared_ptr<bool> ListenerID;
 
    /**
     * Notification constructor

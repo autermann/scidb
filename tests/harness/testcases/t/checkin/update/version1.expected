@@ -304,6 +304,18 @@ Query was executed successfully
 {5,4} 65
 {5,5} 66
 
+[An error expected at this place for the query "scan(updarr@xx)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_REF_NOT_FOUND. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_REF_NOT_FOUND.]
+
+[An error expected at this place for the query "scan(updarr@'xx')". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED.]
+
+[An error expected at this place for the query "scan(updarr@1.1)". And it failed with error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_SYNTAX::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "scan(updarr@0)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "scan(updarr@-1)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
+[An error expected at this place for the query "scan(updarr@-2)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
+
 {VersionNo} version_id
 {1} 1
 {2} 2
@@ -337,6 +349,8 @@ Query was executed successfully
 {5,0} 610
 {5,1} 620
 {5,2} 630
+
+[An error expected at this place for the query "filter(updarr@now()-1000, a > 100)". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST.]
 
 {x,y} a
 {0,0} 110

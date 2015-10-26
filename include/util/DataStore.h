@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,6 +36,7 @@
 #include <set>
 #include <util/FileIO.h>
 #include <util/Mutex.h>
+#include <boost/function.hpp>
 #include <boost/scoped_array.hpp>
 
 namespace scidb
@@ -112,14 +113,12 @@ public:
     /**
      * Return the size of the data store
      * @param filesize Out param size of the store in bytes
-     * @param blocks Out param # of 512b blocks used by store
-     * @param reservedbytes Out param # of bytes reserved for use in store
-     * @param freebytes Out param # of bytes free in store
+     * @param fileblocks Out param # of 512b blocks used by store
+     * @param filefree Out param bytes in file marked as free
      */
     void getSizes(off_t& filesize,
                   blkcnt_t& fileblocks,
-                  off_t& reservedbytes,
-                  off_t& freebytes) const;
+                  off_t& filefree) const;
 
     /**
      * Return the guid
@@ -235,9 +234,9 @@ private:
     public:
         static const size_t usedValue;    // special value to mark headers in use
         static const size_t freeValue;    // special value to mark free header
-        size_t magic;                
+        size_t magic;
         size_t size;
-        DiskChunkHeader(bool free, size_t sz) : 
+        DiskChunkHeader(bool free, size_t sz) :
             magic(free ? freeValue : usedValue),
             size(sz)
             {}
@@ -274,7 +273,7 @@ private:
         /* Serialize the flb to a file
          */
         void write(File::FilePtr& f, off_t offset);
-        
+
         /* Unserialize the flb into the freelist
          */
         void unload(DataStoreFreelists& fl);
@@ -305,8 +304,8 @@ class DataStoreFlusher
 {
 private:
     DataStores&_dsm;
-    boost::shared_ptr<JobQueue> _queue;
-    boost::shared_ptr<ThreadPool> _threadPool;
+    std::shared_ptr<JobQueue> _queue;
+    std::shared_ptr<ThreadPool> _threadPool;
     bool _running;
     std::set <DataStore::Guid> _datastores;
     Mutex _lock;
@@ -316,25 +315,25 @@ private:
     private:
         int64_t _timeIntervalNanos;
         DataStoreFlusher *_flusher;
-        
+
     public:
         FlushJob(int timeIntervalMSecs,
                  DataStoreFlusher* flusher):
-            Job(boost::shared_ptr<Query>()),
+            Job(std::shared_ptr<Query>()),
             _timeIntervalNanos( (int64_t) timeIntervalMSecs * 1000000 ),
             _flusher(flusher)
             {}
-        
+
         virtual void run();
     };
 
-    boost::shared_ptr<FlushJob> _myJob;
-    
+    std::shared_ptr<FlushJob> _myJob;
+
 public:
     DataStoreFlusher(DataStores& dsm):
         _dsm(dsm),
-        _queue(boost::shared_ptr<JobQueue>(new JobQueue())),
-        _threadPool(boost::shared_ptr<ThreadPool>(new ThreadPool(1, _queue))),
+        _queue(std::shared_ptr<JobQueue>(new JobQueue())),
+        _threadPool(std::shared_ptr<ThreadPool>(new ThreadPool(1, _queue))),
         _running(false),
         _datastores(),
         _lock(),
@@ -344,7 +343,7 @@ public:
     void start(int timeIntervalMSecs);
     void add(DataStore::Guid dsguid);
     void stop();
-    
+
     ~DataStoreFlusher();
 };
 
@@ -361,6 +360,9 @@ public:
 class DataStores
 {
 public:
+    typedef boost::function<void(const DataStore&)> Visitor;
+
+public:
 
     /**
      * Initialize the global DataStore state
@@ -372,7 +374,7 @@ public:
      * Get a reference to a specific DataStore
      * @param guid unique identifier for desired datastore
      */
-    boost::shared_ptr<DataStore> getDataStore(DataStore::Guid guid);
+    std::shared_ptr<DataStore> getDataStore(DataStore::Guid guid);
 
     /**
      * Remove a data store from memory and (if remove is true) from disk
@@ -392,9 +394,9 @@ public:
     void clearAllDataStores();
 
     /**
-     * List information about all datastores using the builder
+     * Take the given visitor to each of our data stores
      */
-    void listDataStores(ListDataStoresArrayBuilder& builder);
+    void visitDataStores(const Visitor&) const;
 
     /**
      * Accessor, return the min allocation size
@@ -430,13 +432,13 @@ public:
     ~DataStores();
 
 private:
-    
-    typedef std::map< DataStore::Guid, boost::shared_ptr<DataStore> > DataStoreMap;
+
+    typedef std::map< DataStore::Guid, std::shared_ptr<DataStore> > DataStoreMap;
 
     /* Global map of all DataStores
      */
-    DataStoreMap* _theDataStores;
-    Mutex         _dataStoreLock;
+    DataStoreMap*   _theDataStores;
+    Mutex   mutable _dataStoreLock;
 
     std::string _basePath;        // base path of data directory
     size_t      _minAllocSize;    // smallest allowed allocation

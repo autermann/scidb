@@ -14,7 +14,7 @@ SCIDB QUERY : <load(gradebook, '/tmp/xsvopts.tsv', -2, 'csv:t')>
 {4} 'Zoidberg','John',?42,101,2.75,'Missing dept, code 42.'
 {5} 'Brannigan','Zapp','CS',101,1.1,'Near dolt.'
 {6} 'Rodriguez','Bender',null,101,3,'Null dept and integer GPA.'
-{7} 'Fry','Philip','\'null\'',101,2.7,'Quoted \'null\' dept.'
+{7} 'Fry','Philip',null,101,2.7,'Quoted \'null\' dept.'
 {8} 'Crumb','Robert \'Mr. Natural\'','CS',101,2.5,'Single quotes in FName.'
 {9} 'Farnsworth','Hubert',null,412,4,'Empty department string.'
 {10} 'Kroker','Kif','CS',101,null,'Empty GPA here.'
@@ -44,10 +44,23 @@ SCIDB QUERY : <load(gradebook, '/tmp/xsvopts.psv', -2, 'csv:p')>
 {4} 'Zoidberg','John',?42,101,2.75,'Missing dept, code 42.'
 {5} 'Brannigan','Zapp','CS',101,1.1,'Near dolt.'
 {6} 'Rodriguez','Bender',null,101,3,'Null dept and integer GPA.'
-{7} 'Fry','Philip','\'null\'',101,2.7,'Quoted \'null\' dept.'
+{7} 'Fry','Philip',null,101,2.7,'Quoted \'null\' dept.'
 {8} 'Crumb','Robert \'Mr. Natural\'','CS',101,2.5,'Single quotes in FName.'
 {9} 'Farnsworth','Hubert',null,412,4,'Empty department string.'
 {10} 'Kroker','Kif','CS',101,null,'Empty GPA here.'
+
+Test :l "turn on namelines" option.
+SCIDB QUERY : <save(gradebook, '/tmp/xsvopts.out', -2, 'tsv:l')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <grep Dept /tmp/xsvopts.out>
+LName	FName	Dept	Course	GPA	Remarks
+
+SCIDB QUERY : <save(gradebook, '/tmp/xsvopts.out', -2, 'csv+:l')>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <grep Remarks /tmp/xsvopts.out>
+i,LName,FName,Dept,Course,GPA,Remarks
 
 In-field comma causes "Too many fields" warning.
 SCIDB QUERY : <load(oddchars, '/tmp/xsvopts.csv', -2, 'tsv:c')>
@@ -61,6 +74,8 @@ Too many fields in input at position 51, line 1, column 6 (truncating input reco
 {3} 8,'Meg','Griffin',2,'(Remulax ®)','[It\'s terrible what they do to Meg...]'
 {4} 16,'Stewie','Griffin',7,'Evil Genius ®','[unbound]'
 {5} 32,'Chris','Griffin',2,'Quahog','[usually not inhumane]'
+{6} 64,'Glenn','Quagmire',69,'"I live next door to ""Mr. Etiquette""."','!@#$%^&*()-'
+{7} 128,'Cleveland','Brown',6,'"I used to live across from ""Mr. Etiquette."""','evil triple quote'
 
 SCIDB QUERY : <remove(gradebook)>
 Query was executed successfully

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,11 +27,10 @@
  *      Author: Knizhnik
  */
 
-#include "query/Operator.h"
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "query/ops/merge/MergeArray.h"
-
+#include <query/Operator.h>
+#include <array/Metadata.h>
+#include <array/Array.h>
+#include <query/ops/merge/MergeArray.h>
 
 namespace scidb
 {
@@ -56,7 +55,7 @@ namespace scidb
      * Compare a positioned ChunkIterator with a coordinate pair.
      * @return true if i1 is positioned at coordinates less than pos2, false otherwise
      */
-    inline bool precede(boost::shared_ptr<ConstChunkIterator>& i1, Coordinates const& pos2)  
+    inline bool precede(std::shared_ptr<ConstChunkIterator>& i1, Coordinates const& pos2)
     {
         return cl(i1->getPosition(), pos2);
     }
@@ -65,20 +64,20 @@ namespace scidb
      * Compare the positions of two ChunkIterators.
      * @return true if i1 is positioned at coordinates less than i2, false otherwise.
      */
-    inline bool precede(boost::shared_ptr<ConstChunkIterator>& i1, boost::shared_ptr<ConstChunkIterator>& i2)  
+    inline bool precede(std::shared_ptr<ConstChunkIterator>& i1, std::shared_ptr<ConstChunkIterator>& i2)
     {
         return precede(i1, i2->getPosition());
     }
-        
+
     /**
      * Compare the positions of two ArrayIterators
      * @return true if i1 is positioned at coordinates less than i2, false otherwise.
      */
-    inline bool precede(boost::shared_ptr<ConstArrayIterator>& i1, boost::shared_ptr<ConstArrayIterator>& i2)  
+    inline bool precede(std::shared_ptr<ConstArrayIterator>& i1, std::shared_ptr<ConstArrayIterator>& i2)
     {
         return cl(i1->getPosition(), i2->getPosition());
     }
-        
+
     //
     // Merge chunk iterator methods
     //
@@ -100,7 +99,7 @@ namespace scidb
         //reset all of our iterators, and set currIterator to the lowest position
 
         currIterator = -1;
-        for (size_t i = 0, n = iterators.size(); i < n; i++) { 
+        for (size_t i = 0, n = iterators.size(); i < n; i++) {
             iterators[i]->reset();
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
@@ -129,8 +128,8 @@ namespace scidb
         return false;
     }
 
-    Value& MergeChunkIterator::getItem()
-    { 
+    Value const& MergeChunkIterator::getItem()
+    {
         if (currIterator < 0)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         return iterators[currIterator]->getItem();
@@ -167,7 +166,7 @@ namespace scidb
         return iterators[currIterator]->getPosition();
     }
 
-    MergeChunkIterator::MergeChunkIterator(vector< ConstChunk const* > const& inputChunks, DelegateChunk const* chunk, int iterationMode) 
+    MergeChunkIterator::MergeChunkIterator(vector< ConstChunk const* > const& inputChunks, DelegateChunk const* chunk, int iterationMode)
     : DelegateChunkIterator(chunk, iterationMode),
       iterators(inputChunks.size())
     {
@@ -179,9 +178,9 @@ namespace scidb
                 currIterator = i;
             }
         }
-    }        
+    }
 
-    // 
+    //
     // Merge array iterator methods
     //
 
@@ -189,11 +188,11 @@ namespace scidb
     {
         currIterator = -1;
         currentChunk = NULL;
-        for (size_t i = 0, n = iterators.size(); i < n; i++) 
-        { 
-            if (iterators[i]->setPosition(pos)) 
+        for (size_t i = 0, n = iterators.size(); i < n; i++)
+        {
+            if (iterators[i]->setPosition(pos))
             {
-                if (currIterator < 0) { 
+                if (currIterator < 0) {
                     currIterator = i;
                 }
             }
@@ -209,7 +208,7 @@ namespace scidb
     {
         currIterator = -1;
         currentChunk = NULL;
-        for (size_t i = 0, n = iterators.size(); i < n; i++) { 
+        for (size_t i = 0, n = iterators.size(); i < n; i++) {
             iterators[i]->reset();
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
@@ -255,28 +254,28 @@ namespace scidb
 
     ConstChunk const& MergeArrayIterator::getChunk()
     {
-        if (currentChunk == NULL) { 
+        if (currentChunk == NULL) {
             if (currIterator < 0)
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
             Coordinates const& currPos = iterators[currIterator]->getPosition();
             ConstChunk const& currChunk = iterators[currIterator]->getChunk();
-            if (!isEmptyable) { 
+            if (!isEmptyable) {
                 currentChunk = &currChunk;
                 return currChunk;
             }
             chunk.inputChunks.clear();
             chunk.inputChunks.push_back(&currChunk);
-            for (size_t i = currIterator+1, n = iterators.size(); i < n; i++) { 
-                if (!iterators[i]->end() && iterators[i]->getPosition() == currPos) { 
+            for (size_t i = currIterator+1, n = iterators.size(); i < n; i++) {
+                if (!iterators[i]->end() && iterators[i]->getPosition() == currPos) {
                     ConstChunk const& mergeChunk = iterators[i]->getChunk();
-                    if (!mergeChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS)->end()) { 
+                    if (!mergeChunk.getConstIterator(ChunkIterator::IGNORE_EMPTY_CELLS)->end()) {
                         chunk.inputChunks.push_back(&mergeChunk);
-                    } else { 
+                    } else {
                         ++(*iterators[i]);
-                    }                    
+                    }
                 }
             }
-            if (chunk.inputChunks.size() == 1) { 
+            if (chunk.inputChunks.size() == 1) {
                 currentChunk = &currChunk;
                 return currChunk;
             }
@@ -296,7 +295,7 @@ namespace scidb
       currentChunk(NULL)
     {
         isEmptyable = array.getArrayDesc().getEmptyBitmapAttribute() != NULL;
-        for (size_t i = 0, n = iterators.size(); i < n; i++) { 
+        for (size_t i = 0, n = iterators.size(); i < n; i++) {
             iterators[i] = array.inputArrays[i]->getConstIterator(attrID);
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
@@ -305,7 +304,7 @@ namespace scidb
         }
     }
 
-    
+
     //
     // Merge array methods
     //
@@ -319,13 +318,13 @@ namespace scidb
         return new MergeArrayIterator(*this, attrID);
     }
 
-    MergeArray::MergeArray(ArrayDesc const& desc, vector< boost::shared_ptr<Array> > const& arrays)
+    MergeArray::MergeArray(ArrayDesc const& desc, vector< std::shared_ptr<Array> > const& arrays)
     : DelegateArray(desc, arrays[0]),
       inputArrays(arrays)
     {
-        for (size_t i = 0; i < inputArrays.size(); i++) { 
-            if (inputArrays[i]->getArrayDesc().getAttributes().size() != desc.getAttributes().size()) { 
-                inputArrays[i] = boost::shared_ptr<Array>(new NonEmptyableArray(inputArrays[i]));
+        for (size_t i = 0; i < inputArrays.size(); i++) {
+            if (inputArrays[i]->getArrayDesc().getAttributes().size() != desc.getAttributes().size()) {
+                inputArrays[i] = std::shared_ptr<Array>(new NonEmptyableArray(inputArrays[i]));
             }
         }
     }

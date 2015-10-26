@@ -9,6 +9,9 @@ SCIDB QUERY : <store(join(array1,array2),storage_array)>
 
 SCIDB QUERY : <save(storage_array,'/tmp/storage_array.txt',-2,'dense')>
 {i,j} val,val_2
+
+SCIDB QUERY : <load(storage_array,'/tmp/storage_array.txt',-2)>
+{i,j} val,val_2
 {0,0} 100,200
 {0,1} 101,201
 {0,2} 102,202

@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-# Initialize, start and stop scidb. 
-# Supports single instance and cluster configurations. 
+# Initialize, start and stop scidb.
+# Supports single instance and cluster configurations.
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -46,7 +46,7 @@ def usage():
   print ""
   print "\t Usage: %s <cmd> <srcpath> <linkdst> <db> <conffile> [ [--clear-files=<older than n days>] [--root-dir=<path for root directory>] ]" % progname
   print "\t Setup and cleanup for P4 tests."
-  print "\t Supported commands:" 
+  print "\t Supported commands:"
   print "\t linkdata"
   sys.exit(2)
 
@@ -91,12 +91,12 @@ def parse_global_options(filename):
     config.read(filename)
     section_name = db
 
-    # First process the "global" section. 
+    # First process the "global" section.
     try:
       #print "Parsing %s section." % (section_name)
       for (key, value) in config.items(section_name):
         d[key] = value
-            
+
     except ParsingError:
         print "Error"
         sys.exit(1)
@@ -106,7 +106,7 @@ def parse_global_options(filename):
 def linkData(dstpath, srcpath):
   try:
     os.remove(dstpath)
-  except OSError, detail: 
+  except OSError, detail:
     if detail.errno != errno.ENOENT:
         print "Cannot remove symlink %s OSError: " % dstpath, detail
         sys.exit(detail.errno)

@@ -17,7 +17,7 @@ list('arrays',true)
 list('aggregates')  
 --set-format csv
 --stop-igdata
-filter(list('aggregates'),name != 'mad' and name != 'median' and name != 'top_five' and name !='first_value' and name!='last_value')  
+uniq(project(filter(list('aggregates'),library='scidb'),name))
 
 --stop-query-logging
 

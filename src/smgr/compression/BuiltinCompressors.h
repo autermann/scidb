@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,7 +38,7 @@
 #include "BitInputItr.h"
 #include "ByteOutputItr.h"
 #include "BitOutputItr.h"
-#include <boost/unordered_map.hpp> 
+#include <unordered_map>
 
 
 #include <log4cxx/logger.h>
@@ -46,7 +46,7 @@
 #include <log4cxx/helpers/exception.h>
 
 
-namespace scidb 
+namespace scidb
 {
     /**
      * Compressor using Zlib library
@@ -54,8 +54,8 @@ namespace scidb
     class ZlibCompressor : public Compressor
     {
       public:
-        static int compressionLevel; 
-        virtual const char* getName() 
+        static int compressionLevel;
+        virtual const char* getName()
         {
             return "zlib";
         }
@@ -75,7 +75,7 @@ namespace scidb
       public:
         static int workFactor; // [0..250], default 30
         static int blockSize100k; // [1..9], default 9
-        virtual const char* getName() 
+        virtual const char* getName()
         {
             return "bzlib";
         }
@@ -93,7 +93,7 @@ namespace scidb
     class NoCompression : public Compressor
     {
       public:
-        virtual const char* getName() 
+        virtual const char* getName()
         {
             return "no compression";
         }
@@ -111,7 +111,7 @@ namespace scidb
     class NullFilter : public Compressor
     {
       public:
-        virtual const char* getName() 
+        virtual const char* getName()
         {
             return "null filter";
         }
@@ -123,7 +123,7 @@ namespace scidb
         }
     };
 
-    /** 
+    /**
      * Compressor for grouping data into runs of the same value
      */
 
@@ -131,7 +131,7 @@ namespace scidb
     {
       public:
         RunLengthEncoding() : logger(log4cxx::Logger::getLogger("scidb.smgr.compression.RunLengthEncoding")) {};
-        virtual const char* getName() 
+        virtual const char* getName()
         {
             return "rle";
         }
@@ -148,7 +148,7 @@ namespace scidb
     class BitmapEncoding : public Compressor
     {
       public:
-        virtual const char* getName() 
+        virtual const char* getName()
         {
             return "bitmap encoding";
         }
@@ -159,7 +159,7 @@ namespace scidb
             return CompressorFactory::BITMAP_ENCODING;
         }
 
-        class Bitmap 
+        class Bitmap
         {
             // helper functions
             void clearBitmapCache();
@@ -167,7 +167,7 @@ namespace scidb
             void fillOutput(ByteOutputItr * const target);
             void decodeBitmap(uint8_t const * const baseValue, uint8_t const * const bitmap, uint8_t * const target) ;
             bool getBit(uint8_t byte, uint8_t offset);
-            
+
             // describes and stores the bitmaps
             uint32_t _bitmapElements;
             size_t _elementSize;
@@ -185,9 +185,9 @@ namespace scidb
                 {
                     _bitSetters.push_back(bitSetter  << (7 - i));
                 }
-                
+
             }
-            ~Bitmap() 
+            ~Bitmap()
             {
                 clearBitmapCache();
             }
@@ -201,7 +201,7 @@ namespace scidb
     class NullSuppression : public Compressor
     {
       public:
-        virtual const char* getName() 
+        virtual const char* getName()
         {
             return "null suppression";
         }
@@ -213,7 +213,7 @@ namespace scidb
         	return CompressorFactory::NULL_SUPPRESSION;
         }
       private:
-        uint8_t getBytes(uint8_t const * const data, const uint32_t elementSize);  
+        uint8_t getBytes(uint8_t const * const data, const uint32_t elementSize);
 
         // list of all possible prefix combinations precomputed in the constructor for lookup
         std::map<uint8_t, uint64_t> _decode1Bit; // push up to 8 bits-used (1 bit each) values into an uint64; max usage of 64-bit representation
@@ -223,7 +223,7 @@ namespace scidb
         std::map<uint64_t, uint8_t> _encode1Bit; // put in up to 8 values used, get back its bit code
         std::map<uint64_t, uint8_t> _encode2Bits; // put in up to 4 values used, get back its bit cod
         std::map<uint64_t, uint8_t> _encode4Bits; // put in up to 2 values used, get back its bit code
-	  
+
     };
 
 
@@ -233,14 +233,14 @@ namespace scidb
     class DictionaryEncoding : public Compressor
     {
       public:
-	  
-        virtual const char* getName() 
+
+        virtual const char* getName()
         {
             return "dictionary";
         }
 
         DictionaryEncoding() : logger(log4cxx::Logger::getLogger("scidb.smgr.compression.DictionaryEncoding")) {};
-	  
+
 
 
         virtual size_t compress(void* dst, const ConstChunk& chunk, size_t size);
@@ -255,12 +255,12 @@ namespace scidb
       private:
         class Dictionary {
             // list of values --> code
-            boost::unordered_map<uint64_t, uint8_t> _encodeDictionary;
-            boost::unordered_map<uint8_t, uint64_t> _decodeDictionary;
+            std::unordered_map<uint64_t, uint8_t> _encodeDictionary;
+            std::unordered_map<uint8_t, uint64_t> _decodeDictionary;
             log4cxx::LoggerPtr logger;
 
             uint8_t createDictionary(uint8_t const * const src, const size_t elementSize, const size_t nElems, ByteOutputItr &out);
-            
+
             // returns unique values count - sets up dictionaries for decompression
             uint8_t rebuildDictionary(ByteInputItr & in, const size_t elementSize);
 
@@ -269,7 +269,7 @@ namespace scidb
 
             size_t compress(void* dst, const ConstChunk& chunk, size_t size);
             size_t decompress(void const* src, size_t size, Chunk& chunk);
-        };        
+        };
 
     };
 

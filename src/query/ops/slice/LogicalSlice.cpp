@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -76,10 +76,10 @@ public:
 		ADD_PARAM_VARIES()
 	}
 
-	std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
+	std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
 	{
 		assert(schemas.size() == 1);
-		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+		std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         size_t i = _parameters.size();
 		if ((i & 1) == 0)
 		{
@@ -93,7 +93,7 @@ public:
 		return res;
 	}
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
 	{
 		assert(schemas.size() == 1);
         ArrayDesc const& schema = schemas[0];
@@ -105,15 +105,15 @@ public:
         if (newDims.size() <= 0)
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_SLICE_ERROR1);
         std::vector<std::string> sliceDimName(nParams/2);
-        for (size_t i = 0; i < nParams; i+=2) { 
-            sliceDimName[i >> 1]  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
+        for (size_t i = 0; i < nParams; i+=2) {
+            sliceDimName[i >> 1]  = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
         }
         size_t j = 0;
-        for (size_t i = 0; i < nDims; i++) { 
+        for (size_t i = 0; i < nDims; i++) {
             const std::string dimName = dims[i].getBaseName();
             int k = sliceDimName.size();
             while (--k >= 0
-                   && sliceDimName[k] != dimName 
+                   && sliceDimName[k] != dimName
                    && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1));
             if (k < 0)
             {
@@ -122,8 +122,8 @@ public:
                                                _parameters[i]->getParsingContext()) << dimName;
                 newDims[j++] = dims[i];
             }
-        }        
-        return ArrayDesc(schema.getName(), schema.getAttributes(), newDims);
+        }
+        return ArrayDesc(schema.getName(), schema.getAttributes(), newDims, defaultPartitioning());
 	}
 };
 

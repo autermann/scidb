@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -91,8 +91,8 @@ void PointerRangeTests::conversions()
     char          const ca[] = {'c','a'};
     string              ms   = "ms";
     string        const cs   = "cs";
-    vector<char>        mv   = list_of('m')('v');
-    vector<char>  const cv   = list_of('c')('v');
+    std::vector<char>        mv   = list_of('m')('v');
+    std::vector<char>  const cv   = list_of('c')('v');
      chars              mr   =  chars(2,(char*)"mr");
     cchars              cr   = cchars(2,"cr");
 

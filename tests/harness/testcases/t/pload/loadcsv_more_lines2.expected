@@ -1,3 +1,8 @@
+Query was executed successfully
+
+SCIDB QUERY : <load(array_sm9, '/tmp/sm9.csv', -2, 'csv')>
+[Query was executed successfully, ignoring data output by this query.]
+
 SCIDB QUERY : <sort(array_sm9,a)>
 {n} a,b,c
 {0} 1,2,3
@@ -21,4 +26,6 @@ SCIDB QUERY : <sort(array_sm9,a)>
 {18} 55,56,57
 {19} 58,59,60
 {20} 61,62,63
+
+Query was executed successfully
 

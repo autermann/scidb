@@ -1,10 +1,9 @@
-
 /*
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,13 +25,15 @@
  *
  * @author Roman Simakov <roman.simakov@gmail.com>
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
+ * @author Marty Corbett <mcorbett@paradigm4.com>
  *
  * @brief SciDB's querying utility
  */
-
+#include <limits>
 #include <string>
 #include <iostream>
 #include <stdio.h>
+#include <string.h>
 #include <fstream>
 #include <algorithm>
 #include <signal.h>
@@ -47,28 +48,39 @@
 #include <readline/history.h>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/regex.hpp> 
+#include <boost/regex.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
 #include <pwd.h>
 
-#include "SciDBAPI.h"
-#include "array/MemArray.h"
-#include "system/Exceptions.h"
-#include "system/ErrorCodes.h"
-#include "system/Config.h"
-#include "smgr/io/ArrayWriter.h"
-#include "util/PluginManager.h"
+#include <SciDBAPI.h>
+#include <array/MemArray.h>
+#include <system/Exceptions.h>
+#include <system/ErrorCodes.h>
+#include <smgr/io/ArrayWriter.h>
+#include <util/ConfigUser.h>
+#include <util/PluginManager.h>
+#include <network/BaseConnection.h>
 
-#include "iquery_parser.h"
 #include "commands.h"
+#include "iquery_parser.h"
 #include "IqueryConfig.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <network/proto/scidb_msg.pb.h>
+
 
 using namespace std;
 using namespace boost;
 using namespace yy;
 using namespace iquery;
+
+static log4cxx::LoggerPtr logger = log4cxx::Logger::getRootLogger();
+
 
 namespace bfs = boost::filesystem;
 
@@ -80,18 +92,20 @@ std::string szExecName;
 bool getConfigPath(const string& fileName, string &path, bool &exists);
 void configHook(int32_t configOption);
 
-struct _iqueryState
+
+class IQueryState
 {
-	size_t col;
-	size_t line;
-	size_t queryStart;
-	
-	bool insideComment;
-	bool insideString;
-	bool aql;
-	bool interactive;
-	
-	void* connection;
+public:
+    size_t col;
+    size_t line;
+    size_t queryStart;
+
+    bool insideComment;
+    bool insideString;
+    bool aql;
+    bool interactive;
+
+    void* connection;
     uint64_t currentQueryID;
 
     bool firstSaving; //For clearing result file for the first time and appending next times
@@ -103,7 +117,37 @@ struct _iqueryState
     bool ignoreErrors;
 
     std::string format;
-} iqueryState;
+    std::string userName;
+    std::string userPassword;
+
+    friend std::ostream &operator<<(
+        std::ostream &out,
+        const IQueryState &state)
+    {
+        out << "iqueryState" << std::endl;
+        out << "  col=" << state.col << std::endl;
+        out << "  line=" << state.line << std::endl;
+        out << "  queryStart=" << state.queryStart << std::endl;
+        out << "  insideComment=" << (state.insideComment?"true":"false") << std::endl;
+        out << "  insideString=" << (state.insideString?"true":"false") << std::endl;
+        out << "  aql=" << (state.aql?"true":"false") << std::endl;
+        out << "  interactive=" << (state.interactive?"true":"false") << std::endl;
+        out << "  connection=" << state.connection << std::endl;
+        out << "  currentQueryID=" << state.currentQueryID << std::endl;
+        out << "  firstSaving=" << (state.firstSaving?"true":"false") << std::endl;
+        out << "  nofetch=" << (state.nofetch?"true":"false") << std::endl;
+        out << "  timer=" << (state.timer?"true":"false") << std::endl;
+        out << "  verbose=" << (state.verbose?"true":"false") << std::endl;
+        out << "  ignoreErrors=" << (state.ignoreErrors?"true":"false") << std::endl;
+        out << "  format=" << state.format << std::endl;
+        out << "  userName=" << state.userName<< std::endl;
+        out << "  userPassword=********" << std::endl;
+
+        return out;
+    }
+};
+IQueryState iqueryState;
+
 
 void saveHistory()
 {
@@ -178,7 +222,7 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
         if ("/dev/null" == cfg->getOption<string>(CONFIG_RESULT_FILE))
         {
             scidb::AttributeID nAttrs = (scidb::AttributeID)queryResult.array->getArrayDesc().getAttributes().size();
-            std::vector< boost::shared_ptr<scidb::ConstArrayIterator> >iterators(nAttrs);
+            std::vector< std::shared_ptr<scidb::ConstArrayIterator> >iterators(nAttrs);
             for (scidb::AttributeID i = 0; i < nAttrs; i++)
             {
                 iterators[i] = queryResult.array->getConstIterator(i);
@@ -219,7 +263,7 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
         {
             scidb::ArrayWriter::setPrecision(cfg->getOption<int>(CONFIG_PRECISION));
 
-            boost::shared_ptr<scidb::Query> emptyQuery; //query is not validated on the client side
+            std::shared_ptr<scidb::Query> emptyQuery; //query is not validated on the client side
             scidb::ArrayWriter::save(*queryResult.array,
                                      cfg->getOption<string>(CONFIG_RESULT_FILE),
                                      emptyQuery,
@@ -300,18 +344,19 @@ void executeCommandOrQuery(const string &query)
     try
     {
         IqueryParser p;
-        // Trying to parse command with iquery's parser
+
         if (p.parse(query))
         {
-            // We got error. Possible it was iquery command with wrong syntax?
+            // Parsing failed.
+
             if (!p.isIqueryCommand())
             {
-                // Nope. Trying to execute query on server.
+                // If this is not an iquery command, try to execute on the server.
                 executeSciDBQuery(query);
             }
             else
             {
-                // Yep. Show message.
+                // If this is an iquery command, it got an error in it. Show the error and return.
                 if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
                     cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE)
                          << "' near line " << iqueryState.queryStart << endl;
@@ -422,7 +467,7 @@ void executeCommandOrQuery(const string &query)
         }
 
         iqueryState.currentQueryID = 0;
-            
+
         if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
         {
             cerr << "Error in file '" << scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE)
@@ -438,7 +483,7 @@ void executeCommandOrQuery(const string &query)
     }
     catch (const std::exception& e)
     {
-        // Eat all other exceptions exception in interactive mode, 
+        // Eat all other exceptions exception in interactive mode,
         // but exit with error in non-interactive
         cerr << szExecName << ": Exception caught " << e.what() << endl;
         if (!iqueryState.interactive) {
@@ -456,6 +501,20 @@ void termination_handler(int signum)
     _exit(1);
 }
 
+/**
+ * Get the string variable from the environment.
+ */
+inline std::string getEnvironmentVariable(const char *var)
+{
+    const char * val = ::getenv( var );
+    if( val == NULL )
+    {
+        return "";
+    }
+
+    return val;
+}
+
 int main(int argc, char* argv[])
 {
     struct sigaction action;
@@ -465,20 +524,20 @@ int main(int argc, char* argv[])
     sigaction (SIGINT, &action, NULL);
     sigaction (SIGTERM, &action, NULL);
 
-	szExecName = std::string ( argv[0]);
-	
-    int ret = 0;
-    
-	string queries = ""; //all set of queries (can be divided with semicolon)
-    
-	iqueryState.insideComment = false;
-	iqueryState.insideString = false;
-	iqueryState.aql = true;
+    szExecName = std::string ( argv[0]);
 
-	iqueryState.col = 1;
-	iqueryState.line = 1;
-	iqueryState.connection = NULL;
-	iqueryState.interactive = false;
+    int ret = 0;
+
+    string queries = ""; //all set of queries (can be divided with semicolon)
+
+    iqueryState.insideComment = false;
+    iqueryState.insideString = false;
+    iqueryState.aql = true;
+
+    iqueryState.col = 1;
+    iqueryState.line = 1;
+    iqueryState.connection = NULL;
+    iqueryState.interactive = false;
     iqueryState.currentQueryID = 0;
 
     iqueryState.firstSaving = true;
@@ -510,7 +569,7 @@ int main(int argc, char* argv[])
             (CONFIG_AFL, 'a', "afl", "afl", "", scidb::Config::BOOLEAN,
                 "Switch to AFL query language mode. AQL by default", false, false)
             (CONFIG_TIMER, 't', "timer", "timer", "", scidb::Config::BOOLEAN,
-                "Query setup time (in seconds)", false, false)
+                "Print query execution time (in milliseconds)", false, false)
             (CONFIG_VERBOSE, 'v', "verbose", "verbose", "", scidb::Config::BOOLEAN,
                 "Print debug info. Disabled by default", false, false)
             (CONFIG_RESULT_FILE, 'r', "result", "", "", scidb::Config::STRING,
@@ -532,39 +591,86 @@ int main(int argc, char* argv[])
                 "Show version info", false, false)
             (CONFIG_IGNORE_ERRORS, 0, "ignore-errors", "", "", scidb::Config::BOOLEAN,
                 "Ignore execution errors in batch mode", false, false)
+            (CONFIG_USER_NAME, 'U', "user-name", "", "user-name", scidb::Config::STRING,
+                "User name", string(""), false)
+            (CONFIG_USER_PASSWORD, 'P', "user-password", "", "user-password", scidb::Config::STRING,
+                "User password file name", string(""), false)
             ;
 
-        cfg->addHook(configHook);
 
-        cfg->parse(argc, argv, cfgPath.c_str());
+      cfg->addHook(configHook);
+      cfg->parse(argc, argv, cfgPath.c_str());
 
         const std::string& connectionString = cfg->getOption<string>(CONFIG_HOST);
         uint16_t port = cfg->getOption<int>(CONFIG_PORT);
         const std::string& queryFile = cfg->getOption<string>(CONFIG_QUERY_FILE);
         std::string queryString = cfg->getOption<string>(CONFIG_QUERY_STRING);
 
-        scidb::PluginManager::getInstance()->setPluginsDirectory(cfg->getOption<string>(CONFIG_PLUGINSDIR));
 
-        iqueryState.aql = !cfg->getOption<bool>(CONFIG_AFL);
-        iqueryState.verbose = cfg->getOption<bool>(CONFIG_VERBOSE);
-        iqueryState.nofetch = cfg->getOption<bool>(CONFIG_NO_FETCH);
-        iqueryState.timer = cfg->getOption<bool>(CONFIG_TIMER);
+        scidb::PluginManager::getInstance()->setPluginsDirectory(
+            cfg->getOption<string>(CONFIG_PLUGINSDIR));
+
+        iqueryState.aql          = !cfg->getOption<bool>(CONFIG_AFL);
+        iqueryState.verbose      = cfg->getOption<bool>(CONFIG_VERBOSE);
+        iqueryState.nofetch      = cfg->getOption<bool>(CONFIG_NO_FETCH);
+        iqueryState.timer        = cfg->getOption<bool>(CONFIG_TIMER);
         iqueryState.ignoreErrors = cfg->getOption<bool>(CONFIG_IGNORE_ERRORS);
-        iqueryState.format = cfg->getOption<string>(CONFIG_RESULT_FORMAT);
+        iqueryState.format       = cfg->getOption<string>(CONFIG_RESULT_FORMAT);
+        iqueryState.userName     = cfg->getOption<string>(CONFIG_USER_NAME);
+        iqueryState.userPassword = cfg->getOption<string>(CONFIG_USER_PASSWORD);
+
+
+        try
+        {
+            // The environment variable "SCIDB_CONFIG_USER" points to
+            // a file that allows setting the username and password if
+            // they are not specified on the command line.  This
+            // segement of code handles that functionality.
+
+            std::string scidbConfigUserFilename =
+                getEnvironmentVariable("SCIDB_CONFIG_USER");
+            if(scidbConfigUserFilename.length() != 0)
+            {
+                LOG4CXX_DEBUG(logger, "SCIDB_CONFIG_USER="
+                    << scidbConfigUserFilename);
+
+                scidb::ConfigUser *cfgUser = scidb::ConfigUser::getInstance();
+                cfgUser->addOptions();
+
+                scidb::ConfigUser::verifySafeFile(scidbConfigUserFilename);
+                cfgUser->parse(0, NULL, scidbConfigUserFilename.c_str());
+
+                if(iqueryState.userName.empty())
+                {
+                    iqueryState.userName =
+                        cfgUser->getUserName();
+                }
+
+                if(iqueryState.userPassword.empty())
+                {
+                    iqueryState.userPassword =
+                        cfgUser->getUserPassword();
+                }
+            }
+        } catch (const scidb::Exception& e) {
+            // Assume we are in 'trust' mode but log the exception
+            LOG4CXX_ERROR(logger, "Exception:  - " << e.what());
+        }
+
 
         if (!queryString.empty())
         {
-        	queries = queryString;
+            queries = queryString;
         }
         else if (queryString.empty() && !queryFile.empty())
         {
-			//
-			// PGB: Not good. 
-			// 
-			//      This method for handling the file creates the awful 
-			//		possibility for divergence between the format from 
-			//      files, interactive commands (from a pipe say), and 
-			// 		commands given "-q" option. 
+            //
+            // PGB: Not good.
+            //
+            //      This method for handling the file creates the awful
+            //        possibility for divergence between the format from
+            //      files, interactive commands (from a pipe say), and
+            //         commands given "-q" option.
             ifstream ifs;
             ifs.exceptions(ifstream::eofbit | ifstream::failbit | ifstream::badbit);
             ifs.open(queryFile.c_str());
@@ -595,6 +701,7 @@ int main(int argc, char* argv[])
             }
         }
 
+
         if (!iqueryState.verbose)
         {
             log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getError());
@@ -604,8 +711,17 @@ int main(int argc, char* argv[])
             loadHistory();
 
         const scidb::SciDB& sciDB = scidb::getSciDB();
-        iqueryState.connection = sciDB.connect(connectionString, port);
-    	string query = ""; // separated query from overall set of queries    
+        iqueryState.connection = sciDB.connect(
+            connectionString,
+            port);
+
+        LOG4CXX_DEBUG(logger, "userName=" << iqueryState.userName);
+        sciDB.newClientStart(
+            iqueryState.connection,
+            iqueryState.userName,
+            iqueryState.userPassword);
+
+        string query = ""; // separated query from overall set of queries
 
         // Whenever '{' is encountered, the count is increased by 1.
         // Whenever '}' is encountered, the count is reduced by 1.
@@ -613,108 +729,114 @@ int main(int argc, char* argv[])
         // TO-DO: negative count should be reported as an exception but omit this error checking for now.
         int nLevelsInsideCurlyBrackets = 0;
 
-    	do
-    	{
-    		// We analyzing begin of queries or next query, so reset position 
-    		if (query == "")
-    		{
-    			iqueryState.col = 1;
+        do
+        {
+
+            // We analyzing begin of queries or next query, so reset position
+            if (query == "")
+            {
+                iqueryState.col = 1;
                 iqueryState.queryStart = iqueryState.line;
-    		}
+            }
 
-    		// If we in interactive mode, requesting next line of query(ies)
-    		if (iqueryState.interactive)
-    		{
-    			iqueryState.insideComment = false;
-    			char *line = readline(query == "" ? (iqueryState.aql ? "AQL% " : "AFL% ") : "CON> ");
-    			if (line)
-    				queries = line;
-    			else
-    				break;
+            // If we in interactive mode, requesting next line of query(ies)
+            if (iqueryState.interactive)
+            {
+                iqueryState.insideComment = false;
+                char *line = readline(query == "" ? (iqueryState.aql ? "AQL% " : "AFL% ") : "CON> ");
+                if (line) {
+                    queries = line;
+                } else {
+                    break;
+                }
 
-    			// Ignore whitelines in begin of queries
-    			string trimmedQueries = queries;
-    			boost::trim(trimmedQueries);
-    			if (trimmedQueries == "" && query == "")
-    				continue;
-    		}
+                // Ignore whitelines in begin of queries
+                string trimmedQueries = queries;
+                boost::trim(trimmedQueries);
+                if (trimmedQueries == "" && query == "") {
+                    continue;
+                }
+            }
 
-    		// Parsing next line of query(ies)
-    		char currC = 0;     // Character in current position
-    		char prevC = 0; // Character in previous position
-    		bool eoq = false;
+            // Parsing next line of query(ies)
+            char currC = 0;     // Character in current position
+            char prevC = 0; // Character in previous position
+            bool eoq = false;
 
-    		for (size_t pos = 0; pos < queries.size(); ++pos)
-    		{
-    			prevC = currC;
-    			currC = queries[pos];
-    			
-    			// Checking string literal begin and end, but ignore if current part of query is comment
-    			if (currC == '\'' && prevC != '\\' && !iqueryState.insideComment)
-    			{
-    				iqueryState.insideString = !iqueryState.insideString;
-    			}
+            for (size_t pos = 0; pos < queries.size(); ++pos)
+            {
+                prevC = currC;
+                currC = queries[pos];
 
-    			// Checking comment, but ignore if current part of query is string
-    			if (currC == '-' && prevC == '-' && !iqueryState.insideString)
-    			{
-    				iqueryState.insideComment = true;
-    			}
+                // Checking string literal begin and end, but ignore if current part of query is comment
+                if (currC == '\'' && prevC != '\\' && !iqueryState.insideComment)
+                {
+                    iqueryState.insideString = !iqueryState.insideString;
+                }
 
-    			// Checking newline. Resetting comment if present 
-    			if (currC == '\n')
-    			{
-    				iqueryState.insideComment = false;
-    				++iqueryState.line;
+                // Checking comment, but ignore if current part of query is string
+                if (currC == '-' && prevC == '-' && !iqueryState.insideString)
+                {
+                    iqueryState.insideComment = true;
+                }
+
+                // Checking newline. Resetting comment if present
+                if (currC == '\n')
+                {
+                    iqueryState.insideComment = false;
+                    ++iqueryState.line;
                     iqueryState.col = 1;
 
-                    if (query == "")
+                    if (query == "") {
                         iqueryState.queryStart = iqueryState.line;
-                    else
-    				    query += currC;
-    			}
-    			// Checking query separator, if not in string and comment, execute this query
-    			else if (currC == ';' && !iqueryState.insideComment && !iqueryState.insideString
-    			        && nLevelsInsideCurlyBrackets==0)
-    			{
-    				executeCommandOrQuery(query);
-    				query = "";
-    				eoq = true;
-    				++iqueryState.col;
-    			}
-    			// Maintain nLevelsInsideCurlyBrackets
-    			else if ((currC == '{' || currC == '}') && !iqueryState.insideComment && !iqueryState.insideString)
-    			{
-    			    nLevelsInsideCurlyBrackets += (currC == '{' ? 1 : -1);
-    			    query += currC;
-    			}
-    			// All other just added to query
-    			else
-    			{
-    				query += currC;
-    				++iqueryState.col;
-    			}
-    		}
-    		
-    		if (eoq)
-    		    boost::trim_left(query);
+                    } else {
+                        query += currC;
+                    }
+                }
+                // Checking query separator, if not in string and comment, execute this query
+                else if (currC == ';' && !iqueryState.insideComment && !iqueryState.insideString
+                        && nLevelsInsideCurlyBrackets==0)
+                {
+                    executeCommandOrQuery(query);
+                    query = "";
+                    eoq = true;
+                    ++iqueryState.col;
+                }
+                // Maintain nLevelsInsideCurlyBrackets
+                else if ((currC == '{' || currC == '}') && !iqueryState.insideComment && !iqueryState.insideString)
+                {
+                    nLevelsInsideCurlyBrackets += (currC == '{' ? 1 : -1);
+                    query += currC;
+                }
+                // All other just added to query
+                else
+                {
+                    query += currC;
+                    ++iqueryState.col;
+                }
+            }
 
-    		// Adding last part of query to history 
-    		if (iqueryState.interactive)
-    			add_history(queries.c_str());
+            if (eoq) {
+                boost::trim_left(query);
+            }
 
-    		// If interactive add newline after any part of query to maintain original query view
-    		if (iqueryState.interactive && query != "")
-    		{
-    			query += '\n';
-    		}
-    		// Execute last part of query even without leading semicolon in non-interactive mode
-    		else if (!iqueryState.interactive && query != "")
-    		{
-    			executeCommandOrQuery(query);
-    		}
-    	}
-    	while (iqueryState.interactive);
+            // Adding last part of query to history
+            if (iqueryState.interactive) {
+                add_history(queries.c_str());
+            }
+
+            // If interactive add newline after any part of query to maintain original query view
+            if (iqueryState.interactive && query != "")
+            {
+                query += '\n';
+            }
+            // Execute last part of query even without leading semicolon in non-interactive mode
+            else if (!iqueryState.interactive && query != "")
+            {
+                executeCommandOrQuery(query);
+            }
+        }
+        while (iqueryState.interactive);
     }
     catch (const std::exception& e)
     {
@@ -723,7 +845,9 @@ int main(int argc, char* argv[])
     }
 
     if (iqueryState.interactive)
+    {
         saveHistory();
+    }
 
     return ret;
 }

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -85,7 +85,7 @@ iquery -aq "load_library('dense_linear_algebra')"
 #
 # time gesvd operator on matrices of small size, printing their results
 #
-echo "$BASE_SCRIPT_NAME: **********************************************************************" 
+echo "$BASE_SCRIPT_NAME: **********************************************************************"
 echo "$BASE_SCRIPT_NAME: ****** verbose, remultiplied svd('U'), svd('VT'), svd('values') "
 echo "$BASE_SCRIPT_NAME: ****** from $ORD_MIN to $ORD_MAX_VERBOSE (if any)"
 
@@ -138,14 +138,14 @@ while [ "$ORD" -le "$ORD_MAX_VERBOSE" ] ; do
     #iquery -ocsv+ -aq "scan(${PFX}VALSmat)" | sort                          #| tee /dev/stderr
 
     iquery -ocsv+ -aq "
-     aggregate ( 
+     aggregate (
       apply(
-       cross_join(${PFX}LEFT as C,  
+       cross_join(${PFX}LEFT as C,
                   aggregate(apply(cross_join(${PFX}VALSmat as A, ${PFX}RIGHT as B, A.c, B.i), s2, A.s * B.v), sum(s2) as multiply, A.i, B.c) as D,
                   C.i, D.i
-       ), 
+       ),
        s, C.u * D.multiply
-      ), 
+      ),
       sum(s) as multiply, C.r, D.c
     )" | sort #| tee /dev/stderr
     echo
@@ -166,7 +166,7 @@ done
 # now run up to a limiting size for performance more than
 # edge condition testing
 #
-echo "$BASE_SCRIPT_NAME: *****************************************************************************" 
+echo "$BASE_SCRIPT_NAME: *****************************************************************************"
 echo "$BASE_SCRIPT_NAME: ****** quick test, svd('U') only"
 echo "$BASE_SCRIPT_NAME: ****** from $ORD to $ORD_MAX (if any)"
 
@@ -178,7 +178,7 @@ while [ "$ORD" -le "$ORD_MAX" ] ; do
     echo "$BASE_SCRIPT_NAME: U-only test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}" | tee /dev/stderr
 
     iquery -aq "remove(${PFX}IN)"   > /dev/null 2>&1 # completely silently
-    iquery -naq "create array ${PFX}IN <v:double>[r=0:${ORD_M1},${CSIZE},0 , c=0:${ORD_M1},${CSIZE},0]" 
+    iquery -naq "create array ${PFX}IN <v:double>[r=0:${ORD_M1},${CSIZE},0 , c=0:${ORD_M1},${CSIZE},0]"
     #
     # see explanation in previous loop
     #
@@ -210,5 +210,5 @@ for NAME in $NAMES_USED ; do
 done
 
 echo "$BASE_SCRIPT_NAME: $BASE_SCRIPT_NAME $ORD_MIN,$ORD_MAX_VERBOSE,$ORD_MAX end"
-echo 
+echo
 

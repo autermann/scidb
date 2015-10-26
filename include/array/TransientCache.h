@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,14 +28,16 @@
 #include <array/Metadata.h>                              // For ArrayDesc
 
 /****************************************************************************/
-namespace scidb {
+namespace scidb
+{
 /****************************************************************************/
 
-typedef boost::shared_ptr<Query>    QueryPtr;            // A shared query ptr
-typedef boost::shared_ptr<Array>    MemArrayPtr;         // A shared array ptr
+typedef std::shared_ptr<Query>    QueryPtr;            // A shared query ptr
+typedef std::shared_ptr<Array>    MemArrayPtr;         // A shared array ptr
 
 /****************************************************************************/
-namespace transient {
+namespace transient
+{
 /****************************************************************************/
 
 /**
@@ -66,7 +68,8 @@ void remove(const ArrayDesc&);
 void clear();
 
 /****************************************************************************/
-}}
+} // namespace transient
+} // namespace scidb
 /****************************************************************************/
 #endif
 /****************************************************************************/

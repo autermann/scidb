@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -29,3 +29,5 @@ configure_file(statistics.py "${GENERAL_OUTPUT_DIRECTORY}/scidblib/statistics.py
 configure_file(util.py "${GENERAL_OUTPUT_DIRECTORY}/scidblib/util.py" COPYONLY)
 configure_file(counter.py "${GENERAL_OUTPUT_DIRECTORY}/scidblib/counter.py" COPYONLY)
 configure_file(scidb_psf.py "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_psf.py" COPYONLY)
+configure_file(scidb_control.py "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_control.py" COPYONLY)
+configure_file(pgpass_updater.py "${GENERAL_OUTPUT_DIRECTORY}/scidblib/pgpass_updater.py" COPYONLY)

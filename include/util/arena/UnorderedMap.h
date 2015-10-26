@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
 /****************************************************************************/
 
 #include <util/arena/Managed.h>                          // For macros
-#include <boost/unordered_map.hpp>                       // For unordered_map
+#include <unordered_map>
 
 /****************************************************************************/
 namespace scidb { namespace arena { namespace managed {
@@ -48,14 +48,14 @@ namespace scidb { namespace arena { namespace managed {
  *
  *  @author     jbell@paradigm4.com.
  */
-template<class K,class V,class H = boost::hash<K>,class P = std::equal_to<K> >
-class unordered_map : public SCIDB_MANAGED_BASE(boost,unordered_map,K,V,H,P)
+template<class K,class V,class H = std::hash<K>,class P = std::equal_to<K> >
+class unordered_map : public SCIDB_MANAGED_BASE(std,unordered_map,K,V,H,P)
 {
  private:            // Implementation
-                        SCIDB_MANAGED_UNORDERED(boost,unordered_map,K,V,H,P)
+                        SCIDB_MANAGED_UNORDERED(std,unordered_map,K,V,H,P)
 
  public:             // Implementation
-    static const size_t _n = boost::unordered::detail::default_bucket_count;
+    static const size_t _n = 11; // boost::unordered::detail::default_bucket_count;
 
  public:             // Construction
     explicit            unordered_map(                                  size_type n = _n,const H& h = H(),const P& p = P()) : base_type(n,h,p)      {}
@@ -90,14 +90,14 @@ inline void swap(unordered_map<K,V,H,P>& a,unordered_map<K,V,H,P>& b) {a.swap(b)
  *
  *  @author     jbell@paradigm4.com.
  */
-template<class K,class V,class H = boost::hash<K>,class P = std::equal_to<K> >
-class unordered_multimap : public SCIDB_MANAGED_BASE(boost,unordered_multimap,K,V,H,P)
+template<class K,class V,class H = std::hash<K>,class P = std::equal_to<K> >
+class unordered_multimap : public SCIDB_MANAGED_BASE(std,unordered_multimap,K,V,H,P)
 {
  private:            // Implementation
-                        SCIDB_MANAGED_UNORDERED(boost,unordered_multimap,K,V,H,P)
+                        SCIDB_MANAGED_UNORDERED(std,unordered_multimap,K,V,H,P)
 
  public:             // Implementation
-    static const size_t _n = boost::unordered::detail::default_bucket_count;
+    static const size_t _n = 11; // boost::unordered::detail::default_bucket_count;
 
  public:             // Construction
     explicit            unordered_multimap(                                  size_type n = _n,const H& h = H(),const P& p = P()) : base_type(n,h,p)      {}

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,8 +32,7 @@
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/helpers/exception.h>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/asio.hpp>
 
 #include <dlfcn.h>
@@ -64,12 +63,19 @@
 #include <smgr/io/ReplicationManager.h>
 #include <system/Utils.h>
 
+#include <usr_namespace/NamespaceDesc.h>
+#include <usr_namespace/NamespaceObject.h>
+#include <usr_namespace/UserDesc.h>
+
 // to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.entry"));
 
-using namespace scidb;
+namespace scidb {namespace arena {bool setMemoryLimit(size_t);}}
 
-boost::shared_ptr<ThreadPool> messagesThreadPool;
+using namespace scidb;
+using namespace std;
+
+std::shared_ptr<ThreadPool> messagesThreadPool;
 
 void scidb_termination_handler(int signum)
 {
@@ -85,14 +91,20 @@ void runSciDB()
    sigaction (SIGINT, &action, NULL);
    sigaction (SIGTERM, &action, NULL);
 
+   struct sigaction ignore;
+   ignore.sa_handler = SIG_IGN;
+   sigemptyset(&ignore.sa_mask);
+   ignore.sa_flags = 0;
+   sigaction (SIGPIPE, &ignore, NULL);
+
    Config *cfg = Config::getInstance();
    assert(cfg);
 
    // Configuring loggers
-   const std::string& log4cxxProperties = cfg->getOption<string>(CONFIG_LOGCONF);
+   const string& log4cxxProperties = cfg->getOption<string>(CONFIG_LOGCONF);
    if (log4cxxProperties.empty()) {
       log4cxx::BasicConfigurator::configure();
-      const std::string& log_level = cfg->getOption<string>(CONFIG_LOG_LEVEL);
+      const string& log_level = cfg->getOption<string>(CONFIG_LOG_LEVEL);
       log4cxx::LoggerPtr rootLogger(log4cxx::Logger::getRootLogger());
       rootLogger->setLevel(log4cxx::Level::toLevel(log_level));
    }
@@ -127,6 +139,15 @@ void runSciDB()
        size_t maxMem = ((int64_t) cfg->getOption<int>(CONFIG_MAX_MEMORY_LIMIT)) * MiB;
        LOG4CXX_DEBUG(logger, "Capping maximum memory:");
 
+       if (scidb::arena::setMemoryLimit(maxMem))
+       {
+           LOG4CXX_WARN(logger, ">arena cap set to " << maxMem  << " bytes.");
+       }
+       else
+       {
+           LOG4CXX_WARN(logger, ">arena cap of " << maxMem << " is too small; the cap has already been exceeded.");
+       }
+
        struct rlimit rlim;
        if (getrlimit(RLIMIT_AS, &rlim) != 0)
        {
@@ -155,7 +176,7 @@ void runSciDB()
        }
    }
 
-   std::string tmpDir = FileManager::getInstance()->getTempDir();
+   string tmpDir = FileManager::getInstance()->getTempDir();
    // If the tmp directory does not exist, create it.
    // Note that multiple levels of directories may need to be created.
    if (tmpDir.length() == 0 || tmpDir[tmpDir.length()-1] != '/') {
@@ -185,7 +206,7 @@ void runSciDB()
    }
 
    const size_t memThreshold = Config::getInstance()->getOption<size_t>(CONFIG_MEM_ARRAY_THRESHOLD);
-   std::string memArrayBasePath = tmpDir + "/memarray";
+   string memArrayBasePath = tmpDir + "/memarray";
 
    SharedMemCache::getInstance().initSharedMemCache(memThreshold * MiB,
                                                     memArrayBasePath.c_str());
@@ -202,7 +223,7 @@ void runSciDB()
        LOG4CXX_WARN(logger, "Failed to set small-memalloc-size");
    }
 
-   boost::shared_ptr<JobQueue> messagesJobQueue = boost::make_shared<JobQueue>();
+   std::shared_ptr<JobQueue> messagesJobQueue = std::make_shared<JobQueue>();
 
    // Here we can play with thread number
    // TODO: For SG operations probably we should have separate thread pool
@@ -214,9 +235,7 @@ void runSciDB()
    try
    {
        //Disable metadata upgrade in initialize mode
-       catalog->connect(
-           Config::getInstance()->getOption<string>(CONFIG_CATALOG),
-           !initializeCluster);
+       catalog->connect(!initializeCluster);
    }
    catch (const std::exception &e)
    {
@@ -400,7 +419,7 @@ void runWithWatchdog()
       time_t forkTime = time(NULL);
       assert(forkTime > 0);
 
-      pid_t pid = fork();
+      pid_t pid = ::fork();
 
       if (pid < 0) { // error
          handleFatalError(errno,"fork() failed");
@@ -453,6 +472,13 @@ void runWithWatchdog()
 
 int main(int argc,char* argv[])
 {
+    // Force the ___Dscriptor constructor to be linked.
+    // Because scidb does not invoke the constructor the linker optimizes
+    // it out.  However, the plugin libraries need the constructor.
+    static NamespaceDesc      forceNSD;
+    static NamespaceObject    forceNSO;
+    static UserDesc           forceUD;
+
     struct LoggerControl : boost::noncopyable, scidb::stackonly
     {
        ~LoggerControl()

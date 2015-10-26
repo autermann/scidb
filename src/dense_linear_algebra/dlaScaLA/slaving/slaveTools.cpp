@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,12 +31,12 @@
 
 namespace scidb
 {
-    
+
 ///
 /// getSlaveBLACSInfo()
 ///
 /// for a given context ICTXT, return the parameters of the ScaLAPACK
-/// 
+///
 /// This is slated to be re-worked during Cheshire m4.  It will probably
 /// become a method on ScaLAPACK operator.
 ///
@@ -53,12 +53,12 @@ void getSlaveBLACSInfo(const slpp::int_t ICTXT, slpp::int_t& NPROW, slpp::int_t&
     if(NPROW < 0 || NPCOL < 0) {
         std::cerr << "blacs_gridinfo_ error -- aborting" << std::endl;
         ::exit(99); // something that does not look like a signal
-    }   
+    }
 
     if(MYPROW < 0 || MYPCOL < 0) {
         std::cerr << "blacs_gridinfo_ error -- aborting" << std::endl;
         ::exit(99); // something that does not look like a signal
-    }   
+    }
 
     std::cerr << "blacs_pnum_ " << std::endl;
     MYPNUM = blacs_pnum_(ICTXT, MYPROW, MYPCOL);

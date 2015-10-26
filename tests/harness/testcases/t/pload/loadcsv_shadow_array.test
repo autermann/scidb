@@ -1,19 +1,24 @@
-
 --setup
-
 
 --start-query-logging
 
-#--shell --command "loadcsv.py -a 'array_sm10' -s '<a:int64,b:int64,c:int64>[i=0:*,3,0]' -i 'sm10.csv' -e 10 -x -v -c 3 -l -m -n 10" --store
+--shell --command " cp ${TEST_DATA_DIR}/sm11_shadow.csv /tmp "
 
 --test
 
-
 --start-igdata
  
---shell --command " cat ${TEST_DATA_DIR}/sm11_shadow.csv | loadcsv.py -a 'array_sm10' -s '<a:int64,b:int64,c:int64>[i=0:*,4,0]' -v -x -c 4 -l -L -b -e 100 -w 'array_shadow' -d 'localhost' -p $IQUERY_PORT  "
+create array array_sm10 <a:int64,b:int64,c:int64>[i=0:*,4,0]
+load(array_sm10, '/tmp/sm11_shadow.csv', -2, 'csv', 100, array_shadow)
 
---shell --command " cat ${TEST_DATA_DIR}/sm11_shadow.csv | loadcsv.py -a 'array_sm10' -s '<a:int64 NULL,b:int64,c:int64>[i=0:*,4,0]' -v -x -c 4 -l -L -b -e 100 -w 'array_shadow2' -d 'localhost' -p $IQUERY_PORT "
+remove(array_sm10)
+create array array_sm10 <a:int64 NULL,b:int64,c:int64>[i=0:*,4,0]
+load(array_sm10, '/tmp/sm11_shadow.csv', -2, 'csv', 100, array_shadow2)
+
+
+#--shell --command " cat ${TEST_DATA_DIR}/sm11_shadow.csv | loadcsv.py -a 'array_sm10' -s '<a:int64,b:int64,c:int64>[i=0:*,4,0]' -v -x -c 4 -l -L -b -e 100 -w 'array_shadow' -d 'localhost' -p $IQUERY_PORT  "
+
+#--shell --command " cat ${TEST_DATA_DIR}/sm11_shadow.csv | loadcsv.py -a 'array_sm10' -s '<a:int64 NULL,b:int64,c:int64>[i=0:*,4,0]' -v -x -c 4 -l -L -b -e 100 -w 'array_shadow2' -d 'localhost' -p $IQUERY_PORT "
 
 
 --stop-igdata
@@ -30,6 +35,7 @@ project( array_shadow2, a, b, c)
 remove(array_shadow)
 remove(array_shadow2)
 remove(array_sm10)
+--shell --command " rm /tmp/sm11_shadow.csv "
 
 --stop-query-logging
 

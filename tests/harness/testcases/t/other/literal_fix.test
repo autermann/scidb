@@ -1,7 +1,7 @@
 --setup
 --start-query-logging
 # Ticket number : 1859 & 1646
-# Tests to verify agggregate, filter, repart and joins-concat works with build literal.
+# Tests to verify agggregate, filter, repart and joins works with build literal.
 
 
 --test
@@ -15,8 +15,6 @@ join(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true
 join(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),build(<a1:string> [x=0:1,2,0, y=0:1,2,0],'[[(alpha),(beta)],[(gamma),(theta)]]',true))
 
 join(build(<a1:int64,b1:char> [x=0:1,2,0, y=0:1,2,0],'[[(2,A),(-100,A)],[(-199,B),(-1,D)]]',true),build(<a1:string> [x=0:1,2,0, y=0:1,2,0],'[[(alpha),(beta)],[(gamma),(theta)]]',true))
-
-concat(build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true))
 
 cross_join(build(<a1:int64> [i=0:1,2,0, j=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),build(<a1:int64> [x=0:1,2,0, y=0:1,2,0],'[[(2),(-100)],[(-199),(-1)]]',true),j,y)
 

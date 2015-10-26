@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include <cppunit/TestFixture.h>
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "query/Operator.h"
 
@@ -168,7 +168,7 @@ public:
 
         testFilledMap(cm);
 
-        boost::shared_ptr<SharedBuffer> serialized = cm.serialize();
+        std::shared_ptr<SharedBuffer> serialized = cm.serialize();
         CPPUNIT_ASSERT(serialized->getSize() == cm.getBufferedSize());
 
         ChunkInstanceMap cm2(2, 1);

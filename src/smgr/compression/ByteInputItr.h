@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@ namespace scidb {
   {
   public:
     // initialize the array we are reading from
-  ByteInputItr(uint8_t const * const src, const size_t size) : _readPtr(src), _read(0), _max(size) 
+  ByteInputItr(uint8_t const * const src, const size_t size) : _readPtr(src), _read(0), _max(size)
     {    };
     // put a single byte, returns 0 if successful, -1 if not successful
     int32_t get(uint8_t & e);
@@ -49,7 +49,7 @@ namespace scidb {
     uint8_t const *_readPtr;
     size_t _read;
     size_t _max;
-    
+
   };
 }
 

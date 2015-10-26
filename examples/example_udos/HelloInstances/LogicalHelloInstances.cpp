@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,6 +54,8 @@
 
 #include <query/Operator.h>
 
+using namespace std;
+
 namespace scidb //not required
 {
 
@@ -87,7 +89,7 @@ public:
      * @param query the query context
      * @return the schema of the outpt, as described above.
      */
-    ArrayDesc inferSchema(vector< ArrayDesc> schemas, shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         /*
          * Make one string attribute: id=0, name="instance_status" of type string, no flags, no default compression.
@@ -106,11 +108,11 @@ public:
         /* The output dimension: from 0 to "*" with a chunk size of 1. The amount of data returned is so small that the
          * chunk size is not relevant.
          */
-        DimensionDesc outputDimension("instance_no", 0, MAX_COORDINATE, 1, 0);
+        DimensionDesc outputDimension("instance_no", 0, CoordinateBounds::getMax(), 1, 0);
         Dimensions outputDimensions(1, outputDimension);
 
         /* The first argument is the name of the returned array. */
-        return ArrayDesc("hello_instances", outputAttributes, outputDimensions);
+        return ArrayDesc("hello_instances", outputAttributes, outputDimensions, defaultPartitioning());
     }
 };
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,6 +34,10 @@ public class Result
     private boolean selective;
     private String explainLogical;
     private String explainPhysical;
+    private long elapsedTimeMillis;
+
+    // The result array.
+    private Array array;
 
     /**
      * Constructor
@@ -41,34 +45,10 @@ public class Result
      * @param conn Connection
      */
     public Result(QueryResult result, Connection conn)
+    throws SciDBException
     {
         ScidbMsg.QueryResult rec = result.getRecord();
-        String schemaName = rec.getArrayName();
-        Schema.Attribute[] attributes = new Schema.Attribute[rec.getAttributesCount()];
-        Schema.Dimension[] dimensions = new Schema.Dimension[rec.getDimensionsCount()];
-
-        int i = 0;
-        for (ScidbMsg.QueryResult.AttributeDesc att : rec.getAttributesList())
-        {
-            attributes[i] = new Schema.Attribute(att.getId(), att.getName(), att.getType(), att
-                    .getFlags());
-            i++;
-        }
-
-        i = 0;
-        for (ScidbMsg.QueryResult.DimensionDesc dim : rec.getDimensionsList())
-        {
-            dimensions[i] = new Schema.Dimension(dim.getName(),
-                                                 dim.getStartMin(),
-                                                 dim.getCurrStart(),
-                                                 dim.getCurrEnd(),
-                                                 dim.getEndMax(),
-                                                 dim.getChunkInterval());
-            i++;
-        }
-
         this.queryId = result.getHeader().queryID;
-        this.schema = new Schema(schemaName, attributes, dimensions);
         this.selective = rec.getSelective();
         this.explainLogical = rec.getExplainLogical();
         this.explainPhysical = rec.getExplainPhysical();
@@ -80,6 +60,47 @@ public class Result
                 conn.getWarningCallback().handleWarning(warn.getWhatStr());
             }
         }
+
+        // Set result array.
+        this.array = null;
+
+        if (this.selective) {
+            String schemaName = rec.getArrayName();
+            Schema.Attribute[] attributes = new Schema.Attribute[rec.getAttributesCount()];
+            Schema.Dimension[] dimensions = new Schema.Dimension[rec.getDimensionsCount()];
+
+            int i = 0;
+            for (ScidbMsg.QueryResult.AttributeDesc att : rec.getAttributesList())
+            {
+                attributes[i] = new Schema.Attribute(att.getId(), att.getName(), att.getType(), att.getFlags());
+                i++;
+            }
+
+            i = 0;
+            for (ScidbMsg.QueryResult.DimensionDesc dim : rec.getDimensionsList())
+            {
+                dimensions[i] = new Schema.Dimension(dim.getName(),
+                                                     dim.getStartMin(),
+                                                     dim.getCurrStart(),
+                                                     dim.getCurrEnd(),
+                                                     dim.getEndMax(),
+                                                     dim.getChunkInterval());
+                i++;
+            }
+
+            this.schema = new Schema(schemaName, attributes, dimensions);
+            this.array = new Array(this.queryId, this.schema, conn.getNetwork());
+        }
+    }
+
+    public void setElapsedTimeMillis(long elapsed)
+    {
+        elapsedTimeMillis = elapsed;
+    }
+
+    public long getElapsedTimeMillis()
+    {
+        return elapsedTimeMillis;
     }
 
     /**
@@ -100,11 +121,14 @@ public class Result
         return queryId;
     }
 
-    /**
-     * Returns selective flag
-     * @return true - if selective
-     */
-    public boolean isSelective()
+    /// @return the result array.
+    public Array getArray()
+    {
+        return this.array;
+    }
+
+    /// @return whether the query result has a result array.
+    public boolean getSelective()
     {
         return selective;
     }

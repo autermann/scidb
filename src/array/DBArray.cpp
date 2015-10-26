@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,10 +29,9 @@
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
  */
 #include <log4cxx/logger.h>
-#include "array/DBArray.h"
-#include "smgr/io/InternalStorage.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
+#include <array/DBArray.h>
+#include <smgr/io/InternalStorage.h>
+#include <system/Exceptions.h>
 
 namespace scidb
 {
@@ -40,26 +39,18 @@ namespace scidb
     //
     // DBArray
     //
-    string DBArray::getRealName() const
-    {
-        return SystemCatalog::getInstance()->getArrayDesc(_desc.getId())->getName();
-    }
-
-    DBArray::DBArray(ArrayDesc const& desc, const boost::shared_ptr<Query>& query)
+    DBArray::DBArray(ArrayDesc const& desc, const std::shared_ptr<Query>& query)
     : _desc(desc)
     {
-        assert(query);
+        LOG4CXX_DEBUG(logger, "DBArray::DBArray ID="<<_desc.getId()
+                      <<", UAID="<<_desc.getUAId()
+                      <<", ps="<<_desc.getPartitioningSchema()
+                      << ", desc="<< desc);
         _query = query;
-        _desc.setPartitioningSchema(SystemCatalog::getInstance()->getPartitioningSchema(desc.getId()));
+        SCIDB_ASSERT(query);
+        SCIDB_ASSERT(_desc.getPartitioningSchema() != psUninitialized);
+        SCIDB_ASSERT(_desc.getPartitioningSchema() != psUndefined);
     }
-
-    DBArray::DBArray(std::string const& name, const boost::shared_ptr<Query>& query)
-    {
-        assert(query);
-        _query = query;
-        SystemCatalog::getInstance()->getArrayDesc(name, _desc);
-    }
-
     std::string const& DBArray::getName() const
     {
         return _desc.getName();
@@ -75,26 +66,26 @@ namespace scidb
         return _desc;
     }
 
-    boost::shared_ptr<ArrayIterator> DBArray::getIterator(AttributeID attId)
+    std::shared_ptr<ArrayIterator> DBArray::getIterator(AttributeID attId)
     {
        LOG4CXX_TRACE(logger, "Getting DB iterator for ID="<<_desc.getId()<<", attrID="<<attId);
-       boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-       shared_ptr<const Array> arr= boost::dynamic_pointer_cast<const Array>(shared_from_this());
+       std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+       std::shared_ptr<const Array> arr= std::dynamic_pointer_cast<const Array>(shared_from_this());
        return StorageManager::getInstance().getArrayIterator(arr, attId, query);
     }
 
-    boost::shared_ptr<ConstArrayIterator> DBArray::getConstIterator(AttributeID attId) const
+    std::shared_ptr<ConstArrayIterator> DBArray::getConstIterator(AttributeID attId) const
     {
         LOG4CXX_TRACE(logger, "Getting const DB iterator for ID="<<_desc.getId()<<", attrID="<<attId);
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-        shared_ptr<const Array> arr= boost::dynamic_pointer_cast<const Array>(shared_from_this());
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        std::shared_ptr<const Array> arr= std::dynamic_pointer_cast<const Array>(shared_from_this());
         return StorageManager::getInstance().getConstArrayIterator(arr, attId, query);
     }
 
-    boost::shared_ptr<CoordinateSet> DBArray::getChunkPositions() const
+    std::shared_ptr<CoordinateSet> DBArray::getChunkPositions() const
     {
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-        boost::shared_ptr<CoordinateSet> result (new CoordinateSet());
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        std::shared_ptr<CoordinateSet> result (new CoordinateSet());
         assert(query);
         StorageManager::getInstance().getChunkPositions(_desc, query, *(result.get()));
         return result;

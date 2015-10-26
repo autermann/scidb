@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,12 +32,12 @@
 #ifndef TRANSPOSE_ARRAY_H
 #define TRANSPOSE_ARRAY_H
 
-#include "array/DelegateArray.h"
 #include <map>
+
+#include <array/DelegateArray.h>
 
 namespace scidb {
 
-using namespace boost;
 using namespace std;
 
 /**
@@ -46,7 +46,10 @@ using namespace std;
 class TransposeArray: public Array
 {
 public:
-    TransposeArray(ArrayDesc const& arrayDesc, shared_ptr<Array>const& input, shared_ptr<CoordinateSet>const& inputChunkPositions, shared_ptr<Query>const& query):
+    TransposeArray(ArrayDesc const& arrayDesc,
+            std::shared_ptr<Array>const& input,
+            std::shared_ptr<CoordinateSet>const& inputChunkPositions,
+            std::shared_ptr<Query>const& query):
         _arrayDesc(arrayDesc),
         _inputArray(input),
         _nDimensions(input->getArrayDesc().getDimensions().size()),
@@ -80,12 +83,12 @@ public:
         return true;
     }
 
-    virtual boost::shared_ptr<CoordinateSet> getChunkPositions() const
+    virtual std::shared_ptr<CoordinateSet> getChunkPositions() const
     {
-        return boost::shared_ptr<CoordinateSet> (new CoordinateSet( *_outputChunkPositions ));
+        return std::shared_ptr<CoordinateSet> (new CoordinateSet( *_outputChunkPositions ));
     }
 
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attrID) const
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attrID) const
     {
         //The TransposeArrayIterator will only fill in the extra empty bitmask if emptyTagID is not the same as attrID.
         //If the array is not emptyable, or if attrID is already the empty bitmask - don't bother.
@@ -95,7 +98,7 @@ public:
             emptyTagID = _arrayDesc.getEmptyBitmapAttribute()->getId();
         }
 
-        return boost::shared_ptr<ConstArrayIterator>( new TransposeArrayIterator(_outputChunkPositions,
+        return std::shared_ptr<ConstArrayIterator>( new TransposeArrayIterator(_outputChunkPositions,
                                                                                  _inputArray->getConstIterator(attrID),
                                                                                  _query,
                                                                                  this,
@@ -114,16 +117,16 @@ public:
 
 private:
     ArrayDesc _arrayDesc;
-    boost::shared_ptr<Array> _inputArray;
+    std::shared_ptr<Array> _inputArray;
     size_t const _nDimensions;
-    boost::shared_ptr<CoordinateSet> _outputChunkPositions;
+    std::shared_ptr<CoordinateSet> _outputChunkPositions;
 
     class TransposeArrayIterator: public ConstArrayIterator
     {
     public:
-        TransposeArrayIterator(boost::shared_ptr<CoordinateSet> const& outputChunkPositions,
-                               boost::shared_ptr<ConstArrayIterator> inputArrayIterator,
-                               boost::weak_ptr<Query> const& query,
+        TransposeArrayIterator(std::shared_ptr<CoordinateSet> const& outputChunkPositions,
+                               std::shared_ptr<ConstArrayIterator> inputArrayIterator,
+                               std::weak_ptr<Query> const& query,
                                TransposeArray const* transposeArray,
                                AttributeID const attributeID,
                                AttributeID const emptyTagID):
@@ -179,10 +182,10 @@ private:
         virtual ConstChunk const& getChunk();
 
     private:
-        boost::shared_ptr<CoordinateSet> _outputChunkPositions;
+        std::shared_ptr<CoordinateSet> _outputChunkPositions;
         CoordinateSet::const_iterator _outputChunkPositionsIterator;
-        boost::shared_ptr<ConstArrayIterator> _inputArrayIterator;
-        boost::weak_ptr<Query> _query;
+        std::shared_ptr<ConstArrayIterator> _inputArrayIterator;
+        std::weak_ptr<Query> _query;
         TransposeArray const* _transposeArray;
         AttributeID const _attributeID;
         AttributeID const _emptyTagID;

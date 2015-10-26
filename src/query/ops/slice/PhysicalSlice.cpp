@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -52,11 +52,11 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& sourceDistributions,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& sourceDistributions,
             std::vector<ArrayDesc> const& sourceSchemas) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(
@@ -77,7 +77,7 @@ public:
         size_t nParams = _parameters.size();
         std::vector<std::string> sliceDimName(nParams/2);
         for (size_t i = 0; i < nParams; i+=2) {
-            sliceDimName[i >> 1]  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
+            sliceDimName[i >> 1]  = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
         }
 
         for (size_t i = 0; i < nDims; i++) {
@@ -93,7 +93,7 @@ public:
                 newEnd.push_back(inEnd[i]);
             } else {
                 //dimension i is not present in output; check value
-                Coordinate slice = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[k*2+1])->getExpression()->evaluate().getInt64();
+                Coordinate slice = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[k*2+1])->getExpression()->evaluate().getInt64();
                 if (!inputBoundaries[0].isInsideBox(slice,i))
                 {
                     //the slice value is outside the box; guess what - the result is an empty array
@@ -119,12 +119,12 @@ public:
       * an iterator-based array to the consumer
       * that overrides the chunkiterator method.
       */
-    boost::shared_ptr< Array> execute(
-            std::vector< boost::shared_ptr< Array> >& inputArrays,
-            boost::shared_ptr<Query> query)
+    std::shared_ptr< Array> execute(
+            std::vector< std::shared_ptr< Array> >& inputArrays,
+            std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
-        boost::shared_ptr<Array> inputArray = inputArrays[0];
+        std::shared_ptr<Array> inputArray = inputArrays[0];
         ArrayDesc const& desc = inputArray->getArrayDesc();
         inputArray = ensureRandomAccess(inputArray, query);
         Dimensions const& dims = desc.getDimensions();
@@ -137,8 +137,8 @@ public:
 
         // NOTE: may be to use already evaluated schema in logical operator from schema parameter
         for (size_t i = 0; i < nParams; i+=2) {
-            assert(((boost::shared_ptr<OperatorParam>&)_parameters[i])->getParamType() == PARAM_DIMENSION_REF);
-            sliceDimName[i >> 1]  = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
+            assert(((std::shared_ptr<OperatorParam>&)_parameters[i])->getParamType() == PARAM_DIMENSION_REF);
+            sliceDimName[i >> 1]  = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
         }
         for (size_t i = 0; i < nDims; i++) {
             string dimName = dims[i].getBaseName();
@@ -147,15 +147,15 @@ public:
                    && sliceDimName[k] != dimName
                    && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1));
             if (k >= 0) {
-                assert(((boost::shared_ptr<OperatorParam>&)_parameters[k*2+1])->getParamType() == PARAM_PHYSICAL_EXPRESSION);
-                Value const& coord = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[k*2+1])->getExpression()->evaluate();
+                assert(((std::shared_ptr<OperatorParam>&)_parameters[k*2+1])->getParamType() == PARAM_PHYSICAL_EXPRESSION);
+                Value const& coord = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[k*2+1])->getExpression()->evaluate();
                 slice[i] = coord.getInt64();
                 if (slice[i] < dims[i].getStartMin() || slice[i] > dims[i].getEndMax())
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_SLICE_ERROR2);
                 mask |= (uint64_t)1 << i;
             }
         }
-        return boost::shared_ptr<Array>( new SliceArray(_schema, slice, mask, inputArray));
+        return std::shared_ptr<Array>( new SliceArray(_schema, slice, mask, inputArray));
     }
 };
 

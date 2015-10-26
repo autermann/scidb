@@ -1,5 +1,5 @@
 # Test automatic repartitioning of cross_join() inputs.
-# Based on doscript.cross_join test.
+# Based on docscript.cross_join test.
 
 # Differing chunksizes and overlaps.
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -78,98 +78,130 @@ public:
     LogicalMerge(const string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-    	ADD_PARAM_INPUT()
-		ADD_PARAM_INPUT()
-		ADD_PARAM_VARIES()
+        ADD_PARAM_INPUT()
+        ADD_PARAM_INPUT()
+        ADD_PARAM_VARIES()
     }
 
-	std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
-	{
-		std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
-		res.push_back(PARAM_INPUT());
-		res.push_back(END_OF_VARIES_PARAMS());
-		return res;
-	}
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    {
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
+        res.push_back(PARAM_INPUT());
+        res.push_back(END_OF_VARIES_PARAMS());
+        return res;
+    }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    /**
+     * @brief Determine what the schema of the array resulting from the merge should look like
+     *
+     *  @par Input:
+     *   - schemas:  a vector of array descriptors describing the arrays to be merged
+     *   - query:    the query that generated the merge request
+     *
+     * @par Output:  The descriptor that describes the merged array
+     **/
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() >= 2);
         assert(_parameters.size() == 0);
 
-        Attributes const& leftAttributes = schemas[0].getAttributes();
-        Dimensions const& leftDimensions = schemas[0].getDimensions();
-        Attributes const* newAttributes = &leftAttributes;
-        Dimensions newDims = leftDimensions;
-        size_t nDims = newDims.size();
+        Attributes const&  leftAttributes   = schemas[0].getAttributes();
+        Dimensions const&  leftDimensions   = schemas[0].getDimensions();
+        Attributes const*  mergedAttributes = &leftAttributes;
+        Dimensions         mergedDimensions = leftDimensions;
+        size_t             nDimensions      = mergedDimensions.size();
 
-        for (size_t j = 1; j < schemas.size(); j++) {
-            Attributes const& rightAttributes = schemas[j].getAttributes();
-            Dimensions const& rightDimensions = schemas[j].getDimensions();
+        for (size_t nSchema = 1; nSchema < schemas.size(); nSchema++)
+        {
+            Attributes const& rightAttributes = schemas[nSchema].getAttributes();
+            Dimensions const& rightDimensions = schemas[nSchema].getDimensions();
 
-            if (nDims != rightDimensions.size()) {
+            if (nDimensions != rightDimensions.size())
+            {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_COUNT_MISMATCH)
-                    << "merge" << schemas[0] << schemas[j];
+                    << "merge" << schemas[0] << schemas[nSchema];
             }
 
             // Report all startIndex problems at once.
             ostringstream ss;
             int mismatches = 0;
-            for (size_t i = 0, n = leftDimensions.size(); i < n; i++)
+            for (size_t i = 0; i < nDimensions; i++)
             {
-                if(leftDimensions[i].getStartMin() != rightDimensions[i].getStartMin())
+                DimensionDesc const& leftDimension   = leftDimensions[i];
+                DimensionDesc const& rightDimension  = rightDimensions[i];
+
+                if(leftDimension.getStartMin() != rightDimension.getStartMin())
                 {
                     if (mismatches++) {
                         ss << ", ";
                     }
-                    ss << '[' << leftDimensions[i] << "] != [" << rightDimensions[i] << ']';
+
+                    ss  << '[' << leftDimension << "] != ["  << rightDimension << ']';
                 }
             }
+
             if (mismatches)
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_START_INDEX_MISMATCH) << ss.str();
             }
 
 
-            for (size_t i = 0; i < nDims; i++) {
-                assert(leftDimensions[i].getStartMin() == rightDimensions[i].getStartMin());
+            for (size_t i = 0; i < nDimensions; i++)
+            {
+                DimensionDesc const& leftDimension   = leftDimensions[i];
+                DimensionDesc const& rightDimension  = rightDimensions[i];
+                DimensionDesc&       mergedDimension = mergedDimensions[i];
 
-                DimensionDesc& dim = newDims[i];
-                dim = DimensionDesc(dim.getBaseName(),
-                                    dim.getNamesAndAliases(),
-                                    min(dim.getStartMin(), rightDimensions[i].getStartMin()),
-                                    min(dim.getCurrStart(), rightDimensions[i].getCurrStart()),
-                                    max(dim.getCurrEnd(), rightDimensions[i].getCurrEnd()),
-                                    max(dim.getEndMax(), rightDimensions[i].getEndMax()),
-                                    dim.getChunkInterval(), 
-                                    dim.getChunkOverlap());
+                assert(leftDimension.getStartMin() == rightDimension.getStartMin());
+
+                mergedDimension = DimensionDesc(
+                    mergedDimension.getBaseName(),
+                    mergedDimension.getNamesAndAliases(),
+                    min(mergedDimension.getStartMin(),  rightDimension.getStartMin()),
+                    min(mergedDimension.getCurrStart(), rightDimension.getCurrStart()),
+                    max(mergedDimension.getCurrEnd(),   rightDimension.getCurrEnd()),
+                    max(mergedDimension.getEndMax(),    rightDimension.getEndMax()),
+                    mergedDimension.getChunkInterval(),
+                    mergedDimension.getChunkOverlap());
             }
 
             if (leftAttributes.size() != rightAttributes.size()
                     && (leftAttributes.size() != rightAttributes.size()+1
                         || !leftAttributes[leftAttributes.size()-1].isEmptyIndicator())
+
                     && (leftAttributes.size()+1 != rightAttributes.size()
                         || !rightAttributes[rightAttributes.size()-1].isEmptyIndicator()))
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ATTR_COUNT_MISMATCH)
-                    << schemas[0] << schemas[j];
+                    << schemas[0] << schemas[nSchema];
             }
 
-            size_t nAttrs = min(leftAttributes.size(), rightAttributes.size());
-            if (rightAttributes.size() > newAttributes->size()) { 
-                newAttributes = &rightAttributes;
-            }
-            for (size_t i = 0; i < nAttrs; i++)
+            size_t nAttributes = min(leftAttributes.size(), rightAttributes.size());
+            if (rightAttributes.size() > mergedAttributes->size())
             {
-                if (leftAttributes[i].getType() != rightAttributes[i].getType()
-                    || leftAttributes[i].getFlags() != rightAttributes[i].getFlags())
+                mergedAttributes = &rightAttributes;
+            }
+
+            for (size_t nAttribute = 0; nAttribute < nAttributes; nAttribute++)
+            {
+                AttributeDesc const& leftAttribute   = leftAttributes[nAttribute];
+                AttributeDesc const& rightAttribute  = rightAttributes[nAttribute];
+
+                if (leftAttribute.getType() != rightAttribute.getType()
+                    || leftAttribute.getFlags() != rightAttribute.getFlags())
                 {
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ATTR_TYPE_MISMATCH)
-                        << leftAttributes[i].getName() << rightAttributes[i].getName()
-                        << schemas[0] << schemas[j];
+                        << leftAttribute.getName() << rightAttribute.getName()
+                        << schemas[0] << schemas[nSchema];
                 }
             }
-        }
-        return ArrayDesc(schemas[0].getName(), *newAttributes, newDims);
+        }  // for (size_t nSchema = 1;  ... ) { ... }
+
+        return ArrayDesc(
+            schemas[0].getName(),
+            *mergedAttributes,
+            mergedDimensions,
+            defaultPartitioning());
     }
 };
 

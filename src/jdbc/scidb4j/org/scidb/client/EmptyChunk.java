@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,13 +21,13 @@
 */
 package org.scidb.client;
 
-import org.scidb.io.network.Message.Chunk;
-import org.scidb.util.ByteBufferExtensions;
-
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.logging.Logger;
+
+import org.scidb.io.network.Message.Chunk;
+import org.scidb.util.ByteBufferExtensions;
 
 public class EmptyChunk implements IChunk
 {
@@ -53,7 +53,7 @@ public class EmptyChunk implements IChunk
 
     private static Logger log = Logger.getLogger(EmptyChunk.class.getName());
 
-    public EmptyChunk(Chunk msg, Array array) throws Error
+    public EmptyChunk(Chunk msg, Array array) throws SciDBException
     {
         org.scidb.io.network.ScidbMsg.Chunk record = msg.getRecord();
         attributeId = record.getAttributeId();
@@ -88,14 +88,14 @@ public class EmptyChunk implements IChunk
                 log.fine("Got bitmap chunk");
             } else
             {
-                log.fine("Got just chunk");
+                log.fine("Got data chunk");
             }
 
             header = new Header(chunkData);
 
             if (compressionMethod != 0)
             {
-                throw new Error("Compressed chunks not yet supported");
+                throw new SciDBException("Compressed chunks not yet supported");
             }
 
             segments = new Segment[header.nSegs];
@@ -103,12 +103,14 @@ public class EmptyChunk implements IChunk
             {
                 segments[i] = new Segment(chunkData);
             }
-            if (segments.length == 0)
+            if (segments.length == 0) {
                 _end = true;
-
-            payloadStart = chunkData.position();
-
-            curLogicalPosition = segments[0].lPosition;
+                eof = true;
+            }
+            else {
+                payloadStart = chunkData.position();
+                curLogicalPosition = segments[0].lPosition;
+            }
         }
     }
 
@@ -188,10 +190,10 @@ public class EmptyChunk implements IChunk
             BigInteger magic = ByteBufferExtensions.getUnsignedLong(src);
             if (magic.equals(RleBitmapPayloadMagic))
             {
-                log.fine("Magic is empty bitmap payload");
+                log.fine("The magic number for RLEEmptyBitmap is good.");
             } else
             {
-                log.fine("Magic is shit");
+                log.fine("The magic number for RLEEmptyBitmap is not recognized.");
             }
 
             nSegs = (int) src.getLong();

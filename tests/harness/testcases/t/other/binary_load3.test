@@ -16,16 +16,18 @@ create array MAT_UB2 <val:double,name:string,sal:double> [x=0:*,4,0,y=0:*,4,0]
 save(MAT, 'matrix.bin', 0, '(double,string,double)')
 load(MAT_UB, 'matrix.bin', 0, '(double,string,double)')
 save(MAT_UB, 'mat.txt', -1)
+load(MAT_UB, 'mat.txt', -1)
 
 --shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(Matrix_date, '${TEST_DATA_DIR}/matdate.txt')""
 save(Matrix_date, 'matdate.out', 0, '(double,string,double,datetime)')
+load(Matrix_date, 'matdate.out', 0, '(double,string,double,datetime)')
 show(Matrix_date)
 show(MAT_UB)
 load(MAT_UB, 'mat.txt', 0, 'text')
 
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(MAT_UB1, 'matdate.out', 0, '(double,string,double)')"
 
-load(MAT_UB1, 'matdate.out', 0, '(double,string,double,dummy(8))')
+load(MAT_UB1, 'matdate.out', 0, '(double,string,double,skip(8))')
 
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(Matrix_date, 'matrix.bin', 0, '(double,string,double,datetime)')"
 --error --code=scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(MAT_UB2, 'matrix.bin', 0, '(float,string,float)')"

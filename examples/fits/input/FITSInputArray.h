@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -41,10 +41,10 @@ class FITSInputArrayIterator;
 class FITSInputArray : public Array
 {
 public:
-    FITSInputArray(ArrayDesc const& desc, string const& filePath, uint32_t hdu, boost::shared_ptr<Query>& query);
+    FITSInputArray(ArrayDesc const& desc, std::string const& filePath, uint32_t hdu, std::shared_ptr<Query>& query);
 
     virtual ArrayDesc const&                        getArrayDesc() const;
-    virtual boost::shared_ptr<ConstArrayIterator>   getConstIterator(AttributeID attr) const;
+    virtual std::shared_ptr<ConstArrayIterator>   getConstIterator(AttributeID attr) const;
 
     /**
      * Get the least restrictive access mode that the array supports.
@@ -77,7 +77,7 @@ private:
 
     void                                            calculateLength();
     void                                            readChunk();
-    void                                            initMemChunks(boost::shared_ptr<Query>& query);
+    void                                            initMemChunks(std::shared_ptr<Query>& query);
     void                                            flushMemChunks();
 
     void                                            readShortInts(size_t n);
@@ -92,14 +92,14 @@ private:
     Dimensions const&                               dims;
     size_t                                          nDims;
     size_t                                          nAttrs;
-    vector<Value>                                   values;
-    vector<CachedChunks>                            chunks;
-    vector<boost::shared_ptr<ChunkIterator> >       chunkIterators;
+    std::vector<Value>                                   values;
+    std::vector<CachedChunks>                            chunks;
+    std::vector<std::shared_ptr<ChunkIterator> >       chunkIterators;
     size_t                                          chunkIndex;
     Coordinates                                     chunkPos;
     size_t                                          nConsecutive;
     size_t                                          nOuter;
-    boost::weak_ptr<Query>                          query;
+    std::weak_ptr<Query>                          query;
 };
 
 /* FITSInputArrayIterator */

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -99,7 +99,7 @@ class MpiMessageDesc : public scidb::MessageDesc
 {
  public:
     MpiMessageDesc() : scidb::MessageDesc() {}
-    MpiMessageDesc(boost::shared_ptr<scidb::SharedBuffer> binary)
+    MpiMessageDesc(std::shared_ptr<scidb::SharedBuffer> binary)
     : scidb::MessageDesc(binary) {}
     virtual ~MpiMessageDesc() {}
     virtual bool validate();
@@ -117,7 +117,7 @@ MpiMessageDesc::createRecord(scidb::MessageID messageType)
         return scidb::MessageDesc::createRecord(messageType);
     }
 
-    boost::shared_ptr<scidb::NetworkMessageFactory> msgFactory;
+    std::shared_ptr<scidb::NetworkMessageFactory> msgFactory;
     if (messageType == scidb::mtMpiSlaveResult) {
         return scidb::MessagePtr(new scidb_msg::MpiSlaveResult());
     }
@@ -200,10 +200,10 @@ class MpiMasterProxy
             cerr << "SLAVE: cannot connect to SciDB "<<std::endl;
             MPI_Abort(MPI_COMM_WORLD, 911);
         }
-        boost::shared_ptr<scidb::MessageDesc> handshakeMessage(new MpiMessageDesc());
+        std::shared_ptr<scidb::MessageDesc> handshakeMessage(new MpiMessageDesc());
         handshakeMessage->initRecord(scidb::mtMpiSlaveHandshake);
         handshakeMessage->setQueryID(_queryId);
-        boost::shared_ptr<scidb_msg::MpiSlaveHandshake> record = handshakeMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
+        std::shared_ptr<scidb_msg::MpiSlaveHandshake> record = handshakeMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
 
         record->set_cluster_uuid(_clusterUuid);
         record->set_instance_id(_instanceId);
@@ -239,26 +239,26 @@ class MpiMasterProxy
 
     void sendResult(int64_t status, scidb::mpi::Command* nextCmd)
     {
-        boost::shared_ptr<scidb::MessageDesc> resultMessage(new MpiMessageDesc());
+        std::shared_ptr<scidb::MessageDesc> resultMessage(new MpiMessageDesc());
         resultMessage->initRecord(scidb::mtMpiSlaveResult);
         resultMessage->setQueryID(_queryId);
-        boost::shared_ptr<scidb_msg::MpiSlaveResult> record = resultMessage->getRecord<scidb_msg::MpiSlaveResult>();
+        std::shared_ptr<scidb_msg::MpiSlaveResult> record = resultMessage->getRecord<scidb_msg::MpiSlaveResult>();
         record->set_status(status);
         record->set_launch_id(_launchId);
 
         sendReceive(resultMessage, nextCmd);
     }
 
-    void sendReceive(boost::shared_ptr<scidb::MessageDesc>& resultMessage, scidb::mpi::Command* nextCmd)
+    void sendReceive(std::shared_ptr<scidb::MessageDesc>& resultMessage, scidb::mpi::Command* nextCmd)
     {
         if (nextCmd == NULL) {
             _connection->send(resultMessage);
             return;
         }
-        boost::shared_ptr<MpiMessageDesc> commandMessage =
+        std::shared_ptr<MpiMessageDesc> commandMessage =
             _connection->sendAndReadMessage<MpiMessageDesc>(resultMessage);
 
-        boost::shared_ptr<scidb_msg::MpiSlaveCommand> cmdMsg =
+        std::shared_ptr<scidb_msg::MpiSlaveCommand> cmdMsg =
             commandMessage->getRecord<scidb_msg::MpiSlaveCommand>();
         const string commandStr = cmdMsg->command();
         nextCmd->setCmd(commandStr);
@@ -578,7 +578,7 @@ int runScidbCommands(uint32_t port,
 
             void* bufs[MAX_BUFS];
             size_t sizes[MAX_BUFS];
-            boost::scoped_ptr<scidb::SharedMemoryIpc> shMems[MAX_BUFS];
+            std::unique_ptr<scidb::SharedMemoryIpc> shMems[MAX_BUFS];
 
             for (size_t i=0; (i < nBufs && i < MAX_BUFS); i++) {
                 shMems[i].reset();
@@ -617,9 +617,9 @@ int runScidbCommands(uint32_t port,
                 INFO = scidb::pdgesvdSlave(bufs, sizes, nBufs);
             } else if (dlaOp == "pdgemm_") {
                 INFO = scidb::pdgemmSlave(bufs, sizes, nBufs);
-            } else if (dlaOp == "mpirank") {
+            } else if (dlaOp == "_mpirank") {
                 INFO = scidb::mpirankSlave(bufs, sizes, nBufs);
-            } else if (dlaOp == "mpicopy") {
+            } else if (dlaOp == "_mpicopy") {
                 cerr << "runScidbCommands: calling mpiCopySlave()" << std::endl;
                 INFO = scidb::mpiCopySlave(bufs, sizes, nBufs);
             } else {
@@ -671,10 +671,10 @@ void handleEchoCommand(const std::vector<std::string>& args,
 
     // now get the buffers sent by the master
 
-    boost::scoped_ptr<scidb::SharedMemoryIpc> shmIn(scidb::mpi::newSharedMemoryIpc(ipcInName));
+    std::unique_ptr<scidb::SharedMemoryIpc> shmIn(scidb::mpi::newSharedMemoryIpc(ipcInName));
     char* bufIn(NULL);
     size_t sizeIn(0);
-    boost::scoped_ptr<scidb::SharedMemoryIpc> shmOut(scidb::mpi::newSharedMemoryIpc(ipcOutName));
+    std::unique_ptr<scidb::SharedMemoryIpc> shmOut(scidb::mpi::newSharedMemoryIpc(ipcOutName));
     char* bufOut(NULL);
     size_t sizeOut(0);
 
@@ -727,10 +727,10 @@ void handleBadMessageFlood(QueryID queryId,
     assert(launchId>0);
     for (size_t i=0; i < MSG_NUM; ++i)
     {
-        boost::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc());
+        std::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc());
         wrongMessage->initRecord(scidb::mtMpiSlaveHandshake);
         wrongMessage->setQueryID(queryId);
-        boost::shared_ptr<scidb_msg::MpiSlaveHandshake> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
+        std::shared_ptr<scidb_msg::MpiSlaveHandshake> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
         wrongRecord->set_cluster_uuid("");
         wrongRecord->set_instance_id(0);
         if (i%2==0) {
@@ -754,12 +754,12 @@ void handleBadHandshake(QueryID queryId,
 
     scidb::mpi::Command nextCmd;
 
-    boost::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc());
+    std::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc());
     wrongMessage->initRecord(scidb::mtMpiSlaveHandshake);
     wrongMessage->setQueryID(queryId);
 
     // SciDB is not expecting a handshake message at this time in the current launch
-    boost::shared_ptr<scidb_msg::MpiSlaveHandshake> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
+    std::shared_ptr<scidb_msg::MpiSlaveHandshake> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveHandshake>();
 
     wrongRecord->set_cluster_uuid("");
     wrongRecord->set_instance_id(0);
@@ -785,12 +785,12 @@ void handleBadStatus(QueryID queryId,
 {
     cerr << "SLAVE: sending malformed status from BAD_STATUS" << std::endl;
     char buf[1]; buf[0]='\0';
-    boost::shared_ptr<scidb::SharedBuffer> binary(new scidb::MemoryBuffer(buf, 1));
+    std::shared_ptr<scidb::SharedBuffer> binary(new scidb::MemoryBuffer(buf, 1));
 
-    boost::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc(binary));
+    std::shared_ptr<scidb::MessageDesc> wrongMessage(new MpiMessageDesc(binary));
     wrongMessage->initRecord(scidb::mtMpiSlaveResult);
     wrongMessage->setQueryID(queryId);
-    boost::shared_ptr<scidb_msg::MpiSlaveResult> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveResult>();
+    std::shared_ptr<scidb_msg::MpiSlaveResult> wrongRecord = wrongMessage->getRecord<scidb_msg::MpiSlaveResult>();
 
     wrongRecord->set_status(0);
     wrongRecord->set_launch_id(launchId);

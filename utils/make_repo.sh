@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -147,7 +147,7 @@ elif [ "$repotype" == "yum" ]; then
             rm -rf "$release_dir/repodata"
             createrepo "$release_dir"
             echo Signing repo $release_dir
-            gpg -u "$2" --detach-sign --armor "$release_dir/repodata/repomd.xml"         
+            gpg -u "$2" --detach-sign --armor "$release_dir/repodata/repomd.xml"
         fi
     done
 else

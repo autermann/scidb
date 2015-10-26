@@ -4,7 +4,7 @@ Query was executed successfully
 SCIDB QUERY : <create array B <a:int32 null> [x=0:3,2,1]>
 Query was executed successfully
 
-SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A from '../tests/harness/testcases/data/null_8.txt'">
+SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A from '${TEST_DATA_DIR}/null_8.txt'">
 {x} a
 {1} null
 {3} ?1

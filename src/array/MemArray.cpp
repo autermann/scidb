@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -60,14 +60,14 @@ namespace scidb
     // MemArray
     //
 
-    MemArray::MemArray(ArrayDesc const& arr, boost::shared_ptr<Query> const& query)
+    MemArray::MemArray(ArrayDesc const& arr, std::shared_ptr<Query> const& query)
     : desc(arr)
     {
         _query=query;
         initLRU();
     }
 
-    MemArray::MemArray(boost::shared_ptr<Array>& input, boost::shared_ptr<Query> const& query, bool vertical)
+    MemArray::MemArray(const std::shared_ptr<Array>& input, std::shared_ptr<Query> const& query, bool vertical)
     : desc(input->getArrayDesc())
     {
         _query=query;
@@ -146,12 +146,12 @@ namespace scidb
         return chunk;
     }
 
-    boost::shared_ptr<ArrayIterator> MemArray::getIterator(AttributeID attId)
+    std::shared_ptr<ArrayIterator> MemArray::getIterator(AttributeID attId)
     {
-        return boost::shared_ptr<ArrayIterator>(new MemArrayIterator(*this, attId));
+        return std::shared_ptr<ArrayIterator>(new MemArrayIterator(*this, attId));
     }
 
-    boost::shared_ptr<ConstArrayIterator> MemArray::getConstIterator(AttributeID attId) const
+    std::shared_ptr<ConstArrayIterator> MemArray::getConstIterator(AttributeID attId) const
     {
         return ((MemArray*)this)->getIterator(attId);
     }
@@ -446,7 +446,8 @@ namespace scidb
     Chunk& MemArrayIterator::newChunk(Coordinates const& pos)
     {
         if (!_array.desc.contains(pos)) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES);
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES)
+                << CoordsToStr(pos) << _array.desc.getDimensions();
         }
         addr.coords = pos;
         _array.desc.getChunkPositionFor(addr.coords);

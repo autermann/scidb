@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,14 +31,13 @@
 #include <util/Mutex.h>                                  // For Mutex
 #include <util/PointerRange.h>                           // For PointerRange
 #include <util/PluginObjects.h>                          // For PluginObjects
+#include <util/arena/Malloc.h>                           // For malloc() etc.
 #include <array/RLE.h>                                   // For RLEPayload
 #include <query/Value.h>                                 // For Value
 
 /****************************************************************************/
 namespace scidb {
 /****************************************************************************/
-
-typedef std::string TypeId;
 
 const char TID_INVALID[]    = "InvalidType";
 const char TID_INDICATOR[]  = "indicator";
@@ -180,12 +179,12 @@ const char* const DEFAULT_STRFTIME_FORMAT = "%F %T";
 /****************************************************************************/
 
 /**
- *  Describes the size and behaviour of a set of values.
+ *  Describes the size and behavior of a set of values.
  */
 class Type : boost::totally_ordered<Type>,
              boost::totally_ordered<TypeId>
 {
- public:                  // Construction
+public:                  // Construction
                               Type()
                                : _typeId  (TID_VOID),
                                  _bitSize (0),
@@ -195,7 +194,7 @@ class Type : boost::totally_ordered<Type>,
                                  _bitSize (n),
                                  _baseType(b)            {}
 
- public:                   // Operations
+public:                   // Operations
       const TypeId&           name()               const {return _typeId;}
       const TypeId&           typeId()             const {return _typeId;}
       const TypeId&           baseType()           const {return _baseType;}
@@ -204,11 +203,11 @@ class Type : boost::totally_ordered<Type>,
             bool              variableSize()       const {return _bitSize == 0;}
             bool              isVoid()             const {return _typeId.compare(TID_VOID) == 0;}
 
- public:                   // Operations
+public:                   // Operations
     static  bool              isSubtype  (TypeId const& sub,TypeId const& sup);
             bool              isSubtypeOf(const TypeId& t)const {return _baseType!=TID_VOID && (_baseType==t || isSubtype(_baseType,t));}
 
-  private:                 // Representation
+private:                 // Representation
             TypeId            _typeId;                  // type identificator
             uint32_t          _bitSize;                 // bit size is used in storage manager. 0 - for variable size data
             TypeId            _baseType;
@@ -428,14 +427,16 @@ inline t& Value::get()
     assert(sizeof(t) <= _size);                          // That is no smaller
     assert(iff(small(sizeof(t)),small(_size)));          // And similar layout
 
- /* It would be more general to test the 'small'-ness of '_size' here,  rather
+    /*
+    It would be more general to test the 'small'-ness of '_size' here,  rather
     than looking at the size of the target type 't':  doing so would enable us
     to handle a fetch of the first (small) element from an embedded array that
     does not itself fit within the buffer, for example; but this would require
     a *run time* check, thus slowing down the much more common case of a fetch
     of a single small value from a Value that  holds exactly one such element;
     understand that the test below involves a size known to the compiler, thus
-    is folded away at compile time, and so incurs no overhead whatsoever...*/
+    is folded away at compile time, and so incurs no overhead whatsoever...
+    */
 
     if (small(sizeof(t)))                                // Fits in the buffer
     {
@@ -621,6 +622,12 @@ inline Value& Value::operator=(const Value& v)
 {
     if (this != &v)                                      // Non trivial assign?
     {
+        if (v.isDatum() && !isTile())                    // Possible shortcut?
+        {
+            setData(v.data(),v.size());                  // ...maybe no need
+            return *this;                                // ...to free/malloc
+        }
+
         this->~Value();                                  // ...destroy current
 
         new(this) Value(v);                              // ...re-init overtop
@@ -744,7 +751,7 @@ inline void* Value::calloc(size_t n)
 {
     assert(large(n));                                    // Data must be large
 
-    void* p = ::calloc(n,1);                             // Delegate to calloc
+    void* p = arena::calloc(n,1);                        // Delegate to calloc
 
     if (p == 0)                                          // Allocation failed?
     {
@@ -761,7 +768,7 @@ inline void* Value::malloc(size_t n)
 {
     assert(large(n));                                    // Data must be large
 
-    void* p = ::malloc(n);                               // Delegate to malloc
+    void* p = arena::malloc(n);                          // Delegate to malloc
 
     if (p == 0)                                          // Allocation failed?
     {
@@ -778,7 +785,7 @@ inline void* Value::realloc(void* p,size_t n)
 {
     assert(large(n) && p!=0);                            // Data must be large
 
-    void* v = ::realloc(p,n);                            // Delegate to realloc
+    void* v = arena::realloc(p,n);                       // Delegate to realloc
 
     if (v == 0)                                          // Allocation failed?
     {
@@ -800,7 +807,7 @@ inline void Value::reset()
 {
     if (large(_size))                                    // Has an allocation?
     {
-        ::free(_data);                                   // ...so free it now
+        arena::free(_data);                              // ...so free it now
     }
 }
 
@@ -885,13 +892,6 @@ inline bool isDefaultFor(const Value& v,const TypeId& t)
 }
 
 /**
- * @param type a type of input value
- * @param value a value to be converted
- * @return string with value
- */
-std::string ValueToString(const TypeId& type, const Value& value, int precision = 6);
-
-/**
  * @param type a type of output value
  * @param str a string to be converted
  * @param [out] value a value in which string will be converted
@@ -945,7 +945,7 @@ void parseDateTimeTz(std::string const& str, Value& result);
  * The three-value logic is introduced to improve efficiency for calls to isNan.
  *
  * If isNan takes as input a TypeId, every time isNan is called on a value,
- * string comparisions would be needed to check if the type is equal to TID_DOUBLE
+ * string comparisons would be needed to check if the type is equal to TID_DOUBLE
  * and/or TID_FLOAT.
  *
  * With the introduction of DoubleFloatOther, the caller can do the string
@@ -1059,7 +1059,7 @@ inline bool isNullOrNan(const Value& v,DoubleFloatOther type)
 Value makeTileConstant(const TypeId&,const Value&);
 
 /****************************************************************************/
-}
+} // namespace
 /****************************************************************************/
 #endif
 /****************************************************************************/

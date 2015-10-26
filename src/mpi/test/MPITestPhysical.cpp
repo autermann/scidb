@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <array/Metadata.h>
 #include <system/Cluster.h>
 #include <query/Query.h>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
 #include <log4cxx/logger.h>
@@ -42,12 +42,12 @@ namespace scidb
 using namespace std;
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.mpi.test"));
 
-boost::shared_ptr<MpiSlaveProxy> newMPISlaveProxyForTests(uint64_t launchId,
-                                                          const boost::shared_ptr<Query>& query,
+std::shared_ptr<MpiSlaveProxy> newMPISlaveProxyForTests(uint64_t launchId,
+                                                          const std::shared_ptr<Query>& query,
                                                           const std::string& installPath,
                                                           uint32_t timeout, uint32_t delay)
 {
-    return boost::make_shared<MpiSlaveProxy>(launchId, query, installPath,
+    return std::make_shared<MpiSlaveProxy>(launchId, query, installPath,
                                              timeout, delay);
 }
 
@@ -62,11 +62,11 @@ class PhysicalMpiTest: public MPIPhysical
     {
     }
 
-    void preSingleExecute(shared_ptr<Query> query)
+    void preSingleExecute(std::shared_ptr<Query> query)
     {
         _mustLaunch = true;
     }
-    void setQuery(const boost::shared_ptr<Query>& query)
+    void setQuery(const std::shared_ptr<Query>& query)
     {
         // slow down the workers to make sure the slaves are started before
         // the workers have set up the context
@@ -77,13 +77,13 @@ class PhysicalMpiTest: public MPIPhysical
         MPIPhysical::setQuery(query);
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays,
-                                     boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
+                                     std::shared_ptr<Query> query)
     {
         MpiManager::getInstance()->cleanup();
 
         assert(_ctx);
-        const boost::shared_ptr<const InstanceMembership> membership =
+        const std::shared_ptr<const InstanceMembership> membership =
             Cluster::getInstance()->getInstanceMembership();
 
         if (membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) {
@@ -104,17 +104,17 @@ class PhysicalMpiTest: public MPIPhysical
         testSlaveExit(installPath, membership,  query);
 
         _ctx.reset();
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 
-    void postSingleExecute(shared_ptr<Query> query)
+    void postSingleExecute(std::shared_ptr<Query> query)
     {
     }
 
-    void launchMpiJob(boost::shared_ptr<MpiLauncher>& launcher,
+    void launchMpiJob(std::shared_ptr<MpiLauncher>& launcher,
                       std::vector<std::string>& args,
-                      const boost::shared_ptr<const InstanceMembership>& membership,
-                      const shared_ptr<Query>& query,
+                      const std::shared_ptr<const InstanceMembership>& membership,
+                      const std::shared_ptr<Query>& query,
                       const int maxSlaves)
     {
         launcher->launch(args, membership, maxSlaves);
@@ -132,8 +132,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testMultipleLaunches(const std::string& installPath,
-                              const boost::shared_ptr<const InstanceMembership>& membership,
-                              boost::shared_ptr<Query>& query)
+                              const std::shared_ptr<const InstanceMembership>& membership,
+                              std::shared_ptr<Query>& query)
     {
         for ( size_t i=0; i < NUM_LAUNCH_TESTS; ++i)
         {
@@ -146,7 +146,7 @@ class PhysicalMpiTest: public MPIPhysical
                        << "XXXX Bug in managing last launch ID");
             }
 
-            boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+            std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 
             if (i>0) {
                 try {
@@ -182,9 +182,9 @@ class PhysicalMpiTest: public MPIPhysical
                 // expected
             }
 
-            boost::shared_ptr<MpiLauncher> launcher;
+            std::shared_ptr<MpiLauncher> launcher;
             if (_mustLaunch) {
-                launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+                launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
                 // Perform some negative testing on the launcher object
                 try {
                     vector<pid_t> pids;
@@ -261,7 +261,7 @@ class PhysicalMpiTest: public MPIPhysical
             slave->waitForHandshake(_ctx);
 
             // After the handshake the old slave must be gone
-            boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+            std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 
             // cleanup the slave from the previous launch (if any)
             if (oldSlave) {
@@ -270,7 +270,7 @@ class PhysicalMpiTest: public MPIPhysical
             }
             _ctx->complete(oldLaunchId);
 
-            boost::shared_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName));
+            std::shared_ptr<SharedMemoryIpc> shmIpc(mpi::newSharedMemoryIpc(ipcName));
 
             try {
                 _ctx->addSharedMemoryIpc(launchId-1, shmIpc);
@@ -453,8 +453,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testEcho(const std::string& installPath,
-                  const boost::shared_ptr<const InstanceMembership>& membership,
-                  boost::shared_ptr<Query>& query)
+                  const std::shared_ptr<const InstanceMembership>& membership,
+                  std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX ECHO test");
 
@@ -465,12 +465,12 @@ class PhysicalMpiTest: public MPIPhysical
                    << "XXXX Bug in manging last launch ID");
         }
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+	std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
 	    launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -480,7 +480,7 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -498,10 +498,10 @@ class PhysicalMpiTest: public MPIPhysical
         LOG4CXX_DEBUG(logger, "XXXX IPC name.in = " << ipcNameIn);
         LOG4CXX_DEBUG(logger, "XXXX IPC name.out = " << ipcNameOut);
 
-	boost::shared_ptr<SharedMemoryIpc> shmIpcIn(mpi::newSharedMemoryIpc(ipcNameIn));
+	std::shared_ptr<SharedMemoryIpc> shmIpcIn(mpi::newSharedMemoryIpc(ipcNameIn));
 	_ctx->addSharedMemoryIpc(launchId, shmIpcIn);
 
-	boost::shared_ptr<SharedMemoryIpc> shmIpcOut(mpi::newSharedMemoryIpc(ipcNameOut));
+	std::shared_ptr<SharedMemoryIpc> shmIpcOut(mpi::newSharedMemoryIpc(ipcNameOut));
 	_ctx->addSharedMemoryIpc(launchId, shmIpcOut);
 
 	const int64_t LARGE_SHM_SIZE = 64*MiB;
@@ -589,8 +589,8 @@ class PhysicalMpiTest: public MPIPhysical
     static const uint32_t SLAVE_DELAY_SEC = 10 * 2; //(minimum timeout supported by Event,Semaphore)*2
 
     void testSlowSlave(const std::string& installPath,
-                        const boost::shared_ptr<const InstanceMembership>& membership,
-                        boost::shared_ptr<Query>& query)
+                        const std::shared_ptr<const InstanceMembership>& membership,
+                        std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX SLOW_SLAVE test");
 
@@ -606,14 +606,14 @@ class PhysicalMpiTest: public MPIPhysical
         const uint32_t LAUNCHER_CHECK_DELAY_SEC=1;
         assert(SLAVE_TIMEOUT_SEC > LAUNCHER_CHECK_DELAY_SEC);
 
-	boost::shared_ptr<MpiSlaveProxy> slave = newMPISlaveProxyForTests(launchId, query, installPath,
+	std::shared_ptr<MpiSlaveProxy> slave = newMPISlaveProxyForTests(launchId, query, installPath,
                                                                           SLAVE_TIMEOUT_SEC,
                                                                           LAUNCHER_CHECK_DELAY_SEC);
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             stringstream ss;
             ss << SLAVE_DELAY_SEC;
@@ -664,7 +664,7 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -735,8 +735,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testSlaveExit(const std::string& installPath,
-                          const boost::shared_ptr<const InstanceMembership>& membership,
-                          boost::shared_ptr<Query>& query)
+                          const std::shared_ptr<const InstanceMembership>& membership,
+                          std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX ABNORMAL_EXIT test");
 
@@ -747,12 +747,12 @@ class PhysicalMpiTest: public MPIPhysical
                    << "XXXX Bug in manging last launch ID");
         }
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath, SLAVE_TIMEOUT_SEC));
+	std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath, SLAVE_TIMEOUT_SEC));
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
 	    launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -784,7 +784,7 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -865,8 +865,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testBadMessage(const std::string& installPath,
-                        const boost::shared_ptr<const InstanceMembership>& membership,
-                        boost::shared_ptr<Query>& query)
+                        const std::shared_ptr<const InstanceMembership>& membership,
+                        std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_MSG from slave test");
 
@@ -877,12 +877,12 @@ class PhysicalMpiTest: public MPIPhysical
                    << "XXXX Bug in managing last launch ID");
         }
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+	std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -892,7 +892,7 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -936,8 +936,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testBadMessageFlood(const std::string& installPath,
-                             const boost::shared_ptr<const InstanceMembership>& membership,
-                             boost::shared_ptr<Query>& query)
+                             const std::shared_ptr<const InstanceMembership>& membership,
+                             std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_MSG_FLOOD from slave test");
 
@@ -948,12 +948,12 @@ class PhysicalMpiTest: public MPIPhysical
                    << "XXXX Bug in manging last launch ID");
         }
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+	std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -963,7 +963,7 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -1011,7 +1011,7 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
         // clear all the bogus messages the slave has sent us
-        slave = boost::shared_ptr<MpiSlaveProxy>(new MpiSlaveProxy(launchId+1, query, installPath));
+        slave = std::shared_ptr<MpiSlaveProxy>(new MpiSlaveProxy(launchId+1, query, installPath));
         // Get the malformed handshake
         try {
             slave->waitForHandshake(_ctx);
@@ -1029,8 +1029,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testBadHandshake(const std::string& installPath,
-                          const boost::shared_ptr<const InstanceMembership>& membership,
-                          boost::shared_ptr<Query>& query)
+                          const std::shared_ptr<const InstanceMembership>& membership,
+                          std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_HANDSHAKE from slave test");
 
@@ -1041,12 +1041,12 @@ class PhysicalMpiTest: public MPIPhysical
                    << "XXXX Bug in manging last launch ID");
         }
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+	std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -1056,7 +1056,7 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -1097,8 +1097,8 @@ class PhysicalMpiTest: public MPIPhysical
     }
 
     void testBadStatus(const std::string& installPath,
-                       const boost::shared_ptr<const InstanceMembership>& membership,
-                       boost::shared_ptr<Query>& query)
+                       const std::shared_ptr<const InstanceMembership>& membership,
+                       std::shared_ptr<Query>& query)
     {
         LOG4CXX_DEBUG(logger, "XXXX BAD_STATUS from slave test");
 
@@ -1109,12 +1109,12 @@ class PhysicalMpiTest: public MPIPhysical
                    << "XXXX Bug in managing last launch ID");
         }
 
-	boost::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
+	std::shared_ptr<MpiSlaveProxy> slave(new MpiSlaveProxy(launchId, query, installPath));
 	_ctx->setSlave(slave);
 
-	boost::shared_ptr<MpiLauncher> launcher;
+	std::shared_ptr<MpiLauncher> launcher;
 	if (_mustLaunch) {
-	    launcher = boost::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
+	    launcher = std::shared_ptr<MpiLauncher>(MpiManager::getInstance()->newMPILauncher(launchId, query));
 	    _ctx->setLauncher(launcher);
             std::vector<std::string> args;
             launchMpiJob(launcher, args, membership, query, query->getInstancesCount());
@@ -1125,7 +1125,7 @@ class PhysicalMpiTest: public MPIPhysical
 	slave->waitForHandshake(_ctx);
 
 	// After the handshake the old slave must be gone
-	boost::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
+	std::shared_ptr<MpiSlaveProxy> oldSlave = _ctx->getSlave(oldLaunchId);
 	if (oldSlave) {
 	    oldSlave->destroy();
 	    oldSlave.reset();
@@ -1145,7 +1145,7 @@ class PhysicalMpiTest: public MPIPhysical
         try {
             slave->waitForExit(_ctx);
         } catch (scidb::SystemException& e) {
-            if (!_mustLaunch) { 
+            if (!_mustLaunch) {
                 throw;
             }
             if (e.getLongErrorCode() != SCIDB_LE_OPERATION_FAILED) {
@@ -1159,7 +1159,7 @@ class PhysicalMpiTest: public MPIPhysical
         }
 
         LOG4CXX_DEBUG(logger, "XXXX BAD_STATUS: waitForExit complete");
-        
+
         if (_mustLaunch) {
             try {
                 launcher->destroy();
@@ -1179,6 +1179,6 @@ class PhysicalMpiTest: public MPIPhysical
     const uint64_t NUM_LAUNCH_TESTS;
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalMpiTest, "mpi_test", "PhysicalMpiTest");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalMpiTest, "_mpi_test", "PhysicalMpiTest");
 
 }

@@ -18,7 +18,7 @@
 
 # ----------------------------------------------------------------------------
 # If you have installed LIBPQXX in a non-standard location.
-# Then you have three options. 
+# Then you have three options.
 # In the following comments, it is assumed that <Your Path>
 # points to the root directory of the include directory of LIBPQXX. e.g
 # If you have put LIBPQXX in C:\development\libpqxx then <Your Path> is

@@ -11,7 +11,7 @@ SCIDB QUERY : <iquery -c ${IQUERY_HOST} -p ${IQUERY_PORT} -aq "load(parse_woes, 
 d3b\\d3c',''
 {5} 'e1','','e3e3a
 e3b\\e3c',''
-{6} '\\f1','','f3','\\x\\y\\zf4'
+{6} 'f1','','f3','xyzf4'
 {7} 'g1',null,'g3','g4'
 {8} 'h1','h2','h3','all-good-here-h4'
 {9} '','','',''
@@ -22,7 +22,7 @@ e3b\\e3c',''
 {14} 'o1','o2','o3-line-ends-w-crlf','o4'
 {15} 'p1-short-line-ends-w-crlf','p2','p3',null
 {16} 'q1-now-test-some-nulls',null,null,?127
-{17} '\\N',null,'r3-sql-style-nulls',null
+{17} '',null,'r3-sql-style-nulls',null
 {18} 's1-more-nulls-crlf',null,null,null
 {19} 't1-non-nulls','??0','?','NULL'
 {20} 'u1-more-non-nulls','?-42','Null','NA'
@@ -38,6 +38,7 @@ SCIDB QUERY : <scan(parse_shadow)>
 {13} null,null,null,'Too few input record fields at position 311, line 14, column 3',310
 {15} null,null,null,'Too few input record fields at position 374, line 16, column 3',372
 {16} null,null,'The integer \'?128\' is not a valid missing reason code',null,400
+{17} 'Assigning NULL to non-nullable attribute',null,null,null,410
 {21} null,null,'Too few input record fields at position 545, line 22, column 2','Too few input record fields at position 545, line 22, column 3',545
 
 SCIDB QUERY : <remove(parse_woes)>

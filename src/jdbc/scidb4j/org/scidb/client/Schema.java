@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,7 +31,7 @@ public class Schema
     private String name;
     private Attribute[] attributes;
     private Dimension[] dimensions;
-    private Attribute emptyIndicator;
+    private Attribute emptyIndicator = null;
 
     /**
      * Constructor
@@ -45,12 +45,15 @@ public class Schema
         this.name = name;
         this.attributes = attributes;
         this.dimensions = dimensions;
-        for (Attribute att: attributes)
+
+        assert(this.attributes.length >= 1);
+        for (int i=0; i<this.attributes.length; ++i)
         {
-            if (att.isEmptyIndicator())
-            {
-                emptyIndicator = att;
-                break;
+            if (i+1 < this.attributes.length) {
+                // Not the last one.
+                assert(! this.attributes[i].isEmptyIndicator());
+            } else if (this.attributes[i].isEmptyIndicator()){
+                emptyIndicator = this.attributes[i];
             }
         }
     }
@@ -107,6 +110,7 @@ public class Schema
         private int id;
         private String name;
         private String type;
+        private Type.Enum typeEnum;
         private boolean nullable;
         private boolean emptyIndicator;
 
@@ -119,10 +123,12 @@ public class Schema
          * @param flags Attribute flags
          */
         public Attribute(int id, String name, String type, int flags)
+        throws SciDBException
         {
             this.id = id;
             this.name = name;
             this.type = type;
+            this.typeEnum = Type.type2Enum(type);
             this.nullable = (flags & 1/*IS_NULLABLE*/) != 0;
             this.emptyIndicator = (flags & 2/*IS_EMPTY_INDICATOR*/) != 0;
         }
@@ -152,6 +158,12 @@ public class Schema
         public String getType()
         {
             return type;
+        }
+
+        /// @return type as a Type.Enum.
+        public Type.Enum getTypeEnum()
+        {
+            return typeEnum;
         }
 
         /**

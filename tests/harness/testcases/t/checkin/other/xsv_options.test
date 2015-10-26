@@ -25,6 +25,14 @@ load(gradebook, '/tmp/xsvopts.psv', -2, 'tsv:p')
 --echo ...but it's turned to a null in CSV-speak.
 load(gradebook, '/tmp/xsvopts.psv', -2, 'csv:p')
 
+--echo Test :l "turn on namelines" option.
+--start-igdata
+save(gradebook, '/tmp/xsvopts.out', -2, 'tsv:l')
+--shell --store --command "grep Dept /tmp/xsvopts.out"
+save(gradebook, '/tmp/xsvopts.out', -2, 'csv+:l')
+--shell --store --command "grep Remarks /tmp/xsvopts.out"
+--stop-igdata
+
 # Load a CSV file using 'tsv:c', which is pretty sick and wrong and if it ever breaks who cares.
 --echo In-field comma causes "Too many fields" warning.
 load(oddchars, '/tmp/xsvopts.csv', -2, 'tsv:c')

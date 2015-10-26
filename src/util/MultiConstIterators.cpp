@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,12 +33,12 @@ using namespace boost;
 
 namespace scidb
 {
-MultiConstIterators::MultiConstIterators(std::vector<boost::shared_ptr<ConstIterator> >& inputIters)
+MultiConstIterators::MultiConstIterators(std::vector<std::shared_ptr<ConstIterator> >& inputIters)
 : _inputIters(inputIters)
 {
     size_t i = 0;
-    for (vector<shared_ptr<ConstIterator> >::const_iterator it = inputIters.begin(); it != inputIters.end(); ++it) {
-        shared_ptr<ConstIterator> theIter = *it;
+    for (vector<std::shared_ptr<ConstIterator> >::const_iterator it = inputIters.begin(); it != inputIters.end(); ++it) {
+        std::shared_ptr<ConstIterator> theIter = *it;
         if (theIter && ! theIter->end()) {
             _coordinatesAndIDs.insert(CoordinatesAndID( theIter->getPosition(), i ));
         }
@@ -87,7 +87,7 @@ void MultiConstIterators::operator ++() {
 
     // Add the IDs back with their new positions, after incrementing the input iterators.
     for (vector<size_t>::const_iterator it = IDs.begin(); it != IDs.end(); ++it) {
-        boost::shared_ptr<ConstIterator>& inputIter = _inputIters[ *it ];
+        std::shared_ptr<ConstIterator>& inputIter = _inputIters[ *it ];
         assert(! inputIter->end());
         ++(*inputIter);
         if (! inputIter->end()) {

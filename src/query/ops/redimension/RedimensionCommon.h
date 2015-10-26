@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,40 +30,40 @@
 #ifndef REDIMENSIONCOMMON_H_
 #define REDIMENSIONCOMMON_H_
 
-#include <util/FileIO.h>
-#include <boost/make_shared.hpp>
-
-#include "query/Operator.h"
-#include "query/QueryProcessor.h"
-#include "query/TypeSystem.h"
-#include "query/FunctionLibrary.h"
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "array/DBArray.h"
-#include "system/SystemCatalog.h"
-#include "network/NetworkManager.h"
-#include "smgr/io/Storage.h"
-#include "util/iqsort.h"
-#include <log4cxx/logger.h>
-#include <system/Utils.h>
+#include <limits>
+#include <memory>
 #include <boost/scope_exit.hpp>
+#include <log4cxx/logger.h>
+
+#include <query/Operator.h>
+#include <query/QueryProcessor.h>
+#include <query/TypeSystem.h>
+#include <query/FunctionLibrary.h>
+#include <array/Metadata.h>
+#include <array/Array.h>
+#include <array/DBArray.h>
+#include <system/SystemCatalog.h>
+#include <network/NetworkManager.h>
+#include <smgr/io/Storage.h>
+#include <util/FileIO.h>
+#include <util/iqsort.h>
+
+#include <system/Utils.h>
 #include <util/BitManip.h>
 #include <util/OverlappingChunksIterator.h>
 #include <util/Timing.h>
 #include <array/DelegateArray.h>
 #include <util/ArrayCoordinatesMapper.h>
+#include "SyntheticDimChunkMerger.h"
 
 namespace scidb {
 
-using namespace std;
-using namespace boost;
+using std::shared_ptr;
+using arena::ArenaPtr;
 
-//
-// The macro defintions below are used two switch on 64-bit IO mode
-//
 // Bits used to mark attributes/dimensions
-const size_t FLIP = (1U << 31); // attribute is flipped into dimension or vise versa
-#define SYNTHETIC   (1U << 30) // dimension of target array is not present in source array
+const size_t FLIP      = 1U << 31; // attribute is flipped into dimension or vise versa
+const size_t SYNTHETIC = 1U << 30; // dimension of target array is not present in source array
 
 /**
  * Whether flipped, i.e. an attribute came from dim or vise versa.
@@ -71,7 +71,6 @@ const size_t FLIP = (1U << 31); // attribute is flipped into dimension or vise v
 inline bool isFlipped(size_t j) {
     return isAllOn(j, FLIP);
 }
-
 
 /**
  * Superclass for operators PhysicalRedimension and PhysicalRedimensionStore.
@@ -87,14 +86,14 @@ private:
  * @note For a scalar field, if there are multiple values that accumulated into it, keep the first one (by default).
  */
 class StateVector {
-    vector<Value> _destItem;  // the state vector
-    vector<AggregatePtr> const& _aggregates;  // the aggregate pointers
+    mgd::vector<Value>               _destItem;   // the state vector
+    PointerRange<const AggregatePtr> _aggregates; // the aggregate pointers
     bool _valid;  // whether the state vector contains valid data, i.e. whether accumulate() was called
 
     // For convenience, each input item to accumulate() may contain some more items at the end.
     // This parameter indicates how many such items are there.
     // It should be true that item.size() == _destItem.size() + _numItemsToIgnoreAtTheEnd.
-    size_t _numItemsToIgnoreAtTheEnd;
+    size_t const _numItemsToIgnoreAtTheEnd;
 
 public:
     /**
@@ -103,9 +102,14 @@ public:
      * @param  numItemsToIgnoreAtTheEnd  Each item that is passed in to accumulate contains how many more items that the state vector should worry.
      * @pre Size should match.
      */
-    StateVector(vector<AggregatePtr> const& aggregates, size_t numItemsToIgnoreAtTheEnd = 0)
-    : _destItem(aggregates.size()), _aggregates(aggregates), _valid(false), _numItemsToIgnoreAtTheEnd(numItemsToIgnoreAtTheEnd) {
-        assert(_aggregates.size()>0);
+    StateVector(const ArenaPtr& arena,
+                PointerRange<const AggregatePtr> a,
+                size_t numItemsToIgnoreAtTheEnd)
+      : _destItem(arena,a.size()),
+        _aggregates(a.begin(),a.end()),
+        _valid(false),
+        _numItemsToIgnoreAtTheEnd(numItemsToIgnoreAtTheEnd) {
+        assert(!a.empty());
         init();
     }
 
@@ -130,9 +134,8 @@ public:
      *
      * @param item   The item to accumulate.
      * @param keepFirstScalar   For a scalar field, keep the first value that was accumulated.
-     *
      */
-    void accumulate(vector<Value> const& item, bool keepFirstScalar = true) {
+    void accumulate(PointerRange<const Value> item, bool keepFirstScalar = true) {
         assert(_destItem.size() + _numItemsToIgnoreAtTheEnd == item.size());
         for (size_t i=0; i<_destItem.size(); ++i) {
             if (_aggregates[i]) {
@@ -149,7 +152,7 @@ public:
      * Return the state vector.
      * @pre _valid must be true.
      */
-    vector<Value> const& get() const {
+    PointerRange<const Value> get() const {
         assert(_valid);
         return _destItem;
     }
@@ -164,7 +167,6 @@ public:
 };
 
 public:
-
     static log4cxx::LoggerPtr logger;
 
     /**
@@ -174,25 +176,19 @@ public:
      * @param parameters the operator parameters - the output schema and optional aggregates
      * @param schema the result of Logical inferSchema
      */
-    RedimensionCommon(const string& logicalName,
-                      const string& physicalName,
+    RedimensionCommon(const std::string& logicalName,
+                      const std::string& physicalName,
                       const Parameters& parameters,
                       const ArrayDesc& schema):
     PhysicalOperator(logicalName, physicalName, parameters, schema),
     _hasDataIntegrityIssue(false)
-    {
-        _chunkOverhead = LruMemChunk::getFootprint(schema.getDimensions().size())
-            + sizeof(Address);
-        _chunkOverheadLimit =
-            Config::getInstance()->getOption<size_t>(CONFIG_REDIM_CHUNK_OVERHEAD_LIMIT);
-        assert(!_chunkOverheadLimit || (_chunkOverhead < _chunkOverheadLimit * MiB));
-    }
+    {}
 
     /**
      * @see PhysicalOperator::changesDistribution
      * @return true
      */
-    virtual bool changesDistribution(std::vector< ArrayDesc> const&) const
+    virtual bool changesDistribution(std::vector<ArrayDesc>const&) const
     {
         return true;
     }
@@ -201,18 +197,18 @@ public:
      * @see PhysicalOperator::getOutputBoundaries
      * @return full bounadries based on the schema
      */
-    virtual PhysicalBoundaries getOutputBoundaries(std::vector<PhysicalBoundaries> const&, std::vector<ArrayDesc> const&) const
+    virtual PhysicalBoundaries getOutputBoundaries(std::vector<PhysicalBoundaries>const&,std::vector<ArrayDesc>const&) const
     {
         return PhysicalBoundaries::createFromFullSchema(_schema);
     }
 
     /**
      * @see PhysicalOperator::getOutputDistribution
-     * @return psHashPartitioned
+     * @return RedistributeContext(defaultPartitioning())
      */
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector< ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext>const&,std::vector<ArrayDesc>const&) const
     {
-        return ArrayDistribution(psHashPartitioned);
+       return RedistributeContext(defaultPartitioning());
     }
 
     /**
@@ -231,16 +227,16 @@ public:
      * @note both aggregates and attrMapping have only the real attributes, i.e. not including the empty tag.
      */
     void setupMappings(ArrayDesc const& srcArrayDesc,
-                       vector<AggregatePtr> & aggregates,
-                       vector<size_t>& attrMapping,
-                       vector<size_t>& dimMapping,
-                       Attributes const& destAttrs,
-                       Dimensions const& destDims);
-    typedef enum {
+                       PointerRange<AggregatePtr>        aggregates,
+                       PointerRange<size_t>              attrMapping,
+                       PointerRange<size_t>              dimMapping,
+                       PointerRange<AttributeDesc const> destAttrs,
+                       PointerRange<DimensionDesc const> destDims);
+    enum RedistributeMode {
     AUTO=0,     // delegate SG to optimizer
     AGGREGATED, // SG with aggregation/synthetic dimension
     VALIDATED  // SG with data validation (enforce order & no data collisions)
-    } RedistributeMode;
+    };
 
     /**
      * A common routine that redimensions an input array into a materialized output array and returns it.
@@ -264,54 +260,220 @@ public:
      * @param redistributeMode mode of the output redistribution
      * @return the redimensioned array
      */
-    shared_ptr<Array> redimensionArray(shared_ptr<Array>& srcArray,
-                                       vector<size_t> const& attrMapping,
-                                       vector<size_t> const& dimMapping,
-                                       vector<AggregatePtr> const& aggregates,
-                                       shared_ptr<Query> const& query,
+    std::shared_ptr<Array> redimensionArray(std::shared_ptr<Array>& srcArray,
+                                       PointerRange<const size_t> attrMapping,
+                                       PointerRange<const size_t> dimMapping,
+                                       PointerRange<const AggregatePtr> aggregates,
+                                       std::shared_ptr<Query> const& query,
                                        ElapsedMilliSeconds& timing,
                                        RedistributeMode redistributeMode);
 
-private:
-    /* Private interface to map between chunk positions and chunk ids (and back)
-       ChunkToIdMap maps chunk pos to a pair containing id of chunk, and number
-       of cells seen for chunk.
-     */
-    typedef pair<size_t, size_t> ChunkIdNumPair;
-    typedef map<Coordinates, ChunkIdNumPair> ChunkToIdMap;
-    typedef map<size_t, Coordinates> IdToChunkMap;
-    typedef struct
-    {
-        ChunkToIdMap _chunkPosToIdMap;
-        IdToChunkMap _idToChunkPosMap;
-    } ChunkIdMaps;
+protected:
 
-    size_t mapChunkPosToId(Coordinates const& chunkPos, ChunkIdMaps& maps);
-    Coordinates& mapIdToChunkPos(size_t id, ChunkIdMaps& maps);
+    /**
+     *  Implements a bijection between chunk position (represented as a
+     *  coordinate vector of the given rank) and its chunk identifier (a zero
+     *  based index).  This is an abstract base class.
+     */
+    class ChunkIdMap : boost::noncopyable
+    {
+    public:
+        enum direction {PosToId, IdToPos};
+
+    public:  // Construction
+                ChunkIdMap(size_t rank) :
+                    _rank(rank),
+                    _direction(PosToId)
+                    {}
+        virtual ~ChunkIdMap()
+                    {}
+
+    public:  // Operations
+                size_t            rank() const
+                                      {return _rank;}
+                direction         getDirection() const
+                                      {return _direction;}
+        virtual void              reverse()
+                                      {_direction = IdToPos;}
+        virtual void              clear()
+                                      {}
+
+        virtual size_t            mapChunkPosToId(CoordinateCRange) = 0;
+        virtual CoordinateCRange  mapIdToChunkPos(size_t) = 0;
+        virtual size_t            getUnusedId() const = 0;
+
+    private: // Representation
+        size_t    const _rank;                  // Length of chunk pos
+        direction       _direction;             // Mapping direction
+    };
+
+
+    /**
+     * Implements the mapping with a simple stateless calculation based
+     * on the chunk's position in row-major order in the logcial chunk space.
+     * Due to the nature of the api, mapping from id back to pos returns
+     * a const pointer range which points to an internally allocated
+     * coords structure.  Each subsequent call to mapIdToChunkPos
+     * clobbers the result of the previous call.
+     */
+    class DirectChunkIdMap : public ChunkIdMap
+    {
+    public:  // Construction
+        DirectChunkIdMap(const ArenaPtr& a,
+                          PointerRange<DimensionDesc const> dims) :
+            ChunkIdMap(dims.size()),
+            _lows(a, dims.size(), 0),
+            _highs(a, dims.size(), 0),
+            _chunksz(a, dims.size(), 0),
+            _intervals(a, dims.size(), 0),
+            _mapres(a, dims.size(), 0)
+            {
+                for (size_t i = 0; i < dims.size(); ++i)
+                {
+                    _lows[i] = dims[i].getStartMin();
+                    _highs[i] = dims[i].getEndMax();
+                    _chunksz[i] = dims[i].getChunkInterval();
+                    _intervals[i] = ((_highs[i] - _lows[i]) / _chunksz[i]) + 1;
+                }
+            }
+
+    public:  // Operations
+        size_t mapChunkPosToId(CoordinateCRange cpos)
+            {
+                size_t id = 0;
+                size_t chunkOffset = 0;
+                for (size_t i = 0; i < rank(); ++i)
+                {
+                    chunkOffset = (cpos[i] - _lows[i]) / _chunksz[i];
+                    id *= _intervals[i];
+                    id += chunkOffset;
+                }
+                return id;
+            }
+
+        /* Note:  each call to this method clobbers the result of the previous
+           call to this method.
+         */
+        CoordinateCRange mapIdToChunkPos(size_t id)
+            {
+                for (size_t i = rank(); i > 0;)
+                {
+                    --i;
+                    _mapres[i] = (id % _intervals[i]) * _chunksz[i] +
+                        _lows[i];
+                    id /= _intervals[i];
+                }
+                return _mapres;
+            }
+
+        size_t getUnusedId() const
+            {
+                return std::numeric_limits<size_t>::max();
+            }
+
+    private: // Representation
+
+        mgd::vector<Coordinate> _lows;      // lower bound for each dimension
+        mgd::vector<Coordinate> _highs;     // upper bound for each dimension
+        mgd::vector<Coordinate> _chunksz;   // chunk size for each dimension
+        mgd::vector<Coordinate> _intervals; // chunk interval in each dimension
+        mgd::vector<Coordinate> _mapres;    // stores result of reverse mapping
+    };
+
+
+    /**
+     *  Implements chunk-id mapping using a standard map for the forward direction
+     *  and a vector for the backward direction.
+     *
+     *  Observe that:
+     *
+     *  a) items are not removed until the entire bijection is discarded,
+     *
+     *  b) all entries therefore have the same lifetime,
+     *
+     *  c) all chunk position coordinate vectors have the same length (i.e. rank),
+     *
+     *  d) all chunk positions are seen and recorded before any are found by id,
+     *
+     *  e) once we begin searching for chunk positions by their id, we no longer
+     *  need to look up their id's up by chunk position.
+     *
+     *  Thus:
+     *
+     *  b) justifies the use of a scoped arena,
+     *
+     *  c) justifies the use of raw coordinate arrays rather than (more expensive)
+     *  Coordinates objects,
+     *
+     *  d + e) allow us to operate in a modal 'direction', only consuming resources
+     *  for one mapping at a time.
+     */
+    class IndirectChunkIdMap : public ChunkIdMap
+    {
+     public:  // Construction
+        IndirectChunkIdMap(const ArenaPtr&,size_t rank);
+        ~IndirectChunkIdMap()
+            {clear();}
+
+     public:               // Operations
+        size_t            size()               const
+            {return getDirection()==PosToId ?
+                    _posToId.size() : _idToPos.size();}
+        size_t            getUnusedId()        const
+            {return size();}
+        CoordinateCRange  mapIdToChunkPos(size_t);
+        size_t            mapChunkPosToId(CoordinateCRange);
+        void              reverse();
+        void              clear();
+
+     private:               // Representation
+        typedef Coordinate const*                           coords;
+        typedef mgd::map<coords,size_t,CoordinatePtrLess>   PosToIdMap;
+        typedef mgd::vector<coords>                         IdToPosMap;
+
+     private:               // Representation
+        ArenaPtr    const _rbtree;                   // Tree node allocator
+        ArenaPtr    const _coords;                   // Coordinate allocator
+        size_t      const _chunkOverhead;            //
+        size_t      const _chunkOverheadLimit;       //
+        PosToIdMap        _posToId;                  // Maps coords to ids
+        IdToPosMap        _idToPos;                  // Maps ids to coords
+    };
+
+    /* Factory function which returns a heap-allocated ChunkIdMap object
+       of the appropriate subtype for the given schema.
+     */
+    std::shared_ptr<ChunkIdMap> createChunkIdMap(ArrayDesc const& schema);
+
+    /* Test the correctness of ChunkIdMap.
+     */
+    bool testChunkIdMap();
 
     /* Private interface to manage the 1-d 'redimensioned' array
      */
-    shared_ptr<MemArray> initializeRedimensionedArray(shared_ptr<Query> const& query,
-                                                      Attributes const& srcAttrs,
-                                                      Attributes const& destAttrs,
-                                                      vector<size_t> const& attrMapping,
-                                                      vector<AggregatePtr> const& aggregates,
-                                                      vector< shared_ptr<ArrayIterator> >& redimArrayIters,
-                                                      vector< shared_ptr<ChunkIterator> >& redimChunkIters,
-                                                      size_t& redimCount,
-                                                      size_t const& redimChunkSize);
-    void appendItemToRedimArray(vector<Value> const& item,
-                                shared_ptr<Query> const& query,
-                                vector< shared_ptr<ArrayIterator> >& redimArrayIters,
-                                vector< shared_ptr<ChunkIterator> >& redimChunkIters,
-                                size_t& redimCount,
-                                size_t const& redimChunkSize);
+    std::shared_ptr<MemArray>
+    initializeRedimensionedArray(std::shared_ptr<Query> const& query,
+                                 PointerRange<AttributeDesc const>    srcAttrs,
+                                 PointerRange<AttributeDesc const>    destAttrs,
+                                 PointerRange<const size_t>           attrMapping,
+                                 PointerRange<const AggregatePtr>     aggregates,
+                                 mgd::vector< std::shared_ptr<ArrayIterator> >& redimArrayIters,
+                                 mgd::vector< std::shared_ptr<ChunkIterator> >& redimChunkIters,
+                                 size_t& redimCount,
+                                 size_t  redimChunkSize);
 
-    bool updateSyntheticDimForRedimArray(shared_ptr<Query> const& query,
+    void appendItemToRedimArray(PointerRange<const Value> item,
+                                std::shared_ptr<Query> const& query,
+                                PointerRange< std::shared_ptr<ArrayIterator> const > redimArrayIters,
+                                PointerRange< std::shared_ptr<ChunkIterator> >       redimChunkIters,
+                                size_t& redimCount,
+                                size_t redimChunkSize);
+
+    bool updateSyntheticDimForRedimArray(std::shared_ptr<Query> const& query,
                                          ArrayCoordinatesMapper const& coordMapper,
-                                         ChunkIdMaps& chunkIdMaps,
+                                         ChunkIdMap& chunkIdMap,
                                          size_t dimSynthetic,
-                                         shared_ptr<MemArray>& redimensioned);
+                                         std::shared_ptr<MemArray>& redimensioned);
 
     /* Helper function to append data to 'beforeRedistribution' array
      * Note that 'tmp' is provided so it will not be repeatedly created
@@ -319,29 +481,25 @@ private:
      * the same Coordinate to use, repeatedly at lower cost
      */
     void appendItemToBeforeRedistribution(ArrayCoordinatesMapper const& coordMapper,
-                                          Coordinates const& lows,
-                                          Coordinates const& intervals,
+                                          CoordinateCRange lows,
+                                          CoordinateCRange intervals,
                                           Coordinates & tmp,
                                           position_t prevPosition,
-                                          vector< shared_ptr<ChunkIterator> >& chunkItersBeforeRedist,
+                                          PointerRange< std::shared_ptr<ChunkIterator> const> chunkItersBeforeRedist,
                                           StateVector& stateVector);
+private:
 
     /// Helper to redistribute the input array into an array with a synthetic dimension
-    boost::shared_ptr<Array> redistributeWithSynthetic(boost::shared_ptr<Array>& inputArray,
-                                                       const boost::shared_ptr<Query>& query,
-                                                       const RedimInfo* redimInfo);
+    std::shared_ptr<Array> redistributeWithSynthetic(std::shared_ptr<Array>& inputArray,
+                                                       const std::shared_ptr<Query>& query,
+                                                       const SyntheticDimChunkMerger::RedimInfo* redimInfo);
 
-    boost::shared_ptr<Array> redistributeWithAggregates(boost::shared_ptr<Array>& inputArray,
+    std::shared_ptr<Array> redistributeWithAggregates(std::shared_ptr<Array>& inputArray,
                                                         ArrayDesc const& outSchema,
-                                                        const boost::shared_ptr<Query>& query,
+                                                        const std::shared_ptr<Query>& query,
                                                         bool enforceDataIntegrity,
                                                         bool hasOverlap,
-                                                        const std::vector<AggregatePtr>& aggregates);
-
-    /* Values used in memory usage calculation...
-     */
-    size_t _chunkOverhead;
-    size_t _chunkOverheadLimit;
+                                                        PointerRange<const AggregatePtr> aggregates);
 
     /// true if a data integrity issue has been found
     bool _hasDataIntegrityIssue;

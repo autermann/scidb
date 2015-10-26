@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,7 +20,7 @@
 * END_COPYRIGHT
 */
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <query/Operator.h>
 #include <query/TypeSystem.h>
 #include <system/Exceptions.h>
@@ -95,10 +95,10 @@ public:
         return false; // we dont run in the old tile mode
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
     nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         if (_parameters.size() % 2 == 0) {
             res.push_back(PARAM_OUT_ATTRIBUTE_NAME(TID_VOID));
@@ -108,7 +108,7 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         assert(_parameters[0]->getParamType() == PARAM_ATTRIBUTE_REF);
@@ -141,9 +141,9 @@ public:
         size_t k;
         for (k=0; k<_parameters.size(); k+=2) {
 
-            const string &attributeName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[k])->getObjectName();
+            const string &attributeName = ((std::shared_ptr<OperatorParamReference>&)_parameters[k])->getObjectName();
             Expression expr;
-            expr.compile(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(),
+            expr.compile(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(),
                          query, _properties.tile, TID_VOID, schemas);
             assert(!_properties.tile);
 
@@ -186,7 +186,7 @@ public:
                                               emptyTag->getDefaultValueExpr(),
                                               emptyTag->getVarSize()));
         }
-        return ArrayDesc(schemas[0].getName(), outAttrs, schemas[0].getDimensions());
+        return ArrayDesc(schemas[0].getName(), outAttrs, schemas[0].getDimensions(), defaultPartitioning());
     }
 };
 

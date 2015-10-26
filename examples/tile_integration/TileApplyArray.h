@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,6 @@ namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class TileApplyArray;
 class TileApplyArrayIterator;
@@ -55,7 +54,7 @@ class TileApplyChunkIterator;
 class TileApplyChunkIterator : public DelegateChunkIterator, protected CoordinatesMapper
 {
 public:
-    virtual Value& getItem();
+    virtual Value const& getItem();
     virtual void operator ++();
     virtual void reset();
     virtual bool setPosition(Coordinates const& pos);
@@ -64,7 +63,7 @@ public:
                            int iterationMode);
     virtual ~TileApplyChunkIterator();
     bool isNull();
-    virtual boost::shared_ptr<Query> getQuery() const { return _query; }
+    virtual std::shared_ptr<Query> getQuery() const { return _query; }
 
     virtual position_t getLogicalPosition();
 
@@ -75,24 +74,24 @@ public:
     virtual const Coordinates&
     getData(scidb::Coordinates& offset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData,
-            boost::shared_ptr<BaseTile>& tileCoords);
+            std::shared_ptr<BaseTile>& tileData,
+            std::shared_ptr<BaseTile>& tileCoords);
 
     virtual position_t
     getData(position_t logicalOffset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData,
-            boost::shared_ptr<BaseTile>& tileCoords);
+            std::shared_ptr<BaseTile>& tileData,
+            std::shared_ptr<BaseTile>& tileCoords);
 
     virtual const Coordinates&
     getData(scidb::Coordinates& offset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData);
+            std::shared_ptr<BaseTile>& tileData);
 
     virtual position_t
     getData(position_t logicalOffset,
             size_t maxValues,
-            boost::shared_ptr<BaseTile>& tileData);
+            std::shared_ptr<BaseTile>& tileData);
 private:
 
     template <typename PosType>
@@ -115,25 +114,25 @@ private:
     position_t
     getDataInternal(position_t logicalOffset,
                     size_t maxValues,
-                    boost::shared_ptr<BaseTile>& tileData,
-                    boost::shared_ptr<BaseTile>& tileCoords,
+                    std::shared_ptr<BaseTile>& tileData,
+                    std::shared_ptr<BaseTile>& tileCoords,
                     bool withCoordinates=false);
 
     const Coordinates&
     getDataInternal(scidb::Coordinates& offset,
                     size_t maxValues,
-                    boost::shared_ptr<BaseTile>& tileData,
-                    boost::shared_ptr<BaseTile>& tileCoords,
+                    std::shared_ptr<BaseTile>& tileData,
+                    std::shared_ptr<BaseTile>& tileCoords,
                     bool withCoordinates=false);
     void
     populateTiles(size_t maxValues,
-                  boost::shared_ptr<BaseTile>& dataTile,
-                  boost::shared_ptr<BaseTile>& coordTile);
+                  std::shared_ptr<BaseTile>& dataTile,
+                  std::shared_ptr<BaseTile>& coordTile);
 
     void applyExpression(size_t minTileSize,
-                         std::vector< boost::shared_ptr<BaseTile> >& inputDataTiles,
-                         boost::shared_ptr<BaseTile>& inputCoordTile,
-                         boost::shared_ptr<BaseTile>& dataTile);
+                         std::vector< std::shared_ptr<BaseTile> >& inputDataTiles,
+                         std::shared_ptr<BaseTile>& inputCoordTile,
+                         std::shared_ptr<BaseTile>& dataTile);
 
 
     class CoordinatesMapperWrapper : public CoordinatesMapperProvider
@@ -156,15 +155,15 @@ private:
     Expression* _exp;
     mutable bool _needCoordinates;
     AttributeID _outAttrId;
-    vector<BindInfo> const& _bindings;
-    vector<BindInfo> const _fakeBinding;
-    vector< boost::shared_ptr<ConstChunkIterator> > _iterators;
+    std::vector<BindInfo> const& _bindings;
+    std::vector<BindInfo> const _fakeBinding;
+    std::vector< std::shared_ptr<ConstChunkIterator> > _iterators;
     ExpressionContext _params;
     int _mode;
     const Value* _value;
     bool _applied;
     bool _nullable;
-    boost::shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
 };
 
 /**
@@ -180,7 +179,7 @@ class TileApplyArrayIterator : public DelegateArrayIterator
     TileApplyArrayIterator(TileApplyArray const& array, AttributeID attrID, AttributeID inputAttrID);
 
   private:
-    std::vector< boost::shared_ptr<ConstArrayIterator> > _iterators;
+    std::vector< std::shared_ptr<ConstArrayIterator> > _iterators;
     AttributeID _inputAttrID;
 };
 
@@ -196,18 +195,18 @@ class TileApplyArray : public DelegateArray
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
-    boost::shared_ptr<Query> getQuery() const { return Query::getValidQueryPtr(_query); }
+    std::shared_ptr<Query> getQuery() const { return Query::getValidQueryPtr(_query); }
 
     TileApplyArray(const ArrayDesc& desc,
-                   const boost::shared_ptr<Array>& array,
-                   const boost::shared_ptr< std::vector< boost::shared_ptr< Expression > > >& expressions,
-                   const boost::shared_ptr<Query>& query);
+                   const std::shared_ptr<Array>& array,
+                   const std::shared_ptr< std::vector< std::shared_ptr< Expression > > >& expressions,
+                   const std::shared_ptr<Query>& query);
 
   private:
-    boost::shared_ptr<std::vector<boost::shared_ptr<Expression> > > _expressions;
-    vector <bool> _attributeNullable;
-    vector <bool> _runInTileMode;
-    vector <const vector<BindInfo>* > _bindingSets;
+    std::shared_ptr<std::vector<std::shared_ptr<Expression> > > _expressions;
+    std::vector <bool> _attributeNullable;
+    std::vector <bool> _runInTileMode;
+    std::vector <const std::vector<BindInfo>* > _bindingSets;
 
 };
 
@@ -223,13 +222,13 @@ public:
     TileApplyChunk(DelegateArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID, bool isClone)
     : DelegateChunk(array, iterator, attrID, isClone)
     {}
-    boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const
+    std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const
     {
         const TileApplyArray* myArray = dynamic_cast<const TileApplyArray*>(&array);
-        boost::shared_ptr<ConstChunkIterator> iter = DelegateChunk::getConstIterator(iterationMode);
+        std::shared_ptr<ConstChunkIterator> iter = DelegateChunk::getConstIterator(iterationMode);
         if (dynamic_cast<TileApplyChunkIterator*>(iter.get())) {
-            return boost::make_shared<BufferedConstChunkIterator<
-            boost::shared_ptr<ConstChunkIterator> > >(iter, myArray->getQuery());
+            return std::make_shared<BufferedConstChunkIterator<
+            std::shared_ptr<ConstChunkIterator> > >(iter, myArray->getQuery());
         }
         return iter;
     }

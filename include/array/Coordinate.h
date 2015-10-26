@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,7 +27,9 @@
 
 #include <vector>                                        // For vector
 #include <inttypes.h>                                    // For int64_t etc
+
 #include <util/PointerRange.h>                           // For PointerRange
+#include <util/Hashing.h>
 
 /****************************************************************************/
 namespace scidb {
@@ -36,14 +38,72 @@ namespace scidb {
 typedef int64_t                         position_t;
 typedef int64_t                         Coordinate;
 typedef std::vector <Coordinate>        Coordinates;
+typedef PointerRange<Coordinate>        CoordinateRange;
 typedef PointerRange<Coordinate const>  CoordinateCRange;
-typedef PointerRange<Coordinate      >  CoordinateRange;
+
+/**
+ * A functor to hash a Coordinates object.
+ * E.g. you may define:
+ * std::unordered_map<Coordinates, Value, CoordinatesHash> coordsToValue;
+ */
+typedef VectorHash<Coordinate>          CoordinatesHash;
 
 /****************************************************************************/
 
-const Coordinate  MAX_COORDINATE    =  uint64_t(-1) >> 2;
-const Coordinate  MIN_COORDINATE    = -MAX_COORDINATE;
-const uint64_t    INFINITE_LENGTH   =  MAX_COORDINATE;
+/* Email from Alex (2015_02_15):
+ * Philosophically:
+ *  -  '*' and MAX_COORDINATE (aka 2^62 -1) are merely syntactic synonyms.
+ *     They can be used interchangeably in the queries
+ *
+ * -   MAX_COORDINATE is obviously the largest bound an array can have.
+ *     Arrays with a bound greater than this are not allowed. Analogous
+ *     for the MIN_COORDINATE
+ *
+ * -   the system makes NO distinction between arrays that end with '*'
+ *     or MAX_COORDINATE, versus arrays that end with a smaller number,
+ *     say 10,000. They are just arrays of different logical size.
+ *
+ * -   in other words, there is no such thing as an "unbounded" array
+ *     really. It makes no sense to draw this distinction
+ *
+ * -  operators "do the right thing" whenever possible
+*/
+class CoordinateBounds
+{
+public:
+    /// MAX_COORDINATE replacement.
+    static inline int64_t getMax()
+    {
+        // TODO:  Why is this not 2**63 -1 instead of 2**62 - 1
+        return (1ULL << 62) - 1;
+    }
+
+    /// MIN_COORDINATE replacement.
+    static inline int64_t getMin()
+    {
+        return - static_cast<int64_t>(getMax());
+    }
+
+    static inline size_t getMaxLength()
+    {
+        return getMax() - getMin() + 1;
+    }
+
+    static inline bool isValidLength(size_t length)
+    {
+        return getMaxLength() >= length;
+    }
+
+    /**
+     * @param value - the value to compare against '*'
+     * @brief Determine if the parameter value matches '*'
+     * @return true={value=='*'}, false otherwise
+     */
+    static inline bool isMaxStar(int64_t value)
+    {
+        return value == getMax();
+    }
+};
 
 /****************************************************************************/
 
@@ -57,7 +117,7 @@ const uint64_t    INFINITE_LENGTH   =  MAX_COORDINATE;
  *          positive if b is less than a,
  *          0 if both are equal.
  */
-inline int64_t coordinatesCompare(CoordinateCRange a,CoordinateCRange b)
+inline int64_t coordinatesCompare(CoordinateCRange a, CoordinateCRange b)
 {
     assert(a.size() == b.size());
 
@@ -82,7 +142,7 @@ inline int64_t coordinatesCompare(CoordinateCRange a,CoordinateCRange b)
  *          positive if b is less than a,
  *          0 if both are equal.
  */
-inline int64_t coordinatesCompareCMO(CoordinateCRange a,CoordinateCRange b)
+inline int64_t coordinatesCompareCMO(CoordinateCRange a, CoordinateCRange b)
 {
     assert(a.size() == b.size());
 
@@ -102,7 +162,7 @@ inline int64_t coordinatesCompareCMO(CoordinateCRange a,CoordinateCRange b)
  */
 struct CoordinatesLess
 {
-    bool operator()(CoordinateCRange a,CoordinateCRange b) const
+    bool operator()(CoordinateCRange a, CoordinateCRange b) const
     {
         return coordinatesCompare(a,b) < 0;
     }
@@ -119,6 +179,40 @@ struct CoordinatesLessCMO
     }
 };
 
+/**
+ * Compare two points in row-major order.
+ */
+struct CoordinatePtrLess
+{
+    CoordinatePtrLess(size_t n)
+     : rank(n)
+    {}
+
+    bool operator()(const Coordinate* p,const Coordinate* q) const
+    {
+        return coordinatesCompare(pointerRange(rank,p), pointerRange(rank,q)) < 0;
+    }
+
+    size_t const rank;
+};
+
+/**
+ * Compare two points in column-major order.
+ */
+struct CoordinatePtrLessCMO
+{
+    CoordinatePtrLessCMO(size_t n)
+     : rank(n)
+    {}
+
+    bool operator()(const Coordinate* p,const Coordinate* q) const
+    {
+        return coordinatesCompareCMO(pointerRange(rank,p), pointerRange(rank,q)) < 0;
+    }
+
+    size_t const rank;
+};
+
 /****************************************************************************/
 
 std::ostream& operator<<(std::ostream&,CoordinateCRange);
@@ -130,7 +224,7 @@ typedef CoordinatesLess    CoordinatesComparator;        // Obsolete name
 typedef CoordinatesLessCMO CoordinatesComparatorCMO;     // Obsolete name
 
 /****************************************************************************/
-}
+} // namespace
 /****************************************************************************/
 #endif
 /****************************************************************************/

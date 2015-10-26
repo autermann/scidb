@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,18 +33,18 @@ namespace scidb
 {
     using namespace std;
 
-    MergeSortArray::MergeSortArray(const boost::shared_ptr<Query>& query,
+    MergeSortArray::MergeSortArray(const std::shared_ptr<Query>& query,
                                    ArrayDesc const& array,
-                                   std::vector< boost::shared_ptr<Array> > const& inputArrays,
-                                   boost::shared_ptr<TupleComparator> tcomp,
+                                   PointerRange< std::shared_ptr<Array> const> inputArrays,
+                                   std::shared_ptr<TupleComparator> tcomp,
                                    size_t offset,
-                                   shared_ptr<vector<size_t> > const& streamSizes)
+                                   std::shared_ptr<vector<size_t> > const& streamSizes)
     : SinglePassArray(array),
       currChunkIndex(0),
       comparator(tcomp),
       chunkPos(1),
       chunkSize(array.getDimensions()[0].getChunkInterval()),
-      input(inputArrays),
+      input(inputArrays.begin(),inputArrays.end()),
       streams(inputArrays.size()),
       attributes(array.getAttributes().size())
     {
@@ -106,8 +106,8 @@ namespace scidb
             return true;
         }
         size_t nAttrs = attributes.size();
-        vector< boost::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
-        boost::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
 
         while (permutation.size() != 0) {
             if (!chunkIterators[0]) {

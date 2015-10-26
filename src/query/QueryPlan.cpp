@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,12 +27,12 @@
  */
 
 #include <boost/foreach.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 
-#include "log4cxx/logger.h"
-#include "query/QueryPlanUtilites.h"
-#include "query/QueryPlan.h"
-#include "query/LogicalExpression.h"
+#include <log4cxx/logger.h>
+#include <query/QueryPlanUtilites.h>
+#include <query/QueryPlan.h>
+#include <query/LogicalExpression.h>
 
 using namespace boost;
 using namespace std;
@@ -45,8 +45,8 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc.process
 
 // LogicalQueryPlanNode
 LogicalQueryPlanNode::LogicalQueryPlanNode(
-	const boost::shared_ptr<ParsingContext>& parsingContext,
-	const boost::shared_ptr<LogicalOperator>& logicalOperator):
+	const std::shared_ptr<ParsingContext>& parsingContext,
+	const std::shared_ptr<LogicalOperator>& logicalOperator):
 	_logicalOperator(logicalOperator),
 	_parsingContext(parsingContext)
 {
@@ -54,16 +54,16 @@ LogicalQueryPlanNode::LogicalQueryPlanNode(
 }
 
 LogicalQueryPlanNode::LogicalQueryPlanNode(
-	const boost::shared_ptr<ParsingContext>& parsingContext,
-	const boost::shared_ptr<LogicalOperator>& logicalOperator,
-	const std::vector<boost::shared_ptr<LogicalQueryPlanNode> > &childNodes):
+	const std::shared_ptr<ParsingContext>& parsingContext,
+	const std::shared_ptr<LogicalOperator>& logicalOperator,
+	const std::vector<std::shared_ptr<LogicalQueryPlanNode> > &childNodes):
 	_logicalOperator(logicalOperator),
 	_childNodes(childNodes),
 	_parsingContext(parsingContext)
 {
 }
 
-const ArrayDesc& LogicalQueryPlanNode::inferTypes(boost::shared_ptr< Query> query)
+const ArrayDesc& LogicalQueryPlanNode::inferTypes(std::shared_ptr< Query> query)
 {
     std::vector<ArrayDesc> inputSchemas;
     ArrayDesc outputSchema;
@@ -83,7 +83,7 @@ const ArrayDesc& LogicalQueryPlanNode::inferTypes(boost::shared_ptr< Query> quer
     return _logicalOperator->getSchema();
 }
 
-void LogicalQueryPlanNode::inferArrayAccess(boost::shared_ptr<Query>& query)
+void LogicalQueryPlanNode::inferArrayAccess(std::shared_ptr<Query>& query)
 {
     //XXX TODO: consider non-recursive implementation
     for (size_t i=0, end=_childNodes.size(); i<end; i++)
@@ -109,19 +109,19 @@ void LogicalQueryPlanNode::toString(std::ostream &out, int indent, bool children
     }
 }
 
-PhysicalQueryPlanNode::PhysicalQueryPlanNode(const boost::shared_ptr<PhysicalOperator>& physicalOperator,
-                                             bool agg, bool ddl, bool tile)
+PhysicalQueryPlanNode::PhysicalQueryPlanNode(const std::shared_ptr<PhysicalOperator>& physicalOperator,
+                                             bool ddl, bool tile)
 : _physicalOperator(physicalOperator),
-  _parent(), _agg(agg), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
+  _parent(), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
 {
 }
 
-PhysicalQueryPlanNode::PhysicalQueryPlanNode(const boost::shared_ptr<PhysicalOperator>& physicalOperator,
-		const std::vector<boost::shared_ptr<PhysicalQueryPlanNode> > &childNodes,
-                                             bool agg, bool ddl, bool tile):
+PhysicalQueryPlanNode::PhysicalQueryPlanNode(const std::shared_ptr<PhysicalOperator>& physicalOperator,
+		const std::vector<std::shared_ptr<PhysicalQueryPlanNode> > &childNodes,
+                                             bool ddl, bool tile):
 	_physicalOperator(physicalOperator),
 	_childNodes(childNodes),
-    _parent(), _agg(agg), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
+    _parent(), _ddl(ddl), _tile(tile), _isSgMovable(true), _isSgOffsetable(true), _distribution()
 {
 }
 
@@ -130,7 +130,7 @@ void PhysicalQueryPlanNode::toString(std::ostream &out, int indent, bool childre
     Indent prefix(indent);
     out << prefix('>', false);
 
-    out<<"[pNode] "<<_physicalOperator->getPhysicalName()<<" agg "<<isAgg()<<" ddl "<<isDdl()<<" tile "<<supportsTileMode()<<" children "<<_childNodes.size()<<"\n";
+    out<<"[pNode] "<<_physicalOperator->getPhysicalName()<<" ddl "<<isDdl()<<" tile "<<supportsTileMode()<<" children "<<_childNodes.size()<<"\n";
     _physicalOperator->toString(out,indent+1);
 
     if (children) {
@@ -171,24 +171,59 @@ void PhysicalQueryPlanNode::toString(std::ostream &out, int indent, bool childre
 
 bool PhysicalQueryPlanNode::isStoringSg() const
 {
-    if ( isSgNode() )
-    {
-        PhysicalOperator::Parameters params = _physicalOperator->getParameters();
-        if (params.size() == 3)
-        {
-            return true;
-        }
-        if (params.size() >= 4)
-        {
-            bool storeResult = ((boost::shared_ptr<OperatorParamPhysicalExpression>&) params[3])->getExpression()->evaluate().getBool();
-            return storeResult;
-        }
+    if ( isSgNode() ) {
+        return (!getSgArrayName(_physicalOperator->getParameters()).empty());
     }
     return false;
 }
 
+string PhysicalQueryPlanNode::getSgArrayName(const PhysicalOperator::Parameters& sgParameters)
+{
+    std::string arrayName;
+    if (sgParameters.size() >= 3) {
+        arrayName = static_cast<OperatorParamReference*>(sgParameters[2].get())->getObjectName();
+    }
+    return arrayName;
+}
+
+bool PhysicalQueryPlanNode::getRedimensionIsStrict(const PhysicalOperator::Parameters& redimParameters)
+{
+    bool isStrict = true;
+    if (redimParameters.size() == 2 &&
+        redimParameters[1]->getParamType() == scidb::PARAM_PHYSICAL_EXPRESSION) {
+        OperatorParamPhysicalExpression* paramExpr = static_cast<OperatorParamPhysicalExpression*>(redimParameters[1].get());
+        SCIDB_ASSERT(paramExpr->isConstant());
+        isStrict = paramExpr->getExpression()->evaluate().getBool();
+    }
+    return isStrict;
+}
+
+bool PhysicalQueryPlanNode::getInputIsStrict(const PhysicalOperator::Parameters& inputParameters)
+{
+    bool isStrict = true;
+    if (inputParameters.size() == 6 &&
+        inputParameters[5]->getParamType() == scidb::PARAM_PHYSICAL_EXPRESSION)
+    {
+        OperatorParamPhysicalExpression* paramExpr =
+        static_cast<OperatorParamPhysicalExpression*>(inputParameters[5].get());
+        SCIDB_ASSERT(paramExpr->isConstant());
+        isStrict = paramExpr->getExpression()->evaluate().getBool();
+    }
+    else if (inputParameters.size() == 7)
+    {
+        ASSERT_EXCEPTION((inputParameters[6]->getParamType() == scidb::PARAM_PHYSICAL_EXPRESSION),
+                         "Invalid input() parameters 6");
+
+        OperatorParamPhysicalExpression* paramExpr =
+        static_cast<OperatorParamPhysicalExpression*>(inputParameters[6].get());
+        SCIDB_ASSERT(paramExpr->isConstant());
+        isStrict = paramExpr->getExpression()->evaluate().getBool();
+    }
+    return isStrict;
+}
+
 // LogicalPlan
-LogicalPlan::LogicalPlan(const boost::shared_ptr<LogicalQueryPlanNode>& root):
+LogicalPlan::LogicalPlan(const std::shared_ptr<LogicalQueryPlanNode>& root):
         _root(root)
 {
 
@@ -203,7 +238,7 @@ void LogicalPlan::toString(std::ostream &out, int indent, bool children) const
 }
 
 // PhysicalPlan
-PhysicalPlan::PhysicalPlan(const boost::shared_ptr<PhysicalQueryPlanNode>& root):
+PhysicalPlan::PhysicalPlan(const std::shared_ptr<PhysicalQueryPlanNode>& root):
         _root(root)
 {
 

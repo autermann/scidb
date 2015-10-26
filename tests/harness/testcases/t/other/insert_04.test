@@ -39,8 +39,8 @@ aggregate(versions(MIB),count(*))
 insert(between(filter(build(MIB,null),a is null),-3,0,-1,2), MIB)
 aggregate(versions(MIB),count(*))
 
---error --code scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED "insert(filter(insert(build(MIB,null), MIB),a is null),MIB)"
---error --code scidb::SCIDB_SE_SYSCAT::SCIDB_LE_PG_QUERY_EXECUTION_FAILED "insert(insert(build(MIB,null), MIB),MIB)"
+--error --code scidb::SCIDB_SE_SYSCAT::SCIDB_LE_UNKNOWN_ERROR "insert(filter(insert(build(MIB,null), MIB),a is null),MIB)"
+--error --code scidb::SCIDB_SE_SYSCAT::SCIDB_LE_UNKNOWN_ERROR "insert(insert(build(MIB,null), MIB),MIB)"
 
 insert(build(B,true),B)
 insert(build(B,iif((x+y+z)%2=0,true, false)),B)

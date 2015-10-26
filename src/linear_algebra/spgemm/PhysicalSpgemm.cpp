@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,9 +29,7 @@
 // C++
 #include <limits>
 #include <sstream>
-
-// boost
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 
 // scidb
 #include <array/Tile.h>
@@ -55,11 +53,12 @@
 #include "spgemmSemiringTraits.h"
 #include "SpgemmTimes.h"
 
+using namespace boost;
+using namespace scidb;
+using namespace std;
 
 namespace scidb
 {
-using namespace boost;
-using namespace scidb;
 
 class PhysicalSpgemm : public  PhysicalOperator
 {
@@ -82,14 +81,14 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& inputDistributions,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
             std::vector<ArrayDesc> const& inputSchemas) const
     {
-        return ArrayDistribution(psByRow);
+        return RedistributeContext(psByRow);
     }
 
-    boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query);
+    std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query);
 
 private:
     /**
@@ -99,9 +98,9 @@ private:
     typedef enum dummy1 { SRING_PLUS_STAR, SRING_MIN_PLUS, SRING_MAX_PLUS, SRING_COUNT_MULTS } sringEnum_t ;
     typedef enum dummy2 { RIGHT_REPLICATE_FALSE, RIGHT_REPLICATE_TRUE, RIGHT_REPLICATE_EITHER } rightReplicateEnum_t ;
     template<class SemiringTraits_tt>
-    boost::shared_ptr<Array> executeTraited(std::vector< boost::shared_ptr< Array> >& inputArrays,
+    std::shared_ptr<Array> executeTraited(std::vector< std::shared_ptr< Array> >& inputArrays,
                                             rightReplicateEnum_t rightReplicate,
-                                            boost::shared_ptr<Query>& query);
+                                            std::shared_ptr<Query>& query);
 
     /**
      * Multiply two arrays, with an SPMD algorithm.
@@ -118,8 +117,8 @@ private:
      *          in a BY_ROWS distribution.
      */
     template<class SemiringTraits_tt>
-    void spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr<Array>& rightArray,
-                            shared_ptr<ArrayIterator>& resultArray, shared_ptr<Query>& query, SpgemmTimes& times);
+    void spGemmColumnSubset(std::shared_ptr<Array>& leftArray, std::shared_ptr<Array>& rightArray,
+                            std::shared_ptr<ArrayIterator>& resultArray, std::shared_ptr<Query>& query, SpgemmTimes& times);
 
     /**
      * get the chunk positions of an array, sorted in a particular order.
@@ -128,7 +127,7 @@ private:
      * @param result a container for the algorithm to fill [TODO: change to accept an output random-access iterator (random to support sort())
      */
     template<class CoordinatesComparator_tt>
-    void getChunkPositions(shared_ptr<Array>& array, vector<Coordinates>& result);
+    void getChunkPositions(std::shared_ptr<Array>& array, vector<Coordinates>& result);
 
     /**
      * copy a chunk of data to a CSRBlock, with optional return of a list of rows used by the chunk
@@ -137,8 +136,8 @@ private:
      * @param rowsInUseOptional [optional] pointer to a set which will be filled with the rows that are in use.
      */
     template<class SemiringTraits_tt, class Block_tt>
-    void   copyChunkToBlock(const scidb::ConstChunk& chunk, boost::shared_ptr<Block_tt>& spBlock,
-                            std::set<Coordinate>* rowsInUseOptional, const shared_ptr<Query>& query);
+    void   copyChunkToBlock(const scidb::ConstChunk& chunk, std::shared_ptr<Block_tt>& spBlock,
+                            std::set<Coordinate>* rowsInUseOptional, const std::shared_ptr<Query>& query);
 
     /**
      * determine whether the array is small enough that we can increase parallelism by replication
@@ -147,18 +146,18 @@ private:
      * @param query             the standard query argument
      */
     template<class Value_tt>
-    bool shouldReplicate(shared_ptr<Array> array, boost::shared_ptr<Query>&query) const;
+    bool shouldReplicate(std::shared_ptr<Array> array, std::shared_ptr<Query>&query) const;
 
     /**
      * get the count of non-empty cells across all instances. used by shouldReplicate()
      * @param array             the array in question
      * @param query             the standard query argument
      */
-    size_t  getArrayCellCountTotal(shared_ptr<Array> array, boost::shared_ptr<Query>& query) const;
+    size_t  getArrayCellCountTotal(std::shared_ptr<Array> array, std::shared_ptr<Query>& query) const;
 };
 
 
-boost::shared_ptr< Array> PhysicalSpgemm::execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
+std::shared_ptr< Array> PhysicalSpgemm::execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
 {
     assert(inputArrays.size()==2); // should not happen to developer, else inferSchema() did not raise an exception as it should have
 
@@ -172,7 +171,7 @@ boost::shared_ptr< Array> PhysicalSpgemm::execute(std::vector< boost::shared_ptr
     std::string namedOptionStr;
     for(size_t p=0; p < _parameters.size(); p++) {
         assert(_parameters[p]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
-        typedef boost::shared_ptr<OperatorParamPhysicalExpression> ParamType_t ;
+        typedef std::shared_ptr<OperatorParamPhysicalExpression> ParamType_t ;
         ParamType_t& paramExpr = reinterpret_cast<ParamType_t&>(_parameters[p]);
         assert(paramExpr->isConstant());
         namedOptionStr = paramExpr->getExpression()->evaluate().getString();
@@ -238,22 +237,22 @@ boost::shared_ptr< Array> PhysicalSpgemm::execute(std::vector< boost::shared_ptr
         SCIDB_UNREACHABLE();
     }
 
-    return shared_ptr<Array>();
+    return std::shared_ptr<Array>();
 }
 
 
 template<class SemiringTraits_tt>
-boost::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< boost::shared_ptr< Array> >& inputArrays,
+std::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< std::shared_ptr< Array> >& inputArrays,
                                                         rightReplicateEnum_t rightReplicate,
-                                                        boost::shared_ptr<Query>& query)
+                                                        std::shared_ptr<Query>& query)
 {
     typedef typename SemiringTraits_tt::Value_t Value_t;
 
     SpgemmTimes times;
 
     // Create a result array.
-    shared_ptr<MemArray> resultArray = make_shared<MemArray>(_schema, query);
-    shared_ptr<ArrayIterator> resultArrayIter = resultArray->getIterator(0);
+    std::shared_ptr<MemArray> resultArray = make_shared<MemArray>(_schema, query);
+    std::shared_ptr<ArrayIterator> resultArrayIter = resultArray->getIterator(0);
 
     // We need to duplicate the right array to all instances, and multiply with the local chunks.
     // One option is to duplicate.
@@ -265,17 +264,17 @@ boost::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< boost::shar
     // redistribute the left array, so that chunks in the same row are distributed to the same instance.
     times.totalSecsStart();
     times.redistLeftStart();
-    shared_ptr<Array> leftArray = redistributeToRandomAccess(inputArrays[0], query, psByRow,
+    std::shared_ptr<Array> leftArray = redistributeToRandomAccess(inputArrays[0], query, psByRow,
                                                              ALL_INSTANCE_MASK,
-                                                             shared_ptr<DistributionMapper>(),
+                                                             std::shared_ptr<CoordinateTranslator>(),
                                                              0,
-                                                             shared_ptr<PartitioningSchemaData>());
+                                                             std::shared_ptr<PartitioningSchemaData>());
 
 
 
     times.redistLeftStop();
 
-    shared_ptr<Array> rightArray = inputArrays[1];
+    std::shared_ptr<Array> rightArray = inputArrays[1];
     const size_t instanceCount = query->getInstancesCount();
 
     // should the right array be replicated [faster especially for a vector]
@@ -307,9 +306,9 @@ boost::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< boost::shar
         times.redistRightStart();
         rightArray = redistributeToRandomAccess(rightArray, query, psReplication,
                                                 ALL_INSTANCE_MASK,
-                                                shared_ptr<DistributionMapper>(),
+                                                std::shared_ptr<CoordinateTranslator>(),
                                                 0,
-                                                shared_ptr<PartitioningSchemaData>());
+                                                std::shared_ptr<PartitioningSchemaData>());
 
         times.redistRightStop();
 
@@ -334,9 +333,9 @@ boost::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< boost::shar
             times.redistRightStart();
             rightArray = redistributeToRandomAccess(rightArray, query, psByCol,
                                                     ALL_INSTANCE_MASK,
-                                                    shared_ptr<DistributionMapper>(),
+                                                    std::shared_ptr<CoordinateTranslator>(),
                                                     i,
-                                                    shared_ptr<PartitioningSchemaData>());
+                                                    std::shared_ptr<PartitioningSchemaData>());
 
             times.redistRightStop();
 
@@ -365,8 +364,8 @@ boost::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< boost::shar
 
 
 template<class SemiringTraits_tt>
-void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr<Array>& rightArray,
-                                        shared_ptr<ArrayIterator>& resultArray, shared_ptr<Query>& query, SpgemmTimes& times)
+void PhysicalSpgemm::spGemmColumnSubset(std::shared_ptr<Array>& leftArray, std::shared_ptr<Array>& rightArray,
+                                        std::shared_ptr<ArrayIterator>& resultArray, std::shared_ptr<Query>& query, SpgemmTimes& times)
 {
     typedef typename SemiringTraits_tt::Value_t Value_t;
     typedef typename SemiringTraits_tt::OpAdd_t OpAdd_t ;
@@ -374,7 +373,7 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
     typedef CSRBlock<Value_t> LeftBlock_t; // chunks will be converted to matrix blocks which are efficient for sparse operations
 
     typedef SpgemmBlock<Value_t> RightBlock_t;
-    typedef boost::unordered_map<Coordinate, shared_ptr<RightBlock_t> > RightBlockMap_t; // a map of a column of right blocks
+    typedef std::unordered_map<Coordinate, std::shared_ptr<RightBlock_t> > RightBlockMap_t; // a map of a column of right blocks
 
     // method invariants:
     size_t leftChunkRowSize = leftArray->getArrayDesc().getDimensions()[0].getChunkInterval();
@@ -400,7 +399,7 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
 
     // for every column of chunks in the right array.
     vector<Coordinates>::iterator itChunkPositionsRight = rightChunkPositions.begin();
-    shared_ptr<ConstArrayIterator> arrayIterRight = rightArray->getConstIterator(0);
+    std::shared_ptr<ConstArrayIterator> arrayIterRight = rightArray->getConstIterator(0);
 
     Coordinate lastColMonotonic = std::numeric_limits<Coordinate>::min();
     while (itChunkPositionsRight != rightChunkPositions.end()) {
@@ -426,7 +425,7 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
             ssize_t chunkRows = curChunk.getLastPosition(false)[0] - curChunk.getFirstPosition(false)[0] + 1;
             ssize_t chunkCols = curChunk.getLastPosition(false)[1] - curChunk.getFirstPosition(false)[1] + 1;
 
-            shared_ptr<RightBlock_t> rightBlock =
+            std::shared_ptr<RightBlock_t> rightBlock =
                 SpgemmBlockFactory<SemiringTraits_tt>((*itChunkPositionsRight)[0], (*itChunkPositionsRight)[1],
                                                       chunkRows, chunkCols, nnzMax);
 
@@ -434,7 +433,7 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
             copyChunkToBlock<SemiringTraits_tt, RightBlock_t>(curChunk, rightBlock, NULL, query);
 
             if (!rightBlock->empty()) {
-                rightBlockMap.insert(std::pair<Coordinate, shared_ptr<RightBlock_t> >((*itChunkPositionsRight)[0], rightBlock));
+                rightBlockMap.insert(std::pair<Coordinate, std::shared_ptr<RightBlock_t> >((*itChunkPositionsRight)[0], rightBlock));
             }
             // next chunk in list of sorted chunks, until the chunk column changes
             ++itChunkPositionsRight;
@@ -448,18 +447,18 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
         //         to multiply the left row of chunks by the colunn of right chunks
 
         // for every row of chunks in the left array.
-        shared_ptr<ConstArrayIterator> leftArrayIt = leftArray->getConstIterator(0);
+        std::shared_ptr<ConstArrayIterator> leftArrayIt = leftArray->getConstIterator(0);
         vector<Coordinates>::iterator leftPosIt = leftChunkPositions.begin();
         while(leftPosIt != leftChunkPositions.end()) {
             double timeLeftStart=getDbgMonotonicrawSecs() ;
             // part 2A: load a row of right chunks into memory blocks (owned by leftBlockList)
             //          while also finding the set of rows occupied by these blocks (leftRowsInUse)
-            typedef pair<Coordinate, shared_ptr<LeftBlock_t> > ColBlockPair_t ;
+            typedef pair<Coordinate, std::shared_ptr<LeftBlock_t> > ColBlockPair_t ;
             typedef std::vector<ColBlockPair_t> LeftBlockList_t;  // TODO: should this be made a list?
             typedef typename std::vector< ColBlockPair_t >::iterator LeftBlockListIt_t;
             LeftBlockList_t leftBlockList;
                                                                 // TODO: the tree here is too expensive when it becomes ultra-sparse
-            typedef std::set<Coordinate> LeftRowOrderedSet_t ;  // TODO: try making this std::map<pair<Coord, std::set<pair<Coord, shared_ptr<Block_t>> >
+            typedef std::set<Coordinate> LeftRowOrderedSet_t ;  // TODO: try making this std::map<pair<Coord, std::set<pair<Coord, std::shared_ptr<Block_t>> >
             LeftRowOrderedSet_t leftRowsInUse;                  //       and iteration will skip blocks not involved in the row, rather
                                                                 //       than looking them up in the map and then checking.
 
@@ -472,14 +471,14 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
                 ConstChunk const& curChunk = leftArrayIt->getChunk();
                 size_t nnzMax = curChunk.count();
 
-                shared_ptr<LeftBlock_t> leftBlock = make_shared<LeftBlock_t>((*leftPosIt)[0], (*leftPosIt)[1],
+                std::shared_ptr<LeftBlock_t> leftBlock = make_shared<LeftBlock_t>((*leftPosIt)[0], (*leftPosIt)[1],
                                                                              leftChunkRowSize, leftChunkColSize, nnzMax);
                 times.loadLeftCopyStart();
                 copyChunkToBlock<SemiringTraits_tt, LeftBlock_t>(curChunk, leftBlock, &leftRowsInUse, query);
                 times.loadLeftCopyStop();
 
                 if (!leftBlock->empty()) {
-                    leftBlockList.push_back(std::pair<Coordinate, shared_ptr<LeftBlock_t> >((*leftPosIt)[1], leftBlock));
+                    leftBlockList.push_back(std::pair<Coordinate, std::shared_ptr<LeftBlock_t> >((*leftPosIt)[1], leftBlock));
                 }
                 // next chunk in list of sorted chunks, until the chunk column changes
                 ++leftPosIt;
@@ -498,7 +497,7 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
             resultChunkPos[0] = chunkRow; resultChunkPos[1] = chunkCol ;
 
             // for every row used in the left row-of-chunks
-            shared_ptr<ChunkIterator> currentResultChunk; // lazy creation by sparseRowAccumulator
+            std::shared_ptr<ChunkIterator> currentResultChunk; // lazy creation by sparseRowAccumulator
             for(typename LeftRowOrderedSet_t::iterator rowIt=leftRowsInUse.begin(); rowIt != leftRowsInUse.end(); ++rowIt) {
                 Coordinate leftRow = *(rowIt);
                 // for each block along that row in the left row-of-chunks
@@ -539,9 +538,9 @@ void PhysicalSpgemm::spGemmColumnSubset(shared_ptr<Array>& leftArray, shared_ptr
 
 
 template<class CoordinatesComparator_tt>
-void PhysicalSpgemm::getChunkPositions(shared_ptr<Array>& array, vector<Coordinates>& result)
+void PhysicalSpgemm::getChunkPositions(std::shared_ptr<Array>& array, vector<Coordinates>& result)
 {
-    shared_ptr<CoordinateSet> unsorted = array->findChunkPositions();
+    std::shared_ptr<CoordinateSet> unsorted = array->findChunkPositions();
     result.reserve(unsorted->size()); // for O(n) insertion time
     result.insert(result.begin(), unsorted->begin(), unsorted->end());
     sort(result.begin(), result.end(), CoordinatesComparator_tt());
@@ -549,9 +548,9 @@ void PhysicalSpgemm::getChunkPositions(shared_ptr<Array>& array, vector<Coordina
 
 template<class SemiringTraits_tt, class Block_tt>
 void PhysicalSpgemm::copyChunkToBlock(ConstChunk const& chunk,
-                                      shared_ptr<Block_tt>& spBlock,
+                                      std::shared_ptr<Block_tt>& spBlock,
                                       std::set<Coordinate>* rowsInUseOptional,
-                                      const shared_ptr<Query>& query)
+                                      const std::shared_ptr<Query>& query)
 {
     typedef typename SemiringTraits_tt::Value_t Value_t ;
     typedef typename SemiringTraits_tt::IdAdd_t IdAdd_t ;
@@ -559,13 +558,13 @@ void PhysicalSpgemm::copyChunkToBlock(ConstChunk const& chunk,
     bool priorRowValid = false; // TODO: if there is a reserved value of Coordinate, we can eliminate this bool
     Coordinate priorRow = 0;    // initializing only to silence the compiler warning, that cannot actually happen
 
-    shared_ptr<ConstChunkIterator> itChunk = chunk.getConstIterator();
+    std::shared_ptr<ConstChunkIterator> itChunk = chunk.getConstIterator();
     if( !dynamic_cast<RLETileConstChunkIterator*>(itChunk.get())) {
         // tile is not assured of actually having a tile ... switch to an iterator that
         // makes the tile API continue to function even in this case of "legacy" chunks
         itChunk = make_shared<
                      TileConstChunkIterator<
-                        shared_ptr<ConstChunkIterator> > >(itChunk, query);
+                        std::shared_ptr<ConstChunkIterator> > >(itChunk, query);
     }
 
     assert(itChunk->getLogicalPosition()>=0);
@@ -577,8 +576,8 @@ void PhysicalSpgemm::copyChunkToBlock(ConstChunk const& chunk,
     Coordinates coords(2);
     assert(itChunk->getLogicalPosition() >= 0);
     for (position_t offset = itChunk->getLogicalPosition(); offset >= 0; ) {
-        boost::shared_ptr<BaseTile> tileData;
-        boost::shared_ptr<BaseTile> tileCoords;
+        std::shared_ptr<BaseTile> tileData;
+        std::shared_ptr<BaseTile> tileCoords;
         offset = itChunk->getData(offset, MAX_VALUES_TO_GET,
                                   tileData, tileCoords);
         if (!tileData) {
@@ -626,7 +625,7 @@ void PhysicalSpgemm::copyChunkToBlock(ConstChunk const& chunk,
 }
 
 template<class Value_tt>
-bool PhysicalSpgemm::shouldReplicate(shared_ptr<Array> array, boost::shared_ptr<Query>&query) const
+bool PhysicalSpgemm::shouldReplicate(std::shared_ptr<Array> array, std::shared_ptr<Query>&query) const
 {
     size_t rightTotalElements = getArrayCellCountTotal(array, query);
     size_t rightTotalBytes = rightTotalElements * sizeof(Value_tt);
@@ -647,7 +646,7 @@ bool PhysicalSpgemm::shouldReplicate(shared_ptr<Array> array, boost::shared_ptr<
 //
 // find the total number of bytes in an array, across all instances
 //
-size_t  PhysicalSpgemm::getArrayCellCountTotal(shared_ptr<Array> array, boost::shared_ptr<Query>& query) const
+size_t  PhysicalSpgemm::getArrayCellCountTotal(std::shared_ptr<Array> array, std::shared_ptr<Query>& query) const
 {
     size_t rightLocalElements = array->count();
 
@@ -657,7 +656,7 @@ size_t  PhysicalSpgemm::getArrayCellCountTotal(shared_ptr<Array> array, boost::s
     InstanceID myInstanceID = query->getInstanceID();
     const size_t instancesCount = query->getInstancesCount();
 
-    shared_ptr<SharedBuffer> outBuf(make_shared<MemoryBuffer>(static_cast<void*>(NULL), 2*sizeof(size_t)));
+    std::shared_ptr<SharedBuffer> outBuf(make_shared<MemoryBuffer>(static_cast<void*>(NULL), 2*sizeof(size_t)));
     size_t* sPtr = static_cast<size_t*> (outBuf->getData());
     *sPtr = sizeof(size_t);
     ++sPtr;
@@ -669,7 +668,7 @@ size_t  PhysicalSpgemm::getArrayCellCountTotal(shared_ptr<Array> array, boost::s
     // receive rightLocalElements from all other instances
     for (size_t i=0; i < instancesCount; i++ ) {
         if (i == myInstanceID) { continue; }
-        shared_ptr<SharedBuffer> inBuf = BufReceive(i, query);
+        std::shared_ptr<SharedBuffer> inBuf = BufReceive(i, query);
         size_t* sPtr = reinterpret_cast<size_t*>(inBuf->getData());
         assert((*sPtr) == sizeof(size_t));
         sPtr++;

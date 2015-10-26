@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,7 @@
 
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include <sstream>
 
@@ -63,19 +63,21 @@ namespace scidb
         for (size_t i = 0; i < nAttrs; i++) {
             dstAttrs[i] = AttributeDesc(i, srcAttrs[i].getName(), TID_STRING,  AttributeDesc::IS_NULLABLE, 0);
         }
+        // FWIW row_offset is a misnomer.  According to the 14.8 docs and the implementation,
+        // this value is really a file offset into the flat load file.
         dstAttrs[nAttrs] = AttributeDesc(nAttrs, "row_offset", TID_INT64, 0, 0);
         dstAttrs[nAttrs+1] = AttributeDesc(nAttrs+1, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
                                            TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
-        return ArrayDesc(shadowArrayName, dstAttrs, targetArray.getDimensions());
+        return ArrayDesc(shadowArrayName, dstAttrs, targetArray.getDimensions(), defaultPartitioning());
     }
 
 InputArray::InputArray(ArrayDesc const& array,
                        string const& format,
-                       boost::shared_ptr<Query>& query,
+                       std::shared_ptr<Query>& query,
                        bool emptyMode,
                        bool enforceDataIntegrity,
                        int64_t maxCnvErrors,
-                       string const& shadowArrayName,
+                       const ArrayDesc& shadowArraySchema,
                        bool parallel)
 :     SinglePassArray(array),
       _chunkLoader(ChunkLoader::create(format)),
@@ -100,14 +102,17 @@ InputArray::InputArray(ArrayDesc const& array,
         SCIDB_ASSERT(_chunkLoader);   // else inferSchema() messed up
         _chunkLoader->bind(this, query);
 
-        if (!shadowArrayName.empty()) {
-            shadowArray.reset(new MemArray(generateShadowArraySchema(array, shadowArrayName), query));
+        if (!shadowArraySchema.getName().empty()) {
+            assert(shadowArraySchema.getId() > 0);
+            assert(shadowArraySchema.getUAId() > 0);
+            assert(shadowArraySchema.getId() > shadowArraySchema.getUAId());
+            _shadowArray.reset(new MemArray(shadowArraySchema, query));
         }
     }
 
     bool InputArray::isSupportedFormat(string const& format)
     {
-        boost::scoped_ptr<ChunkLoader> cLoader(ChunkLoader::create(format));
+        std::unique_ptr<ChunkLoader> cLoader(ChunkLoader::create(format));
         return cLoader.get() != 0;
     }
 
@@ -134,30 +139,32 @@ InputArray::InputArray(ArrayDesc const& array,
         _chunkLoader->openString(dataString);
     }
 
-    void InputArray::redistributeShadowArray(boost::shared_ptr<Query> const& query)
+    void InputArray::redistributeShadowArray(std::shared_ptr<Query>& query)
     {
-        SCIDB_ASSERT(shadowArray);
+        SCIDB_ASSERT(_shadowArray);
 
-        //All arrays are currently stored as round-robin. Let's store shadow arrays round-robin as well
+        //Lets store shadow arrays in defaultPartitioning()
         //TODO: revisit this when we allow users to store arrays with specified distributions
-        PartitioningSchema ps = psHashPartitioned;
-        ArrayDesc shadowArrayDesc = shadowArray->getArrayDesc();
-        string shadowArrayVersionName;
+        PartitioningSchema ps = defaultPartitioning();
+        const ArrayDesc& shadowArrayDesc = _shadowArray->getArrayDesc();
 
+        assert(shadowArrayDesc.getId() > 0);
+        assert(shadowArrayDesc.getUAId() > 0);
         LOG4CXX_DEBUG(logger, "Redistribute shadow array " << shadowArrayDesc.getName());
 
         if (! query->isCoordinator()) {
             // worker
-            string shadowArrayName = shadowArrayDesc.getName();
-            SCIDB_ASSERT(ArrayDesc::isNameUnversioned(shadowArrayName));
 
-            shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(shadowArrayName,
+            SCIDB_ASSERT(ArrayDesc::isNameVersioned(shadowArrayDesc.getName()));
+            string shadowArrayName = ArrayDesc::makeUnversionedName(shadowArrayDesc.getName());
+
+            std::shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(shadowArrayName,
                                                                                  query->getQueryID(),
                                                                                  Cluster::getInstance()->getLocalInstanceId(),
                                                                                  SystemCatalog::LockDesc::WORKER,
                                                                                  SystemCatalog::LockDesc::WR));
 
-            shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(lock));
+            std::shared_ptr<Query::ErrorHandler> ptr(new UpdateErrorHandler(lock));
             query->pushErrorHandler(ptr);
 
             Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock, lock, _1);
@@ -166,57 +173,38 @@ InputArray::InputArray(ArrayDesc const& array,
             if (!SystemCatalog::getInstance()->lockArray(lock, errorChecker)) {
                 throw USER_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_INCREMENT_LOCK) << shadowArrayName;
             }
-
-            ArrayDesc desc;
-            bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(shadowArrayName, desc, false);
-            VersionID lastVersion = 0;
-            if (arrayExists) {
-                lastVersion = SystemCatalog::getInstance()->getLastVersion(desc.getId());
-            }
-            VersionID version = lastVersion+1;
-
-            lock->setArrayVersion(version);
-            bool rc = SystemCatalog::getInstance()->updateArrayLock(lock);
-            SCIDB_ASSERT(rc);
-
-            LOG4CXX_DEBUG(logger, "Use version " << version << " of shadow array " << shadowArrayName);
-            shadowArrayVersionName = ArrayDesc::makeVersionedName(shadowArrayName, version);
-        } else {
-            // coordinator
-            shadowArrayVersionName = shadowArrayDesc.getName();
-            SCIDB_ASSERT(ArrayDesc::isNameVersioned(shadowArrayVersionName));
+            SCIDB_ASSERT(lock->getLockMode() == SystemCatalog::LockDesc::WR);
         }
-
-        shared_ptr<Array> persistentShadowArray(DBArray::newDBArray(shadowArrayVersionName, query));
-        ArrayDesc const& dstArrayDesc = persistentShadowArray->getArrayDesc();
+        std::shared_ptr<Array> persistentShadowArray(DBArray::newDBArray(shadowArrayDesc, query));
+        ArrayDesc dstArrayDesc = persistentShadowArray->getArrayDesc();
 
         query->getReplicationContext()->enableInboundQueue(dstArrayDesc.getId(),
                                                            persistentShadowArray);
 
         set<Coordinates, CoordinatesLess> newChunkCoordinates;
-        redistributeToArray(shadowArray, persistentShadowArray,  &newChunkCoordinates,
+        redistributeToArray(_shadowArray, persistentShadowArray,  &newChunkCoordinates,
                             query, ps,
                             ALL_INSTANCE_MASK,
-                            boost::shared_ptr <DistributionMapper>(),
+                            std::shared_ptr <CoordinateTranslator>(),
                             0,
-                            shared_ptr<PartitioningSchemaData>());
+                            std::shared_ptr<PartitioningSchemaData>());
 
         StorageManager::getInstance().removeDeadChunks(dstArrayDesc, newChunkCoordinates, query);
+        PhysicalBoundaries bounds = PhysicalBoundaries::createFromChunkList(persistentShadowArray,
+                                                                            newChunkCoordinates);
+        PhysicalUpdate::updateSchemaBoundaries(dstArrayDesc, bounds, query);
+
         query->getReplicationContext()->replicationSync(dstArrayDesc.getId());
         query->getReplicationContext()->removeInboundQueue(dstArrayDesc.getId());
         StorageManager::getInstance().flush();
-        PhysicalBoundaries bounds = PhysicalBoundaries::createFromChunkList(persistentShadowArray,
-                                                                            newChunkCoordinates);
-        SystemCatalog::getInstance()->updateArrayBoundaries(dstArrayDesc, bounds);
-
         // XXX TODO: add: getInjectedErrorListener().check();
     }
 
     // Callback for deferred scatter/gather of the shadow array.
     void InputArray::sg()
     {
-        SCIDB_ASSERT(shadowArray);
-        shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        SCIDB_ASSERT(_shadowArray);
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
         redistributeShadowArray(query);
     }
 
@@ -227,12 +215,12 @@ InputArray::InputArray(ArrayDesc const& array,
     // (denoted by state == S_Empty), we schedule an SG for the shadow
     // array.  Once scheduled, state == S_Done.
     //
-    void InputArray::scheduleSG(boost::shared_ptr<Query> const& query)
+    void InputArray::scheduleSG(std::shared_ptr<Query> const& query)
     {
-        if (!shadowArray) {
+        if (!_shadowArray) {
             return;
         }
-        boost::shared_ptr<Query::OperatorContext> sgCtx = query->getOperatorContext();
+        std::shared_ptr<Query::OperatorContext> sgCtx = query->getOperatorContext();
         resetShadowChunkIterators();
         shadowArrayIterators.clear();
         if (sgCtx) {
@@ -244,7 +232,7 @@ InputArray::InputArray(ArrayDesc const& array,
     }
 
     void InputArray::handleError(Exception const& x,
-                                 boost::shared_ptr<ChunkIterator> cIter,
+                                 std::shared_ptr<ChunkIterator> cIter,
                                  AttributeID i)
     {
         SCIDB_ASSERT(_chunkLoader);
@@ -273,15 +261,15 @@ InputArray::InputArray(ArrayDesc const& array,
         }
         cIter->writeItem(errVal);
 
-        if (shadowArray) {
+        if (_shadowArray) {
             if (shadowChunkIterators.empty()) {
-                shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+                std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
                 if (shadowArrayIterators.empty()) {
                     shadowArrayIterators.resize(nAttrs+1);
                     for (size_t j = 0; j < nAttrs; j++) {
-                        shadowArrayIterators[j] = shadowArray->getIterator(j);
+                        shadowArrayIterators[j] = _shadowArray->getIterator(j);
                     }
-                    shadowArrayIterators[nAttrs] = shadowArray->getIterator(nAttrs);
+                    shadowArrayIterators[nAttrs] = _shadowArray->getIterator(nAttrs);
                 }
                 shadowChunkIterators.resize(nAttrs+1);
                 Coordinates const& chunkPos = _chunkLoader->getChunkPos();
@@ -335,7 +323,7 @@ InputArray::InputArray(ArrayDesc const& array,
             if (chunkIndex > _currChunkIndex+1) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR1);
             }
-            shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+            std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
             if (chunkIndex <= _currChunkIndex) {
                 return true;
             }

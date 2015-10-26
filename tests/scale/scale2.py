@@ -1,8 +1,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -30,7 +30,7 @@ import logging
 import logging.handlers
 # Tested on 2-instance cluster
 
-basepath = os.path.realpath(os.path.dirname(sys.argv[0])) 
+basepath = os.path.realpath(os.path.dirname(sys.argv[0]))
 dgpath = basepath + "/../data_gen/gen_matrix"
 spath = basepath + "/../../bin"
 outfilename = '/data/scale.stdout'
@@ -62,11 +62,11 @@ def generate(nxchunks=10, nychunks=10, nx=100, ny=100, val=1.0):
     print "Generate load file " + filename
     print "cmdstr " + cmdstr
     # subprocess.Popen(["rm", "-f", filename]).wait()
-    # If a file exists by this name, assume it's a previously generated data file. Re-use it. 
-    if (not(os.path.exists(filename) & os.path.isfile(filename))): 
+    # If a file exists by this name, assume it's a previously generated data file. Re-use it.
+    if (not(os.path.exists(filename) & os.path.isfile(filename))):
         start = time.time()
-        subprocess.Popen(shlex.split(cmdstr), stdout=open(filename, "w")).wait() 
-        end = time.time() 
+        subprocess.Popen(shlex.split(cmdstr), stdout=open(filename, "w")).wait()
+        end = time.time()
         logger.debug("generate %2.2f" % (end - start))
     return filename
 
@@ -79,27 +79,27 @@ def gen_load_matrix(arrname, nxchunks=2, nychunks=2, nx=1000, ny=1000, val=1.0):
     print "Generate load file " + filename
     print "cmdstr " + cmdstr
     # subprocess.Popen(["rm", "-f", filename]).wait()
-    # If a file exists by this name, assume it's a previously generated data file. Re-use it. 
-    if (not(os.path.exists(filename) & os.path.isfile(filename))): 
+    # If a file exists by this name, assume it's a previously generated data file. Re-use it.
+    if (not(os.path.exists(filename) & os.path.isfile(filename))):
         start = time.time()
-        subprocess.Popen(shlex.split(cmdstr), stdout=open(filename, "w")).wait() 
-        end = time.time() 
+        subprocess.Popen(shlex.split(cmdstr), stdout=open(filename, "w")).wait()
+        end = time.time()
         logger.debug("generate %2.2f" % (end - start))
 
     start = time.time()
     load(arrname, filename)
-    end = time.time()     
+    end = time.time()
     logger.debug("load %2.2f" % (end - start))
 
 def create(arrname, nrows, ncols, chunkx, chunky, updflag=False):
     attno = 1
-    if (updflag): 
-        ccmd = "create updatable array " + arrname + " <a1: int32, a2: double> " 
+    if (updflag):
+        ccmd = "create updatable array " + arrname + " <a1: int32, a2: double> "
     else:
-        ccmd = "create array " + arrname + " <a1: int32, a2: double> " 
-    ccmd = ccmd + "[" + "I=0:" + "%d" % (nrows-1) + "," + "%d" % chunkx + ",0," 
+        ccmd = "create array " + arrname + " <a1: int32, a2: double> "
+    ccmd = ccmd + "[" + "I=0:" + "%d" % (nrows-1) + "," + "%d" % chunkx + ",0,"
     ccmd = ccmd + " J=0:" + "%d" % (ncols-1) + "," + "%d" % chunky + ",0" + "]"
-    
+
     print ccmd
     start = time.time()
     subprocess.Popen(["iquery", "--afl", "-q", ccmd], stdout=None).wait()
@@ -109,11 +109,11 @@ def create(arrname, nrows, ncols, chunkx, chunky, updflag=False):
 
 def create_3d(arrname, x1, y1, z1, chunkx1, chunky1, chunkz1):
     attno = 1
-    ccmd = "create array " + arrname + " <a1: int32, a2: double> " 
+    ccmd = "create array " + arrname + " <a1: int32, a2: double> "
     ccmd = ccmd + "[I=0:%d,%d,%d, " % ((x1-1), chunkx1, 0)
     ccmd = ccmd + "J=0:%d,%d,%d,  " % ((y1-1), chunky1, 0)
     ccmd = ccmd + "K=0:%d,%d,%d]  " % ((z1-1), chunkz1, 0)
-    
+
     print ccmd
     start = time.time()
     subprocess.Popen(["iquery", "--afl", "-q", ccmd], stdout=None).wait()
@@ -122,12 +122,12 @@ def create_3d(arrname, x1, y1, z1, chunkx1, chunky1, chunkz1):
     return arrname
 
 def create_matrix(arrname, nrows, ncols, chunkx, chunky):
-    ccmd = "create array " + arrname + " <a: double> " 
-    ccmd = ccmd + "[" + "I=0:" + "%d" % (nrows-1) + "," + "%d" % chunkx + ",0," 
+    ccmd = "create array " + arrname + " <a: double> "
+    ccmd = ccmd + "[" + "I=0:" + "%d" % (nrows-1) + "," + "%d" % chunkx + ",0,"
     ccmd = ccmd + " J=0:" + "%d" % (ncols-1) + "," + "%d" % chunky + ",0" + "]"
 
     logger.debug("arrname is %s size %d x %d, chunks %d x %d" % (arrname, nrows, ncols, chunkx, chunky))
-    
+
     print ccmd
     start = time.time()
     subprocess.Popen(["iquery", "--afl", "-q", ccmd], stdout=open(outfilename, "w")).wait()
@@ -140,16 +140,16 @@ def load(arrname, filename):
     outfile = open(outfilename, "w")
     errfile = open(errfilename, "w")
 
-    if (os.path.exists(filename) & os.path.isfile(filename)): 
-        lcmd = "load(" + arrname + ", " + "'" + filename  + "'" + ")" 
+    if (os.path.exists(filename) & os.path.isfile(filename)):
+        lcmd = "load(" + arrname + ", " + "'" + filename  + "'" + ")"
         print lcmd
         start = time.time()
         subprocess.Popen(["iquery", "--afl", "-n", "-q", lcmd], stdout=outfile).wait()
         end = time.time()
-        logger.debug("load %2.2f" % (end - start)) 
+        logger.debug("load %2.2f" % (end - start))
     outfile.close()
     errfile.close()
- 
+
 def run_cmd(cmd, afl=True):
     print cmd
 
@@ -192,73 +192,73 @@ def scatter_gather(arrname, newarrname):
     logger.debug(timing)
 
 def apply(arrname):
-    cmd = "avg(project(apply(" + arrname + ",  b, 2*a), b))" 
+    cmd = "avg(project(apply(" + arrname + ",  b, 2*a), b))"
     el = run_cmd(cmd)
-    timing = "ave/proj/apply  %2.2f" % el 
+    timing = "ave/proj/apply  %2.2f" % el
     logger.debug(timing)
 
-def count_join_transpose(arrname): 
+def count_join_transpose(arrname):
     cmd = "count(join(transpose(" + arrname + "), " + arrname + "))"
     el = run_cmd(cmd)
     timing = "count/join/transpose  %2.2f" % el
     logger.debug(timing)
-    return 
+    return
 
 def covariance(arrname):
     cmd = "covariance(" + arrname + ", " + arrname + ")"
     el = run_cmd(cmd)
-    timing = "covariance "+ "%2.2f" % el 
+    timing = "covariance "+ "%2.2f" % el
     logger.debug(timing)
     return
 
-def multiply1(arrname): 
-    cmd = "multiply(" + arrname + ", transpose(" + arrname + "))" 
+def multiply1(arrname):
+    cmd = "multiply(" + arrname + ", transpose(" + arrname + "))"
     el = run_cmd(cmd)
-    timing = "multiply/transpose  %2.2f" % el 
+    timing = "multiply/transpose  %2.2f" % el
     logger.debug(timing)
-    return 
+    return
 
-def multiply2(arrname): 
-    cmd = "min(multiply(" + arrname + ", transpose(" + arrname + ")))" 
+def multiply2(arrname):
+    cmd = "min(multiply(" + arrname + ", transpose(" + arrname + ")))"
     el = run_cmd(cmd)
-    timing = "multiply2  %2.2f" % el 
+    timing = "multiply2  %2.2f" % el
     logger.debug(timing)
 
-def multiply3(arrname): 
+def multiply3(arrname):
     condition = "I = J"
-    cmd = "multiply(filter(" + arrname + ", " + condition + "), transpose(filter(" + arrname + "," + condition + ")))" 
+    cmd = "multiply(filter(" + arrname + ", " + condition + "), transpose(filter(" + arrname + "," + condition + ")))"
     el = run_cmd(cmd)
-    timing = "multiply  %2.2f" % el 
+    timing = "multiply  %2.2f" % el
     logger.debug(timing)
 
 def join(a1, a2):
     cmd = "count(subarray(join(" + a1 + " as A1, " + a2 + " as A2), 0, 0, 1000, 1000), J)"
-    el = run_cmd(cmd)    
-    timing = "count-gb/subarray/join  %2.2f" % el 
+    el = run_cmd(cmd)
+    timing = "count-gb/subarray/join  %2.2f" % el
     logger.debug(timing)
 
 def aggregate(a1):
     cmd = "aggregate(" + a1 + ", e, 0, e*0.75 + a*0.25 )"
     el = run_cmd(cmd)
-    timing = "aggregate  %2.2f" % el 
+    timing = "aggregate  %2.2f" % el
     logger.debug(timing)
 
 def regrid(a1, gridx=10, gridy=10):
     cmd = "avg(regrid(" + a1 + ", %d" % gridx + ", %d" % gridy + ", s, 0, s + a1*a2 ))"
     el = run_cmd(cmd)
-    timing = "regrid/avg  %2.2f" % el 
+    timing = "regrid/avg  %2.2f" % el
     logger.debug(timing)
 
 def repart(a1, a2):
     cmd = "count(filter(repart(" + a1 + "," + a2 + "), a1 > 100*a2))"
     el = run_cmd(cmd)
-    timing = "repart  %2.2f" % el 
+    timing = "repart  %2.2f" % el
     logger.debug(timing)
 
 def reshape(a1, a2):
     cmd = "count(filter(reshape(" + a1 + "," + a2 + "), a1 > 100*a2))"
     el = run_cmd(cmd)
-    timing = "reshape  %2.2f" % el 
+    timing = "reshape  %2.2f" % el
     logger.debug(timing)
 
 def filter(a1):
@@ -318,7 +318,7 @@ def array_make_name(nrows, ncols, nx1, ny1):
     arrname = "a_%d_%d_%d_%d" % (nrows, ncols, nx1, ny1)
     print arrname
     return arrname
-    
+
 def array_cleanup(arrname):
     repart_arrname = arrname + "_rep"
     reshape_arrname = arrname + "_res"
@@ -328,8 +328,8 @@ def array_cleanup(arrname):
     cleanup(repart_arrname)
     cleanup(reshape_arrname)
     cleanup(sgname)
-    
-def array_create_load(arrname, nrows, ncols, nx1, ny1): 
+
+def array_create_load(arrname, nrows, ncols, nx1, ny1):
     nxchunks1=nrows/nx1
     nychunks1=ncols/ny1
 
@@ -351,7 +351,7 @@ def array_scale_run(arrname):
     repart_arrname = arrname + "_rep"
     reshape_arrname = arrname + "_res"
     sgname = arrname + "_sg"
-    
+
     title = "\narray %d x %d # run " % (nrows, ncols)
     logger.debug(title)
 
@@ -373,19 +373,19 @@ def matrix_scale_tests(nrows, ncols, nx1, ny1):
     bldmatname = matname + "_bld"
     sgmatname = matname + "_sg"
     trmatname = matname + "_tp"
-    
+
     cleanup(matname)
     cleanup(bldmatname)
     cleanup(trmatname)
-    
+
     # Create, build, count/scan
     create_matrix(matname, nrows, ncols, nx1, ny1)
     build_matrix(matname, bldmatname, nrows, ncols)
 #    gen_load_matrix(matname, nrows/nx1, ncols/ny1, nx1, ny1, 1.0)
-    
+
     count_scan(bldmatname)
     get_storage_size()
- 
+
     covariance(bldmatname)
 #    multiply1(bldmatname)
 #    multiply2(bldmatname)
@@ -397,29 +397,29 @@ def matrix_scale_tests(nrows, ncols, nx1, ny1):
 #    scatter_gather(bldmatname, sgmatname)
 #    count_scan(sgmatname)
     get_storage_size()
-    
+
     # transpose join
     count_join_transpose(bldmatname)
     get_storage_size()
 
     # apply an operator
     apply(bldmatname)
-    
+
     count_scan(bldmatname)
 #    aggregate(bldmatname)
     return
-    
+
 if __name__ == "__main__":
     get_storage_size()
-    
+
     sizes2 = [20000, 40000]
 #    sizes2 = [32000]
 #    sizes2 = [12000]
     chunksizes = [100]
-    for c in chunksizes: 
+    for c in chunksizes:
         nx1=c
         ny1=c
-        for s in sizes2: 
+        for s in sizes2:
             nrows=s
             ncols=s
             nxchunks1=nrows/nx1
@@ -435,19 +435,19 @@ if __name__ == "__main__":
     createflag = False
     niters = 0
     updateflag = False
-    for s in sizes1: 
+    for s in sizes1:
         nrows=s
         ncols=s
         nx1=2500
         ny1=2500
 
         an = array_make_name(nrows, ncols, nx1, ny1)
-        if (createflag): 
+        if (createflag):
             array_cleanup(an)
             array_create_load(an, nrows, ncols, nx1, ny1)
 
         iter = 0
-        while (iter < niters): 
+        while (iter < niters):
             array_scale_run(an)
             iter = iter + 1
 
@@ -456,6 +456,6 @@ if __name__ == "__main__":
 
     sys.exit()
 
-    
-        
-    
+
+
+

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,11 +31,8 @@
 
 #include <string>
 #include <boost/shared_array.hpp>
-#include "array/MemArray.h"
-#include "array/Metadata.h"
-
-using namespace std;
-using namespace boost;
+#include <array/MemArray.h>
+#include <array/Metadata.h>
 
 namespace scidb
 {
@@ -47,13 +44,13 @@ class DelegateArrayIterator;
 class DelegateChunk : public ConstChunk
 {
     friend class DelegateChunkIterator;
-  public:
+public:
     const ArrayDesc& getArrayDesc() const;
     const AttributeDesc& getAttributeDesc() const;
     virtual int getCompressionMethod() const;
     virtual Coordinates const& getFirstPosition(bool withOverlap) const;
     virtual Coordinates const& getLastPosition(bool withOverlap) const;
-    virtual boost::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
+    virtual std::shared_ptr<ConstChunkIterator> getConstIterator(int iterationMode) const;
 
     virtual void setInputChunk(ConstChunk const& inputChunk);
     ConstChunk const& getInputChunk() const;
@@ -67,26 +64,29 @@ class DelegateChunk : public ConstChunk
     size_t getSize() const;
     bool pin() const;
     void unPin() const;
-    void compress(CompressedBuffer& buf, boost::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
+    void compress(CompressedBuffer& buf, std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const;
     Array const& getArray() const;
 
-    void overrideClone(bool clone = true) {
+    void overrideClone(bool clone = true)
+    {
         isClone = clone;
     }
 
     virtual void overrideTileMode(bool enabled);
-  
-    bool inTileMode() const { 
+
+    bool inTileMode() const
+    {
         return tileMode;
     }
 
     DelegateChunk(DelegateArray const& array, DelegateArrayIterator const& iterator, AttributeID attrID, bool isClone);
 
-    DelegateArray const& getDelegateArray() const { 
+    DelegateArray const& getDelegateArray() const
+    {
         return array;
     }
 
-  protected:
+protected:
     DelegateArray const& array;
     DelegateArrayIterator const& iterator;
     AttributeID attrID;
@@ -97,10 +97,10 @@ class DelegateChunk : public ConstChunk
 
 class DelegateChunkIterator : public ConstChunkIterator
 {
-  public:
-    virtual int getMode();
-    virtual Value& getItem();
-    virtual bool isEmpty();
+public:
+    virtual int getMode() const;
+    virtual Value const& getItem();
+    virtual bool isEmpty() const;
     virtual bool end();
     virtual void operator ++();
     virtual Coordinates const& getPosition();
@@ -111,18 +111,18 @@ class DelegateChunkIterator : public ConstChunkIterator
     DelegateChunkIterator(DelegateChunk const* chunk, int iterationMode);
     virtual ~DelegateChunkIterator() {}
 
-  protected:
+protected:
     DelegateChunk const* chunk;
-    boost::shared_ptr<ConstChunkIterator> inputIterator;
+    std::shared_ptr<ConstChunkIterator> inputIterator;
 };
 
 class DelegateArrayIterator : public ConstArrayIterator
 {
-  public:
-	DelegateArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
+public:
+	DelegateArrayIterator(DelegateArray const& delegate, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator);
 
 	virtual ConstChunk const& getChunk();
-        boost::shared_ptr<ConstArrayIterator> getInputIterator() const;
+        std::shared_ptr<ConstArrayIterator> getInputIterator() const;
 
 	virtual bool end();
 	virtual void operator ++();
@@ -130,18 +130,18 @@ class DelegateArrayIterator : public ConstArrayIterator
 	virtual bool setPosition(Coordinates const& pos);
 	virtual void reset();
 
-  protected:
-    DelegateArray const& array;	
+protected:
+    DelegateArray const& array;
     AttributeID attr;
-    boost::shared_ptr<ConstArrayIterator> inputIterator;
-    boost::shared_ptr<DelegateChunk> chunk;
+    std::shared_ptr<ConstArrayIterator> inputIterator;
+    std::shared_ptr<DelegateChunk> chunk;
     bool chunkInitialized;
 };
 
 class DelegateArray : public Array
 {
-  public:
-	DelegateArray(ArrayDesc const& desc, boost::shared_ptr<Array> input, bool isClone = false);
+public:
+	DelegateArray(ArrayDesc const& desc, std::shared_ptr<Array> input, bool isClone = false);
 
 	virtual ~DelegateArray()
 	{}
@@ -155,84 +155,87 @@ class DelegateArray : public Array
         return inputArray->getSupportedAccess();
     }
 
-	virtual string const& getName() const;
+	virtual std::string const& getName() const;
 	virtual ArrayID getHandle() const;
 	virtual const ArrayDesc& getArrayDesc() const;
-	virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const;
+	virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const;
 
-    boost::shared_ptr<Array> getInputArray() const; 
+    std::shared_ptr<Array> getInputArray() const;
 
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-  protected:
+protected:
 	ArrayDesc desc;
-	boost::shared_ptr<Array> inputArray;
+	std::shared_ptr<Array> inputArray;
     bool isClone;
 };
 
 class ShallowDelegateArray : public DelegateArray
 {
 public:
-    ShallowDelegateArray(ArrayDesc const& desc, boost::shared_ptr<Array> input):
+    ShallowDelegateArray(ArrayDesc const& desc, std::shared_ptr<Array> input):
         DelegateArray(desc,input)
     {}
 
     virtual ~ShallowDelegateArray()
     {}
 
-    virtual boost::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const
+    virtual std::shared_ptr<ConstArrayIterator> getConstIterator(AttributeID id) const
     {
         return inputArray->getConstIterator(id);
     }
 };
 
 /**
- * Array with dummy empty-tag attribute - used to perform operations with 
+ * Array with dummy empty-tag attribute - used to perform operations with
  * emptyable and non-emptyable arrays
  */
 class NonEmptyableArray : public DelegateArray
 {
     class DummyBitmapChunkIterator : public DelegateChunkIterator
     {
-      public:
-        virtual Value& getItem();
-        virtual bool isEmpty();
+    public:
+        virtual Value const& getItem();
+        virtual bool isEmpty() const;
 
         DummyBitmapChunkIterator(DelegateChunk const* chunk, int iterationMode);
 
-      private:
+    private:
         Value _true;
     };
+
     class DummyBitmapArrayIterator : public DelegateArrayIterator
     {
-      public:
+    public:
         ConstChunk const& getChunk();
-        DummyBitmapArrayIterator(DelegateArray const& delegate, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
-      private:
+        DummyBitmapArrayIterator(DelegateArray const& delegate, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator);
+
+    private:
         MemChunk shapeChunk;
     };
-  public:
-	NonEmptyableArray(boost::shared_ptr<Array> input);
+
+public:
+	NonEmptyableArray(std::shared_ptr<Array> input);
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
 
-  private:
+private:
     AttributeID emptyTagID;
 };
 
 /**
  * Array splitting C++ array into chunks
  */
-class SplitArray : public DelegateArray 
+class SplitArray : public DelegateArray
 {
-  protected:
+protected:
     class ArrayIterator : public DelegateArrayIterator
     {
-      public:
+    public:
         virtual ConstChunk const& getChunk();
         virtual bool end();
         virtual void operator ++();
@@ -242,23 +245,23 @@ class SplitArray : public DelegateArray
 
         ArrayIterator(SplitArray const& array, AttributeID attrID);
 
-      protected:
+    protected:
         MemChunk chunk;
         Address addr;
         Dimensions const& dims;
         SplitArray const& array;
         bool hasCurrent;
         bool chunkInitialized;
-      private:
+    private:
         size_t attrBitSize;
     };
 
-  public:
+public:
     SplitArray(ArrayDesc const& desc,
                const boost::shared_array<char>& src,
                Coordinates const& from,
                Coordinates const& till,
-               shared_ptr<Query>const& query);
+               std::shared_ptr<Query>const& query);
     virtual ~SplitArray();
 
     /**
@@ -275,7 +278,8 @@ class SplitArray : public DelegateArray
     const Coordinates& till() const { return _till; }
     const Coordinates& size() const { return _size; }
     const Coordinates& startingChunk() const { return _startingChunk; }
-  private:
+
+private:
     Coordinates _startingChunk;
     Coordinates _from;
     Coordinates _till;
@@ -289,43 +293,42 @@ class SplitArray : public DelegateArray
  */
 class MaterializedArray : public DelegateArray
 {
-  public:
-    enum MaterializeFormat { 
+public:
+    enum MaterializeFormat
+    {
         PreserveFormat,
         RLEFormat,
         DenseFormat
     };
     MaterializeFormat _format;
-    std::vector< std::map<Coordinates, boost::shared_ptr<MemChunk>, CoordinatesLess > > _chunkCache;
-    std::map<Coordinates, boost::shared_ptr<ConstRLEEmptyBitmap>, CoordinatesLess > _bitmapCache;
+    std::vector< std::map<Coordinates, std::shared_ptr<MemChunk>, CoordinatesLess > > _chunkCache;
+    std::map<Coordinates, std::shared_ptr<ConstRLEEmptyBitmap>, CoordinatesLess > _bitmapCache;
     Mutex _mutex;
     size_t _cacheSize;
 
-    static void materialize(const shared_ptr<Query>& query, MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format);
+    static void materialize(const std::shared_ptr<Query>& query, MemChunk& materializedChunk, ConstChunk const& chunk, MaterializeFormat format);
 
-    boost::shared_ptr<MemChunk> getMaterializedChunk(ConstChunk const& inputChunk);
+    std::shared_ptr<MemChunk> getMaterializedChunk(ConstChunk const& inputChunk);
 
     class ArrayIterator : public DelegateArrayIterator
     {
         MaterializedArray& _array;
         ConstChunk const* _chunkToReturn;
-        boost::shared_ptr<MemChunk> _materializedChunk;
+        std::shared_ptr<MemChunk> _materializedChunk;
 
-      public:
+    public:
         virtual ConstChunk const& getChunk();
         virtual void operator ++();
         virtual bool setPosition(Coordinates const& pos);
         virtual void reset();
 
-        ArrayIterator(MaterializedArray& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat);
+        ArrayIterator(MaterializedArray& arr, AttributeID attrID, std::shared_ptr<ConstArrayIterator> input, MaterializeFormat chunkFormat);
     };
 
-    MaterializedArray(boost::shared_ptr<Array> input, shared_ptr<Query>const& query, MaterializeFormat chunkFormat = PreserveFormat);
+    MaterializedArray(std::shared_ptr<Array> input, std::shared_ptr<Query>const& query, MaterializeFormat chunkFormat = PreserveFormat);
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 };
 
-
 } //namespace
-
 #endif /* DELEGATE_ARRAY_H_ */

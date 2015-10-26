@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,12 +29,13 @@
 
 #include <log4cxx/logger.h>
 #include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 
 #include <network/NetworkManager.h>
 #include <network/Connection.h>
 #include <system/Exceptions.h>
 #include <util/Notification.h>
+#include <util/session/Session.h>
 
 using namespace std;
 using namespace boost;
@@ -47,7 +48,10 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.netw
 /***
  * C o n n e c t i o n
  */
-Connection::Connection(NetworkManager& networkManager, InstanceID sourceInstanceID, InstanceID instanceID):
+Connection::Connection(
+    NetworkManager& networkManager,
+    InstanceID sourceInstanceID,
+    InstanceID instanceID):
     BaseConnection(networkManager.getIOService()),
     _messageQueue(instanceID),
     _networkManager(networkManager),
@@ -62,34 +66,67 @@ Connection::Connection(NetworkManager& networkManager, InstanceID sourceInstance
 
 void Connection::start()
 {
-   assert(_connectionState == NOT_CONNECTED);
-   assert(!_error);
-   _connectionState = CONNECTED;
-   getRemoteIp();
+    assert(_connectionState == NOT_CONNECTED);
+    assert(!_error);
 
-   LOG4CXX_DEBUG(logger, "Connection started from " << getPeerId());
+    _session = std::make_shared<Session>();
+    ASSERT_EXCEPTION(_session.get()!=nullptr, "NULL _session");
 
-   // The first work we should do is reading initial message from client
-   _networkManager.getIOService().post(bind(&Connection::readMessage,
+    std::string securityMode = scidb::Config::getInstance()->
+        getOption<string>(CONFIG_SECURITY);
+
+    _session->setSecurityMode(securityMode);
+    if(securityMode.compare("trust") == 0)
+    {
+        ASSERT_EXCEPTION(
+            _session->getAuthenticatedState() ==
+            scidb::Session::AUTHENTICATION_STATE_E_NOT_INITIALIZED,
+            "Invalid authentication state");
+
+        _session->setAuthenticatedState(
+            scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZING);
+
+        _session->setAuthenticatedState(
+            scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZED);
+    }
+
+
+    _connectionState = CONNECTED;
+    getRemoteIp();
+
+    LOG4CXX_DEBUG(logger, "Connection started from " << getPeerId());
+
+    // The first work we should do is reading initial message from client
+    _networkManager.getIOService().post(bind(&Connection::readMessage,
                                             shared_from_this()));
 }
 
-// Reading messages
+/*
+ * @brief Read from socket sizeof(MessageHeader) bytes of data to _messageDesc.
+ */
 void Connection::readMessage()
 {
    LOG4CXX_TRACE(logger, "Reading next message");
 
    assert(!_messageDesc);
-   _messageDesc = boost::shared_ptr<MessageDesc>(new ServerMessageDesc());
+   _messageDesc = make_shared<ServerMessageDesc>();
    // XXX TODO: add a timeout after we get the first byte
-   async_read(_socket, asio::buffer(&_messageDesc->_messageHeader,
-                                    sizeof(_messageDesc->_messageHeader)),
-              bind(&Connection::handleReadMessage, shared_from_this(),
-                   asio::placeholders::error,
-                   asio::placeholders::bytes_transferred));
+   async_read(_socket, asio::buffer(
+        &_messageDesc->getMessageHeader(),
+        sizeof(_messageDesc->getMessageHeader())),
+
+   bind(&Connection::handleReadMessage, shared_from_this(),
+       asio::placeholders::error,
+       asio::placeholders::bytes_transferred));
 }
 
-void Connection::handleReadMessage(const boost::system::error_code& error, size_t bytes_transferr)
+/**
+ * @brief Validate _messageDesc & read from socket
+ *    _messageDesc->getMessageHeader().getRecordSize() bytes of data
+ */
+void Connection::handleReadMessage(
+    const boost::system::error_code& error,
+    size_t bytes_transferr)
 {
    if (error)
    {
@@ -98,7 +135,7 @@ void Connection::handleReadMessage(const boost::system::error_code& error, size_
    }
 
    if(!_messageDesc->validate() ||
-      _messageDesc->_messageHeader.sourceInstanceID == _sourceInstanceID) {
+      _messageDesc->getMessageHeader().getSourceInstanceID() == _sourceInstanceID) {
       LOG4CXX_ERROR(logger, "Connection::handleReadMessage: unknown/malformed message, closing connection");
       if (_connectionState == CONNECTED) {
          abortMessages();
@@ -107,21 +144,38 @@ void Connection::handleReadMessage(const boost::system::error_code& error, size_
       return;
    }
 
-   assert(bytes_transferr == sizeof(_messageDesc->_messageHeader));
-   assert(_messageDesc->_messageHeader.sourceInstanceID != _sourceInstanceID);
-   assert(_messageDesc->_messageHeader.netProtocolVersion == NET_PROTOCOL_CURRENT_VER);
+   assert(bytes_transferr == sizeof(_messageDesc->getMessageHeader()));
+   assert(_messageDesc->getMessageHeader().getSourceInstanceID() != _sourceInstanceID);
+   assert(_messageDesc->getMessageHeader().getNetProtocolVersion() == NET_PROTOCOL_CURRENT_VER);
 
-   async_read(_socket, _messageDesc->_recordStream.prepare(_messageDesc->_messageHeader.recordSize),
-              bind(&Connection::handleReadRecordPart,
-                   shared_from_this(),  asio::placeholders::error,
-                   asio::placeholders::bytes_transferred));
-   LOG4CXX_TRACE(logger, "Connection::handleReadMessage: messageType=" << _messageDesc->_messageHeader.messageType
-                 << "; instanceID="<< _messageDesc->_messageHeader.sourceInstanceID <<
-                 " ; recordSize=" << _messageDesc->_messageHeader.recordSize <<
-                 " ; messageDesc.binarySize=" << _messageDesc->_messageHeader.binarySize);
+   async_read(_socket, _messageDesc->_recordStream.prepare(
+       _messageDesc->getMessageHeader().getRecordSize()),
+
+   bind(&Connection::handleReadRecordPart,
+       shared_from_this(),  asio::placeholders::error,
+       asio::placeholders::bytes_transferred));
+
+   LOG4CXX_TRACE(logger, "Connection::handleReadMessage: "
+            << "messageType="
+            << _messageDesc->getMessageHeader().getMessageType()
+
+            << "; from instanceID="
+            << _messageDesc->getMessageHeader().getSourceInstanceID()
+
+            << " ; recordSize="
+            << _messageDesc->getMessageHeader().getRecordSize()
+
+            << " ; messageDesc.binarySize="
+            << _messageDesc->getMessageHeader().getBinarySize());
 }
 
-void Connection::handleReadRecordPart(const boost::system::error_code& error, size_t bytes_transferr)
+/*
+ * @brief  If header indicates data is available, read from
+ *         socket _messageDesc->binarySize bytes of data.
+ */
+void Connection::handleReadRecordPart(
+    const boost::system::error_code& error,
+    size_t bytes_transferr)
 {
    if (error)
    {
@@ -130,12 +184,20 @@ void Connection::handleReadRecordPart(const boost::system::error_code& error, si
    }
 
    assert(_messageDesc->validate());
-   assert(_messageDesc->_messageHeader.recordSize == bytes_transferr);
-   assert(_messageDesc->_messageHeader.sourceInstanceID != _sourceInstanceID);
+
+   assert(  _messageDesc->getMessageHeader().getRecordSize() ==
+            bytes_transferr);
+
+   assert(  _messageDesc->getMessageHeader().getSourceInstanceID() !=
+            _sourceInstanceID);
 
    if (!_messageDesc->parseRecord(bytes_transferr)) {
-      LOG4CXX_ERROR(logger, "Network error in handleReadRecordPart: cannot parse record for msgID="
-                    << _messageDesc->_messageHeader.messageType <<", closing connection");
+      LOG4CXX_ERROR(logger,
+        "Network error in handleReadRecordPart: cannot parse record for "
+        << " msgID="
+        << _messageDesc->getMessageHeader().getMessageType()
+        << ", closing connection");
+
       if (_connectionState == CONNECTED) {
          abortMessages();
          disconnectInternal();
@@ -144,21 +206,38 @@ void Connection::handleReadRecordPart(const boost::system::error_code& error, si
    }
    _messageDesc->prepareBinaryBuffer();
 
-   LOG4CXX_TRACE(logger, "handleReadRecordPart: messageType=" << _messageDesc->_messageHeader.messageType <<
-                 " ; messageDesc.binarySize=" << _messageDesc->_messageHeader.binarySize);
+   LOG4CXX_TRACE(logger,
+        "handleReadRecordPart: "
 
-   if (_messageDesc->_messageHeader.binarySize)
+            << " messageType="
+            << _messageDesc->getMessageHeader().getMessageType()
+
+            << " ; messageDesc.binarySize="
+            << _messageDesc->getMessageHeader().getBinarySize());
+
+   if (_messageDesc->_messageHeader.getBinarySize())
    {
-      async_read(_socket, asio::buffer(_messageDesc->_binary->getData(), _messageDesc->_binary->getSize()),
-                 bind(&Connection::handleReadBinaryPart, shared_from_this(), asio::placeholders::error,
-                      asio::placeholders::bytes_transferred));
+      async_read(_socket,
+            asio::buffer(
+                _messageDesc->_binary->getData(),
+                _messageDesc->_binary->getSize()),
+                bind(
+                    &Connection::handleReadBinaryPart,
+                    shared_from_this(),
+                    asio::placeholders::error,
+                    asio::placeholders::bytes_transferred));
       return;
    }
 
    handleReadBinaryPart(error, 0);
 }
 
-void Connection::handleReadBinaryPart(const boost::system::error_code& error, size_t bytes_transferr)
+/*
+ * @brief Invoke the appropriate dispatch routine
+ */
+void Connection::handleReadBinaryPart(
+    const boost::system::error_code& error,
+    size_t bytes_transferr)
 {
    if (error)
    {
@@ -166,19 +245,22 @@ void Connection::handleReadBinaryPart(const boost::system::error_code& error, si
       return;
    }
    assert(_messageDesc);
-   assert(_messageDesc->_messageHeader.binarySize == bytes_transferr);
 
-   boost::shared_ptr<MessageDesc> msgPtr;
+   assert(  _messageDesc->getMessageHeader().getBinarySize() ==
+            bytes_transferr);
+
+   std::shared_ptr<MessageDesc> msgPtr;
    _messageDesc.swap(msgPtr);
 
-   _networkManager.handleMessage(shared_from_this(), msgPtr);
+   std::shared_ptr<Connection> self(shared_from_this());
+   _networkManager.handleMessage(self, msgPtr);
 
    // Preparing to read new message
    assert(_messageDesc.get() == NULL);
    readMessage();
 }
 
-void Connection::sendMessage(boost::shared_ptr<MessageDesc> messageDesc,
+void Connection::sendMessage(std::shared_ptr<MessageDesc>& messageDesc,
                              NetworkManager::MessageQueueType mqt)
 {
     pushMessage(messageDesc, mqt);
@@ -186,10 +268,10 @@ void Connection::sendMessage(boost::shared_ptr<MessageDesc> messageDesc,
                                             shared_from_this()));
 }
 
-void Connection::pushMessage(boost::shared_ptr<MessageDesc>& messageDesc,
+void Connection::pushMessage(std::shared_ptr<MessageDesc>& messageDesc,
                              NetworkManager::MessageQueueType mqt)
 {
-    boost::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
+    std::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
     {
         ScopedMutexLock mutexLock(_mutex);
 
@@ -206,10 +288,10 @@ void Connection::pushMessage(boost::shared_ptr<MessageDesc>& messageDesc,
     }
 }
 
-boost::shared_ptr<MessageDesc> Connection::popMessage()
+std::shared_ptr<MessageDesc> Connection::popMessage()
 {
-    boost::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
-    boost::shared_ptr<MessageDesc> msg;
+    std::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
+    std::shared_ptr<MessageDesc> msg;
     {
         ScopedMutexLock mutexLock(_mutex);
 
@@ -229,7 +311,7 @@ void Connection::setRemoteQueueState(NetworkManager::MessageQueueType mqt,  uint
                                      uint64_t localSn, uint64_t remoteSn)
 {
     assert(mqt != NetworkManager::mqtNone);
-    boost::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
+    std::shared_ptr<const NetworkManager::ConnectionStatus> connStatus;
     {
         ScopedMutexLock mutexLock(_mutex);
 
@@ -248,7 +330,8 @@ void Connection::setRemoteQueueState(NetworkManager::MessageQueueType mqt,  uint
                                              shared_from_this()));
 }
 
-bool Connection::publishQueueSizeIfNeeded(const boost::shared_ptr<const NetworkManager::ConnectionStatus>& connStatus)
+bool
+Connection::publishQueueSizeIfNeeded(const std::shared_ptr<const NetworkManager::ConnectionStatus>& connStatus)
 {
     // mutex must be locked
     if (!connStatus) {
@@ -270,7 +353,7 @@ void Connection::publishQueueSize()
     for (ConnectionStatusMap::iterator iter = toPublish.begin();
          iter != toPublish.end(); ++iter) {
 
-        boost::shared_ptr<const NetworkManager::ConnectionStatus>& status = iter->second;
+        std::shared_ptr<const NetworkManager::ConnectionStatus>& status = iter->second;
         NetworkManager::MessageQueueType mqt = iter->first;
         assert(mqt == status->getQueueType());
         assert(mqt != NetworkManager::mqtNone);
@@ -287,7 +370,7 @@ void Connection::publishQueueSize()
 
 void Connection::handleSendMessage(const boost::system::error_code& error,
                                    size_t bytes_transferred,
-                                   boost::shared_ptr< std::list<shared_ptr<MessageDesc> > >& msgs,
+                                   std::shared_ptr< std::list<std::shared_ptr<MessageDesc> > >& msgs,
                                    size_t bytes_sent)
 {
    _isSending = false;
@@ -295,9 +378,9 @@ void Connection::handleSendMessage(const boost::system::error_code& error,
        assert(msgs);
        assert(bytes_transferred == bytes_sent);
        if (logger->isTraceEnabled()) {
-           for (std::list<shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
+           for (std::list<std::shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
                 i != msgs->end(); ++i) {
-               const boost::shared_ptr<MessageDesc>& messageDesc = *i;
+               const std::shared_ptr<MessageDesc>& messageDesc = *i;
                LOG4CXX_TRACE(logger, "handleSendMessage: bytes_transferred="
                              << messageDesc->getMessageSize()
                              << ", "<< getPeerId()
@@ -319,9 +402,9 @@ void Connection::handleSendMessage(const boost::system::error_code& error,
                  << error.value() << "('" << error.message() << "')"
                  << ", "<< getPeerId());
 
-   for (std::list<shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
+   for (std::list<std::shared_ptr<MessageDesc> >::const_iterator i = msgs->begin();
         i != msgs->end(); ++i) {
-       const boost::shared_ptr<MessageDesc>& messageDesc = *i;
+       const std::shared_ptr<MessageDesc>& messageDesc = *i;
        _networkManager.handleConnectionError(messageDesc->getQueryID());
    }
 
@@ -351,19 +434,22 @@ void Connection::pushNextMessage()
    }
 
    vector<asio::const_buffer> constBuffers;
-   boost::shared_ptr< std::list<shared_ptr<MessageDesc> > >  msgs(new std::list<shared_ptr<MessageDesc> >());
+   typedef std::list<std::shared_ptr<MessageDesc> > MessageDescList;
+   std::shared_ptr<MessageDescList> msgs = make_shared<MessageDescList>();
    size_t size(0);
    const size_t maxSize(32*KiB);
 
    while (true) {
-       shared_ptr<MessageDesc> messageDesc = popMessage();
+       std::shared_ptr<MessageDesc> messageDesc = popMessage();
        if (!messageDesc) {
            break;
        }
        msgs->push_back(messageDesc);
        if (messageDesc->getMessageType() != mtAlive) {
            // mtAlive are useful only if there is no other traffic
-           messageDesc->_messageHeader.sourceInstanceID = _sourceInstanceID;
+           messageDesc->_messageHeader.setSourceInstanceID(
+                _sourceInstanceID);
+
            messageDesc->writeConstBuffers(constBuffers);
            size += messageDesc->getMessageSize();
            if (size >= maxSize) {
@@ -376,20 +462,21 @@ void Connection::pushNextMessage()
        return;
    }
    if (_instanceID != CLIENT_INSTANCE) {
-       shared_ptr<MessageDesc> controlMsg = getControlMessage();
+       std::shared_ptr<MessageDesc> controlMsg = getControlMessage();
        if (controlMsg) {
            msgs->push_back(controlMsg);
            controlMsg->writeConstBuffers(constBuffers);
-           controlMsg->_messageHeader.sourceInstanceID = _sourceInstanceID;
+           controlMsg->_messageHeader.setSourceInstanceID(
+                _sourceInstanceID);
            size += controlMsg->getMessageSize();
        }
    }
    if (size == 0) {
        assert(!msgs->empty());
        assert(msgs->front()->getMessageType() == mtAlive);
-       shared_ptr<MessageDesc>& aliveMsg = msgs->front();
+       std::shared_ptr<MessageDesc>& aliveMsg = msgs->front();
        aliveMsg->writeConstBuffers(constBuffers);
-       aliveMsg->_messageHeader.sourceInstanceID = _sourceInstanceID;
+       aliveMsg->_messageHeader.setSourceInstanceID(_sourceInstanceID);
        size += aliveMsg->getMessageSize();
    }
 
@@ -409,7 +496,7 @@ Connection::ServerMessageDesc::createRecord(MessageID messageType)
       return MessageDesc::createRecord(messageType);
    }
 
-   boost::shared_ptr<NetworkMessageFactory> msgFactory;
+   std::shared_ptr<NetworkMessageFactory> msgFactory;
    msgFactory = getNetworkMessageFactory();
    assert(msgFactory);
    MessagePtr recordPtr = msgFactory->createMessage(messageType);
@@ -427,14 +514,14 @@ Connection::ServerMessageDesc::validate()
    if (MessageDesc::validate()) {
       return true;
    }
-   boost::shared_ptr<NetworkMessageFactory> msgFactory;
+   std::shared_ptr<NetworkMessageFactory> msgFactory;
    msgFactory = getNetworkMessageFactory();
    assert(msgFactory);
    return msgFactory->isRegistered(getMessageType());
 }
 
-void Connection::onResolve(shared_ptr<asio::ip::tcp::resolver>& resolver,
-                           shared_ptr<asio::ip::tcp::resolver::query>& query,
+void Connection::onResolve(std::shared_ptr<asio::ip::tcp::resolver>& resolver,
+                           std::shared_ptr<asio::ip::tcp::resolver::query>& query,
                            const boost::system::error_code& err,
                            asio::ip::tcp::resolver::iterator endpoint_iterator)
  {
@@ -476,8 +563,8 @@ void Connection::onResolve(shared_ptr<asio::ip::tcp::resolver>& resolver,
                                       boost::asio::placeholders::error));
  }
 
-void Connection::onConnect(shared_ptr<asio::ip::tcp::resolver>& resolver,
-                           shared_ptr<asio::ip::tcp::resolver::query>& query,
+void Connection::onConnect(std::shared_ptr<asio::ip::tcp::resolver>& resolver,
+                           std::shared_ptr<asio::ip::tcp::resolver::query>& query,
                            asio::ip::tcp::resolver::iterator endpoint_iterator,
                            const boost::system::error_code& err)
 
@@ -561,7 +648,7 @@ void Connection::connectAsyncInternal(const string& address, uint16_t port)
    LOG4CXX_TRACE(logger, "Connecting (async) to " << address << ":" << port);
 
    //XXX TODO: switch to using scidb::resolveAsync()
-   shared_ptr<asio::ip::tcp::resolver>  resolver(new asio::ip::tcp::resolver(_socket.get_io_service()));
+   std::shared_ptr<asio::ip::tcp::resolver>  resolver(new asio::ip::tcp::resolver(_socket.get_io_service()));
    stringstream serviceName;
    serviceName << port;
    _query.reset(new asio::ip::tcp::resolver::query(address, serviceName.str()));
@@ -574,14 +661,20 @@ void Connection::connectAsyncInternal(const string& address, uint16_t port)
                                        boost::asio::placeholders::iterator));
 }
 
-void Connection::attachQuery(QueryID queryID, ClientContext::DisconnectHandler& dh)
+void Connection::attachQuery(
+    QueryID queryID,
+    ClientContext::DisconnectHandler& dh)
 {
+    // Note:  at this point in time the query object itself has
+    // not been instantiated.
     ScopedMutexLock mutexLock(_mutex);
     _activeClientQueries[queryID] = dh;
 }
 
 void Connection::attachQuery(QueryID queryID)
 {
+    // Note:  at this point in time the query object itself has
+    // not been instantiated.
     ClientContext::DisconnectHandler dh;
     attachQuery(queryID, dh);
 }
@@ -599,13 +692,15 @@ void Connection::disconnectInternal()
    _connectionState = NOT_CONNECTED;
    _query.reset();
    _remoteIp = boost::asio::ip::address();
-   map<QueryID,ClientContext::DisconnectHandler> clientQueries;
+   ClientQueries clientQueries;
    {
        ScopedMutexLock mutexLock(_mutex);
        clientQueries.swap(_activeClientQueries);
    }
+
    LOG4CXX_TRACE(logger, str(format("Number of active client queries %lld") % clientQueries.size()));
-   for (std::map<QueryID,ClientContext::DisconnectHandler>::const_iterator i = clientQueries.begin();
+
+   for (ClientQueries::const_iterator i = clientQueries.begin();
         i != clientQueries.end(); ++i)
    {
        assert(_instanceID == CLIENT_INSTANCE);
@@ -639,7 +734,7 @@ void Connection::handleReadError(const boost::system::error_code& error)
 
 Connection::~Connection()
 {
-   LOG4CXX_TRACE(logger, "Destroying connection to " << getPeerId());
+   LOG4CXX_DEBUG(logger, "Destroying connection to " << getPeerId());
    abortMessages();
    disconnectInternal();
 }
@@ -688,20 +783,20 @@ void Connection::getRemoteIp()
    }
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
+std::shared_ptr<NetworkManager::ConnectionStatus>
 Connection::MultiChannelQueue::pushBack(NetworkManager::MessageQueueType mqt,
-                                       const boost::shared_ptr<MessageDesc>& msg)
+                                       const std::shared_ptr<MessageDesc>& msg)
 {
     assert(msg);
     assert(mqt<NetworkManager::mqtMax);
 
-    boost::shared_ptr<Channel>& channel = _channels[mqt];
+    std::shared_ptr<Channel>& channel = _channels[mqt];
     if (!channel) {
-        channel = boost::make_shared<Channel>(_instanceId, mqt);
+        channel = std::make_shared<Channel>(_instanceId, mqt);
     }
     bool isActiveBefore = channel->isActive();
 
-    boost::shared_ptr<NetworkManager::ConnectionStatus> status = channel->pushBack(msg);
+    std::shared_ptr<NetworkManager::ConnectionStatus> status = channel->pushBack(msg);
     ++_size;
 
     bool isActiveAfter = channel->isActive();
@@ -712,8 +807,8 @@ Connection::MultiChannelQueue::pushBack(NetworkManager::MessageQueueType mqt,
     return status;
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
-Connection::MultiChannelQueue::popFront(boost::shared_ptr<MessageDesc>& msg)
+std::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::MultiChannelQueue::popFront(std::shared_ptr<MessageDesc>& msg)
 {
     assert(!msg);
 
@@ -733,7 +828,7 @@ Connection::MultiChannelQueue::popFront(boost::shared_ptr<MessageDesc>& msg)
         }
         break;
     }
-    boost::shared_ptr<NetworkManager::ConnectionStatus> status;
+    std::shared_ptr<NetworkManager::ConnectionStatus> status;
     if (channel!=NULL && channel->isActive()) {
 
         status = channel->popFront(msg);
@@ -746,12 +841,12 @@ Connection::MultiChannelQueue::popFront(boost::shared_ptr<MessageDesc>& msg)
     return status;
 }
 
-shared_ptr<MessageDesc> Connection::getControlMessage()
+std::shared_ptr<MessageDesc> Connection::getControlMessage()
 {
-    shared_ptr<MessageDesc> msgDesc = make_shared<MessageDesc>(mtControl);
+    std::shared_ptr<MessageDesc> msgDesc = make_shared<MessageDesc>(mtControl);
     assert(msgDesc);
 
-    shared_ptr<scidb_msg::Control> record = msgDesc->getRecord<scidb_msg::Control>();
+    std::shared_ptr<scidb_msg::Control> record = msgDesc->getRecord<scidb_msg::Control>();
     google::protobuf::uint64 localGenId=0;
     google::protobuf::uint64 remoteGenId=0;
     assert(record);
@@ -784,7 +879,7 @@ shared_ptr<MessageDesc> Connection::getControlMessage()
         scidb_msg::Control_Channel& entry = (*iter);
         assert(entry.has_id());
         const NetworkManager::MessageQueueType mqt = static_cast<NetworkManager::MessageQueueType>(entry.id());
-        const google::protobuf::uint64 available = _networkManager.getAvailable(NetworkManager::MessageQueueType(mqt));
+        const google::protobuf::uint64 available = _networkManager.getAvailable(NetworkManager::MessageQueueType(mqt), _instanceID);
         entry.set_available(available);
     }
 
@@ -810,14 +905,14 @@ shared_ptr<MessageDesc> Connection::getControlMessage()
     return msgDesc;
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
+std::shared_ptr<NetworkManager::ConnectionStatus>
 Connection::MultiChannelQueue::setRemoteState(NetworkManager::MessageQueueType mqt,
                                               uint64_t rSize,
                                               uint64_t localGenId, uint64_t remoteGenId,
                                               uint64_t localSn, uint64_t remoteSn)
 {
     // XXX TODO: consider turning asserts into exceptions
-    boost::shared_ptr<NetworkManager::ConnectionStatus> status;
+    std::shared_ptr<NetworkManager::ConnectionStatus> status;
     if (mqt>=NetworkManager::mqtMax) {
         assert(false);
         return status;
@@ -834,9 +929,9 @@ Connection::MultiChannelQueue::setRemoteState(NetworkManager::MessageQueueType m
         localSn = 0;
     }
 
-    boost::shared_ptr<Channel>& channel = _channels[mqt];
+    std::shared_ptr<Channel>& channel = _channels[mqt];
     if (!channel) {
-        channel = boost::make_shared<Channel>(_instanceId, mqt);
+        channel = std::make_shared<Channel>(_instanceId, mqt);
     }
     if (!channel->validateRemoteState(rSize, localSn, remoteSn)) {
         assert(false);
@@ -861,7 +956,7 @@ uint64_t
 Connection::MultiChannelQueue::getAvailable(NetworkManager::MessageQueueType mqt) const
 {
     assert(mqt<NetworkManager::mqtMax);
-    const boost::shared_ptr<Channel>& channel = _channels[mqt];
+    const std::shared_ptr<Channel>& channel = _channels[mqt];
     if (!channel) {
         return NetworkManager::MAX_QUEUE_SIZE;
     }
@@ -872,7 +967,7 @@ uint64_t
 Connection::MultiChannelQueue::getLocalSeqNum(NetworkManager::MessageQueueType mqt) const
 {
     assert(mqt<NetworkManager::mqtMax);
-    const boost::shared_ptr<Channel>& channel = _channels[mqt];
+    const std::shared_ptr<Channel>& channel = _channels[mqt];
     if (!channel) {
         return 0;
     }
@@ -883,7 +978,7 @@ uint64_t
 Connection::MultiChannelQueue::getRemoteSeqNum(NetworkManager::MessageQueueType mqt) const
 {
     assert(mqt<NetworkManager::mqtMax);
-    const boost::shared_ptr<Channel>& channel = _channels[mqt];
+    const std::shared_ptr<Channel>& channel = _channels[mqt];
     if (!channel) {
         return 0;
     }
@@ -895,7 +990,7 @@ Connection::MultiChannelQueue::abortMessages()
 {
     for (Channels::iterator iter = _channels.begin();
          iter != _channels.end(); ++iter) {
-        boost::shared_ptr<Channel>& channel = (*iter);
+        std::shared_ptr<Channel>& channel = (*iter);
         if (!channel) {
             continue;
         }
@@ -935,13 +1030,13 @@ Connection::MultiChannelQueue::swap(MultiChannelQueue& other)
     _channels.swap(other._channels);
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
-Connection::Channel::pushBack(const boost::shared_ptr<MessageDesc>& msg)
+std::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::Channel::pushBack(const std::shared_ptr<MessageDesc>& msg)
 {
     if ( !_msgQ.empty() &&  msg->getMessageType() == mtAlive) {
         // mtAlive are useful only if there is no other traffic
         assert(_mqt == NetworkManager::mqtNone);
-        return  boost::shared_ptr<NetworkManager::ConnectionStatus>();
+        return  std::shared_ptr<NetworkManager::ConnectionStatus>();
     }
     const uint64_t spaceBefore = getAvailable();
     if (spaceBefore <= 0) {
@@ -949,14 +1044,14 @@ Connection::Channel::pushBack(const boost::shared_ptr<MessageDesc>& msg)
     }
     _msgQ.push_back(msg);
     const uint64_t spaceAfter = getAvailable();
-    boost::shared_ptr<NetworkManager::ConnectionStatus> status = getNewStatus(spaceBefore, spaceAfter);
+    std::shared_ptr<NetworkManager::ConnectionStatus> status = getNewStatus(spaceBefore, spaceAfter);
     return status;
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
-Connection::Channel::popFront(boost::shared_ptr<MessageDesc>& msg)
+std::shared_ptr<NetworkManager::ConnectionStatus>
+Connection::Channel::popFront(std::shared_ptr<MessageDesc>& msg)
 {
-    boost::shared_ptr<NetworkManager::ConnectionStatus> status;
+    std::shared_ptr<NetworkManager::ConnectionStatus> status;
     if (!isActive()) {
         msg.reset();
         return status;
@@ -975,7 +1070,7 @@ Connection::Channel::popFront(boost::shared_ptr<MessageDesc>& msg)
     return status;
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
+std::shared_ptr<NetworkManager::ConnectionStatus>
 Connection::Channel::setRemoteState(uint64_t rSize, uint64_t localSn, uint64_t remoteSn)
 {
    const uint64_t spaceBefore = getAvailable();
@@ -983,7 +1078,7 @@ Connection::Channel::setRemoteState(uint64_t rSize, uint64_t localSn, uint64_t r
     _remoteSeqNum = remoteSn;
     _localSeqNumOnPeer = localSn;
     const uint64_t spaceAfter = getAvailable();
-    boost::shared_ptr<NetworkManager::ConnectionStatus> status = getNewStatus(spaceBefore, spaceAfter);
+    std::shared_ptr<NetworkManager::ConnectionStatus> status = getNewStatus(spaceBefore, spaceAfter);
 
     LOG4CXX_TRACE(logger, "setRemoteState: Channel "<< _mqt
                   << " to " << _instanceId
@@ -1004,26 +1099,23 @@ Connection::Channel::abortMessages()
     std::set<QueryID> queries;
     for (MessageQueue::iterator iter = mQ.begin();
          iter != mQ.end(); ++iter) {
-        shared_ptr<MessageDesc>& messageDesc = (*iter);
+        std::shared_ptr<MessageDesc>& messageDesc = (*iter);
         queries.insert(messageDesc->getQueryID());
     }
     mQ.clear();
     NetworkManager* networkManager = NetworkManager::getInstance();
     assert(networkManager);
-    for (std::set<QueryID>::const_iterator iter = queries.begin();
-         iter != queries.end(); ++iter) {
-        networkManager->handleConnectionError(*iter);
-    }
+    networkManager->handleConnectionError(_instanceId, queries);
 }
 
-boost::shared_ptr<NetworkManager::ConnectionStatus>
+std::shared_ptr<NetworkManager::ConnectionStatus>
 Connection::Channel::getNewStatus(const uint64_t spaceBefore,
                                   const uint64_t spaceAfter)
 {
     if ((spaceBefore != spaceAfter) && (spaceBefore == 0 || spaceAfter == 0)) {
-        return boost::make_shared<NetworkManager::ConnectionStatus>(_instanceId, _mqt, spaceAfter);
+        return std::make_shared<NetworkManager::ConnectionStatus>(_instanceId, _mqt, spaceAfter);
     }
-    return boost::shared_ptr<NetworkManager::ConnectionStatus>();
+    return std::shared_ptr<NetworkManager::ConnectionStatus>();
 }
 
 uint64_t

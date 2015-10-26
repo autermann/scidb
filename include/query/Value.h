@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,6 +36,8 @@ namespace scidb {
 class Type;
 class RLEPayload;
 
+typedef std::string TypeId;
+
 /**
  *  Represents a single data value.
  *
@@ -44,12 +46,13 @@ class RLEPayload;
  */
 class Value : boost::equality_comparable<Value>
 {
- public:                   // Supporting Types
+public:                   // Supporting Types
     enum    asData_t          {asData};                  // Has actual datum
     enum    asTile_t          {asTile};                  // Has an RLEPayload*
     typedef uint8_t           reason;                    // Why is it missing?
+    class                     Formatter;                 // Forward decl
 
- public:                   // Construction
+public:                   // Construction
     explicit                  Value();
     explicit                  Value(size_t);
     explicit                  Value(const Type&);
@@ -59,12 +62,12 @@ class Value : boost::equality_comparable<Value>
                               Value(const Value&);
                              ~Value();
 
- public:                   // Operations
+public:                   // Operations
             Value&            operator= (const Value&);
     friend  bool              operator==(const Value&, const Value&);
     friend  std::ostream&     operator<<(std::ostream&,const Value&);
 
- public:                   // Operations
+public:                   // Operations
             bool              isNull()             const {return _code >= 0;}
             bool              isTile()             const {return _code == MR_TILE;}
             bool              isDatum()            const {return _code == MR_DATUM;}
@@ -90,10 +93,79 @@ class Value : boost::equality_comparable<Value>
       const char*             getString()          const;
             int32_t           getMissingReason()   const;
 
- public:                   // Operations
+public:                   // Output support
+            std::string       toString(TypeId const& typeId) const
+                                {return s_defaultFormatter.format(typeId, *this);}
+            std::string       toString(TypeId const& typeId, Formatter const& vf) const
+                                {return vf.format(typeId, *this);}
+
+            /**
+             *  Helper class to stringify Value data according to an output format.
+             */
+            class Formatter
+            {
+            public:
+                    /// Default precision for TID_DOUBLE values.
+                    enum { DEFAULT_PRECISION = 6 }; // FLT_DIG from <float.h>
+
+                    /// Constructor for default formatting.
+                    Formatter();
+
+                    /// Constructor for other formats.
+                    Formatter(std::string const& format);
+
+                    /// Given type and Value, return correctly formatted string.
+                    std::string format(TypeId const& typeId, Value const& v) const;
+
+                    /**
+                     * Set precision for TID_DOUBLE values, returning previous precision.
+                     * @param p precision to set, if < 0 restore default
+                     * @return previous precision value
+                     */
+                    int setPrecision(int p);
+
+            private:
+                    int         _precision;
+                    bool        _useDefaultNull;
+                    bool        _tsv;
+                    char        _quote;
+                    std::string _format;
+                    std::string _options;
+                    std::string _nullRepr;
+                    std::string _nanRepr;
+                    void        quoteCstr(std::stringstream&, const char *) const;
+            static  void        tsvChar(std::stringstream&, char);
+            };
+private:
+            static  Formatter   s_defaultFormatter;
+
+public:                   // Operations
     static  size_t            getFootprint(size_t);
 
- public:                   // Operations
+    /**
+     * Return true iff an integer value is an acceptable "missing reason" code.
+     *
+     * @description Although the code base uses various integral types
+     * to store "missing reason", ultimately a valid code must conform
+     * to the constraints imposed by our on-disk storage formats: it
+     * must fit as a non-negative number within an @c int8_t .
+     *
+     * @note In many contexts a negative reason means "value is not
+     * missing".  We explicitly do not permit them here because in
+     * some contexts (for example, RLE segments) negative values are
+     * never allowed.
+     */
+    template <typename T>
+    static  bool              isValidMissingReason(T t)
+    {
+        if (std::numeric_limits<T>::is_signed) {
+            return t >= 0 && t <= std::numeric_limits<int8_t>::max();
+        } else {
+            return t <= std::numeric_limits<int8_t>::max();
+        }
+    }
+
+public:                   // Operations
             void              setNull    (reason = 0);
             void              setBool    (bool     v)    {set<bool>    (v);}
             void              setChar    (char     v)    {set<char>    (v);}
@@ -115,23 +187,23 @@ class Value : boost::equality_comparable<Value>
             void              clear      ();
             void              swap       (Value&);
 
- public:                   // Operations
+public:                   // Operations
     template<class t>t const& get        ()        const;
     template<class t>t&       get        ();
     template<class t>void     set        (const t&);
     template<class t>void     reset      (const t&);
     template<class a>void     serialize  (a&,unsigned int);
 
- public:                   // Operations
+public:                   // Operations
     template<class t>t const* getData    ()        const {return static_cast<t const*>(data());}
     template<class t>t*       getData    ()              {return static_cast<t*>      (data());}
 
- private:                  // Implementation
+private:                  // Implementation
             bool              consistent ()        const;// Assert consistency
             void*             resize     (size_t);       // Resize data buffer
             void              reset      ();             // Clear  data buffer
 
- private:                  // Implementation
+private:                  // Implementation
     static  bool              small      (size_t n)      {return n<=sizeof(_data);}
     static  bool              large      (size_t n)      {return n> sizeof(_data);}
     static  void*             calloc     (size_t);       // Wraps calloc()
@@ -139,14 +211,14 @@ class Value : boost::equality_comparable<Value>
     static  void*             realloc    (void*,size_t); // Wraps realloc()
     static  void              fail       (int);          // Throw exception
 
- private:                  // Representation
+private:                  // Representation
             enum
             {
                 MR_DATUM   = -1,                         // Represents a datum
                 MR_TILE    = -2                          // Represents a tile
             };
 
- private:                  // Representation
+private:                  // Representation
             int32_t           _code;                     // >=0 for 'missing'
             uint32_t          _size;                     // Size of the buffer
     union { void*             _data;                     // The data buffer
@@ -154,7 +226,7 @@ class Value : boost::equality_comparable<Value>
 };
 
 /****************************************************************************/
-}
+} // namespace
 /****************************************************************************/
 #endif
 /****************************************************************************/

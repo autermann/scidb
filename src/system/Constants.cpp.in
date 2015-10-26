@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@ namespace scidb {
 const char* SCIDB_VERSION()         {return "@CONFIGURE_SCIDB_VERSION@";}
 const char* SCIDB_VERSION_PUBLIC()  {return "@CONFIGURE_SCIDB_VERSION_MAJOR@.@CONFIGURE_SCIDB_VERSION_MINOR@.@CONFIGURE_SCIDB_VERSION_BUILD@";}
 const char* SCIDB_BUILD_TYPE()      {return "@CONFIGURE_SCIDB_BUILD_TYPE@";}
-const char* SCIDB_COPYRIGHT()       {return "Copyright (C) 2008-2014 SciDB, Inc.";}
+const char* SCIDB_COPYRIGHT()       {return "Copyright (C) 2008-2015 SciDB, Inc.";}
 const char* SCIDB_INSTALL_PREFIX()  {return "@CMAKE_INSTALL_PREFIX@";}
 
 uint32_t    SCIDB_VERSION_MAJOR()   {return @CONFIGURE_SCIDB_VERSION_MAJOR@;}

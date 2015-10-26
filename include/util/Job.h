@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,41 +33,40 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
 #include <util/Atomic.h>
 #include <util/Semaphore.h>
 
 namespace scidb
 {
 
-/**
- * Base virtual class for job executed by ThreadPool.
- */
 class Query;
 class WorkQueue;
 class SerializationCtx;
 
+/**
+ * Base virtual class for a job to be executed by threads in a ThreadPool.
+ */
 class Job
 {
 private:
     Semaphore _done;
     Atomic<bool> _removed;
 
- protected:
+protected:
     typedef boost::function<void()> Handler;
-    boost::shared_ptr<Exception> _error;
-    boost::shared_ptr<Query> _query; //XXX TODO: make it a weak_ptr ?
+    std::shared_ptr<Exception> _error;
+    std::shared_ptr<Query> _query; //XXX TODO: make it a weak_ptr ?
 
     // When a job is executed multiple times using executeOnQueue(),
     // _wq, _wqSCtx, _currHandler need to be set accordingly
     // _wq, _wqSCtx are set by the WorkQueue invoking executeOnQueue()
     // _currHandler must be set by the job algorithm prior
     // to scheduling the next invocation of executeOnQueue()
-   
-    boost::weak_ptr<WorkQueue> _wq;
-    boost::weak_ptr<SerializationCtx> _wqSCtx;
+
+    std::weak_ptr<WorkQueue> _wq;
+    std::weak_ptr<SerializationCtx> _wqSCtx;
     Handler _currHandler;
 
     /// This method must be implemented in child classes
@@ -76,15 +75,17 @@ private:
     virtual void run() = 0;
 
 public:
-    Job(boost::shared_ptr<Query> query)
+    Job(std::shared_ptr<Query>const& query)
     : _removed(false),
       _query(query)
     {
     }
+
     virtual ~Job()
     {
     }
-    boost::shared_ptr<Query> getQuery()
+
+    std::shared_ptr<Query> getQuery()
     {
         return _query;
     }
@@ -102,8 +103,8 @@ public:
      * @throw WorkQueue::PushBackException if this job is re-enqueued onto another under the overflow condition
      * @see WorkQueue::PushBackException
      */
-    void executeOnQueue(boost::weak_ptr<WorkQueue>& wq,
-                        boost::shared_ptr<SerializationCtx>& sCtx);
+    void executeOnQueue(std::weak_ptr<WorkQueue>& wq,
+                        std::shared_ptr<SerializationCtx>& sCtx);
 
     /// Waits until job is done
     bool wait(bool propagateException = false, bool allowMultipleWaits = true);
@@ -116,7 +117,6 @@ public:
 
     void rethrow();
 };
-
 
 } //namespace
 

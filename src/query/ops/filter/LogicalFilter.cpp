@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -78,11 +78,11 @@ public:
         ADD_PARAM_EXPRESSION("bool")
     }
 
-    virtual bool compileParamInTileMode(size_t paramNo) { 
+    virtual bool compileParamInTileMode(size_t paramNo) {
         return paramNo == 0;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
 	{
 		assert(schemas.size() == 1);
 		assert(_parameters.size() == 1);

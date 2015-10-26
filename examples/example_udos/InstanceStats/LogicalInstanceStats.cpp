@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -77,6 +77,8 @@
 #include <query/Operator.h>
 #include "InstanceStatsSettings.h"
 
+using namespace std;
+
 namespace scidb
 {
 
@@ -100,10 +102,10 @@ public:
      * @param schemas the shapes of the input arrays
      * @return the list of possible types of the next parameters
      */
-    vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const&)
+    vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(vector< ArrayDesc> const&)
     {
         /* A list of all possble things that the next parameter could be. */
-        vector<shared_ptr<OperatorParamPlaceholder> > res;
+        vector<std::shared_ptr<OperatorParamPlaceholder> > res;
 
         /* the next parameter may be "end of parameters" - that's always true */
         res.push_back(END_OF_VARIES_PARAMS());
@@ -119,7 +121,7 @@ public:
     /**
      * @note all the parameters are assembled in the _parameters member variable
      */
-    ArrayDesc inferSchema(vector< ArrayDesc>, shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc>, std::shared_ptr< Query> query)
     {
         /* Construct the settings object that parses and validates the other parameters. */
         InstanceStatsSettings settings (_parameters, true, query);
@@ -142,7 +144,7 @@ public:
         {
             outputDimensions.push_back(DimensionDesc("instance_no", 0, query->getInstancesCount(), 1, 0));
         }
-        return ArrayDesc("instance_stats", outputAttributes, outputDimensions);
+        return ArrayDesc("instance_stats", outputAttributes, outputDimensions, defaultPartitioning());
     }
 };
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,8 +32,8 @@
 
 #include <map>
 
-#include "array/Metadata.h"
-#include "util/Singleton.h"
+#include <array/Metadata.h>
+#include <util/Singleton.h>
 
 namespace scidb
 {
@@ -57,7 +57,7 @@ public:
      * @param[in] query Current query context
      */
     void fileExists(const std::string &path, std::map<InstanceID, bool> &instancesMap,
-        const boost::shared_ptr<class Query>& query);
+        const std::shared_ptr<class Query>& query);
 
     /**
      * @brief Check file existing on single instance
@@ -67,7 +67,7 @@ public:
      * @param[in] query Current query context
      * @return true if exists
      */
-    bool fileExists(const std::string &path, InstanceID instanceId, const boost::shared_ptr<class Query>& query);
+    bool fileExists(const std::string &path, InstanceID instanceId, const std::shared_ptr<class Query>& query);
 
 private:
     Resources():
@@ -75,7 +75,7 @@ private:
     {
     }
 
-    void handleFileExists(const boost::shared_ptr<class MessageDesc> &messageDesc);
+    void handleFileExists(const std::shared_ptr<class MessageDesc> &messageDesc);
     bool checkFileExists(const std::string &path) const;
     void markFileExists(uint64_t resourceCollectorId, InstanceID instanceId, bool exists);
 

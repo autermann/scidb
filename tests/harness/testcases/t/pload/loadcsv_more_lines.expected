@@ -1,3 +1,6 @@
+SCIDB QUERY : <create array array_sm7_2 <a:int64,b:int64,c:int64>[i=0:*,1,0]>
+[Query was executed successfully, ignoring data output by this query.]
+
 SCIDB QUERY : <sort( array_sm7_2,a )>
 {n} a,b,c
 {0} 1,2,3

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,18 +32,20 @@
 #define AGGREGATE_H_
 
 #include <map>
+#include <boost/function.hpp>
 
 #include <query/TypeSystem.h>
 #include <array/Metadata.h>
 #include <array/RLE.h>
 #include <array/StreamArray.h>
-#include "query/TileFunctions.h"
-#include "util/Singleton.h"
+#include <query/TileFunctions.h>
+#include <util/Singleton.h>
+#include <util/Mutex.h>
 
 namespace scidb
 {
 class Query;
-typedef boost::shared_ptr<class Aggregate> AggregatePtr;
+typedef std::shared_ptr<class Aggregate> AggregatePtr;
 
 /**
  * Base class of aggregate functions.
@@ -297,12 +299,12 @@ public:
 
     AggregatePtr clone() const
     {
-        return boost::make_shared<BaseAggregate>(getName(), getAggregateType(), getResultType());
+        return std::make_shared<BaseAggregate>(getName(), getAggregateType(), getResultType());
     }
 
     AggregatePtr clone(Type const& aggregateType) const
     {
-        return boost::make_shared<BaseAggregate>(getName(), aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType);
+        return std::make_shared<BaseAggregate>(getName(), aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType);
     }
 
     bool ignoreNulls() const
@@ -337,14 +339,15 @@ public:
 
         for (size_t i=0,n=tile->nSegments(); i < n; i++)
         {
-            const RLEPayload::Segment& v = tile->getSegment(i);
-            if (v._null)
+            size_t vLen;
+            const RLEPayload::Segment& v = tile->getSegment(i, vLen);
+            if (v.null())
                 continue;
-            if (v._same) {
-                Agg::multAggregate(s, getPayloadValue<T>(tile, v._valueIndex), v.length());
+            if (v.same()) {
+                Agg::multAggregate(s, getPayloadValue<T>(tile, v.valueIndex()), vLen);
             } else {
-                const size_t end = v._valueIndex + v.length();
-                for (size_t j = v._valueIndex; j < end; j++) {
+                const size_t end = v.valueIndex() + vLen;
+                for (size_t j = v.valueIndex(); j < end; j++) {
                     Agg::aggregate(s, getPayloadValue<T>(tile, j));
                 }
             }
@@ -427,12 +430,12 @@ public:
 
     AggregatePtr clone() const
     {
-        return boost::make_shared<BaseAggregateInitByFirst>(getName(), getAggregateType(), getResultType());
+        return std::make_shared<BaseAggregateInitByFirst>(getName(), getAggregateType(), getResultType());
     }
 
     AggregatePtr clone(Type const& aggregateType) const
     {
-        return boost::make_shared<BaseAggregateInitByFirst>(getName(), aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType);
+        return std::make_shared<BaseAggregateInitByFirst>(getName(), aggregateType, _resultType.typeId() == TID_VOID ? aggregateType : _resultType);
     }
 
     bool ignoreNulls() const
@@ -487,14 +490,15 @@ public:
 
         for (size_t i=0,n=tile->nSegments(); i < n; i++)
         {
-            const RLEPayload::Segment& v = tile->getSegment(i);
-            if (v._null)
+            size_t vLen;
+            const RLEPayload::Segment& v = tile->getSegment(i, vLen);
+            if (v.null())
                 continue;
-            if (v._same) {
-                Agg::multAggregate(s, getPayloadValue<T>(tile, v._valueIndex), v.length());
+            if (v.same()) {
+                Agg::multAggregate(s, getPayloadValue<T>(tile, v.valueIndex()), vLen);
             } else {
-                const size_t end = v._valueIndex + v.length();
-                for (size_t j = v._valueIndex; j < end; j++) {
+                const size_t end = v.valueIndex() + vLen;
+                for (size_t j = v.valueIndex(); j < end; j++) {
                     Agg::aggregate(s, getPayloadValue<T>(tile, j));
                 }
             }
@@ -545,13 +549,38 @@ public:
     virtual void overrideCount(Value& state, uint64_t newCount)   = 0;
 };
 
+class ListAggregatesArrayBuilder;  // forward reference
+
 class AggregateLibrary: public Singleton<AggregateLibrary>
 {
 private:
+    class AggregateElement
+    {
+    private:
+        AggregatePtr _ptr;
+        std::string  _libraryName;
+
+    public:
+        AggregateElement() { }
+        AggregateElement(
+            AggregatePtr const & ptr,
+            std::string const & libraryName)
+            : _ptr(ptr), _libraryName(libraryName) { }
+
+        AggregatePtr getPtr() const { return _ptr; }
+        const std::string  & getLibraryName() const { return _libraryName; }
+    };
+
     // Map of aggregate factories.
     // '*' for aggregate type means universal aggregate operator which operates by expressions (slow universal implementation).
-    typedef std::map < std::string, std::map<TypeId, AggregatePtr>, __lesscasecmp > FactoriesMap;
+    typedef std::map<TypeId, AggregateElement> AggregateTypeIdToElementMap;
+    typedef std::map < std::string, AggregateTypeIdToElementMap, __lesscasecmp > FactoriesMap;
     FactoriesMap _registeredFactories;
+
+    Mutex mutable _mutex;
+
+public:
+    typedef boost::function<void(const std::string&,const TypeId&,const std::string&)> Visitor;
 
 public:
     AggregateLibrary();
@@ -559,14 +588,11 @@ public:
     virtual ~AggregateLibrary()
     {}
 
-    void addAggregate(AggregatePtr const& aggregate);
+    void addAggregate(AggregatePtr const& aggregate, std::string const & libraryName = "scidb");
 
-    void getAggregateNames(std::vector<std::string>& names) const;
+    size_t getNumAggregates() const;
 
-    size_t getNumAggregates() const
-    {
-        return _registeredFactories.size();
-    }
+    void visitPlugins(const Visitor&) const;
 
     bool hasAggregate(std::string const& aggregateName) const
     {
@@ -644,7 +670,7 @@ protected:
     AggregatePtr const _aggregate;
 private:
     bool const _isEmptyable;
-    boost::shared_ptr<MemChunk> _mergedChunk;
+    std::shared_ptr<MemChunk> _mergedChunk;
 
 public:
     /// Constructor
@@ -665,12 +691,12 @@ public:
     /// @see MultiStreamArray::PartialChunkMerger::mergePartialChunk
     virtual bool mergePartialChunk(InstanceID instanceId,
                                    AttributeID attId,
-                                   boost::shared_ptr<MemChunk>& chunk,
-                                   const boost::shared_ptr<Query>& query);
+                                   std::shared_ptr<MemChunk>& chunk,
+                                   const std::shared_ptr<Query>& query);
 
     /// @see MultiStreamArray::PartialChunkMerger::getMergedChunk
-    virtual boost::shared_ptr<MemChunk> getMergedChunk(AttributeID attId,
-                                                       const boost::shared_ptr<Query>& query);
+    virtual std::shared_ptr<MemChunk> getMergedChunk(AttributeID attId,
+                                                       const std::shared_ptr<Query>& query);
 };
 #endif
 

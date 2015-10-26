@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,7 +34,6 @@
 %{
 #include <boost/format.hpp>                              // For format()
 #include <boost/lexical_cast.hpp>                        // For lexical_cast
-#include <boost/algorithm/string/replace.hpp>            // For replace()
 #include "query/parser/Lexer.h"                          // For Lexer
 
 #define YY_USER_ACTION  {yylloc->columns(yyleng);}
@@ -213,14 +212,41 @@ catch (boost::bad_lexical_cast&)                         // Failed to parse?
 /**
  *  Parse the contents of the lexeme buffer for a string literal.
  */
-inline int Lexer::onString()
+int Lexer::onString()
 {
-    string  s(yytext,1,yyleng-2);                        // Copy into a string
+    const char* begin = yytext + 1;                 // Skip first quote
+    const char* end = &yytext[yyleng - 1];          // Ignore last quote
+    const char* rp = begin;                         // Read from beginning
+    char* wp = const_cast<char*>(rp);               // Modify yytext in place
 
-    boost::replace_all(s,"\\'","'");                     // FIXME: Ugly unescaping
+    while (rp < end) {
+        if (*rp == '\\') {
+            if (++rp == end) {                      // '\\' at end of string?
+                *wp++ = '\\';                       // Leave it alone
+                break;                              // We're done
+            }
+            switch (*rp) {                          // Translate (most of) the
+            case 'n':  *wp++ = '\n'; break;         // C89 escape sequences.
+            case 't':  *wp++ = '\t'; break;
+            case '\'': *wp++ = '\''; break;
+            case '\\': *wp++ = '\\'; break;
+            case 'r':  *wp++ = '\r'; break;
+            case 'f':  *wp++ = '\f'; break;
+            case 'v':  *wp++ = '\v'; break;
+            default:                                // Unrecognized sequence?
+                *wp++ = '\\';                       // Leave both chars alone
+                *wp++ = *rp;
+                break;
+            }
+            ++rp;                                   // Move past escape sequence
+        }
+        else {
+            *wp++ = *rp++;                          // No escapes, direct copy
+        }
+    }
 
-    copy(s.size(),&*s.begin());                          // Assign token value
-    return Token::STRING;                                // Parsed a string
+    copy(wp - begin, begin);                        // Assign token value
+    return Token::STRING;                           // Parsed a string
 }
 
 /**
@@ -262,6 +288,17 @@ inline int Lexer::onIdentifier()
 
     if (_isKeyword(yytext,_yylval->keyword,token))       // Jump thru pointer
     {
+     /* Correction:  Some keywords can also function as identifiers (those not
+        marked as being 'reserved' in the keyword table); if the spelling here 
+        differs by casing from that in the table,  then we must still copy the  
+        original spelling or we'll have  inadvertantly changed the identifier.  
+        See ticket #4503 for the fun and merriment that otherwise ensues...*/
+        
+        if (strcmp(yytext,_yylval->keyword) != 0)        // ...changed casing?
+        {
+            copy(yyleng,yytext);                         // ....must copy it
+        }
+
         return token;                                    // ...read a keyword
     }
     else                                                 // No, not a keyword

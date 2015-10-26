@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -66,5 +66,5 @@ set(system_src
 file(GLOB system_include "*.h")
 
 add_library(system_lib STATIC ${system_src} ${system_include})
-target_link_libraries(system_lib json_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES})
+target_link_libraries(system_lib json_lib ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} )
 add_dependencies(system_lib scidb_msg_lib)

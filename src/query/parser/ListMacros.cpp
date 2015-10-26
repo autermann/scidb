@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -47,7 +47,8 @@ ArrayDesc logicalListMacros()
     return ArrayDesc("macros",                           // The array name
         list_of(AttributeDesc(0,"name",TID_STRING,0,0))  // ...name attribute
                (AttributeDesc(1,"type",TID_STRING,0,0)), // ...type attribute
-        list_of(DimensionDesc("No",0,n-1,n,0)));         // Has one dimension
+        list_of(DimensionDesc("No",0,n-1,n,0)),          // Has one dimension
+        defaultPartitioning());
 }
 
 /**
@@ -56,7 +57,7 @@ ArrayDesc logicalListMacros()
  *  We define a local visitor subclass that formats each binding it visits and
  *  pushes another tuple onto the end of the vector it carries along with it.
  */
-shared_ptr<Array> physicalListMacros(const ArenaPtr& arena)
+std::shared_ptr<Array> physicalListMacros(const ArenaPtr& arena)
 {
     struct Lister : Visitor
     {
@@ -103,7 +104,7 @@ shared_ptr<Array> physicalListMacros(const ArenaPtr& arena)
             return s.str();                              // The type string
         }
 
-        shared_ptr<TupleArray> tuples;                   // The result array
+        std::shared_ptr<TupleArray> tuples;                   // The result array
     };
 
     return Lister(*getTable(),arena).tuples;             // Run the lister

@@ -7,10 +7,6 @@ load_library('linear_algebra')
 #
 #
 
-# csv to .scidb
-#--shell --command "csv2scidb < ${TEST_DATA_DIR}/graph_triplets6_9.csv > /tmp/graph_triplets6_9.scidb.txt"
-# Note: load() supports direct loading of CSV in 14.12 and later.
-
 # load
 --justrun "remove(GRAPH_TRIPLETS_6_9)"
 create array GRAPH_TRIPLETS_6_9 <v0:int64, v1:int64, w:float>[dummy=0:*,1000*1000,0]

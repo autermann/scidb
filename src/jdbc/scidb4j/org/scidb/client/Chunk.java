@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -54,7 +54,7 @@ public class Chunk implements IChunk
 
     private static Logger log = Logger.getLogger(Chunk.class.getName());
 
-    public Chunk(Message.Chunk msg, Array array) throws Error
+    public Chunk(Message.Chunk msg, Array array) throws SciDBException
     {
         org.scidb.io.network.ScidbMsg.Chunk record = msg.getRecord();
         attributeId = record.getAttributeId();
@@ -93,7 +93,7 @@ public class Chunk implements IChunk
 
             if (compressionMethod != 0)
             {
-                throw new Error("Compressed chunks not yet supported");
+                throw new SciDBException("Compressed chunks not yet supported");
             }
 
             header = new Header(chunkData);
@@ -103,12 +103,13 @@ public class Chunk implements IChunk
             {
                 segments[i] = new Segment(chunkData);
             }
-            if (segments.length == 0)
+            if (segments.length == 1) {
                 _end = true;
-
-            payloadStart = chunkData.position();
-
-            evalCurValueIndex();
+                eof = true;
+            } else {
+                payloadStart = chunkData.position();
+                evalCurValueIndex();
+            }
         }
     }
 
@@ -129,8 +130,6 @@ public class Chunk implements IChunk
             }
         }
     }
-
-
 
     public int getAttributeId()
     {
@@ -194,12 +193,35 @@ public class Chunk implements IChunk
         }
     }
 
+    /// @return whether the current value represents a null.
     public boolean isNull()
     {
         return segments[curSeg].isNull;
     }
 
-    public long getInt64() throws Error
+    /// @return the current value's missing_reason, when isNull() is true.
+    public int missingReason()
+    {
+        return segments[curSeg].valueIndex;
+    }
+
+    public long[] getInt128() throws SciDBException
+    {
+        if (!segments[curSeg].isNull || _end)
+        {
+            long[] result = new long[2];
+            chunkData.position(curValueIndex);
+            result[0] = chunkData.getLong();
+            chunkData.position(curValueIndex+8);
+            result[1] = chunkData.getLong();
+            return result;
+        } else
+        {
+            throw new SciDBException("Current item is NULL");
+        }
+    }
+
+    public long getInt64() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -207,11 +229,11 @@ public class Chunk implements IChunk
             return chunkData.getLong();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public int getInt32() throws Error
+    public int getInt32() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -219,11 +241,11 @@ public class Chunk implements IChunk
             return chunkData.getInt();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public short getInt16() throws Error
+    public short getInt16() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -231,11 +253,11 @@ public class Chunk implements IChunk
             return chunkData.getShort();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public byte getInt8() throws Error
+    public byte getInt8() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -243,59 +265,11 @@ public class Chunk implements IChunk
             return chunkData.get();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public BigInteger getUint64() throws Error
-    {
-        if (!segments[curSeg].isNull || _end)
-        {
-            chunkData.position(curValueIndex);
-            return ByteBufferExtensions.getUnsignedLong(chunkData);
-        } else
-        {
-            throw new Error("Current item is NULL");
-        }
-    }
-
-    public long getUint32() throws Error
-    {
-        if (!segments[curSeg].isNull || _end)
-        {
-            chunkData.position(curValueIndex);
-            return ByteBufferExtensions.getUnsignedInt(chunkData);
-        } else
-        {
-            throw new Error("Current item is NULL");
-        }
-    }
-
-    public int getUint16() throws Error
-    {
-        if (!segments[curSeg].isNull || _end)
-        {
-            chunkData.position(curValueIndex);
-            return ByteBufferExtensions.getUnsignedShort(chunkData);
-        } else
-        {
-            throw new Error("Current item is NULL");
-        }
-    }
-
-    public short getUint8() throws Error
-    {
-        if (!segments[curSeg].isNull || _end)
-        {
-            chunkData.position(curValueIndex);
-            return ByteBufferExtensions.getUnsignedByte(chunkData);
-        } else
-        {
-            throw new Error("Current item is NULL");
-        }
-    }
-
-    public char getChar() throws Error
+    public char getChar() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -303,11 +277,11 @@ public class Chunk implements IChunk
             return (char) chunkData.get();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public float getFloat() throws Error
+    public float getFloat() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -315,11 +289,11 @@ public class Chunk implements IChunk
             return chunkData.getFloat();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public double getDouble() throws Error
+    public double getDouble() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -327,11 +301,11 @@ public class Chunk implements IChunk
             return chunkData.getDouble();
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public boolean getBoolean() throws Error
+    public boolean getBoolean() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -341,11 +315,11 @@ public class Chunk implements IChunk
             return (b & (1 << (p & 7))) != 0;
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
-    public String getString() throws Error
+    public String getString() throws SciDBException
     {
         if (!segments[curSeg].isNull || _end)
         {
@@ -363,7 +337,7 @@ public class Chunk implements IChunk
             return new String(chars);
         } else
         {
-            throw new Error("Current item is NULL");
+            throw new SciDBException("Current item is NULL");
         }
     }
 
@@ -398,10 +372,10 @@ public class Chunk implements IChunk
             BigInteger magic = ByteBufferExtensions.getUnsignedLong(src);
             if (magic.equals(RlePayloadMagic))
             {
-                log.fine("Magic is payload");
+                log.fine("The magic number for RLEPayload is good.");
             } else
             {
-                log.fine("Magic is shit");
+                log.fine("The magic number for RLEPayload is not recognized.");
             }
 
             nSegs = (int) src.getLong();

@@ -1,3 +1,7 @@
+# Formerly a test of csv2scidb, now a test to ensure that the built-in CSV loader can do all the same things.
+# Interestingly, in nearly every case the complicated csv2scidb options are information just not needed
+# by the in-engine CSV load code.
+
 --setup
 --start-query-logging
 
@@ -19,25 +23,25 @@ CREATE ARRAY Raw_CSVLoad_8 < attr_2 : string > [ I=0:*,4,0 ]
 
 --test
 
---shell --store --command " cat ${TEST_DATA_DIR}/csv2scidb_1.csv | csv2scidb -c 10 -s 1 -p SSNN > /tmp/csv2scidb_test_1.load " 
+--shell --store --command " sed 1d ${TEST_DATA_DIR}/csv2scidb_1.csv > /tmp/csv2scidb_test_1.load " 
 
-load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load' )
+load ( Raw_CSVLoad_1, '/tmp/csv2scidb_test_1.load', -2, 'csv' )
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_2.csv | csv2scidb -d '|' -c 10 -s 1 -p NNSSNSNS > /tmp/csv2scidb_test_2.load "
+--shell --command " sed 1d ${TEST_DATA_DIR}/csv2scidb_2.csv > /tmp/csv2scidb_test_2.load "
 
-load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load' )
+load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load', -2, 'csv:p' )
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_3.csv | csv2scidb -q -c 10 -s 1 > /tmp/csv2scidb_test_3.load "
+--shell --command " sed 1d ${TEST_DATA_DIR}/csv2scidb_3.csv > /tmp/csv2scidb_test_3.load "
 
-load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load' )
+load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load', -2, 'csv' )
 
 # without chunk size specified... see #1560
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_3.csv | csv2scidb -q -s 1 > /tmp/csv2scidb_test_4.load "
+--shell --command " sed 1d ${TEST_DATA_DIR}/csv2scidb_3.csv > /tmp/csv2scidb_test_4.load "
 
 --start-igdata
 
-load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load' )
+load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load', -2, 'csv' )
 
 --stop-igdata
 
@@ -45,23 +49,24 @@ subarray (Raw_CSVLoad_4, 0,100)
 
 show ( Raw_CSVLoad_4 )
 
-# empty lines in the input file - see #2134 
+# empty lines in the input file - see #2134
+# [... which is a wrong input file and should be fixed with "sed '/^[ \t]*$/d'".  --mjl]
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_5.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_5.load "
+--shell --command " cp ${TEST_DATA_DIR}/csv2scidb_5.csv /tmp/csv2scidb_test_5.load "
 
-load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load' )
+load ( Raw_CSVLoad_5, '/tmp/csv2scidb_test_5.load', -2, 'csv' )
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_5.csv | csv2scidb -c 4 -p N > /tmp/csv2scidb_test_6.load "
+--shell --command " cp ${TEST_DATA_DIR}/csv2scidb_5.csv /tmp/csv2scidb_test_6.load "
 
-load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load' )
+load ( Raw_CSVLoad_6, '/tmp/csv2scidb_test_6.load', -2, 'csv' )
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_7.csv | csv2scidb -q -c 4 > /tmp/csv2scidb_test_7.load "
+--shell --command " cp ${TEST_DATA_DIR}/csv2scidb_7.csv /tmp/csv2scidb_test_7.load "
 
-load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load' )
+load ( Raw_CSVLoad_7, '/tmp/csv2scidb_test_7.load', -2, 'csv' )
 
---shell --command " cat ${TEST_DATA_DIR}/csv2scidb_7.csv | csv2scidb -c 4 -p S > /tmp/csv2scidb_test_8.load "
+--shell --command " cp ${TEST_DATA_DIR}/csv2scidb_7.csv /tmp/csv2scidb_test_8.load "
 
-load ( Raw_CSVLoad_8, '/tmp/csv2scidb_test_8.load' )
+load ( Raw_CSVLoad_8, '/tmp/csv2scidb_test_8.load', -2, 'csv' )
 
 --cleanup
 

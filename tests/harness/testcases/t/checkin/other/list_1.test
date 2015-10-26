@@ -9,7 +9,7 @@ sort(filter(list('operators'),library='scidb'),name)
 sort(filter(list('functions'),library='scidb'),name, profile)
 --igdata "store(list('queries'),query_array)"
 attributes(query_array)
-list('aggregates')
+filter(list('aggregates'), library='scidb')
 
 --start-igdata
 --aql select name,schema from list()

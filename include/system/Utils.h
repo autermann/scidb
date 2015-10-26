@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -34,7 +34,7 @@
 #include <assert.h>
 #include <iosfwd>
 #include <boost/filesystem.hpp>
-#include "log4cxx/logger.h"
+#include <log4cxx/logger.h>
 
 namespace scidb
 {
@@ -79,6 +79,21 @@ namespace scidb
      * @return does not return
      */
     void exit(int status);
+
+    /**
+     * Like ::fork(), but also arranges for the function arena::onForkOfChild
+     * to immediately be called within the new child process.
+     *
+     * NB. The new child process should be careful when accessing a mutex that
+     * is accessable to the parent process because it may well now be locked;
+     * in particular, it should be careful not to allocate memory through any
+     * arena other than the root, or via malloc etc.
+     *
+     * @see http://linux.die.net/man/2/fork for semantics.
+     *
+     * @see http://cppwisdom.quora.com/Why-threads-and-fork-dont-mix
+     */
+    pid_t fork();
 
     /**
      *

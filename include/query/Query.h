@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,8 +31,7 @@
 #ifndef QUERY_H_
 #define QUERY_H_
 
-#include <boost/enable_shared_from_this.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/scoped_array.hpp>
 #include <string>
 #include <queue>
@@ -55,29 +54,6 @@
 #include <system/SystemCatalog.h>
 #include <util/WorkQueue.h>
 
-// XXX TODO: we should not modify std & boost namespaces
-namespace boost
-{
-   bool operator< (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
-                   boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& r);
-   bool operator== (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
-                    boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& r);
-   bool operator!= (boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& l,
-                    boost::shared_ptr<scidb::SystemCatalog::LockDesc> const& r);
-} // namespace boost
-
-namespace std
-{
-   template<>
-   struct less<boost::shared_ptr<scidb::SystemCatalog::LockDesc> > :
-   binary_function <const boost::shared_ptr<scidb::SystemCatalog::LockDesc>,
-                    const boost::shared_ptr<scidb::SystemCatalog::LockDesc>,bool>
-   {
-      bool operator() (const boost::shared_ptr<scidb::SystemCatalog::LockDesc>& l,
-                       const boost::shared_ptr<scidb::SystemCatalog::LockDesc>& r) const ;
-   };
-} // namespace std
-
 namespace scidb
 {
 
@@ -87,6 +63,7 @@ class RemoteArray;
 class RemoteMergedArray;
 class MessageDesc;
 class ReplicationContext;
+class Session;
 
 const size_t MAX_BARRIERS = 2;
 
@@ -95,9 +72,30 @@ const size_t MAX_BARRIERS = 2;
  * in order to execute the query. The Query is a state of query processor to make
  * query processor stateless. The object lives while query is used including receiving results.
  */
-class Query : public boost::enable_shared_from_this<Query>
+class Query : public std::enable_shared_from_this<Query>
 {
- public:
+private:
+    /**
+     * This is the value that is used when a fake query is needed.
+     * It is invoked when code like the following is executed:
+     *
+     * create array A <a:string> [x=-2:3,2,1];
+     * show('select * from A');
+     */
+    static const QueryID FAKE_QUERY_ID = 0;
+
+public:
+    inline bool isFake() const
+    {
+        return (Query::FAKE_QUERY_ID == getQueryID())
+            ? true : false;
+    }
+        
+
+    /**
+     * Base class for some context an operator may need to store into the query context,
+     * typically to share data among different threads.
+     */
     class OperatorContext
     {
     public:
@@ -109,19 +107,20 @@ class Query : public boost::enable_shared_from_this<Query>
     private:
         boost::function<void()> _cb;
     };
+
     class ErrorHandler
     {
       public:
-        virtual void handleError(const boost::shared_ptr<Query>& query) = 0;
+        virtual void handleError(const std::shared_ptr<Query>& query) = 0;
         virtual ~ErrorHandler() {}
     };
 
     /**
-     * This struct is used for propper accounting of outstanding requests/jobs.
+     * This struct is used for proper accounting of outstanding requests/jobs.
      * The number of outstanding requests can be incremented when they arrive
      * and decremented when they have been processed.
      * test() indicates the arrival of the last request.
-     * From that point on, when the count of outstanding requests drops to zerro,
+     * From that point on, when the count of outstanding requests drops to zero,
      * it is an indication that all of the requests have been processed.
      * This mechanism is used for the sync() method used in SG and (for debugging) in replication.
      */
@@ -139,13 +138,10 @@ class Query : public boost::enable_shared_from_this<Query>
         PendingRequests() : _nReqs(0), _sync(false) {}
     };
 
-    typedef boost::function<void(const boost::shared_ptr<Query>&)> Finalizer;
+    typedef boost::function<void(const std::shared_ptr<Query>&)> Finalizer;
+    typedef boost::function<void(const std::shared_ptr<Query>&, InstanceID)> InstanceVisitor;
 
-    typedef std::set<boost::shared_ptr<SystemCatalog::LockDesc> >  QueryLocks;
-
-    typedef boost::function<void(const boost::shared_ptr<Query>&,InstanceID)> InstanceVisitor;
-
- private:
+private:
 
     /**
      * Hold next value for generation query ID
@@ -160,7 +156,8 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * The global list of queries present in the system
      */
-    static std::map<QueryID, boost::shared_ptr<Query> > _queries;
+    typedef std::map<QueryID, std::shared_ptr<Query> >  Queries;
+    static  Queries _queries;
 
     /**
      * Get/insert a query object from/to the global list of queries
@@ -168,12 +165,12 @@ class Query : public boost::enable_shared_from_this<Query>
      * @return the old query object if it is already on the list;
      *         otherwise, the newly inserted object specified by the argument
      */
-    static boost::shared_ptr<Query> insert(const boost::shared_ptr<Query>& query);
+    static std::shared_ptr<Query> insert(const std::shared_ptr<Query>& query);
 
     /**
      * Creates new query object detached from global list of queries
      */
-    static boost::shared_ptr<Query> createDetached(QueryID queryID);
+    static std::shared_ptr<Query> createDetached(QueryID queryID);
 
     /**
      * Initialize a query
@@ -183,9 +180,9 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     void init(InstanceID coordID,
               InstanceID localInstanceID,
-              boost::shared_ptr<const InstanceLiveness>& coordinatorLiveness);
+              std::shared_ptr<const InstanceLiveness>& coordinatorLiveness);
 
-    void setCoordinatorLiveness(boost::shared_ptr<const InstanceLiveness>& liveness)
+    void setCoordinatorLiveness(std::shared_ptr<const InstanceLiveness>& liveness)
     {
        ScopedMutexLock cs(errorMutex);
        _coordinatorLiveness = liveness;
@@ -193,20 +190,20 @@ class Query : public boost::enable_shared_from_this<Query>
 
     friend class ServerMessageHandleJob;
 
-    boost::shared_ptr<OperatorContext> _operatorContext;
+    std::shared_ptr<OperatorContext> _operatorContext;
 
     /**
      * The physical plan of query. Optimizer generates it for current step of incremental execution
      * from current logical plan. This plan is generated on coordinator and sent out to every instance for execution.
      */
-    std::vector< boost::shared_ptr<PhysicalPlan> > _physicalPlans;
+    std::vector< std::shared_ptr<PhysicalPlan> > _physicalPlans;
 
     /**
      * Snapshot of the liveness information on the coordiantor
      * The worker instances must fail the query if their liveness view
      * is/becomes different any time during the query execution.
      */
-    boost::shared_ptr<const InstanceLiveness> _coordinatorLiveness;
+    std::shared_ptr<const InstanceLiveness> _coordinatorLiveness;
 
     /// Registration ID for liveness notifications
     InstanceLivenessNotification::ListenerID _livenessListenerID;
@@ -243,7 +240,7 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     Mutex errorMutex;
 
-    boost::shared_ptr<Exception> _error;
+    std::shared_ptr<Exception> _error;
 
     // RNG
     static boost::mt19937 _rng;
@@ -266,8 +263,8 @@ class Query : public boost::enable_shared_from_this<Query>
     Mutex _warningsMutex;
 
     /// Query array locks requested by the operators
-    std::set<boost::shared_ptr<SystemCatalog::LockDesc> >  _requestedLocks;
-    std::deque< boost::shared_ptr<ErrorHandler> > _errorHandlers;
+    SystemCatalog::QueryLocks _requestedLocks;
+    std::deque< std::shared_ptr<ErrorHandler> > _errorHandlers;
     std::deque<Finalizer> _finalizers; // last minute actions
 
     /** execution of query completion status */
@@ -290,22 +287,22 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Queue for MPI-style buffer messages
      */
-    boost::shared_ptr<scidb::WorkQueue> _bufferReceiveQueue;
+    std::shared_ptr<scidb::WorkQueue> _bufferReceiveQueue;
 
     /**
      * FIFO queue for error messages
      */
-    boost::shared_ptr<scidb::WorkQueue> _errorQueue;
+    std::shared_ptr<scidb::WorkQueue> _errorQueue;
 
     /**
      * FIFO queue for SG messages
      */
-    boost::shared_ptr<scidb::WorkQueue> _operatorQueue;
+    std::shared_ptr<scidb::WorkQueue> _operatorQueue;
 
     /**
      * The state required to perform replication during execution
      */
-    boost::shared_ptr<ReplicationContext> _replicationCtx;
+    std::shared_ptr<ReplicationContext> _replicationCtx;
 
     /**
      *  Helper to invoke the finalizers with exception handling
@@ -315,10 +312,10 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      *  Helper to invoke the finalizers with exception handling
      */
-    void invokeErrorHandlers(std::deque< boost::shared_ptr<ErrorHandler> >& errorHandlers);
+    void invokeErrorHandlers(std::deque< std::shared_ptr<ErrorHandler> >& errorHandlers);
 
     void destroy();
-    static void destroyFinalizer(const boost::shared_ptr<Query>& q)
+    static void destroyFinalizer(const std::shared_ptr<Query>& q)
     {
         assert(q);
         q->destroy();
@@ -332,19 +329,19 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Acquire a set of SystemCatalog locks
      */
-    void acquireLocksInternal(Query::QueryLocks& locks);
+    void acquireLocksInternal(SystemCatalog::QueryLocks& locks);
 
     /**
      * The result of query execution. It lives while the client connection is established.
      * In future we can develop more useful policy of result keeping with multiple
      * re-connections to query.
      */
-    boost::shared_ptr<Array> _currentResultArray;
+    std::shared_ptr<Array> _currentResultArray;
 
     /**
      * TODO: XXX
      */
-    boost::shared_ptr<RemoteMergedArray> _mergedArray;
+    std::shared_ptr<RemoteMergedArray> _mergedArray;
 
     /**
      * Time of query creation;
@@ -390,7 +387,12 @@ class Query : public boost::enable_shared_from_this<Query>
      */
      arena::ArenaPtr _arena;
 
- public:
+    /**
+     *  A pointer to the session object used with this query
+     */
+    std::shared_ptr<Session> _session;
+
+public:
 
     explicit Query(QueryID querID);
     ~Query();
@@ -414,25 +416,45 @@ class Query : public boost::enable_shared_from_this<Query>
      */
     static QueryID generateID();
 
+    /// @return a random value
+    static uint32_t getRandom() { return _rng(); }
+
     /**
      * @return the number of queries currently in the system
-     * @param class Observer_tt
-     *{
-     *  bool operator!();
-     *
-     *  void operator()(const shared_ptr<scidb::Query>&)
-     *}
+     * @param class Query::Visitor, a function of a query pointer
      * It is not allowed to take any locks.
      */
-    template<class Observer_tt>
-    static size_t listQueries(Observer_tt& observer);
+    typedef boost::function<void(const std::shared_ptr<Query>&)> Visitor;
+    static size_t visitQueries(const Visitor&);
+
+
+    /**
+     * Saves a pointer to the session object.  This method is normally
+     * called by the connection object when the query is being initialized.
+     *
+     * @param session - a pointer to the session information
+     */
+    void attachSession(const std::shared_ptr<Session> &session)
+    {
+        _session = session;
+    }
+
+    /**
+     * Retrieves the session pointer set by the connection object.
+     *
+     * @return - a pointer to the session information
+     */
+    std::shared_ptr<Session> getSession()
+    {
+         return _session;
+    }
 
     /**
      * Add an error handler to run after a query's "main" routine has completed
      * and the query needs to be aborted/rolled back
      * @param eh - the error handler
      */
-    void pushErrorHandler(const boost::shared_ptr<ErrorHandler>& eh);
+    void pushErrorHandler(const std::shared_ptr<ErrorHandler>& eh);
 
     /**
      * Add a finalizer to run after a query's "main" routine has completed (with any status)
@@ -454,7 +476,8 @@ class Query : public boost::enable_shared_from_this<Query>
      * Handle a change in the local instance liveness. If the new livenes is different
      * from this query's coordinator liveness, the query is marked to be aborted.
      */
-    void handleLivenessNotification(boost::shared_ptr<const InstanceLiveness>& newLiveness);
+    void handleLivenessNotification(std::shared_ptr<const InstanceLiveness>& newLiveness);
+
     /**
      * Map a "logical" instance ID to a "physical" one using the coordinator liveness.
      * @param logicalInstanceID  a logical instanceID.
@@ -542,38 +565,43 @@ class Query : public boost::enable_shared_from_this<Query>
         return (_coordinatorID == INVALID_INSTANCE);
     }
 
-    boost::shared_ptr<const InstanceLiveness> getCoordinatorLiveness()
+    std::shared_ptr<const InstanceLiveness> getCoordinatorLiveness()
     {
        return _coordinatorLiveness;
     }
+
+    /// @return true if the set of instances participating in the query is NOT the same as
+    ///         the set of instances to which a given array is distributed; false otherwise
+    /// @param desc array descriptor (which specifies the array distribution)
+    bool isDistributionDegraded(const ArrayDesc& desc);
 
     /**
      * The string with query that user want to execute.
      */
     std::string queryString;
 
-    boost::shared_ptr<Array> getCurrentResultArray()
+    std::shared_ptr<Array> getCurrentResultArray()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
         return _currentResultArray;
     }
 
-    void setCurrentResultArray(const boost::shared_ptr<Array>& array)
+    void setCurrentResultArray(const std::shared_ptr<Array>& array)
     {
         ScopedMutexLock cs(errorMutex);
         validate();
         _currentResultArray = array;
     }
 
-    boost::shared_ptr<RemoteMergedArray> getMergedArray()
+    std::shared_ptr<RemoteMergedArray> getMergedArray()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
         return _mergedArray;
     }
 
-    void setMergedArray(const boost::shared_ptr<RemoteMergedArray>& array)
+    void setMergedArray(const std::shared_ptr<RemoteMergedArray>& array)
     {
         ScopedMutexLock cs(errorMutex);
         validate();
@@ -586,7 +614,7 @@ class Query : public boost::enable_shared_from_this<Query>
      * The logical plan of query. QueryProcessor generates it by parser only at coordinator instance.
      * Since we use incremental optimization this is the rest of logical plan to be executed.
      */
-    boost::shared_ptr<LogicalPlan> logicalPlan;
+    std::shared_ptr<LogicalPlan> logicalPlan;
 
     /**
      * Request that a given array lock be acquired before the query execution starts
@@ -595,15 +623,15 @@ class Query : public boost::enable_shared_from_this<Query>
      *         with a more exclusive mode (RD < WR,CRT,RM,RNF,RNT)
      * @see scidb::SystemCatalog::LockDesc
      */
-    boost::shared_ptr<SystemCatalog::LockDesc>
-    requestLock(boost::shared_ptr<SystemCatalog::LockDesc>& lock);
+    std::shared_ptr<SystemCatalog::LockDesc>
+    requestLock(std::shared_ptr<SystemCatalog::LockDesc>& lock);
 
-    void addPhysicalPlan(boost::shared_ptr<PhysicalPlan> physicalPlan)
+    void addPhysicalPlan(std::shared_ptr<PhysicalPlan> physicalPlan)
     {
         _physicalPlans.push_back(physicalPlan);
     }
 
-    boost::shared_ptr<PhysicalPlan> getCurrentPhysicalPlan()
+    std::shared_ptr<PhysicalPlan> getCurrentPhysicalPlan()
     {
         return _physicalPlans.back();
     }
@@ -612,7 +640,7 @@ class Query : public boost::enable_shared_from_this<Query>
      * Get the queue for delivering buffer-send (mtMPISend) messages
      * @return empty pointer if the query is no longer active
      */
-    boost::shared_ptr<scidb::WorkQueue> getBufferReceiveQueue()
+    std::shared_ptr<scidb::WorkQueue> getBufferReceiveQueue()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
@@ -620,13 +648,13 @@ class Query : public boost::enable_shared_from_this<Query>
         return _bufferReceiveQueue;
     }
 
-    boost::shared_ptr<scidb::WorkQueue> getErrorQueue()
+    std::shared_ptr<scidb::WorkQueue> getErrorQueue()
     {
         ScopedMutexLock cs(errorMutex);
         return _errorQueue;
     }
 
-    boost::shared_ptr<scidb::WorkQueue> getOperatorQueue()
+    std::shared_ptr<scidb::WorkQueue> getOperatorQueue()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
@@ -634,7 +662,7 @@ class Query : public boost::enable_shared_from_this<Query>
         return _operatorQueue;
     }
 
-    boost::shared_ptr<scidb::ReplicationContext> getReplicationContext()
+    std::shared_ptr<scidb::ReplicationContext> getReplicationContext()
     {
         ScopedMutexLock cs(errorMutex);
         validate();
@@ -657,9 +685,9 @@ class Query : public boost::enable_shared_from_this<Query>
 
     /// Create a fake query that does not correspond to a user-generated request
     /// for internal purposes only
-    static boost::shared_ptr<Query> createFakeQuery(InstanceID coordID,
+    static std::shared_ptr<Query> createFakeQuery(InstanceID coordID,
                                                     InstanceID localInstanceID,
-                                                    boost::shared_ptr<const InstanceLiveness> liveness,
+                                                    std::shared_ptr<const InstanceLiveness> liveness,
                                                     int32_t *longErrorCode=NULL);
     /// Destroy a query generated by createFakeQuery()
     static void destroyFakeQuery(Query* q);
@@ -667,19 +695,19 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Creates new query object and generate new queryID
      */
-    static boost::shared_ptr<Query> create(QueryID queryId, InstanceID instanceId=INVALID_INSTANCE);
+    static std::shared_ptr<Query> create(QueryID queryId, InstanceID instanceId=INVALID_INSTANCE);
 
     /**
      * Find query with given queryID in the global query list
      */
-    static boost::shared_ptr<Query> getQueryByID(QueryID queryID, bool raise = true);
+    static std::shared_ptr<Query> getQueryByID(QueryID queryID, bool raise = true);
 
     /**
      * Validates the pointer and the query it points for errors
      * @throws scidb::SystemException if the pointer is empty or if the query is in error state
      * @return true if no exception is thrown
      */
-    static bool validateQueryPtr(const boost::shared_ptr<Query>& query)
+    static bool validateQueryPtr(const std::shared_ptr<Query>& query)
     {
 #ifndef SCIDB_CLIENT
         if (!query) {
@@ -696,11 +724,17 @@ class Query : public boost::enable_shared_from_this<Query>
      * @throws scidb::SystemException if the pointer is dead or if the query is in error state
      * @return a live query pointer if no exception is thrown
      */
-    static boost::shared_ptr<Query> getValidQueryPtr(const boost::weak_ptr<Query>& query)
+    static std::shared_ptr<Query> getValidQueryPtr(const std::weak_ptr<Query>& query)
     {
-        boost::shared_ptr<Query> q(query.lock());
+        std::shared_ptr<Query> q(query.lock());
         validateQueryPtr(q);
         return q;
+    }
+
+    ///A wrapper over getValidQueryPtr(), to return a boolean.
+    static bool isValidQueryPtr(const std::weak_ptr<Query>& query)
+    {
+        return getValidQueryPtr(query).get() != nullptr;
     }
 
     /**
@@ -713,21 +747,13 @@ class Query : public boost::enable_shared_from_this<Query>
      * @param query whose locks to release
      * @throws exceptions while releasing the lock
      */
-    static void releaseLocks(const boost::shared_ptr<Query>& query);
-
-    /**
-     * Get temporary or persistent array
-     * @param arrayName array name
-     * @return reference to the array
-     * @exception SCIDB_LE_ARRAY_DOESNT_EXIST
-     */
-    boost::shared_ptr<Array> getArray(std::string const& arrayName);
+    static void releaseLocks(const std::shared_ptr<Query>& query);
 
     /**
      * Associate temporay array with this query
      * @param tmpArray temporary array
      */
-    void setTemporaryArray(boost::shared_ptr<Array> const& tmpArray);
+    void setTemporaryArray(std::shared_ptr<Array> const& tmpArray);
 
     /**
      * Repeatedly execute given work until it either succeeds
@@ -767,7 +793,7 @@ class Query : public boost::enable_shared_from_this<Query>
      * Handle a query error.
      * May attempt to invoke error handlers
      */
-    void handleError(const boost::shared_ptr<Exception>& unwindException);
+    void handleError(const std::shared_ptr<Exception>& unwindException);
 
     /**
      * Handle a client complete request
@@ -790,12 +816,26 @@ class Query : public boost::enable_shared_from_this<Query>
     void handleAbort();
 
     /**
-     * Retursns query ID
+     * Returns query ID
      */
     QueryID getQueryID() const
     {
         return _queryID;
     }
+
+    /**
+     * Get the maximum ArrayID, versioned or unversioned, currently recorded in the catalog for a given array name.
+     * All the versioned array names result in the same value as the corresponding unversioned array name,
+     * i.e. getCatalogVersion("X") == getCatalogVersion("X@Y").
+     * @note THREAD-SAFETY: This method can be called either before all the query locks are acquired or strictly after.
+     * Otherwise, the effect is undefined. Currently the code respects that protocol but
+     * this method does not use any synchronization to enforce it.
+     * @param [in] arrayName (possibly an array version name like 'X@Y')
+     * @param [in] allowMissing If it is true and arrayName is not known, SystemCatalog::ANY_VERSION is returned.
+     *             The default value is false.
+     * @return the catalog array version ID
+     */
+    ArrayID getCatalogVersion(const std::string& arrayName, bool allowMissing=false) const ;
 
     /**
      * Return current queryID for thread.
@@ -810,8 +850,8 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Set result SG context. Thread safe.
      */
-    void setOperatorContext(boost::shared_ptr<OperatorContext> const& opContext,
-                            boost::shared_ptr<JobQueue> const& jobQueue = boost::shared_ptr<JobQueue>());
+    void setOperatorContext(std::shared_ptr<OperatorContext> const& opContext,
+                            std::shared_ptr<JobQueue> const& jobQueue = std::shared_ptr<JobQueue>());
 
     /**
      * Remove result SG context.
@@ -822,7 +862,7 @@ class Query : public boost::enable_shared_from_this<Query>
      * @return SG Context. Thread safe.
      * wait until context is not NULL,
      */
-    boost::shared_ptr<OperatorContext> getOperatorContext(){
+    std::shared_ptr<OperatorContext> getOperatorContext(){
         ScopedMutexLock lock(errorMutex);
         return _operatorContext;
     }
@@ -845,7 +885,7 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Mark query as completed with an error
      */
-    void done(const boost::shared_ptr<Exception> unwindException);
+    void done(const std::shared_ptr<Exception> unwindException);
 
     /**
      * This section describe member fields needed for implementing send/receive functions.
@@ -856,7 +896,7 @@ class Query : public boost::enable_shared_from_this<Query>
      * This vector holds send/receive messages for current query at this instance.
      * index in vector is source instance number.
      */
-    std::vector< std::list<boost::shared_ptr< MessageDesc> > > _receiveMessages;
+    std::vector< std::list<std::shared_ptr< MessageDesc> > > _receiveMessages;
 
     /**
      * This vector holds semaphores for working with messages queue. One semaphore for every source instance.
@@ -873,7 +913,7 @@ class Query : public boost::enable_shared_from_this<Query>
     /**
      * Statistics monitor for query
      */
-    boost::shared_ptr<StatisticsMonitor> statisticsMonitor;
+    std::shared_ptr<StatisticsMonitor> statisticsMonitor;
 
     /**
      * Validates the query for errors
@@ -920,122 +960,119 @@ private:
 
 class UpdateErrorHandler : public Query::ErrorHandler
 {
- public:
+public:
     typedef boost::function< void(VersionID,ArrayID,ArrayID) > RollbackWork;
 
-    UpdateErrorHandler(const boost::shared_ptr<SystemCatalog::LockDesc> & lock)
-    : _lock(lock) { assert(_lock); }
+    explicit UpdateErrorHandler(const std::shared_ptr<SystemCatalog::LockDesc> & lock)
+    : _lock(lock)
+    {
+        assert(_lock);
+    }
+
     virtual ~UpdateErrorHandler() {}
-    virtual void handleError(const boost::shared_ptr<Query>& query);
+    virtual void handleError(const std::shared_ptr<Query>& query);
 
-    static void releaseLock(const boost::shared_ptr<SystemCatalog::LockDesc>& lock,
-                            const boost::shared_ptr<Query>& query);
+    static void releaseLock(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
+                            const std::shared_ptr<Query>& query);
 
-    static void handleErrorOnCoordinator(const boost::shared_ptr<SystemCatalog::LockDesc>& lock,
+    static void handleErrorOnCoordinator(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
                                          RollbackWork& rw);
-    static void handleErrorOnWorker(const boost::shared_ptr<SystemCatalog::LockDesc>& lock,
+    static void handleErrorOnWorker(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
                                     bool forceCoordLockCheck,
                                     RollbackWork& rw);
- private:
+private:
     static void doRollback(VersionID lastVersion,
                            ArrayID   baseArrayId,
                            ArrayID   newArrayId);
-    void _handleError(const boost::shared_ptr<Query>& query);
+    void _handleError(const std::shared_ptr<Query>& query);
 
     UpdateErrorHandler(const UpdateErrorHandler&);
     UpdateErrorHandler& operator=(const UpdateErrorHandler&);
 
- private:
-    const boost::shared_ptr<SystemCatalog::LockDesc> _lock;
+private:
+    const std::shared_ptr<SystemCatalog::LockDesc> _lock;
     static log4cxx::LoggerPtr _logger;
 };
-
 
 class RemoveErrorHandler : public Query::ErrorHandler
 {
- public:
-    RemoveErrorHandler(const boost::shared_ptr<SystemCatalog::LockDesc> & lock)
-    : _lock(lock) { assert(_lock); }
-    virtual ~RemoveErrorHandler() {}
-    virtual void handleError(const boost::shared_ptr<Query>& query);
+public:
+    explicit RemoveErrorHandler(const std::shared_ptr<SystemCatalog::LockDesc> & lock)
+    : _lock(lock)
+    {
+        assert(_lock);
+    }
 
-    static bool handleRemoveLock(const boost::shared_ptr<SystemCatalog::LockDesc>& lock,
+    virtual ~RemoveErrorHandler() {}
+    virtual void handleError(const std::shared_ptr<Query>& query);
+
+    static bool handleRemoveLock(const std::shared_ptr<SystemCatalog::LockDesc>& lock,
                                  bool forceLockCheck);
- private:
+private:
     RemoveErrorHandler(const RemoveErrorHandler&);
     RemoveErrorHandler& operator=(const RemoveErrorHandler&);
- private:
-    const boost::shared_ptr<SystemCatalog::LockDesc> _lock;
+
+private:
+    const std::shared_ptr<SystemCatalog::LockDesc> _lock;
     static log4cxx::LoggerPtr _logger;
 };
-
-template<class Observer_tt>
-size_t Query::listQueries(Observer_tt& observer)
-{
-    ScopedMutexLock mutexLock(queriesMutex);
-
-    if (!observer) {
-        return _queries.size();
-    }
-
-    for (std::map<QueryID, boost::shared_ptr<Query> >::const_iterator q = _queries.begin();
-         q != _queries.end(); ++q) {
-        observer(q->second);
-    }
-    return _queries.size();
-
-}
 
 class BroadcastAbortErrorHandler : public Query::ErrorHandler
 {
  public:
-    virtual void handleError(const boost::shared_ptr<Query>& query);
+    virtual void handleError(const std::shared_ptr<Query>& query);
     virtual ~BroadcastAbortErrorHandler() {}
  private:
     static log4cxx::LoggerPtr _logger;
 };
 
 class ReplicationManager;
+
 /**
- * The neccesary context to perform replication
- * during the execution of a query.
+ * The necessary context to perform replication during the execution of a query.
  */
 class ReplicationContext
 {
- private:
+private:
 
     typedef ArrayID QueueID;
 
     /**
      * Internal triplet container class.
-     *  It is used to hold the info needed for replication:
+     * It is used to hold the info needed for replication:
      *  - WorkQueue where incoming replication messages inserted
      *  - Array where the replicas are to be written
-     *  - Semaphore for signalling when all replicas sent
+     *  - Semaphore for signaling when all replicas sent
      *    from this instance to all other instances are written
      */
     class QueueInfo
     {
     public:
-        explicit QueueInfo(const boost::shared_ptr<scidb::WorkQueue>& q)
-        : _wq(q) { assert(q); }
+        explicit QueueInfo(const std::shared_ptr<scidb::WorkQueue>& q)
+        : _wq(q)
+        {
+            assert(q);
+        }
+
         virtual ~QueueInfo()
         {
             if (_wq) { _wq->stop(); }
         }
-        boost::shared_ptr<scidb::WorkQueue> getQueue()     { return _wq; }
-        boost::shared_ptr<scidb::Array>     getArray()     { return _array; }
+
+        std::shared_ptr<scidb::WorkQueue> getQueue()     { return _wq; }
+        std::shared_ptr<scidb::Array>     getArray()     { return _array; }
         scidb::Semaphore&                   getSemaphore() { return _replicaSem; }
-        void setArray(const boost::shared_ptr<scidb::Array>& arr) { _array=arr; }
+        void setArray(const std::shared_ptr<scidb::Array>& arr) { _array=arr; }
     private:
-        boost::shared_ptr<scidb::WorkQueue> _wq;
-        boost::shared_ptr<scidb::Array>     _array;
+        std::shared_ptr<scidb::WorkQueue> _wq;
+        std::shared_ptr<scidb::Array>     _array;
         Semaphore _replicaSem;
     private:
         QueueInfo(const QueueInfo&);
         QueueInfo& operator=(const QueueInfo&);
     };
-    typedef boost::shared_ptr<QueueInfo> QueueInfoPtr;
+
+    typedef std::shared_ptr<QueueInfo> QueueInfoPtr;
     typedef std::map<QueueID, QueueInfoPtr>  QueueMap;
 
     /**
@@ -1049,22 +1086,23 @@ class ReplicationContext
      * @param arrId array ID
      * @return WorkQueue for enqueing replication jobs
      */
-    boost::shared_ptr<scidb::WorkQueue> getInboundQueue(ArrayID arrId);
+    std::shared_ptr<scidb::WorkQueue> getInboundQueue(ArrayID arrId);
 
- private:
+private:
 
     Mutex _mutex;
     QueueMap _inboundQueues;
-    boost::weak_ptr<Query> _query;
+    std::weak_ptr<Query> _query;
     static ReplicationManager* _replicationMngr;
 
- public:
+public:
     /**
      * Constructor
      * @param query
      * @param nInstaneces
      */
-    explicit ReplicationContext(const boost::shared_ptr<Query>& query, size_t nInstances);
+    explicit ReplicationContext(const std::shared_ptr<Query>& query, size_t nInstances);
+
     /// Destructor
     virtual ~ReplicationContext() {}
 
@@ -1073,14 +1111,14 @@ class ReplicationContext
      * @param arrId array ID of arr
      * @param arr array to which write replicas
      */
-    void enableInboundQueue(ArrayID arrId, const boost::shared_ptr<scidb::Array>& arr);
+    void enableInboundQueue(ArrayID arrId, const std::shared_ptr<scidb::Array>& arr);
 
     /**
      * Enqueue a job to write a remote instance replica locally
      * @param arrId array ID to locate the appropriate queue
      * @param job replication job to enqueue
      */
-    void enqueueInbound(ArrayID arrId, boost::shared_ptr<Job>& job);
+    void enqueueInbound(ArrayID arrId, std::shared_ptr<Job>& job);
 
     /**
      * Wait until all replicas originated on THIS instance have been written to the REMOTE instances
@@ -1107,9 +1145,9 @@ class ReplicationContext
      * Get the persistent array for writing replicas
      * @param arrId array ID to locate the appropriate queue
      */
-    boost::shared_ptr<scidb::Array> getPersistentArray(ArrayID arrId);
+    std::shared_ptr<scidb::Array> getPersistentArray(ArrayID arrId);
 
- public:
+public:
 
 #ifndef NDEBUG // for debugging
     std::vector<Query::PendingRequests> _chunkReplicasReqs;

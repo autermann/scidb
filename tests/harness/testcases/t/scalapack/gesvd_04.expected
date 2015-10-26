@@ -1,7 +1,7 @@
 SCIDB QUERY : <load_library('dense_linear_algebra')>
 Query was executed successfully
 
-SCIDB QUERY : <create           array M8x8_ubi     <val:int64>              [x=0:*,32,0,y=0:*,32,0]>
+SCIDB QUERY : <create array M8x8_ubi     <val:int64>              [x=0:*,32,0,y=0:*,32,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create array M8x8_default <val:double default 0.0> [x=0:*,32,0,y=0:*,32,0]>
@@ -20,6 +20,9 @@ SCIDB QUERY : <create array M4x5c32x16 <a:double> [x=0:3,32,0, y=0:4,16,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create array M4x5c32x16_UB <a:double> [x=0:*,32,0, y=0:*,16,0]>
+Query was executed successfully
+
+SCIDB QUERY : <create array M4x5_UB_singular_values <ref:double> [x=0:31,32,0]>
 Query was executed successfully
 
 SCIDB QUERY : <store(build(M4x5c32x16, sin(x+5*y)*sqrt(2)), s4x5c32x16)>
@@ -90,6 +93,41 @@ SCIDB QUERY : <store(M4x5c32x16, M4x5c32x16_UB)>
 {3,2} 0.594206
 {3,3} 0.937944
 {3,4} 0.803264
+
+SCIDB QUERY : <store(build(M4x5_UB_singular_values, '[{0}(2.50599),{1}(0.613469),{2}(0.457489),{3}(0.358316),{4}(0.0),{5}(0.0),{6}(0.0),{7}(0.0),{8}(0.0),{9}(0.0),{10}(0.0),{11}(0.0),{12}(0.0),{13}(0.0),{14}(0.0),{15}(0.0),{16}(0.0),{17}(0.0),{18}(0.0),{19}(0.0),{20}(0.0),{21}(0.0),{22}(0.0),{23}(0.0),{24}(0.0),{25}(0.0),{26}(0.0),{27}(0.0),{28}(0.0),{29}(0.0),{30}(0.0),{31}(0.0)]',true), M4x5_UB_singular_values)>
+{x} ref
+{0} 2.50599
+{1} 0.613469
+{2} 0.457489
+{3} 0.358316
+{4} 0
+{5} 0
+{6} 0
+{7} 0
+{8} 0
+{9} 0
+{10} 0
+{11} 0
+{12} 0
+{13} 0
+{14} 0
+{15} 0
+{16} 0
+{17} 0
+{18} 0
+{19} 0
+{20} 0
+{21} 0
+{22} 0
+{23} 0
+{24} 0
+{25} 0
+{26} 0
+{27} 0
+{28} 0
+{29} 0
+{30} 0
+{31} 0
 
 gesvd only works for the double data types:
 SCIDB QUERY : <gesvd(M8x8_ubi, 'values')>
@@ -2409,40 +2447,11 @@ SCIDB QUERY : <gesvd(M4x5, 'values')>
 {2} 0.457489
 {3} 0.358316
 
-SCIDB QUERY : <gesvd(scan(M4x5_UB,true), 'values')>
-{i} sigma
-{0} 2.50599
-{1} 0.613469
-{2} 0.457489
-{3} 0.358316
-{4} 0
-{5} 0
-{6} 0
-{7} 0
-{8} 0
-{9} 0
-{10} 0
-{11} 0
-{12} 0
-{13} 0
-{14} 0
-{15} 0
-{16} 0
-{17} 0
-{18} 0
-{19} 0
-{20} 0
-{21} 0
-{22} 0
-{23} 0
-{24} 0
-{25} 0
-{26} 0
-{27} 0
-{28} 0
-{29} 0
-{30} 0
-{31} 0
+SCIDB QUERY : <store(gesvd(scan(M4x5_UB,true), 'values'), tmpValues)>
+[Query was executed successfully, ignoring data output by this query.]
+
+SCIDB QUERY : <filter(apply(join(tmpValues, M4x5_UB_singular_values), err, abs(sigma-ref)), err > 5e-6)>
+{i} sigma,ref,err
 
 SCIDB QUERY : <gesvd(M4x5, 'left')>
 {x,i} u
@@ -3616,65 +3625,65 @@ SCIDB QUERY : <gesvd(scan(M4x5_UB,true), 'right')>
 {3,2} -0.646046
 {3,3} 0.563926
 {3,4} 0.129235
-{3,5} 0
-{3,6} 0
-{3,7} 0
-{3,8} 0
-{3,9} 0
-{3,10} 0
-{3,11} 0
-{3,12} 0
-{3,13} 0
-{3,14} 0
-{3,15} 0
-{3,16} 0
-{3,17} 0
-{3,18} 0
-{3,19} 0
-{3,20} 0
-{3,21} 0
-{3,22} 0
-{3,23} 0
-{3,24} 0
-{3,25} 0
-{3,26} 0
-{3,27} 0
-{3,28} 0
-{3,29} 0
-{3,30} 0
-{3,31} 0
+{3,5} -0
+{3,6} -0
+{3,7} -0
+{3,8} -0
+{3,9} -0
+{3,10} -0
+{3,11} -0
+{3,12} -0
+{3,13} -0
+{3,14} -0
+{3,15} -0
+{3,16} -0
+{3,17} -0
+{3,18} -0
+{3,19} -0
+{3,20} -0
+{3,21} -0
+{3,22} -0
+{3,23} -0
+{3,24} -0
+{3,25} -0
+{3,26} -0
+{3,27} -0
+{3,28} -0
+{3,29} -0
+{3,30} -0
+{3,31} -0
 {4,0} -0.880703
 {4,1} 0.149596
 {4,2} 0.319898
 {4,3} -0.247133
 {4,4} 0.196403
-{4,5} 0
-{4,6} 0
-{4,7} 0
-{4,8} 0
-{4,9} 0
-{4,10} 0
-{4,11} 0
-{4,12} 0
-{4,13} 0
-{4,14} 0
-{4,15} 0
-{4,16} 0
-{4,17} 0
-{4,18} 0
-{4,19} 0
-{4,20} 0
-{4,21} 0
-{4,22} 0
-{4,23} 0
-{4,24} 0
-{4,25} 0
-{4,26} 0
-{4,27} 0
-{4,28} 0
-{4,29} 0
-{4,30} 0
-{4,31} 0
+{4,5} -0
+{4,6} -0
+{4,7} -0
+{4,8} -0
+{4,9} -0
+{4,10} -0
+{4,11} -0
+{4,12} -0
+{4,13} -0
+{4,14} -0
+{4,15} -0
+{4,16} -0
+{4,17} -0
+{4,18} -0
+{4,19} -0
+{4,20} -0
+{4,21} -0
+{4,22} -0
+{4,23} -0
+{4,24} -0
+{4,25} -0
+{4,26} -0
+{4,27} -0
+{4,28} -0
+{4,29} -0
+{4,30} -0
+{4,31} -0
 {5,0} 0
 {5,1} 0
 {5,2} 0
@@ -4559,5 +4568,11 @@ SCIDB QUERY : <remove(M4x5)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(M4x5_UB)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(tmpValues)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(M4x5_UB_singular_values)>
 Query was executed successfully
 

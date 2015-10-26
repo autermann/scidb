@@ -21,7 +21,7 @@
 #   - Majority of the modification is to use scidb_fdiv() to replace division,
 #     to avoid truncating the division result to an integer, in Python 2.
 #   - Other changes are all accompanied with a comment "Modified by SciDB, Inc.",
-#     to allow easy searching. 
+#     to allow easy searching.
 #
 
 """

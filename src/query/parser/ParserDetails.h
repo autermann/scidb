@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include <system/Exceptions.h>                           // For error messages
 #include <util/PointerRange.h>                           // For PointerRange
 #include <util/Arena.h>                                  // For arena library
-#include "query/Parser.h"                                // Public interface
+#include <query/Parser.h>                                // Public interface
 
 /****************************************************************************/
 namespace scidb {
@@ -44,8 +44,8 @@ namespace parser {
 
 using namespace std;                                     // Everything in std
 using namespace arena;                                   // Everything in arena
-using boost::shared_ptr;                                 // A tracking pointer
-using boost::make_shared;                                // For allocating one
+using std::shared_ptr;                                 // A tracking pointer
+using std::make_shared;                                // For allocating one
 
 /****************************************************************************/
 
@@ -97,8 +97,8 @@ typedef Node                     Name;                   // An entity name
 typedef int32_t                  error;                  // An error code
 typedef PointerRange<Node*>      nodes;                  // A range of nodes
 typedef PointerRange<Node*const>cnodes;                  // A range of nodes
-typedef shared_ptr<Query>        QueryPtr;               // The original query
-typedef shared_ptr<string>       StringPtr;              // Its source text
+typedef std::shared_ptr<Query>        QueryPtr;               // The original query
+typedef std::shared_ptr<string>       StringPtr;              // Its source text
 
 /****************************************************************************/
 /**
@@ -132,10 +132,10 @@ Table*                           newTable (Arena&,Log&,Table*,cnodes bindings);
 
 /****************************************************************************/
 
-Node*&                           desugar  (Factory&,Log&,Node*&);
+Node*&                           desugar  (Factory&,Log&,Node*&,const QueryPtr&);
 Node*&                           inliner  (Factory&,Log&,Node*&);
-shared_ptr<LogicalExpression>    translate(Factory&,Log&,const StringPtr&,Node*);
-shared_ptr<LogicalQueryPlanNode> translate(Factory&,Log&,const StringPtr&,Node*,const QueryPtr&);
+std::shared_ptr<LogicalExpression>    translateExp(Factory&,Log&,const StringPtr&,Node*,const QueryPtr&);
+std::shared_ptr<LogicalQueryPlanNode> translatePlan(Factory&,Log&,const StringPtr&,Node*,const QueryPtr&);
 
 /****************************************************************************/
 

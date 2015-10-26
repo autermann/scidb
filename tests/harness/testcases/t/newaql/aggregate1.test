@@ -51,10 +51,9 @@ store(build(B,x*2),B)
 --aql select x,sin(x),cos(2*a*a*x/2),tan(a) from B where (sqrt(x)+x)<3
 --aql select * from A,B
 --aql select * from A,repart(B,<a:double> [x=-3:8,4,0])
---aql select * from A,reverse(A)
---aql select * from A,reverse(repart(B,<a:double> [x=-3:8,4,0]))
---aql select * from A,reverse(A),reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0])
---aql select * from A,reverse(A),reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0]) where x>0 and x<3
+--aql select * from A,repart(B,<a:double> [x=-3:8,4,0])
+--aql select * from A,reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0])
+--aql select * from A,reshape( subarray(sort(A,a,4),0,11), <a:double> [x=-3:8,4,0]) where x>0 and x<3
 --aql select Arr.x + 10 from A as Arr
 --aql select (Arr.a + 1),(Arr.a*10) from A as Arr
 --aql select (Brr.a + 1)+(Brr.a*10) from B as Brr

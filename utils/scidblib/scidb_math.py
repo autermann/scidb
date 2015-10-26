@@ -2,8 +2,8 @@
 
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -197,7 +197,7 @@ def geomean(values):
         raise ValueError('I cannot compute geomean over an empty list.')
     product = reduce(
       lambda prod,val: prod*val, # accumulation
-      values, 
+      values,
       1.0 # initial product value
     )
     return math.pow( product, 1.0/len(values) )

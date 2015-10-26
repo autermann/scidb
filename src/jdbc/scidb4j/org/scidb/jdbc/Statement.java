@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,12 +21,13 @@
 */
 package org.scidb.jdbc;
 
-import org.scidb.client.Result;
-
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.scidb.client.Result;
+import org.scidb.client.PrepareResult;
 
 public class Statement implements java.sql.Statement
 {
@@ -41,7 +42,7 @@ public class Statement implements java.sql.Statement
         this.conn = conn;
         this.scidbConnection = conn.getSciDBConnection();
     }
-    
+
     @Override
     @SuppressWarnings(value = "unchecked") //While we checking types inside we can safely ignore warnings
     public <T> T unwrap(Class<T> iface) throws SQLException
@@ -63,10 +64,10 @@ public class Statement implements java.sql.Statement
     {
         try
         {
-            Result res = scidbConnection.prepare(sql);
-            if (res.isSelective())
+            PrepareResult res = scidbConnection.prepare(sql);
+            if (res.getSelective())
             {
-                return new ResultSet(scidbConnection.execute());
+                return new ResultSet(scidbConnection.execute().getArray());
             }
             else
             {
@@ -116,7 +117,7 @@ public class Statement implements java.sql.Statement
     public void setMaxFieldSize(int max) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -130,14 +131,14 @@ public class Statement implements java.sql.Statement
     public void setMaxRows(int max) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void setEscapeProcessing(boolean enable) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -151,14 +152,14 @@ public class Statement implements java.sql.Statement
     public void setQueryTimeout(int seconds) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void cancel() throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -172,14 +173,14 @@ public class Statement implements java.sql.Statement
     public void clearWarnings() throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void setCursorName(String name) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -212,7 +213,7 @@ public class Statement implements java.sql.Statement
     public void setFetchDirection(int direction) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -226,7 +227,7 @@ public class Statement implements java.sql.Statement
     public void setFetchSize(int rows) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -390,7 +391,7 @@ public class Statement implements java.sql.Statement
     public void setPoolable(boolean poolable) throws SQLException
     {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
@@ -398,5 +399,22 @@ public class Statement implements java.sql.Statement
     {
         // TODO Auto-generated method stub
         return false;
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public boolean isCloseOnCompletion() throws SQLException
+    {
+    	return true;
+    }
+
+    /**
+     * @since Java 7
+     */
+    @Override
+    public void closeOnCompletion() throws SQLException
+    {
     }
 }

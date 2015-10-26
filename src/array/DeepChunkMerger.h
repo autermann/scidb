@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,10 +30,11 @@
 #ifndef DEEPCHUNKMERGER_H_
 #define DEEPCHUNKMERGER_H_
 
-#include <array/MemArray.h>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
+
+#include <array/MemArray.h>
 
 namespace scidb
 {
@@ -49,15 +50,53 @@ private:
      * Intermediate segment for the RLEPayload part of the merged chunk.
      * The valueIndex is a 'finger' into one of the source payloads.
      */
-    struct IntermediatePayloadSegment
+    class IntermediatePayloadSegment
     {
-        uint32_t   _valueIndex: 30; // [local] meaningful *only* in the context of one of the two payloads. It is the valueIndex in one of _dst or _with
-        uint32_t   _same: 1;        // [local]
-        uint32_t   _null: 1;        // [local]
-        size_t     _currSeg;        // [local] multiple calls to appendIntermediatePayloadSegment will append to the same output segment, if they are dealing with the same input segment
-        position_t _pPosition;      // [global] E.g. if _dst has 5 earlier physical positions and _with has 6 earlier physical positions, the next pPosition is 11.
+        // A segment is a (physPos, valueIndex, same, null) tuple:
+        //   pPosition() - [global] E.g. if _dst has 5 earlier physical positions and _with has 6
+        //                          earlier physical positions, the next pPosition is 11.
+        //   valueIndex() - [local] Meaningful *only* in the context of one of the two payloads.
+        //                          It is the valueIndex in one of _dst or _with
+        //   same(), null() - [local]
+        //
+        rle::Segment _self;         // (prefer composition to private inheritance)
+
+        size_t     _currSeg;        // [local] multiple calls to appendIntermediatePayloadSegment will append to
+                                    //   the same output segment, if they are dealing with the same input segment
         position_t _length;         // [global] #positions of this segment
         bool       _isFromDst;      // [global] Whether valueIndex/same/null are from _dst.
+
+    public:
+
+        IntermediatePayloadSegment()
+            : _self(), _currSeg(0), _length(0), _isFromDst(false)
+        {}
+
+        /**
+         * Getters
+         * @{
+         */
+        uint32_t    valueIndex() const { return _self.valueIndex(); }
+        bool        same() const { return _self.same(); }
+        bool        null() const { return _self.null(); }
+        size_t      currSeg() const { return _currSeg; }
+        position_t  pPosition() const { return _self.pPosition(); }
+        position_t  length() const { return _length; }
+        bool        isFromDst() const { return _isFromDst; }
+        /**@}*/
+
+        /**
+         * Setters
+         * @{
+         */
+        void    setValueIndex(size_t vi) { _self.setValueIndex(vi); }
+        void    setSame(bool b) { _self.setSame(b); }
+        void    setNull(bool b) { _self.setNull(b); }
+        void    setCurrSeg(size_t seg) { _currSeg = seg; }
+        void    setPPosition(position_t pPos) { _self.setPPosition(pPos); }
+        void    setLength(position_t len) { _length = len; }
+        void    setFromDst(bool b) { _isFromDst = b; }
+        /**@}*/
 
         /**
          * Assign all values, except isFromDst, based on a SegmentIterator.
@@ -66,13 +105,14 @@ private:
          * @param[in] segmentIterator a segment iterator in the input payload
          * @param[in] segment         a segment in the input payload
          */
-        void AssignValuesExceptIsFromDst(position_t pPosition, position_t length, ConstRLEPayload::SegmentIterator& segmentIterator, ConstRLEPayload::SegmentWithLength const& segment)
+        void AssignValuesExceptIsFromDst(position_t pPosition,
+                                         position_t length,
+                                         ConstRLEPayload::SegmentIterator& segmentIterator,
+                                         ConstRLEPayload::SegmentWithLength const& segment)
         {
-            _pPosition = pPosition;
+            _self = segment;    // intentional slicing
+            _self.setPPosition(pPosition);
             _length = length;
-            _valueIndex = segment._valueIndex;
-            _same = segment._same;
-            _null = segment._null;
             _currSeg = segmentIterator.getCurrSeg();
         }
 
@@ -83,7 +123,9 @@ private:
          * @param[in] length          the 'global' length
          * @param[in] segmentIterator a segment iterator in the input payload
          */
-        void AssignValuesExceptIsFromDst(position_t pPosition, position_t length, ConstRLEPayload::SegmentIterator& segmentIterator)
+        void AssignValuesExceptIsFromDst(position_t pPosition,
+                                         position_t length,
+                                         ConstRLEPayload::SegmentIterator& segmentIterator)
         {
             ConstRLEPayload::SegmentWithLength segment;
             segmentIterator.getVirtualSegment(segment);
@@ -93,11 +135,11 @@ private:
 
     MemChunk& _dst;
     MemChunk const& _with;
-    shared_ptr<Query> _query;
+    std::shared_ptr<Query> _query;
     PinBuffer _pinBufferWith;    // The constructor of DeepChunkMerger will try to pin the source chunk; ok if cannot pin.
 
-    scoped_ptr<ConstRLEPayload> _payloadDst, _payloadWith;
-    scoped_ptr<ConstRLEEmptyBitmap> _bitmapDst, _bitmapWith;
+    std::unique_ptr<ConstRLEPayload> _payloadDst, _payloadWith;
+    std::unique_ptr<ConstRLEEmptyBitmap> _bitmapDst, _bitmapWith;
     std::vector<IntermediatePayloadSegment> _intermediatePayloadSegments;
     std::vector<ConstRLEEmptyBitmap::Segment> _intermediateBitmapSegments;
 
@@ -143,7 +185,7 @@ public:
      * @param with  source chunk
      * @param query the query object
      */
-    DeepChunkMerger(MemChunk& dst, MemChunk const& with, boost::shared_ptr<Query> const& query);
+    DeepChunkMerger(MemChunk& dst, MemChunk const& with, std::shared_ptr<Query> const& query);
 
     /**
      * Merge _with into _dst (parameters of the constructor).

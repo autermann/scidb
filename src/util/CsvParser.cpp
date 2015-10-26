@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014-2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,20 +28,43 @@
 // Module header always comes first.
 #include <util/CsvParser.h>
 
+#include <system/ErrorCodes.h>
+#include <system/Exceptions.h>
 #include <system/Utils.h>
 #include <util/Platform.h>
 
 #include <iostream>
 #include <stdint.h>
 #include <string.h>
+#include <sys/stat.h>
 
-#define LOG_WARNING(_x)                         \
-do {                                            \
-    if (_logger) {                              \
-        LOG4CXX_WARN(_logger, _x);              \
-    } else {                                    \
-        std::cerr << _x << std::endl;           \
-    }                                           \
+#define LOG_INFO(_x)                                    \
+do {                                                    \
+    if (_logger) {                                      \
+        LOG4CXX_INFO(_logger, _x);                      \
+    } else {                                            \
+        std::cerr << "INFO: " << _x << std::endl;       \
+    }                                                   \
+} while (0)
+
+#define LOG_WARNING(_x)                                 \
+do {                                                    \
+    if (_logger) {                                      \
+        LOG4CXX_WARN(_logger, _x);                      \
+    } else {                                            \
+        std::cerr << "WARN: " << _x << std::endl;       \
+    }                                                   \
+} while (0)
+
+#define CKRET(_expr, _cond)                                     \
+do {                                                            \
+    int _rc = _expr ;                                           \
+    if (!(_rc _cond)) {                                         \
+        LOG_WARNING("Call to " << #_expr << " returned " << _rc \
+                    << " (" << ::strerror(errno) << ") at "     \
+                    << __FILE__ << ":" << __LINE__);            \
+        SCIDB_ASSERT(_rc _cond); /* we know it will be false */ \
+    }                                                           \
 } while (0)
 
 using namespace std;
@@ -51,24 +74,24 @@ namespace scidb {
 CsvParser::CsvParser(FILE *fp)
     : _fp(fp)
     , _csverr(0)
-    , _delim('\0')
+    , _delim(',')
     , _quote('\0')
     , _lastField(START_OF_FILE, 0, 0, 0)
     , _inbuf(BUF_SIZE)
+    , _bufOffset(0)
     , _data(BUF_SIZE + ::getpagesize())
     , _datalen(0)
     , _numRecords(0)
     , _numFields(0)
     , _prevFields(SIZE_MAX)
     , _warnings(0)
-    , _fileOffset(0)
+    , _nread(0)
+    , _wantReset(false)
+    , _reparse(NULL)
 {
-    int rc = csv_init(&_parser, 0);
-    SCIDB_ASSERT(rc == 0);
+    CKRET(csv_init(&_parser, 0), == 0);
     csv_set_space_func(&_parser, spaceFunc);
-
-    // Empty _fields queue says: read more data!
-    SCIDB_ASSERT(_fields.empty());
+    SCIDB_ASSERT(_fields.empty()); // Empty _fields queue says: read more data!
 }
 
 CsvParser::~CsvParser()
@@ -121,6 +144,68 @@ CsvParser& CsvParser::setLogger(log4cxx::LoggerPtr logger)
     return *this;
 }
 
+void CsvParser::reset()
+{
+    LOG_INFO("Re-initializing CSV parser...");
+
+    // Re-initialize parser state.
+    int opts = csv_get_opts(&_parser);
+    if (!_quote) {
+        _quote = csv_get_quote(&_parser);
+    }
+    if (!_delim) {
+        _delim = csv_get_delim(&_parser);
+    }
+    csv_free(&_parser);
+    CKRET(csv_init(&_parser, 0), == 0);
+    csv_set_space_func(&_parser, spaceFunc);
+    csv_set_quote(&_parser, _quote);
+    csv_set_delim(&_parser, _delim);
+    csv_set_opts(&_parser, opts);
+
+    // Very simple-minded error recovery: scan forward, starting with
+    // last successfully parsed position in the _inbuf, to get beyond
+    // a newline.  Start re-parsing from there.  If we don't find a
+    // newline in the current buffer, keep reading.
+
+    if (_reparse == NULL) {
+        // _lastField.filepos is the *start* of the last parsed field.
+        off_t start = std::max(_bufOffset, _lastField.filepos);
+        _reparse = &_inbuf[std::min(size_t(start - _bufOffset), _nread)];
+    } else {
+        SCIDB_ASSERT(size_t(_reparse - &_inbuf[0]) <= _nread);
+    }
+
+    bool found = false;
+    do {
+        // Search (what's left of) current _inbuf for newline.
+        size_t len = _nread - (_reparse - &_inbuf[0]);
+        for (size_t i = 0; i < len; ++i) {
+            if (*_reparse++ == '\n') {
+                // Same EOR logic as in putRecord().
+                _numRecords += 1;
+                _fields.push_back(Field(END_OF_RECORD, _numRecords, _numFields,
+                                        _bufOffset + (_reparse - &_inbuf[0])));
+                _numFields = 0;
+                found = true;
+                break;
+            }
+        }
+        if (_reparse == &_inbuf[_nread]) {
+            // Found or not, if we're out of data, read more.
+            readNextBuffer();
+            _reparse = &_inbuf[0];
+        }
+    } while (_nread && !found);
+
+    if (!_nread && !found) {
+        _fields.push_back(Field(END_OF_FILE, _numRecords, _numFields, _bufOffset));
+        LOG_INFO("Hit EOF while restarting CSV parse at file offset " << _bufOffset);
+    } else {
+        LOG_INFO("Restarting CSV parse at file offset " << (_bufOffset + (_reparse - &_inbuf[0])));
+    }
+}
+
 int CsvParser::getField(char const*& field)
 {
     SCIDB_ASSERT(_fp != 0);
@@ -161,42 +246,131 @@ int CsvParser::getField(char const*& field)
     SCIDB_UNREACHABLE();
 }
 
+void CsvParser::readNextBuffer()
+{
+    // Read next input buffer.
+    _bufOffset += _nread;
+    _nread = ::fread(&_inbuf[0], 1, BUF_SIZE, _fp);
+    if (_nread == 0) {
+        if (::ferror(_fp)) {
+            int err = errno ? errno : EIO;
+            throw USER_EXCEPTION(SCIDB_SE_IO, SCIDB_LE_FILE_READ_ERROR)
+                << ::strerror(err);
+        }
+    }
+}
+
 int CsvParser::more()
 {
     SCIDB_ASSERT(_fields.empty()); // else why are we being called?
 
+    if (_wantReset) {
+        reset();
+        _wantReset = false;
+    }
+
     _datalen = 0;           // Start reusing the _data buffer.
 
-    // Read next input buffer.
-    size_t nread = ::fread(&_inbuf[0], 1, BUF_SIZE, _fp);
-    if (nread <= 0) {
-        // End of file, finish up.
+    // Remember our progress so far.
+    size_t savedRecords = _numRecords;
+    size_t savedFields = _numFields;
+
+    size_t nparse = 0;
+    bool error = false;
+    if (_reparse) {
+        // Using the buffer last seen by reset().
+        if (_nread == 0) {
+            // EOF encountered during reset.  Call to csv_fini() is
+            // probably useless since we just reset the parser, but we
+            // do it for form's sake.
+            csv_fini(&_parser, fieldCbk, recordCbk, this);
+            _fields.push_back(Field(END_OF_FILE, _numRecords, _numFields, _bufOffset + _nread));
+            return 0;
+        }
+
+        size_t len = _nread - (_reparse - &_inbuf[0]);
+        nparse = csv_parse(&_parser, _reparse, len, fieldCbk, recordCbk, this);
+        error = (nparse != len);
+
+    } else {
+        readNextBuffer();
+        if (_nread == 0) {
+            // End of file, finish up.
+            csv_fini(&_parser, fieldCbk, recordCbk, this);
+            _fields.push_back(Field(END_OF_FILE, _numRecords, _numFields, _bufOffset));
+            return 0;
+        }
+
+        // Guess at the quote character if none has been set.
+        if (!_quote) {
+            const char *cp = &_inbuf[0];
+            for (size_t i = 0; i < _nread; ++i, ++cp) {
+                if (*cp == '"' || *cp == '\'') {
+                    setQuote(*cp);
+                    break;
+                }
+            }
+            if (!_quote) {
+                // The save() operator emits single-quotes for backward
+                // compatibility, so for input we'll assume the same.
+                setQuote('\'');
+            }
+        }
+        SCIDB_ASSERT(_quote);
+
+        // ...and parse the buffer.
+        nparse = csv_parse(&_parser, &_inbuf[0], _nread, fieldCbk, recordCbk, this);
+        error = (nparse != _nread);
+    }
+
+    // Check for parse errors.  In theory this should only happen in
+    // "strict" mode.  Note we haven't cleared _reparse yet, so
+    // reset() knows that we're still chewing on the same buffer.
+    //
+    if (error) {
+        _wantReset = true;
+        int err = csv_error(&_parser);
+        throw USER_EXCEPTION(SCIDB_SE_IO, SCIDB_LE_CSV_PARSE_ERROR)
+            << (_bufOffset + nparse) << _numRecords << _numFields << csv_strerror(err);
+    }
+
+    // It's possible we're now at end-of-file.
+    if (::feof(_fp)) {
         csv_fini(&_parser, fieldCbk, recordCbk, this);
-        _fields.push_back(Field(END_OF_FILE, _numRecords, _numFields, _fileOffset));
+        _fields.push_back(Field(END_OF_FILE, _numRecords, _numFields, _bufOffset + _nread));
         return 0;
     }
 
-    // Parse the buffer.
-    size_t nparse =
-        csv_parse(&_parser, &_inbuf[0], nread, fieldCbk, recordCbk, this);
-    if (nparse != nread) {
-        _fileOffset += nread;
-        return csv_error(&_parser);
+    // We just read and parsed a fairly large buffer.  If we didn't
+    // make any progress, something is wrong---probably an unbalanced
+    // quote.  We need to report the error, rebuild the parser state,
+    // and move to a file offset that is likely beyond where the
+    // problem occurred.
+    //
+    if (_numRecords == savedRecords && _numFields == savedFields) {
+        LOG_WARNING("No progress after parsing " << nparse
+                    << " bytes, unbalanced quotes in CSV input?");
+        SCIDB_ASSERT(_fields.empty());
+        SCIDB_ASSERT(_lastField.filepos > -1);
+        _wantReset = true;
+        throw USER_EXCEPTION(SCIDB_SE_IO, SCIDB_LE_CSV_UNBALANCED_QUOTE)
+            << _numRecords;
     }
 
-    // Update _fileOffset *after* parsing is done, so that _fileOffset
-    // and _datalen can be used to approximate the actual file offset
-    // of a field.
-    _fileOffset += nread;
-
-    // If we had a good parse, we should have seen some fields.
+    // Not at EOF, so if we had a good parse and made progress, we
+    // should have some fields here.
     SCIDB_ASSERT(!_fields.empty());
+
+    // If we had to reparse a buffer after a reset, we can now safely
+    // declare that we are finished with that buffer load.
+    _reparse = NULL;
 
     return 0;
 }
 
 void CsvParser::fieldCbk(void* s, size_t n, void* state)
 {
+    assert(s);
     CsvParser* self = static_cast<CsvParser*>(state);
     self->putField(s, n);
 }
@@ -207,9 +381,36 @@ void CsvParser::putField(void* s, size_t n)
     if ((_datalen + n + 1) >= _data.size()) {
         _data.resize(_data.size() + ::getpagesize());
     }
-    _fields.push_back(Field(_datalen, _numRecords, _numFields, _fileOffset + _datalen));
-    ::memcpy(&_data[_datalen], s, n);
-    _datalen += n;
+    _fields.push_back(Field(_datalen, _numRecords, _numFields, _bufOffset + _datalen));
+
+    // Un-escape quotes and backslashes on the way in, or we'll never get rid of
+    // \\\\\'em.  Libcsv turns "foo""bar" into foo"bar but does not
+    // assist with foo\"bar.  @see Value::Formatter::quoteCstr
+    const char* src = reinterpret_cast<const char*>(s);
+    const char* end = src + n;
+    char *dst = &_data[_datalen];
+    size_t dlen = 0;
+    for (size_t i = 0; i < n; ++i) {
+        assert(*src);
+        char ch = *src++;
+        if (ch == '\\' && (src < end)) {
+            if (*src == _quote) {
+                *dst++ = _quote;
+                ++src, ++i;
+            } else if (*src == '\\') {
+                *dst++ = '\\';
+                ++src, ++i;
+            } else {
+                // Some backslash not injected by quoteCstr.
+                *dst++ = '\\';
+            }
+        } else {
+            *dst++ = ch;
+        }
+        ++dlen;
+    }
+
+    _datalen += dlen;
     _data[_datalen++] = '\0';
 }
 
@@ -229,7 +430,7 @@ void CsvParser::putRecord(int endChar)
                     << ") is missing a newline.");
     }
 
-    _fields.push_back(Field(END_OF_RECORD, _numRecords, _numFields, _fileOffset + _datalen));
+    _fields.push_back(Field(END_OF_RECORD, _numRecords, _numFields, _bufOffset + _datalen));
     size_t fieldCount = _numFields;
     _numFields = 0;
 

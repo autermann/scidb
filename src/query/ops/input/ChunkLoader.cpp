@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -60,7 +60,8 @@ ChunkLoader* ChunkLoader::create(string const& format)
     else if (!compareStringsIgnoreCase(baseFmt, "opaque")) {
         ret = new OpaqueChunkLoader();
     }
-    else if (!compareStringsIgnoreCase(baseFmt, "text")) {
+    else if (!compareStringsIgnoreCase(baseFmt, "text") ||
+             !compareStringsIgnoreCase(baseFmt, "store")) {
         ret = new TextChunkLoader();
     }
     else if (!compareStringsIgnoreCase(baseFmt, "tsv")) {
@@ -169,7 +170,7 @@ ArrayDesc const& ChunkLoader::schema() const
 
 /// Validate and return the query pointer.
 /// @return shared_ptr to valid Query object
-boost::shared_ptr<Query> ChunkLoader::query()
+std::shared_ptr<Query> ChunkLoader::query()
 {
     SCIDB_ASSERT(_inArray);
     return Query::getValidQueryPtr(_inArray->_query);
@@ -184,11 +185,11 @@ bool ChunkLoader::isParallelLoad() const
 // This sort of activity would ordinarily happen in the constructor,
 // but I prefer to delay it so that an attempt to construct a
 // ChunkLoader for format "foo" can be used to determine that "foo" is
-// a supported format, even when no @c InputArray* or @c boost::shared_ptr<Query> is
+// a supported format, even when no @c InputArray* or @c std::shared_ptr<Query> is
 // present.  Otherwise the check for is-supported has to be coded in
 // two places, which grosses me out.
 //
-void ChunkLoader::bind(InputArray* parent, boost::shared_ptr<Query>& query)
+void ChunkLoader::bind(InputArray* parent, std::shared_ptr<Query>& query)
 {
     _inArray = parent;
     _enforceDataIntegrity = parent->_enforceDataIntegrity;
@@ -261,12 +262,22 @@ void ChunkLoader::nextImplicitChunkPosition(WhoseChunk whose)
         if (whose == MY_CHUNK) {
             // Keep bumping the _chunkPos until it points at one of *my* chunks.
             if (_chunkPos[i] <= dims[i].getEndMax()) {
-                if (!isParallelLoad()
-                    || schema().getHashedChunkNumber(_chunkPos) % numInstances() == myInstance())
+                if (!isParallelLoad())
                 {
                     // _chunkPos points at one of my chunks.
                     break;
                 }
+                if (schema().getPartitioningSchema() == psUndefined) {
+		  // the array descriptor does not specify a preferred distribution,
+		  // will use the default one
+		  array()->adjustArrayDistributionForParallelMode(defaultPartitioning());
+                }
+                if (schema().getPrimaryInstanceId(_chunkPos, numInstances()) == myInstance())
+                {
+                    // _chunkPos points at one of my chunks.
+                    break;
+                }
+
             } else {
                 // Stepped beyond end of dimension, start considering chunks at the start of the
                 // next dimension...
@@ -347,25 +358,31 @@ static void compareArrayMetadata(ArrayDesc const& a1, ArrayDesc const& a2)
     size_t nDims = dims1.size();
     size_t nAttrs = attrs1.size();
     if (nDims != dims2.size()) {
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+        << "Dimensions do not match";
     }
     if (nAttrs != attrs2.size()) {
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+        << "Attributes do not match";
     }
     for (size_t i = 0; i < nDims; i++) {
         if (dims1[i].getChunkInterval() != dims2[i].getChunkInterval()) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+            << "Dimension intervals do not match";
         }
         if (dims1[i].getChunkOverlap() != dims2[i].getChunkOverlap()) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+            << "Dimension overlaps do not match";
         }
     }
     for (size_t i = 0; i < nAttrs; i++) {
         if (attrs1[i].getType() != attrs2[i].getType()) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+            << "Attribute types do not match";
         }
         if (attrs1[i].getFlags() != attrs2[i].getFlags()) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+            << "Attribute flags do not match";
         }
     }
 }
@@ -375,7 +392,7 @@ static void compareArrayMetadata(ArrayDesc const& a1, ArrayDesc const& a2)
 // saved by SciDB, so elaborate error reporting via shadow array isn't
 // needed.
 //
-bool OpaqueChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkIndex)
+bool OpaqueChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 {
     Dimensions const& dims = schema().getDimensions();
     Attributes const& attrs = schema().getAttributes();
@@ -411,14 +428,15 @@ bool OpaqueChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkI
             stringstream ss;
             ss << arrayDescStr;
             ArrayDesc opaqueDesc;
-            archive::text_iarchive ia(ss);
+            boost::archive::text_iarchive ia(ss);
             ia & opaqueDesc;
             compareArrayMetadata(schema(), opaqueDesc);
             i -= 1; // compencate increment in for: repeat loop and try to load more mapping arrays
             continue;
         }
         if (hdr.signature != _signature) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT);
+            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
+            << "Chunk array metadata mismatch";
         }
         if (hdr.nDims != nDims) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_WRONG_NUMBER_OF_DIMENSIONS);
@@ -471,15 +489,20 @@ void BinaryChunkLoader::bindHook()
     _binVal.resize(attrs.size());
 }
 
-bool BinaryChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkIndex)
+/**
+ * Read binary data based on a template.
+ * @see ArrayWriter
+ * @see saveUsingTemplate()
+ */
+bool BinaryChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 {
     // It would be nice to SCIDB_ASSERT(_fileOffset == ::ftell(fp())) in a
-    // few places, but use of ungetc(3) makes that infeasible.
+    // few places, but use of FIFOs for input makes that infeasible.
 
     Attributes const& attrs = schema().getAttributes();
     size_t nAttrs = attrs.size();
 
-    vector< boost::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
+    vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
     Value emptyTagVal;
     emptyTagVal.setBool(true);
 
@@ -533,7 +556,7 @@ bool BinaryChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkI
                 if (buf.size() < size) {
                     buf.resize(size * 2);
                 }
-                if (fread(&buf[0], size, 1, fp()) != 1) {
+                if (size && fread(&buf[0], size, 1, fp()) != 1) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
                 }
                 _fileOffset += size;
@@ -624,7 +647,7 @@ void TextChunkLoader::openHook()
     _scanner.open(fp(), query());
 }
 
-bool TextChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkIndex)
+bool TextChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 {
     SCIDB_ASSERT(_where != W_EndOfStream);
 
@@ -632,7 +655,7 @@ bool TextChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInd
     Attributes const& attrs = schema().getAttributes();
     size_t nAttrs = attrs.size();
     size_t nDims = dims.size();
-    vector< boost::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
+    vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
     Value tmpVal;
 
     bool isSparse = false;
@@ -661,8 +684,6 @@ BeginScanChunk:
                     if ((_chunkPos[i] - dims[i].getStartMin()) % dims[i].getChunkInterval() != 0)
                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR4);
                 }
-
-                enforceChunkOrder("text loader 1");
 
                 if (_scanner.get() != TKN_COORD_END)
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR2) << "}";
@@ -942,7 +963,7 @@ void TsvChunkLoader::bindHook()
     }
 }
 
-bool TsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkIndex)
+bool TsvChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 {
     // Must do EOF check *before* nextImplicitChunkPosition() call, or
     // we risk stepping out of bounds.
@@ -959,7 +980,7 @@ bool TsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
     // Initialize a chunk and chunk iterator for each attribute.
     Attributes const& attrs = schema().getAttributes();
     size_t nAttrs = attrs.size();
-    vector< boost::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
+    vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
     for (size_t i = 0; i < nAttrs; i++) {
         Address addr(i, _chunkPos);
         MemChunk& chunk = getLookaheadChunk(i, chunkIndex);
@@ -1021,14 +1042,16 @@ bool TsvChunkLoader::loadChunk(boost::shared_ptr<Query>& query, size_t chunkInde
                 }
                 SCIDB_ASSERT(field);
 
-                if (mightBeNull(field) && attrs[i].isNullable()) {
-                    int8_t missingReason = parseNullField(field);
-                    if (missingReason >= 0) {
+                int8_t missingReason = parseNullField(field);
+                if (missingReason >= 0) {
+                    if (attrs[i].isNullable()) {
                         attrVal(i).setNull(missingReason);
                         chunkIterators[i]->writeItem(attrVal(i));
                         ++(*chunkIterators[i]);
                         _column += 1;
                         continue;
+                    } else {
+                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
                     }
                 }
                 if (converter(i)) {

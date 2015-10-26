@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -21,7 +21,7 @@
 */
 
 // defacto std
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/numeric/conversion/cast.hpp>
 #include <log4cxx/logger.h>
 
@@ -71,8 +71,8 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_line
 
 void mpiCopyMaster(//general args
                 Query* query,
-                boost::shared_ptr<MpiOperatorContext>& ctx,
-                boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
+                std::shared_ptr<MpiOperatorContext>& ctx,
+                std::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                 const string& ipcName, // can this be in the ctx too?
                 void * argsBuf,
                 const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
@@ -114,7 +114,7 @@ void mpiCopyMaster(//general args
     cmd.setCmd(string("DLAOP")); // dummy command
     cmd.addArg(ipcName);
     cmd.addArg("3"); // 3 buffers: ARGS + IN, OUT arrays
-    cmd.addArg("mpicopy");
+    cmd.addArg("_mpicopy");
     slave->sendCommand(cmd, ctx);       // at this point the command and ipcName are sent
                                         // our slave finds and maps the buffers by name
                                         // based on ipcName

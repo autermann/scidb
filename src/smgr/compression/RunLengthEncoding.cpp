@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,8 +38,8 @@
 
 namespace scidb
 {
-    
-    size_t RunLengthEncoding::compress(void* dst, const ConstChunk& chunk, size_t chunkSize) 
+
+    size_t RunLengthEncoding::compress(void* dst, const ConstChunk& chunk, size_t chunkSize)
     {
         return chunkSize;
     }
@@ -48,7 +48,7 @@ namespace scidb
   {
 
     size_t chunkSize = chunk.getSize();
-    TypeId type = chunk.getAttributeDesc().getType();        
+    TypeId type = chunk.getAttributeDesc().getType();
     size_t elementSize = TypeLibrary::getType(type).byteSize();
     size_t nElems;
 
@@ -73,7 +73,7 @@ namespace scidb
       }
 
     boost::scoped_array<char> runValueArr(new char[elementSize]);
-    char *runValue = runValueArr.get(); 
+    char *runValue = runValueArr.get();
 
     // iterate over the runs
     for(i = 0; i < runs; ++i)
@@ -85,7 +85,7 @@ namespace scidb
 
 	if(outputLength + runLength * elementSize <= chunkSize)
 	  {
-	    
+
 	    for(j = 0; j < runLength; ++j)
 	      {
 		memcpy(dstPos, runValue, elementSize);

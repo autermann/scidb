@@ -10,6 +10,9 @@ Query was executed successfully
 SCIDB QUERY : <create array CString <name:string> [x=1:*,100000,0,y=1:*,100000,0,z=1:*,100000,0]>
 Query was executed successfully
 
+SCIDB QUERY : <create array CString4 <name1:string,name2:string,name3:string,name4:string> [x=1:*,100000,0,y=1:*,100000,0,z=1:*,100000,0]>
+Query was executed successfully
+
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(C, '${TEST_DATA_DIR}/bsp1.txt')">
 {x,y,z} num
 {1,1,1} 15.2
@@ -18,9 +21,6 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(C, '${TEST_DATA_
 
 SCIDB QUERY : <save C into current instance 'Csparse1.bin' as '(double)'>
 {x,y,z} num
-{1,1,1} 15.2
-{100000,100000,1000000} inf
-{100000000,500000,10000000} nan
 
 SCIDB QUERY : <load C1 from current instance 'Csparse1.bin' as '(double)'>
 {x,y,z} num
@@ -70,6 +70,9 @@ SCIDB QUERY : <select * from show(Z)>
 
 SCIDB QUERY : <save Z into current instance 'Zsparse1.bcp' as '(double,double)'>
 {x,y,z} num,num_2
+
+SCIDB QUERY : <load Z from current instance 'Zsparse1.bcp' as '(double,double)'>
+{x,y,z} num,num_2
 {1,1,1} 15.2,15.2
 {1,1,2} inf,inf
 {1,1,3} nan,nan
@@ -92,23 +95,26 @@ SCIDB QUERY : <select * from show(ZxZ)>
 
 SCIDB QUERY : <save ZxZ into current instance 'ZxZsparse1.bcp' as '(double,double,double,double)'>
 {x,y,z} num,num_2,num_3,num_2_2
+
+SCIDB QUERY : <load ZxZ from current instance 'ZxZsparse1.bcp' as '(double,double,double,double)'>
+{x,y,z} num,num_2,num_3,num_2_2
 {1,1,1} 15.2,15.2,15.2,15.2
 {1,1,2} inf,inf,inf,inf
 {1,1,3} nan,nan,nan,nan
 
-SCIDB QUERY : <load Z from current instance 'ZxZsparse1.bcp' as '(double,double,dummy(8),dummy(8))'>
+SCIDB QUERY : <load Z from current instance 'ZxZsparse1.bcp' as '(double,double,skip(8),skip(8))'>
 {x,y,z} num,num_2
 {1,1,1} 15.2,15.2
 {1,1,2} inf,inf
 {1,1,3} nan,nan
 
-SCIDB QUERY : <load Z from current instance 'ZxZsparse1.bcp' as '(double,dummy(8),double,dummy(8))'>
+SCIDB QUERY : <load Z from current instance 'ZxZsparse1.bcp' as '(double,skip(8),double,skip(8))'>
 {x,y,z} num,num_2
 {1,1,1} 15.2,15.2
 {1,1,2} inf,inf
 {1,1,3} nan,nan
 
-SCIDB QUERY : <load C1 from current instance 'ZxZsparse1.bcp' as '(dummy(8),dummy(8),double,dummy(8))'>
+SCIDB QUERY : <load C1 from current instance 'ZxZsparse1.bcp' as '(skip(8),skip(8),double,skip(8))'>
 {x,y,z} num
 {1,1,1} 15.2
 {1,1,2} inf
@@ -116,18 +122,21 @@ SCIDB QUERY : <load C1 from current instance 'ZxZsparse1.bcp' as '(dummy(8),dumm
 
 SCIDB QUERY : <save ZxZ into current instance 'ZxZsparse2.bcp' as '(string,string,string,string)'>
 {x,y,z} num,num_2,num_3,num_2_2
-{1,1,1} 15.2,15.2,15.2,15.2
-{1,1,2} inf,inf,inf,inf
-{1,1,3} nan,nan,nan,nan
 
-SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(dummy(8),dummy(8),dummy(8),string)'>
-[An error expected at this place for the query "load CString from current instance 'ZxZsparse2.bcp' as '(dummy(8),dummy(8),dummy(8),string)'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+SCIDB QUERY : <load CString4 from current instance 'ZxZsparse2.bcp' as '(string,string,string,string)'>
+{x,y,z} name1,name2,name3,name4
+{1,1,1} '15.2','15.2','15.2','15.2'
+{1,1,2} 'inf','inf','inf','inf'
+{1,1,3} 'nan','nan','nan','nan'
 
-SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(dummy(8),dummy(8),dummy(8),string)' errors 100>
+SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(skip(8),skip(8),skip(8),string)'>
+[An error expected at this place for the query "load CString from current instance 'ZxZsparse2.bcp' as '(skip(8),skip(8),skip(8),string)'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+
+SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(skip(8),skip(8),skip(8),string)' errors 100>
 {x,y,z} name
 {1,1,1} ''
 
-SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(dummy,dummy,dummy,string)'>
+SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(skip,skip,skip,string)'>
 {x,y,z} name
 {1,1,1} '15.2'
 {1,1,2} 'inf'
@@ -144,9 +153,6 @@ SCIDB QUERY : <save C into current instance 'Csparse3.txt' as '(text)'>
 
 SCIDB QUERY : < save C into current instance 'Csparse3.txt' as 'text'>
 {x,y,z} num
-{1,1,1} 15.2
-{100000,100000,1000000} inf
-{100000000,500000,10000000} nan
 
 SCIDB QUERY : <remove(C)>
 Query was executed successfully
@@ -164,5 +170,8 @@ SCIDB QUERY : <remove(ZxZ)>
 Query was executed successfully
 
 SCIDB QUERY : <remove(CString)>
+Query was executed successfully
+
+SCIDB QUERY : <remove(CString4)>
 Query was executed successfully
 

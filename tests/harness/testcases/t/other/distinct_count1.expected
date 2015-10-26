@@ -156,47 +156,47 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A7,'${TEST_DATA_
 {3,3} '(82/5)'
 
 SCIDB QUERY : <aggregate(A1, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A2, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 9
 
 SCIDB QUERY : <aggregate(A3, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A4, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A5, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 16
 
 SCIDB QUERY : <aggregate(A6, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <aggregate(A7, ApproxDC(val1))>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 15
 
 SCIDB QUERY : <select ApproxDC(A1)>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <select ApproxDC(A3)>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 7
 
 SCIDB QUERY : <select ApproxDC(A5)>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 16
 
 SCIDB QUERY : <select ApproxDC(A7)>
-{i} val1_ApproxDC
+{i} val1_approxdc
 {0} 15
 
 SCIDB QUERY : <select ApproxDC(val1) from A1>

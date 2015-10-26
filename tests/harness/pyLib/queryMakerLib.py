@@ -1,8 +1,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,7 @@ class defaultBuildQuery(object):
             'i': i,
             'n': n
             }
-        
+
     def schema(self,**kwargs):
         # Validate keyword arguments:
         if (not (all([x in self.__kwargs.keys() for x in kwargs.keys()]))):
@@ -48,7 +48,7 @@ class defaultBuildQuery(object):
             return ''
         kw = self.__kwargs.copy()
         kw.update(kwargs)
-        
+
         attrNames = kw['a']
         attrTypes = kw['t']
         dims = kw['d']
@@ -56,51 +56,51 @@ class defaultBuildQuery(object):
         chunks = kw['c']
         overlaps = kw['o']
         nullable = kw['n']
-        
+
         schemaStatement = '<attrs>[dims]'
-        
+
         if (len(attrNames) > len(attrTypes)):
             attrTypes.extend([attrTypes[-1] for i in range(len(attrNames) - len(attrTypes))])
-            
+
         if (len(dims) > len(ranges)):
             ranges.extend([ranges[-1] for i in range(len(dims) - len(ranges))])
-            
+
         if (len(dims) > len(chunks)):
             chunks.extend([chunks[-1] for i in range(len(dims) - len(chunks))])
-            
+
         if (len(dims) > len(overlaps)):
             overlaps.extend([overlaps[-1] for i in range(len(dims) - len(overlaps))])
-        
+
         attrList = [x[0] + ':' + x[1] + ',' for x in zip(attrNames,attrTypes)]
         attrList[-1] = attrList[-1][:-1]
-        
+
         if (nullable):
             attrList.append(' null')
-        
+
         dimList = [
             x[0] + '=' + str(x[1][0]) + ':' + str(x[1][1]) + ',' + str(x[2]) + ',' + str(x[3]) + ',' for x in zip(dims,ranges,chunks,overlaps)
             ]
         dimList[-1] = dimList[-1][:-1]
-        
+
         schemaStatement = schemaStatement.replace('attrs',''.join(attrList))
         schemaStatement = schemaStatement.replace('dims',''.join(dimList))
-        
+
         return schemaStatement
-        
+
     def build(self,**kwargs):
         buildStatement = 'build(schema,init)'
         sch = self.schema(**kwargs)
-        
+
         kw = self.__kwargs.copy()
         kw.update(kwargs)
-        
+
         init = kw['i']
-        
+
         buildStatement = buildStatement.replace('schema',sch)
         buildStatement = buildStatement.replace('init',str(init))
-        
+
         return buildStatement
-'''        
+'''
 if __name__ == '__main__':
     dbq = defaultBuildQuery()
     print dbq.schema()

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -62,7 +62,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.impl_fits
 
 /* FITSInputArray */
 
-FITSInputArray::FITSInputArray(ArrayDesc const& array, string const& filePath, uint32_t hdu, boost::shared_ptr<Query>& query)
+FITSInputArray::FITSInputArray(ArrayDesc const& array, string const& filePath, uint32_t hdu, std::shared_ptr<Query>& query)
     : parser(filePath),
       hdu(hdu),
       desc(array),
@@ -103,9 +103,9 @@ ArrayDesc const& FITSInputArray::getArrayDesc() const
     return desc;
 }
 
-boost::shared_ptr<ConstArrayIterator> FITSInputArray::getConstIterator(AttributeID attr) const
+std::shared_ptr<ConstArrayIterator> FITSInputArray::getConstIterator(AttributeID attr) const
 {
-    return boost::shared_ptr<ConstArrayIterator>(new FITSInputArrayIterator(*(FITSInputArray*) this, attr));
+    return std::shared_ptr<ConstArrayIterator>(new FITSInputArrayIterator(*(FITSInputArray*) this, attr));
 }
 
 ConstChunk* FITSInputArray::getChunkByIndex(size_t index, AttributeID attr)
@@ -246,7 +246,7 @@ void FITSInputArray::calculateLength()
  */
 void FITSInputArray::readChunk()
 {
-    boost::shared_ptr<Query> queryLock(Query::getValidQueryPtr(query));
+    std::shared_ptr<Query> queryLock(Query::getValidQueryPtr(query));
 
     initMemChunks(queryLock);
 
@@ -303,7 +303,7 @@ void FITSInputArray::readChunk()
 /**
  * Initialize chunks and iterators.
  */
-void FITSInputArray::initMemChunks(boost::shared_ptr<Query>& query)
+void FITSInputArray::initMemChunks(std::shared_ptr<Query>& query)
 {
     for (size_t i = 0; i < nAttrs; i++) {
         Address addr(i, chunkPos);

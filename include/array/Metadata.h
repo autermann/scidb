@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -125,7 +125,7 @@ const std::string DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME = "EmptyTag";
  *   - Add to enum PartitioningSchema (right above psMax).
  *   - Modify the doxygen comments in LogicalSG.cpp.
  *   - Modify redistribute() to handle the new partitioning schema.
- *   - Modify std::ostream& operator<<(std::ostream& stream, const ArrayDistribution& dist). (See Operator.cpp)
+ *   - Modify std::ostream& operator<<(std::ostream& stream, const RedistributeContext& dist). (See Operator.cpp)
  *   - If the partitioning schema uses extra data:
  *   -    Modify doesPartitioningSchemaHaveOptionalData.
  *   -    Derive a class from PartitioningSchemaData.
@@ -133,33 +133,79 @@ const std::string DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME = "EmptyTag";
  */
 enum PartitioningSchema
 {
-    psReplication = 0,
+    psUninitialized = -1, // e.g. _ps after ArrayDesc::ArrayDesc()
+    psMIN = 0,
+    psReplication = psMIN,
     psHashPartitioned,
     psLocalInstance,
     psByRow,
     psByCol,
-    psUndefined,
+    psUndefined,        // a range of meanings, including sometimes "wildcard"
+                        // TODO: replace with psWildcard and others as required
     psGroupby,
     psScaLAPACK,
-
     // A newly introduced partitioning schema should be added before this line.
-    psMAX
+    psEND
 };
+
+/**
+ * defaultPartitioning
+ *
+ * Most of the code was assuming that arrays are scanned and stored in
+ * psHashPartitioned Partitioning (currently a category of ArrayDistribution).
+ * Therefore there were many "psHashPartitioned" scatter about the code that
+ * logically mean "whatever the default PartitioningSchema is".  We are moving on
+ * a path toward generalizing what distributions can be stored.  The first attempt
+ * will be to extend tempArrays to psReplication, psByRow, and psByCol.  When that
+ * is working we will enable it for dbArrays.  Later we will move on to distributions
+ * which require additional parameterizations to be stored, such as the 2D
+ * ScaLAPACK.
+ *
+ * As scaffolding for that effort, we are making the "default" PartitioningSchema
+ * configurable.  This will allow us to (1) experiment with performance of alternate
+ * distributions for certain workflows and (2) start fixing the query compiler/optimizer
+ * to insert SGs without assuming that psHashPartitioned is the universal goal.
+ *
+ * Then we can add a create array parameterization for particular distributions
+ * and drive the query tree's output toward that. (e.g. right now, for iterated spgemm,
+ * psByRow and psByCol are far more efficient than psHashed)
+ *
+ * Once this is working for TEMP arrays, we can allow it for general arrays
+ *
+ * Once this all works correctly via create statements, we will no longer be managing
+ * "ps" outside of ArrayDesc's and ArrayDistributions, this function should no longer be referenced
+ * and this scaffolding removed.
+ */
+inline PartitioningSchema defaultPartitioning()
+{
+    // you MAY NOT change this from psHashPartitioned at this time
+    // this is scaffolding code that is locating all the places where
+    // psHashPartitioned is assumed which need to be generalized.
+    // there are further changes in the optimizer that must be planned first
+    // and then we can decide which PartitioningSchema variable is the
+    // definitive one.  Until then, the code will read "defaultParitioning()"
+    // and the reader should think "psHashPartitioned"
+
+    return psHashPartitioned;
+
+}
 
 /**
  * Whether a partitioning schema has optional data.
  */
 inline bool doesPartitioningSchemaHaveData(PartitioningSchema ps)
 {
-    return ps==psGroupby || ps==psScaLAPACK;
+    return ps==psGroupby || ps==psScaLAPACK; // TODO: || ps==psLocalInstance ?
 }
 
 /**
  * Whether an uint32_t is a valid partitioning schema.
+ *
  */
-inline bool isValidPartitioningSchema(uint32_t ps, bool allowOptionalData=true)
+inline bool isValidPartitioningSchema(PartitioningSchema ps, bool allowOptionalData=true)
 {
-    if (ps >= (uint32_t)psMAX)
+    bool isLegalRange = ((psMIN <= ps) && (ps < psEND));
+    if (!isLegalRange)
     {
         return false;
     }
@@ -435,10 +481,11 @@ public:
      * @param name array name
      * @param attributes vector of attributes
      * @param dimensions vector of dimensions
+     * @param ps partitioning schema of this array
      * @param flags array flags from ArrayDesc::ArrayFlags
      */
     ArrayDesc(const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
-              int32_t flags = 0);
+              PartitioningSchema ps, int32_t flags = 0);
 
     /**
      * Construct full descriptor (for returning metadata from catalog)
@@ -449,11 +496,12 @@ public:
      * @param name array name
      * @param attributes vector of attributes
      * @param dimensions vector of dimensions
+     * @param ps partitioning schema of this array
      * @param flags array flags from ArrayDesc::ArrayFlags
-     * @param documentation comment
      */
-    ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId, const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
-              int32_t flags = 0);
+    ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
+              const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
+              PartitioningSchema ps, int32_t flags = 0);
 
     /**
      * Copy constructor
@@ -601,24 +649,6 @@ public:
     uint64_t getSize() const;
 
     /**
-     * Get actual array size (number of elements within actual boundaries)
-     * @return array size
-     */
-    uint64_t getCurrSize() const;
-
-    /**
-     * Get array size in bytes (works only for arrays with fixed size dimensions and fixed size types)
-     * @return array size in bytes
-     */
-    uint64_t getUsedSpace() const;
-
-    /**
-     * Get number of chunks in array
-     * @return number of chunks in array
-     */
-    uint64_t getNumberOfChunks() const;
-
-    /**
      * Get bitmap attribute used to mark empty cells
      * @return descriptor of the empty indicator attribute or NULL is array is regular
      */
@@ -636,12 +666,34 @@ public:
         return excludeEmptyBitmap ? _attributesWithoutBitmap : _attributes;
     }
 
+    /** Set vector of array attributes */
+    ArrayDesc& setAttributes(Attributes const& attributes)
+    {
+        _attributes = attributes;
+        locateBitmapAttribute();
+        return *this;
+    }
+
     /**
      * Get vector of array dimensions
      * @return array dimensions
      */
     Dimensions const& getDimensions() const {return _dimensions;}
     Dimensions&       getDimensions()       {return _dimensions;}
+    /**
+     * Get the current low boundary of an array
+     * @note This is NOT reliable.
+     *       The only time the value can be trusted is when the array schema is returned by scan().
+     *       As soon as we add other ops into the mix (e.g. filter(scan()), the value is not trustworthy anymore.
+     */
+    Coordinates getLowBoundary() const ;
+    /**
+     * Get the current high boundary of an array
+     * @note This is NOT reliable.
+     *       The only time the value can be trusted is when the array schema is returned by scan().
+     *       As soon as we add other ops into the mix (e.g. filter(scan()), the value is not trustworthy anymore.
+     */
+    Coordinates getHighBoundary() const ;
 
     /** Set vector of array dimensions */
     ArrayDesc& setDimensions(Dimensions const& dims)
@@ -693,11 +745,21 @@ public:
                             Coordinates& lowerBound,
                             Coordinates& upperBound) const;
    /**
-     * Get hashed position of the chunk for the given coordinates
-     * @param pos in: element position
-     * @param box in: bounding box for offset distributions
+     * Get assigned instance for chunk for the given coordinates.
+     * This function is unaware of the current query liveness; therefore,
+     * the returned instance may not be identified by the same logical instanceID in the current query.
+     * To get the corresponding logical instance ID use @see Query::mapPhysicalToLogical()
+     * @param pos chunk position
+     * @param originalInstanceCount query->getNumInstances() from the creating/storing query
+     *        this was not saved in the ArrayDesc, so it is supplied from without
+     *        at this time.  [For a more precise rules of whether this value changes on
+     *        a per-version basis or not, one must investigate how the storage manager
+     *        currently persists this value.]
+     *
+     * TODO: consider a design where the original instance count is managed alongside _ps
+     *       to alleviate a potential source of errors that happen only during failover
      */
-    uint64_t getHashedChunkNumber(Coordinates const& pos) const;
+    InstanceID getPrimaryInstanceId(Coordinates const& pos, size_t instanceCount) const;
 
     /**
      * Get flags associated with array
@@ -759,6 +821,7 @@ public:
      */
     PartitioningSchema getPartitioningSchema() const
     {
+        assert(isPermitted(_ps)); // prevent psUninitialized from leaking
         return _ps;
     }
 
@@ -767,6 +830,7 @@ public:
      */
     void setPartitioningSchema(PartitioningSchema ps)
     {
+        assert(isPermitted(ps)); // prevent psUninitialized from leaking
        _ps = ps;
     }
 
@@ -776,6 +840,12 @@ public:
      * @param alias alias name
      */
     void addAlias(const std::string &alias);
+
+    /**
+     * @return a string representation of the ArrayDescriptor
+     * including the attributes, dimensions, array IDs and version, flags, and the PartitioningSchema
+     */
+    std::string toString () const;
 
     template<class Archive>
     void serialize(Archive& ar,unsigned version)
@@ -787,7 +857,7 @@ public:
         ar & _attributes;
         ar & _dimensions;
         ar & _flags;
-        //XXX tigor TODO: add _ps as well
+        ar & _ps;
 
         if (Archive::is_loading::value)
         {
@@ -805,12 +875,146 @@ public:
 
     void addAttribute(AttributeDesc const& newAttribute);
 
-    double getNumChunksAlongDimension(size_t dimension, Coordinate start = MAX_COORDINATE, Coordinate end = MIN_COORDINATE) const;
+    double getNumChunksAlongDimension(size_t dimension,
+                                      Coordinate start = CoordinateBounds::getMax(),
+                                      Coordinate end = CoordinateBounds::getMin()) const;
+
+    /**
+     * Check if two array descriptors are conformant, i.e. if srcDesc one can be "stored" into dstDesc.
+     * It checks the number and types of the attributes, the number of dimensions, partitioning schema, flags.
+     * @throws scidb::SystemException with SCIDB_LE_ARRAYS_NOT_CONFORMANT or a more precise error code
+     * @param srcDesc source array schema
+     * @param dstDesc target array schema
+     * @param options bit mask of options to toggle certain conformity checks
+     * @param ignorePs wether to ignore the PartitioningSchema; true by default
+     */
+    static void checkConformity(ArrayDesc const& srcDesc, ArrayDesc const& dstDesc, unsigned options = 0);
+
+    /** Option flags for use with checkConformity() */
+    enum ConformityOptions {
+        IGNORE_PSCHEME  = 0x01, /**< Partitioning schemes need not match */
+        IGNORE_OVERLAP  = 0x02, /**< Chunk overlaps need not match */
+        IGNORE_INTERVAL = 0x04, /**< Chunk intervals need not match */
+        SHORT_OK_IF_EBM = 0x08  /**< Src dim can be shorter if src array has empty bitmap */
+    };
+
+    /**
+     *  @brief      A union of the various possible schema filter attributes.
+     *
+     *  @details    Modelled after the Arena Options class, class
+     *              SchemaFieldSelector provides a sort of union of the
+     *              many parameters with which an schema can be filtered.
+     *              It uses the 'named parameter idiom' to enable these
+     *              options to be supplied by name in any convenient
+     *              order. For example:
+     *
+     *  @code
+     *              sameSchema(
+     *                  schmaInstance,
+     *                  SchemaFieldSelector()
+     *                      .startMin(true)
+     *                      .endMax(true));
+     *  @endcode
+     *
+     *  @see        http://www.parashift.com/c++-faq/named-parameter-idiom.html for
+     *              a description of the 'named parameter idiom'.
+     *
+     *  @author     mcorbett@paradigm4.com.
+     */
+
+    class SchemaFieldSelector
+    {
+    public:
+
+        // Construction
+        SchemaFieldSelector()
+            : _startMin(false)
+            , _endMax(false)
+            , _chunkInterval(false)
+            , _chunkOverlap(false)
+        {
+
+        }
+
+        // Attributes
+        bool startMin()       const { return _startMin;      }
+        bool endMax()         const { return _endMax;        }
+        bool chunkInterval()  const { return _chunkInterval; }
+        bool chunkOverlap()   const { return _chunkOverlap;  }
+
+        // Operations
+        SchemaFieldSelector & startMin(bool b)      { _startMin=b;       return *this; }
+        SchemaFieldSelector & endMax(bool b)        { _endMax=b;         return *this; }
+        SchemaFieldSelector & chunkInterval(bool b) { _chunkInterval=b;  return *this; }
+        SchemaFieldSelector & chunkOverlap(bool b)  { _chunkOverlap=b;   return *this; }
+
+    private:
+        // Representation
+        unsigned  _startMin      : 1;  // true = startMin selected
+        unsigned  _endMax        : 1;  // true = endMax selected
+        unsigned  _chunkInterval : 1;  // true = chunkInterval selected
+        unsigned  _chunkOverlap  : 1;  // true = chunkOverlap selected
+    };
+
+    /**
+     * Determine whether two arrays have the same schema filtered by a field selector
+     * @returns true IFF the selected fields within the schema match
+     * @throws internal error if dimension sizes do not match.
+     */
+    bool sameSchema(ArrayDesc const& other, SchemaFieldSelector const &sel) const;
+
+    /**
+     * Determine whether two arrays have the same schema (non-filtered)
+     * @returns true IFF the schemas match
+     * @throws internal error if dimension sizes do not match.
+     */
+    bool sameSchema(ArrayDesc const& other) const
+    {
+        return sameSchema(other,
+            SchemaFieldSelector()
+                .startMin(true)
+                .endMax(true)
+                .chunkInterval(true)
+                .chunkOverlap(true));
+    }
+
+    /**
+     * Determine whether two arrays have the same partitioning.
+     * @returns true IFF all dimensions have same chunk sizes and overlaps
+     * @throws internal error if dimension sizes do not match.
+     */
+    bool samePartitioning(ArrayDesc const& other) const
+    {
+        return sameSchema(other,
+            SchemaFieldSelector()
+                .chunkInterval(true)
+                .chunkOverlap(true));
+    }
+
+    /**
+     * Compare the dimensions of this array descriptor with those of "other"
+     * @returns true IFF all dimensions have same startMin and endMax
+     * @throws internal error if dimension sizes do not match.
+     */
+    bool sameDimensions(ArrayDesc const& other) const
+    {
+        return sameSchema(other,
+            SchemaFieldSelector()
+                .startMin(true)
+                .endMax(true));
+    }
+
+    void replaceDimensionValues(ArrayDesc const& other);
 
 private:
     void locateBitmapAttribute();
     void initializeDimensions();
 
+    /**
+     * @parm ps the PS the inquiry concerns
+     * @return true or false
+     */
+    bool isPermitted(PartitioningSchema ps) const ;
 
     /**
      * The Versioned Array Identifier - unique ID for every different version of a named array.
@@ -1116,6 +1320,22 @@ public:
 
     bool operator == (DimensionDesc const&) const;
 
+
+    /**
+     * @brief replace the values, excluding the name, with those from another descriptor
+     */
+    void replaceValues(DimensionDesc const &other)
+    {
+        setStartMin(other.getStartMin());
+        setEndMax(other.getEndMax());
+
+        setChunkInterval(other.getChunkInterval());
+        setChunkOverlap(other.getChunkOverlap());
+
+        setCurrStart(other.getCurrStart());
+        setCurrEnd(other.getCurrEnd());
+    }
+
     /**
      * @return minimum start coordinate.
      * @note This is reliable. The value is independent of the data in the array.
@@ -1127,7 +1347,7 @@ public:
 
     /**
      * @return current start coordinate.
-     * @note In an array with no data, getCurrStart()=MAX_COORDINATE and getCurrEnd()=MIN_COORDINATE.
+     * @note In an array with no data, getCurrStart()=CoordinateBounds::getMax() and getCurrEnd()=CoordinateBounds::getMin().
      * @note This is NOT reliable.
      *       The only time the value can be trusted is right after the array schema is generated by scan().
      *       As soon as we add other ops into the mix (e.g. filter(scan()), the value is not trustworthy anymore.
@@ -1156,10 +1376,22 @@ public:
     }
 
     /**
-     * @return dimension length, or INFINITE_LENGTH in case getStartMin() is MIN_COORDINATE or getEndMax() is MAX_COORDINATE.
+     * @return dimension length
      * @note This is reliable. @see getStartMin().
      */
-    uint64_t getLength() const;
+    uint64_t getLength() const
+    {
+        return _endMax - _startMin + 1;
+    }
+
+    /**
+     * @brief Determine if the max value matches '*'
+     * @return true={max=='*'}, false otherwise
+     */
+    bool isMaxStar() const
+    {
+        return CoordinateBounds::isMaxStar(getEndMax());
+    }
 
     /**
      * @return current dimension length.
@@ -1598,7 +1830,7 @@ inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
 {
     //XXX: This does not check to see if some other attribute does not already have the same name
     //     and it would be faster to mutate the structure, not copy. See also ArrayDesc::addAttribute
-    return ArrayDesc(desc.getName(), addEmptyTagAttribute(desc.getAttributes()), desc.getDimensions());
+    return ArrayDesc(desc.getName(), addEmptyTagAttribute(desc.getAttributes()), desc.getDimensions(), desc.getPartitioningSchema());
 }
 
 /**
@@ -1678,12 +1910,6 @@ inline size_t getChunkNumberOfElements(Coordinates const& chunkPos, Dimensions c
     return getChunkNumberOfElements(lo,hi);
 }
 
-/**
- * Determine whether two arrays have the same partitioning.
- * @returns true IFF all dimensions have same chunk sizes and overlaps
- * @throws internal error if dimension sizes do not match.
- */
-bool samePartitioning(ArrayDesc const& a1, ArrayDesc const& a2);
 
 /**
  * Print only the pertinent part of the relevant object.

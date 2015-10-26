@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,7 +38,7 @@ extern "C" {
     // these declarations let one call the FORTRAN-interface-only ScaLAPACK FORTRAN code
     // correctly from non-FORTRAN code.  The "extern "C"" prevents name-mangling which
     // FORTRAN doesn't do, unfortunately there is no "extern "FORTRAN"" to add the trailing _
-    // 
+    //
 
     // scalapack setup
     void sl_init_(slpp::int_t&, slpp::int_t&, slpp::int_t&);
@@ -49,7 +49,7 @@ extern "C" {
                    const slpp::int_t& mb, const slpp::int_t& nb,
                    const slpp::int_t& irSrc, const slpp::int_t& icSrc, const slpp::int_t& icTxt,
                    const slpp::int_t& lld, slpp::int_t& info);
-   
+
     void pdelset_(double* data, const slpp::int_t& row, const slpp::int_t& col,
                   const slpp::desc_t& desc, const double& val);
     void pdelget_(const char& SCOPE, const char& TOP, double& ALPHA, const double* A,

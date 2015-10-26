@@ -18,7 +18,9 @@ save(RAT, 'rational.out', 0, '(rational)')
 save(RAT1, 'ration1.bin', 0, '(rational,rational)')
 
 save(RAT, 'rational.txt', 0, 'text')
+load(RAT, 'rational.txt', 0, 'text')
 save(RAT1, 'ration1.txt', 0, 'text')
+load(RAT1, 'ration1.txt', 0, 'text')
 save(RAT1, 'rat11.txt')
 save(RAT, 'ration11.txt')
 
@@ -31,8 +33,8 @@ load(RAT2, 'rat11.txt')
 --error --code scidb::SCIDB_SE_TYPE::SCIDB_LE_CANT_FIND_CONVERTER "load(RAT3, 'rational.out', 0, '(double)',100)"
 --error --code scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED "load(RAT3, 'rational.out', 0, '(string)')"
 load(RAT3, 'rational.out', 0, '(string)', 100, rat_shad)
-load(RAT3, 'ration1.bin', 0, '(rational,dummy(16))')
-load(RAT3, 'ration1.bin', 0, '(dummy(16),rational)')
+load(RAT3, 'ration1.bin', 0, '(rational,skip(16))')
+load(RAT3, 'ration1.bin', 0, '(skip(16),rational)')
 aggregate(versions(RAT3),count(*))
 
 

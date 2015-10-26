@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -114,7 +114,7 @@ class Bound(object):
         return self._has_overlap
 
     def __str__(self):
-        return ("Bound(value=%s,overlap=%s,has_overlap=%s)" % 
+        return ("Bound(value=%s,overlap=%s,has_overlap=%s)" %
                 tuple(map(str,[self.value, self.overlap, self.has_overlap])))
 
     def __repr__(self):
@@ -134,7 +134,7 @@ class Bound(object):
         return not (self == right)
 
 class Range(object):
-    @pv.verify_method(pv.Var(a_name="minimum", a_type=Bound), 
+    @pv.verify_method(pv.Var(a_name="minimum", a_type=Bound),
                    pv.Var(a_name="maximum", a_type=Bound))
     def __init__(self, minimum, maximum):
         if minimum.overlap != maximum.overlap:
@@ -248,7 +248,7 @@ class Box(object):
         return iter(self._range)
 
     def cell_count(self):
-        return 
+        return
 
     def vector_count(self):
         return mul(map(Range.value_count, self))
@@ -259,7 +259,7 @@ class Box(object):
     @property
     def minimum(self):
         return Vector([current_range.minimum.value for current_range in self])
-        
+
 
 class Value(object):
     @pv.verify_method(pv.Iterable(a_name="value", a_type=int, a_none=True))
@@ -277,7 +277,7 @@ class Value(object):
                 raise TypeError("Value: compatible expects same dimension "
                                 "count of values, but self has %s "
                                 "and right has %s" % (len(self), len(right)))
-        
+
     def __nonzero__(self):
         return not (self._value is None)
 
@@ -326,7 +326,7 @@ class Value(object):
     #    return str(self)
 
 class Dimension(object):
-    def __init__(self, name=None, min=0,  max=None, 
+    def __init__(self, name=None, min=0,  max=None,
                        size=None, count=None, overlap=0):
         if name is None or type(name) != str:
             raise TypeError("Dimension: incorrect name '%s'" % str(name))
@@ -359,12 +359,12 @@ class Dimension(object):
         else:
             bound_range = max - min
             count_range = size * count
-            if bound_range != count_range and (bound_range >= count_range or 
+            if bound_range != count_range and (bound_range >= count_range or
                                                bound_range <= count_range - size):
                 raise ValueError("Dimension: incompatible range, size and count, "
                                  "should (%s * %s)  == (%s - %s) or "
                                  "(%s * %s) < (%s - %s) < (%s * %s)" %
-                                 (str(size), str(count), 
+                                 (str(size), str(count),
                                   str(max), str(min),
                                   str(size), str(count-1),
                                   str(max), str(min),
@@ -422,7 +422,7 @@ class Dimension(object):
             maximum= create_bound(index+1, index + 1 < self.count)
             return Range(minimum, maximum)
         return imap(create_range, range(0, self.count))
- 
+
     def __str__(self):
         return "Dimension(%s)" % self.create()
 
@@ -448,10 +448,10 @@ class DimensionList(object):
         return reduce(mul, [len(dimension) for dimension in self])
 
     def box_iter(self):
-        # 1) from every i'th dimension receive the Range list. 
+        # 1) from every i'th dimension receive the Range list.
         #    As result, we have list of list of Range
         # 2) product Range lists (for get every combination of ranges)
-        # 3) iterate over result from (2), receive arguments for Box, create Boxes        
+        # 3) iterate over result from (2), receive arguments for Box, create Boxes
         return [Box(range_list) for range_list in product(*map(iter,self))]
 
     def __str__(self):
@@ -459,7 +459,7 @@ class DimensionList(object):
 
     def __repr__(self):
         return str(self)
-        
+
     def create(self):
         return ','.join(map(Dimension.create, list(self)))
 
@@ -477,11 +477,11 @@ class Attribute(object):
     @property
     def name(self):
         return self._name
-    
+
     @property
     def type(self):
         return self._type
-    
+
     def create(self):
         if self._default is None:
             default= ''
@@ -533,7 +533,7 @@ class Chunk(object):
         self._filler= filler
 
     #def dense(self):
-    #    @pv.verify(pv.Iterable(a_name="vector", a_type=int), 
+    #    @pv.verify(pv.Iterable(a_name="vector", a_type=int),
     #               pv.Iterable(a_name="range_iter", a_type=Range))
     #    def build(vector, range_iter):
     #        range_list= list(range_iter)
@@ -551,7 +551,7 @@ class Chunk(object):
     #                return build(vector + [value], range_list)
     #            value_iter= list(current_range.value_iter())
     #            return '[%s]' % comma.join(map(convert, value_iter))
-    #    return build([], list(self._box))    
+    #    return build([], list(self._box))
 
     #def sparse(self):
     #    def create_cell(vector):
@@ -634,7 +634,7 @@ class Array(object):
 #    def result(_):
 #        return None
 #    return result
-    
+
 
 #def full_vector_filler(value_filler):
 #    return value_filler
@@ -666,7 +666,7 @@ def set_suite(suite):
     if not os.path.exists(path):
         os.makedirs(path)
     global SUITE
-    SUITE = suite    
+    SUITE = suite
 
 def set_name(name):
     assert(type(name) == str)
@@ -703,7 +703,7 @@ def clean():
         print "Remove of %s completed with error '%s'" % (get_path_test(), str(e))
 
 __all__ = [ "Vector", "Box", "Value", "Dimension", "DimensionList", "Attribute",
-            "AttributeList", "Cell", "Chunk", "Array", 
+            "AttributeList", "Cell", "Chunk", "Array",
             "set_suite", "set_name",
             "get_path_test", #"get_path_result",
             "write_test", "clean"]

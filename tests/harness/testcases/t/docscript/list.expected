@@ -13,9 +13,9 @@ SCIDB QUERY : <list('arrays',true)>
 SCIDB QUERY : <list('aggregates')>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <filter(list('aggregates'),name != 'mad' and name != 'median' and name != 'top_five' and name !='first_value' and name!='last_value')>
+SCIDB QUERY : <uniq(project(filter(list('aggregates'),library='scidb'),name))>
 name
-'ApproxDC'
+'approxdc'
 'avg'
 'count'
 'max'

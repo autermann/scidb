@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -63,9 +63,9 @@ namespace scidb {
 /// except restart.
 ///
 void pdgemmMaster(Query* query,  // or do I need only the ctx?
-                   boost::shared_ptr<MpiOperatorContext>& ctx,
-                   boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
-                   const string& ipcName, // can this be in the ctx too?
+                   std::shared_ptr<MpiOperatorContext>& ctx,
+                   std::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
+                   const std::string& ipcName, // can this be in the ctx too?
                    void * argsBuf,
                    // the following args are common to all scalapack slave operators:
                    const slpp::int_t& NPROW, const slpp::int_t& NPCOL,

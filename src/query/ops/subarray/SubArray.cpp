@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -65,7 +65,7 @@ void SubArrayIterator::fillSparseChunk(size_t i)
     if (i == dims.size()) {
         if (inputIterator->setPosition(inPos)) {
             ConstChunk const& inChunk = inputIterator->getChunk();
-            boost::shared_ptr<ConstChunkIterator> inIterator = inChunk.getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS|
+            std::shared_ptr<ConstChunkIterator> inIterator = inChunk.getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS|
                                                                                         ConstChunkIterator::IGNORE_EMPTY_CELLS);
 
             while (!inIterator->end()) {
@@ -103,7 +103,7 @@ ConstChunk const& SubArrayIterator::getChunk()
             Address emptyAddr(emptyAttr->getId(), outPos);
             sparseBitmapChunk.initialize(&array, &desc, emptyAddr, 0);
             sparseChunk.setBitmapChunk(&sparseBitmapChunk);
-        } 
+        }
 
         outIterator = sparseChunk.getIterator(Query::getValidQueryPtr(array._query), mode);
         fillSparseChunk(0);
@@ -263,7 +263,7 @@ void MappedSubArrayIterator::reset()
 // SubArray methods
 //
 SubArray::SubArray(ArrayDesc& array, Coordinates lowPos, Coordinates highPos,
-                   boost::shared_ptr<Array>& input, const shared_ptr<Query>& query)
+                   std::shared_ptr<Array>& input, const std::shared_ptr<Query>& query)
 : DelegateArray(array, input),
   subarrayLowPos(lowPos),
   subarrayHighPos(highPos),
@@ -325,7 +325,7 @@ void SubArray::buildChunkSet()
         inputAttribute = inputArray->getArrayDesc().getEmptyBitmapAttribute()->getId();
     }
     size_t nDims = inputArray->getArrayDesc().getDimensions().size();
-    shared_ptr<ConstArrayIterator> inputIter = inputArray->getConstIterator(inputAttribute);
+    std::shared_ptr<ConstArrayIterator> inputIter = inputArray->getConstIterator(inputAttribute);
     Coordinates outChunkCoords(nDims);
     while(!inputIter->end())
     {

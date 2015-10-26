@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -148,7 +148,7 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 	  {
 	    trac_url = "http://trac.scidb.net/browser/trunk/tests/harness/testcases/";
 	  }
-	
+
 	string url = "";
 	if (!run_tests_basic)
 		{
@@ -164,8 +164,8 @@ ostream & print_IndividualTestResults (ostream &os, const struct CDASH_HarnessTe
 //		url = "http://" + cdashclntip + "/" + scidbtestresultsURL + "/" + "/tests_basic/" + tmp;
 
 	        url = scidbtestcasesURL;
-	
-		os << "<NamedMeasurement type=\"text/string\" name=\"Testcase File\"><Value>&lt;a href=\"" 
+
+		os << "<NamedMeasurement type=\"text/string\" name=\"Testcase File\"><Value>&lt;a href=\""
 		   << url << "\">" << tr.v_IndividualTestResult[i].TestcaseFile << " &lt;/a></Value></NamedMeasurement>" << endl;
 
 		/* .expected file name */

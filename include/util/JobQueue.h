@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,46 +32,43 @@
 #define JOBQUEUE_H_
 
 #include <list>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
-#include "Job.h"
-#include "Mutex.h"
-#include "Semaphore.h"
-#include "RWLock.h"
-
+#include <util/Job.h>
+#include <util/Mutex.h>
+#include <util/Semaphore.h>
+#include <util/RWLock.h>
 
 namespace scidb
 {
 
-
 class JobQueue
 {
 private:
-    std::list< boost::shared_ptr<Job> > _queue;
-	Mutex _queueMutex;
-	Semaphore _queueSemaphore;
+    std::list< std::shared_ptr<Job> > _queue;
+    Mutex _queueMutex;
+    Semaphore _queueSemaphore;
 
 public:
-	JobQueue();
+    JobQueue();
 
-        size_t getSize()
-        {
-            return _queue.size();
-        }
+    size_t getSize() const
+    {
+        return _queue.size();
+    }
 
-	/// Add new job to the end of queue
-	void pushJob(boost::shared_ptr<Job> job);
+    /// Add new job to the end of queue
+    void pushJob(std::shared_ptr<Job> job);
 
-	// Add new job to the beginning of queue
-	void pushHighPriorityJob(boost::shared_ptr<Job> job);
+    /// Add new job to the beginning of queue
+    void pushHighPriorityJob(std::shared_ptr<Job> job);
 
-        /**
-         * Get next job from the beginning of the queue
-         * If there is next element the method waits
-         */
-        boost::shared_ptr<Job> popJob();
+    /**
+     * Get next job from the beginning of the queue
+     * If there is next element the method waits
+     */
+    std::shared_ptr<Job> popJob();
 };
-
 
 } // namespace
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -159,14 +159,14 @@ public class JDBCBasicTestCase extends TestCase
             sbConvertFloat.append(res.getFloat("i8") + ":" + res.getDouble("i8") + ":" +
                     res.getFloat("i16") + ":" + res.getDouble("i16") + ":" +
                     res.getFloat("i32") + ":" + res.getDouble("i32") + ":" +
-                    res.getFloat("i64") + ":" + res.getDouble("i64") + ":");
+                    res.getDouble("i64") + ":");
             res.next();
         }
         assertEquals("0:false:1:false:260:false:67000:false:10000000:10000000:false:1:false:-1:false:-260:false:-67000:false:-10000000:-10000000:false:2:false:0:true:0:true:0:true:0:null:true:", sbMain.toString());
         assertEquals("1:260:67000:67000:-1:-260:-67000:-67000:0:0:0:null:", sbConvert1.toString());
         assertEquals("1:260:260:-1:-260:-260:0:0:null:", sbConvert2.toString());
         assertEquals("1:1:260:67000:-1:-1:-260:-67000:0:null:null:null:", sbConvert3.toString());
-        assertEquals("1.0:1.0:260.0:260.0:67000.0:67000.0:1.0E7:1.0E7:-1.0:-1.0:-260.0:-260.0:-67000.0:-67000.0:-1.0E7:-1.0E7:0.0:0.0:0.0:0.0:0.0:0.0:0.0:0.0:", sbConvertFloat.toString());
+        assertEquals("1.0:1.0:260.0:260.0:67000.0:67000.0:1.0E7:-1.0:-1.0:-260.0:-260.0:-67000.0:-67000.0:-1.0E7:0.0:0.0:0.0:0.0:0.0:0.0:0.0:", sbConvertFloat.toString());
     }
 
     public void testUnsignedIntegerDataTypes() throws SQLException
@@ -213,14 +213,14 @@ public class JDBCBasicTestCase extends TestCase
             sbConvertFloat.append(res.getFloat("i8") + ":" + res.getDouble("i8") + ":" +
                     res.getFloat("i16") + ":" + res.getDouble("i16") + ":" +
                     res.getFloat("i32") + ":" + res.getDouble("i32") + ":" +
-                    res.getFloat("i64") + ":" + res.getDouble("i64") + ":");
+                    res.getDouble("i64") + ":");
             res.next();
         }
         assertEquals("0:false:1:false:260:false:67000:false:10000000:false:", sbMain.toString());
         assertEquals("1:260:67000:67000:", sbConvert1.toString());
         assertEquals("1:260:260:", sbConvert2.toString());
         assertEquals("1:1:", sbConvert3.toString());
-        assertEquals("1.0:1.0:260.0:260.0:67000.0:67000.0:1.0E7:1.0E7:", sbConvertFloat.toString());
+        assertEquals("1.0:1.0:260.0:260.0:67000.0:67000.0:1.0E7:", sbConvertFloat.toString());
     }
 
     public void testFloatDataTypes() throws SQLException

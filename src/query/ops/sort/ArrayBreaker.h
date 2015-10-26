@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,7 @@
 #ifndef _ARRAYBREAKER_H_
 #define _ARRAYBREAKER_H_
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <array/Array.h>
 
 namespace scidb
@@ -49,7 +49,7 @@ namespace scidb
 typedef size_t (*BreakerOnCoordinates)(
         Coordinates const& cellPos,
         size_t previousResult,
-        boost::shared_ptr<Query>& query,
+        std::shared_ptr<Query>& query,
         Dimensions const& dims,
         void* additionalInfo);
 
@@ -65,9 +65,9 @@ typedef size_t (*BreakerOnCoordinates)(
  * @param additionalInfo       some information to be passed to the breaker function.
  */
 void breakOneArrayIntoMultiple(
-        boost::shared_ptr<Array> const& inputArray,
-        std::vector<boost::shared_ptr<Array> >& outputArrays,
-        boost::shared_ptr<Query>& query,
+        std::shared_ptr<Array> const& inputArray,
+        std::vector<std::shared_ptr<Array> >& outputArrays,
+        std::shared_ptr<Query>& query,
         BreakerOnCoordinates breaker,
         bool isBreakerConsecutive,
         void* additionalInfo);

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,7 @@
  */
 
 #include "log4cxx/logger.h"
-#include <boost/make_shared.hpp>
+#include <memory>
 
 
 #include "query/Operator.h"
@@ -87,9 +87,9 @@ public:
         _usage = "explain_physical(<querystring> [,language]) language := 'afl'|'aql'";
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         if (_parameters.size() == 1)
         {
             res.push_back(PARAM_CONSTANT("string"));
@@ -98,7 +98,7 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
 
@@ -108,9 +108,9 @@ public:
 
         if ( _parameters.size() != 1 && _parameters.size() != 2 )
         {
-                boost::shared_ptr< ParsingContext> pc;
+                std::shared_ptr< ParsingContext> pc;
                 if (_parameters.size()==0) //need a parsing context for exception!
-                {       pc = boost::make_shared<ParsingContext>(); }
+                {       pc = std::make_shared<ParsingContext>(); }
                 else
                 {       pc = _parameters[0]->getParsingContext(); }
 
@@ -119,7 +119,7 @@ public:
         }
 
         string queryString =  evaluate(
-                        ((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(),
+                        ((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(),
                         query,
                         TID_STRING).getString();
         // TODO: queryString is not used!
@@ -127,7 +127,7 @@ public:
         if (_parameters.size() == 2)
         {
                 string languageSpec =  evaluate(
-                                ((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+                                ((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                                 query,
                                 TID_STRING).getString();
 
@@ -140,11 +140,11 @@ public:
 
         dimensions[0] = DimensionDesc("No", 0, 0, 0, 0, 1, 0);
 
-        return ArrayDesc("physical_plan", attributes, dimensions);
+        return ArrayDesc("physical_plan", attributes, dimensions, defaultPartitioning());
     }
 
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalExplainPhysical, "explain_physical")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalExplainPhysical, "_explain_physical")
 
 } //namespace

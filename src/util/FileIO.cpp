@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -77,7 +77,7 @@ namespace scidb
         }
         return err;
     }
-    
+
     /* Close a directory
      */
     int
@@ -159,7 +159,7 @@ namespace scidb
         }
         return false;
     }
-    
+
     /* Close file descriptor (restarting after signal interrupt if necessary)
      */
     int
@@ -174,7 +174,7 @@ namespace scidb
                  (++eintrRetries < MAX_EINTR_RETRIES));
         return rc;
     }
-    
+
     /* Open a file (restarting after signal interrupt if necessary)
      */
     int
@@ -201,14 +201,14 @@ namespace scidb
 
     /* Write data to the file
      */
-    void 
+    void
     File::writeAll(const void* data, size_t size, uint64_t offs)
     {
         /* Verify that the fd is open
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -264,7 +264,7 @@ namespace scidb
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -350,14 +350,14 @@ namespace scidb
 
     /* Read data from the file
      */
-    void 
+    void
     File::readAll(void* data, size_t size, uint64_t offs)
     {
         /* Verify that the fd is open
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -413,10 +413,10 @@ namespace scidb
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-        
+
         assert(_fd >= 0);
         assert(_pin);
-        
+
         /* Try to read the data, retrying if we are interrupted by signals
          */
         ssize_t totalSize = 0;
@@ -495,14 +495,14 @@ namespace scidb
 
     /* Try to read from the file -- retry on EINTR and EAGAIN
      */
-    size_t 
+    size_t
     File::read(void* data, size_t size, uint64_t offs)
     {
         /* Verify that the fd is open
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -545,7 +545,7 @@ namespace scidb
         }
         return rc;
     }
-    
+
     /* Fsync a file (restarting after signal interrupt if necessary)
      */
     int
@@ -555,7 +555,7 @@ namespace scidb
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -579,7 +579,7 @@ namespace scidb
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -604,7 +604,7 @@ namespace scidb
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -644,7 +644,7 @@ namespace scidb
 
         return rc;
     }
-    
+
     /* Stat the file
      */
     int
@@ -654,7 +654,7 @@ namespace scidb
          */
         checkClosedByUser();
         FileMonitor fm(_fm, *this);
-            
+
         assert(_fd >= 0);
         assert(_pin);
 
@@ -690,7 +690,7 @@ namespace scidb
             /* Take this entry out of the list (lru or closed)
              */
             _fm->forgetFd(*this);
-            
+
             /* Close the file (if necessary)
              */
             if (_fd >= 0)
@@ -721,7 +721,7 @@ namespace scidb
     {
         _fm = FileManager::getInstance();
     }
-    
+
     /* Destructor (closes the file descriptor)
      */
     File::~File()
@@ -733,7 +733,7 @@ namespace scidb
                    << "close" << rc << errno << ::strerror(errno) << _path);
         }
     }
-    
+
     /* Check if the file had been explicitly close and throw if so
      */
     void
@@ -762,7 +762,7 @@ namespace scidb
     {
         --(_f._pin);
     }
-    
+
     /* FileManager implementation
      */
 
@@ -774,7 +774,7 @@ namespace scidb
     {
         std::string dir;
         int fd;
-        
+
         /* Try to create the temp file
          */
         if (filePath == NULL) {
@@ -805,7 +805,7 @@ namespace scidb
         File::FilePtr ret(new File(fd, filePath, O_RDWR|O_LARGEFILE, true));
         addFd(*ret);
 
-        return ret;        
+        return ret;
     }
 
 
@@ -827,11 +827,11 @@ namespace scidb
         if (fd >= 0)
         {
             flags = flags & (~O_CREAT) & (~O_EXCL) & (~O_TRUNC);
-            ret.reset(new File(fd, fileName, flags, false)); 
+            ret.reset(new File(fd, fileName, flags, false));
             addFd(*ret);
         }
 
-        return ret;        
+        return ret;
     }
 
     /* Constructor -- need to ensure that everything in the temp dir
@@ -932,7 +932,7 @@ namespace scidb
     FileManager::forgetFd(File& file)
     {
         ScopedMutexLock scm(_fileLock);
-        
+
         if (file._fd >= 0)
         {
             _lru.erase(file._listPos);
@@ -974,7 +974,7 @@ namespace scidb
         /* Try to open the file using the saved flags
          */
         file._fd = File::openFile(file._path, file._flags);
-        
+
         /* Remove from the closed list and add to the lru
          */
         file._pin++;

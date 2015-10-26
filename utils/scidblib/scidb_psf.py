@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation; 
+## Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation;
 ## All Rights Reserved
 ##
 ## http://opensource.org/licenses/PythonSoftFoundation.php
@@ -27,17 +27,17 @@ def confirm(prompt=None, resp=False):
     user simply types ENTER.
 
     >>> confirm(prompt='Create Directory?', resp=True)
-    Create Directory? [y]|n: 
+    Create Directory? [y]|n:
     True
     >>> confirm(prompt='Create Directory?', resp=False)
-    Create Directory? [n]|y: 
+    Create Directory? [n]|y:
     False
     >>> confirm(prompt='Create Directory?', resp=False)
     Create Directory? [n]|y: y
     True
 
     """
-    
+
     if prompt is None:
         prompt = 'Confirm'
 
@@ -45,7 +45,7 @@ def confirm(prompt=None, resp=False):
         prompt = '%s [%s]|%s: ' % (prompt, 'y', 'n')
     else:
         prompt = '%s [%s]|%s: ' % (prompt, 'n', 'y')
-        
+
     while True:
         ans = raw_input(prompt)
         if not ans:

@@ -9,9 +9,6 @@ SCIDB QUERY : <filter(m4x4,val<100)>
 
 SCIDB QUERY : <filter(list('operators'),regex(name,'(.*)z(.*)'))>
 name,library
-'analyze','scidb'
-'materialize','scidb'
-'normalize','scidb'
 
 Query was executed successfully
 

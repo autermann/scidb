@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,7 +25,7 @@
  *
  * @author knizhnik@garretr.ru
  *
- * @brief Shared library that loads into SciDB a RA/DECL data types. 
+ * @brief Shared library that loads into SciDB a RA/DECL data types.
  */
 
 #include <boost/assign.hpp>
@@ -116,7 +116,7 @@ void DECLFromOrdinal(const Value** args, Value* res, void*)
 REGISTER_SUBTYPE(right_ascention, 8, TID_DOUBLE);
 REGISTER_SUBTYPE(declination, 8, TID_DOUBLE);
 
-/* 
+/*
 REGISTER_FUNCTION(ordinal, ("right_ascention", TID_INT64, TID_INT64), TID_INT64, RAToOrdinal);
 REGISTER_FUNCTION(right_ascention, (TID_INT64, TID_INT64, TID_INT64), "right_ascention", RAFromOrdinal);
 REGISTER_FUNCTION(ordinal, ("declination", TID_INT64, TID_INT64), TID_INT64, DECLToOrdinal);
@@ -130,7 +130,7 @@ REGISTER_FUNCTION(declination, list_of(TID_INT64), "declination", DECLFromOrdina
 
 //
 // Need casts to double().
-// 
+//
 REGISTER_FUNCTION(double, list_of("right_ascention"), TID_DOUBLE, RAToDouble);
 REGISTER_FUNCTION(double, list_of("declination"), TID_DOUBLE, DECLToDouble);
 

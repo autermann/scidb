@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-# Initialize, start and stop scidb. 
-# Supports single instance and cluster configurations. 
+# Initialize, start and stop scidb.
+# Supports single instance and cluster configurations.
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -79,35 +79,35 @@ class SciDBTest:
                self.resultDim = ["[ j=1:%d,%d,0 ]", 1, 1]
         elif resDim =='i':
            self.resultDim = ["[ i=1:%d,%d,0, j=1:%d,%d,0 ]", 2, 0]
-        else:    
+        else:
            self.resultDim = ["[ i=1:%d,%d,0, j=1:%d,%d,0 ]", 2, 1]
-    
+
     # workaround for not allowing non-nullable results in nullable arrays
     def setNullableResult(self, n):
         self.resultIsNullable = n
-    
+
     # sometimes, results have different data types than sources
     def setResultDataType(self,dataType):
         self.resultDataType = dataType
-                              
+
     def setSparseFunction(self,sf):
         if sf:
             self.sparseFunction=","+sf
         else:
             self.sparseFunction=""
-    
+
     def getCreateCommands(self, dataType, dim, createFlags=""):
         cc = []
         createTemplate = "create %s array %s < x: %s > "
         if len(dim)>2:
             iChunkSize = dim[2]
         else:
-            iChunkSize=100 
+            iChunkSize=100
         if len(dim)>3:
             jChunkSize = dim[3]
         else:
             jChunkSize=100
-        
+
         # T may be rectangular
         createCommand = createTemplate + self.sourceDim
         if self.isSparse():
@@ -115,7 +115,7 @@ class SciDBTest:
         else:
             cf = createFlags[0]
         cc.append(createCommand%(cf,"T",dataType, dim[0], iChunkSize, dim[1], jChunkSize))
-        
+
         # check for different resultDataType
         if self.resultDataType:
             rdt = self.resultDataType
@@ -125,14 +125,14 @@ class SciDBTest:
         # check for nullable result array
         if self.resultIsNullable:
             rdt += " null"
-            
-        # Result & Expected Result arrays 
+
+        # Result & Expected Result arrays
         createCommand = createTemplate + self.resultDim[0]
         if self.resultIsSparse:
             cf = createFlags[0]+' '+createFlags[1]
         else:
             cf = createFlags[0]
-            
+
         if self.resultDim[1] == 2:
             cc.append(createCommand%(cf,"E",rdt, dim[self.resultDim[2]], iChunkSize, dim[self.resultDim[2]], iChunkSize))
             cc.append(createCommand%(cf,"R",rdt, dim[self.resultDim[2]], iChunkSize, dim[self.resultDim[2]], iChunkSize))
@@ -142,20 +142,20 @@ class SciDBTest:
         else:
             cc.append(createCommand%(cf,"E",rdt))
             cc.append(createCommand%(cf,"R",rdt))
-            
+
         return cc
-    
+
     def getFillCommands(self,iSize,jSize, emptyFlag=False):
         if self.isSparse():
             bf = "build_sparse"
         else:
             bf = "build"
         cc = ["store(%s(T,%s%s),T)"%(bf,self.arrayFunction,self.sparseFunction)]
-        
+
         if(emptyFlag):
             empty = 1
         else:
-            empty = 0  
+            empty = 0
         ef = self.expectedFunction%{"J":jSize, "I":iSize, "EMPTY":empty}
 
         if self.resultIsSparse:
@@ -167,12 +167,12 @@ class SciDBTest:
     def getTestCommand(self):
         cc = ["store(repart(%s,R),R)"%(self.testFunction)]
         return cc
-    
+
     def getComparisonCommand(self):
         eps = 0.0000001
         #eps = 0.000001
         return "SELECT count(*) FROM R , E WHERE abs((R.x-E.x)/iif(E.x=0,1,E.x)) > %g"%eps
-    
+
     def getExpectedResult(self):
         return self.expectedResult
 
@@ -181,19 +181,19 @@ class SciDBTest:
         for m in self.cleanupMatrixNameList:
             cc.append("remove(%s)"%m)
         return cc
-    
+
     def getArrayFunction(self):
         return self.arrayFunction
-    
+
     def isSparse(self):
         return self.sparseFlag
-    
+
     def isOnlySquare(self):
         return self.onlySquareFlag
-    
+
     def isNeverSquare(self):
         return self.neverSquareFlag
-    
+
     def isEmpty(self):
         return self.emptyFlag
 
@@ -202,14 +202,14 @@ class SciDBTest:
             return "%s(%s)"%(self.arrayFunction,"sparse")
         else:
             return self.arrayFunction
-    
+
 # execute the statement
 def executeCmd(cmd,flags, echo=False):
     if echo:
        print "iquery %s '%s'" %(flags, cmd)
-    #p = subprocess.Popen(['iquery','-p','7239',flags,cmd], shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
-    p = subprocess.Popen(['iquery',flags,cmd], shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
-    #p = subprocess.Popen(['echo',flags,cmd], shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
+    #p = subprocess.Popen(['iquery','-p','7239',flags,cmd], shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(['iquery',flags,cmd], shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #p = subprocess.Popen(['echo',flags,cmd], shell=False,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return p.communicate()
 #
 # piece the test from various pieces and run it with all sizes
@@ -218,7 +218,7 @@ def runTest(t, matrixNames, matrixSizes, dataTypes):
         creationFlags = [ ["","empty"],["immutable",""], ["immutable" ,"empty" ], ["",""]]
     else:
         creationFlags = [["",""],["immutable", ""]]
-        
+
     for d in dataTypes:
         for i in matrixSizes:
             # skip rectangular data sets for tests that are defined to be square
@@ -228,7 +228,7 @@ def runTest(t, matrixNames, matrixSizes, dataTypes):
             # skip square data sets for tests that are defined to be not square
             if i[0]==i[1] and t.isNeverSquare():
                 continue
-            
+
             for cf in creationFlags:
                 # initial cleanup
                 for cmd in t.getCleanupCommands():
@@ -240,19 +240,19 @@ def runTest(t, matrixNames, matrixSizes, dataTypes):
                     r = executeCmd(cmd,'-q', True)
                     if r[1]:
                         print "FAIL: cmd %s failed, reported %s"%(cmd,r[1])
-            
+
                 # the test and expected matrices
                 for cmd in t.getFillCommands(i[0],i[1],cf[1]=="empty"):
                     r = executeCmd(cmd,'-anq', True)
                     if r[1]:
                         print "FAIL: cmd %s failed, reported %s"%(cmd,r[1])
-                    
+
                 # the operation result
                 for cmd in t.getTestCommand():
                     r = executeCmd(cmd,'-anq', True)
                     if r[1]:
                         print "FAIL: cmd %s failed, reported %s"%(cmd,r[1])
-                
+
                 # and now test the result
                 r = executeCmd(t.getComparisonCommand(), '-q', True)
                 if r[1]:
@@ -261,9 +261,9 @@ def runTest(t, matrixNames, matrixSizes, dataTypes):
                     print "FAIL: Test %s %s %s %s %dx%d %s failed - reported %s"%(t.testFunction,cf[0],cf[1],d,i[0],i[1],t.testName(),r[0])
                 else:
                     print "Test %s %s %s %s %dx%d %s succeeded - reported %s"%(t.testFunction,cf[0],cf[1],d,i[0],i[1],t.testName(),r[0])
-                        
+
                 # final cleanup
                 for cmd in t.getCleanupCommands():
-                    executeCmd(cmd,'-aq')            
-            
+                    executeCmd(cmd,'-aq')
+
                 sys.stdout.flush()

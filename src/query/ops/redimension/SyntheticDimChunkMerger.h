@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,7 +30,8 @@
 #define SYNTHETIC_DIM_CHUNK_MERGER_H_
 
 #include <vector>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
+
 #include <array/StreamArray.h>
 #include <array/MemChunk.h>
 #include <query/Operator.h>
@@ -51,7 +52,7 @@ private:
     class SyntheticDimAdjuster
     {
     private:
-        typedef boost::unordered_map<Coordinates, size_t> MapCoordToCount;
+        typedef std::unordered_map<Coordinates, size_t, CoordinatesHash> MapCoordToCount;
 
         /// Maps "collapsed" coordinates to count of collisions
         /// Collapsed coordinates have the synthetic dimension set to the same value, the dimension start
@@ -113,11 +114,32 @@ private:
     };
 
     SyntheticDimAdjuster _syntheticDimHelper;
-    std::vector<boost::shared_ptr<MemChunk> > _partialChunks;
+    std::vector<std::shared_ptr<MemChunk> > _partialChunks;
     Coordinates _currChunkPos;
     Coordinates _coord;
 
 public:
+
+    struct RedimInfo {
+        /**
+         * Whether there is a synthetic dimension.
+         */
+        bool _hasSynthetic;
+
+        /**
+         * Which dimension is the synthetic one.
+         */
+        AttributeID _dimSynthetic;
+
+        /**
+         * A copy of the synthetic dim description
+         */
+        DimensionDesc _dim;
+
+        RedimInfo(bool hasSynthetic, AttributeID dimSynthetic, DimensionDesc const& dim):
+        _hasSynthetic(hasSynthetic), _dimSynthetic(dimSynthetic), _dim(dim)
+        {}
+    };
 
     /**
      * Constructor
@@ -133,18 +155,18 @@ public:
     bool
     mergePartialChunk(InstanceID instanceId,
                       AttributeID attId,
-                      boost::shared_ptr<MemChunk>& chunk,
-                      const boost::shared_ptr<Query>& query);
+                      std::shared_ptr<MemChunk>& chunk,
+                      const std::shared_ptr<Query>& query);
 
     /// @see MultiStreamArray::PartialChunkMerger::getMergedChunk
-    boost::shared_ptr<MemChunk>
+    std::shared_ptr<MemChunk>
     getMergedChunk(AttributeID attId,
-                   const boost::shared_ptr<Query>& query);
+                   const std::shared_ptr<Query>& query);
 
 private:
     void
-    mergeChunks(boost::shared_ptr<ChunkIterator>& dstIterator,
-                boost::shared_ptr<MemChunk>& src);
+    mergeChunks(std::shared_ptr<ChunkIterator>& dstIterator,
+                std::shared_ptr<MemChunk>& src);
     void clear();
 };
 

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -45,7 +45,7 @@ arrList = []
 
 def getMoreArrays(dbq,dType):
     # Generate arrays with different attributes, dimensions and overlaps
-    # The set of arrays is used for each data type mentioned in the variable DATA_TYPES 
+    # The set of arrays is used for each data type mentioned in the variable DATA_TYPES
 
     global arrList
 
@@ -110,11 +110,8 @@ def getMoreArrayQueries():
 
         MORE_ARRAY_QUERIES += [
             'aggregate(' + arr[1] + ',count(*))',
-            'allversions(' + arr[1] + ')',
             'attributes(' + arr[1] + ')',
-            'analyze(' + arr[1] + ')',
             'apply(' + arr[1] + ',z,d1*2)',
-            'attribute_rename(' + arr[1] + ',' + eval_attr + ',y)',
             'avg_rank(' + arr[1] + ')',
             'bernoulli(' + arr[1] + ',0.3)',
             'cross_join(' + arr[1] + ',' + arr[1] + ')',
@@ -123,7 +120,6 @@ def getMoreArrayQueries():
             'merge(filter(' + arr[1] + ',d1<2), filter(' + arr[1] + ',d1>2))',
             'quantile(' + arr[1] + ',2)',
             'rank(' + arr[1] + ',' + eval_attr + ')',
-            'reverse(' + arr[1] + ')',
             'sort(' + arr[1] + ')',
             'unpack(' + arr[1] + ',z)'
         ]
@@ -131,8 +127,8 @@ def getMoreArrayQueries():
         if (arr[0][5:9]!='bool') and (len(arr[1]) == 4):   # Array dimension does Not have overlaps and data type is not bool
             MORE_ARRAY_QUERIES += [ 'cumulate(' + arr[1] + ',sum(at1),d1)'  ]
 
-        if (arr[0][5:11]=='double') and (arr[1][3] == '1'):   # Array is 1-D
-            MORE_ARRAY_QUERIES += [ 'normalize(project(' + arr[1] + ',at1))' ]
+#        if (arr[0][5:11]=='double') and (arr[1][3] == '1'):   # Array is 1-D
+#            MORE_ARRAY_QUERIES += [ 'normalize(project(' + arr[1] + ',at1))' ]
 
     return MORE_ARRAY_QUERIES
 
@@ -157,12 +153,12 @@ class myTestCase(testCase):
             # Register the cleaner that will remove any data files created by this test.
             self.registerCleaner(DataDirCleaner(dataPath))
         except:
-            pass # Somehow, we could not get to the scidb data folder: 
+            pass # Somehow, we could not get to the scidb data folder:
                  # we will leave some junk files in there.
-            
+
         self.__iquery = scidbIquery() # Iquery wrapper class.
         self.exitCode = 0 # Exit code for test harness
-        
+
     #-------------------------------------------------------------------------
     # runQueries: executes a list of queries
     def runQueries(self,queries,stopOnError=False):
@@ -171,7 +167,7 @@ class myTestCase(testCase):
             queryException = False
             queryOk = False
             startTime = time.time()
-            
+
             try:
                 exitCode,\
                 stdoutData,\
@@ -192,10 +188,10 @@ class myTestCase(testCase):
                 print stderrData
                 exitStatus = 1
                 queryOk = False
-                
+
             if ((not queryOk) and stopOnError):
                 break
-                
+
             if (queryOk):
                 print 'Time = {0}, sucess: {1}'.format(queryTime,q)
         return exitStatus
@@ -203,10 +199,10 @@ class myTestCase(testCase):
     # test: main entry point into the test.
     # Important: this function gets called by the superclass function runTest.
     # RunTest wraps this function in a "try: except: finally:" clause to
-    # ensure the cleanup function is called.  Cleanup performs all of the 
+    # ensure the cleanup function is called.  Cleanup performs all of the
     # actions of the registered cleaner classes (see constructor).
     def test(self):
-        
+
         # Default build query and schema "roller": makes the strings.
         # The default build query (called as is - dbq.build()), will produce this:
         #  'build(<attr1:double>[i=0:9,4,0,j=0:9,4,0],random())'
@@ -214,7 +210,7 @@ class myTestCase(testCase):
         # '<attr1:double>[i=0:9,4,0,j=0:9,4,0]'
         # See definition of the class on explanation of parameters.
         dbq = defaultBuildQuery()
-        
+
         self.exitCode = self.runQueries(self.queries,self.stopOnError)
 
 

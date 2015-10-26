@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -70,7 +70,7 @@ public:
         ADD_PARAM_INPUT();
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         if(schemas.size() > 1) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "LogicalSplitArrayTest: no input schema.";
@@ -91,8 +91,7 @@ public:
 
         DimensionDesc d0 = schema.getDimensions()[0]; // hereafter reduced to two dims only
         DimensionDesc d1 = schema.getDimensions()[1];
-        if (d0.getLength() == INFINITE_LENGTH ||
-            d1.getLength() == INFINITE_LENGTH) {
+        if (d0.isMaxStar() || d1.isMaxStar()) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
                       << "LogicalSplitArrayTest: input schema must be bounded in both dimensions";
         }
@@ -109,10 +108,10 @@ public:
                                         d1.getStartMin(), d1.getCurrStart(), d1.getCurrEnd(), d1.getEndMax(),
                                         d1.getChunkInterval(), 0));
 
-        return ArrayDesc("Splitarraytest", outAtts, outDims);
+        return ArrayDesc("Splitarraytest", outAtts, outDims, defaultPartitioning());
     }
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSplitArrayTest, "splitarraytest")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSplitArrayTest, "_splitarraytest")
 
 } //namespace scidb

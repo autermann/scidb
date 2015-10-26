@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,7 +36,7 @@
 #include <vector>
 #include <map>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "system/Config.h"
 #include "query/QueryPlan.h"
@@ -61,8 +61,8 @@ protected:
      *  including headers. Each function must be implemented in related .cpp file
      *  with optimizer implementation.
      */
-    virtual boost::shared_ptr<LogicalQueryPlanNode> logicalRewriteIfNeeded(const boost::shared_ptr<Query>& query,
-                                                                            boost::shared_ptr< LogicalQueryPlanNode> node);
+    virtual std::shared_ptr<LogicalQueryPlanNode> logicalRewriteIfNeeded(const std::shared_ptr<Query>& query,
+                                                                            std::shared_ptr< LogicalQueryPlanNode> node);
 
   public:
     virtual ~Optimizer() {}
@@ -78,10 +78,10 @@ protected:
      * @return physical plan to be executed.
      *
      */
-    virtual boost::shared_ptr<PhysicalPlan> optimize(const boost::shared_ptr<Query>& query,
-                                                      boost::shared_ptr< LogicalPlan>& logicalPlan) = 0;
+    virtual std::shared_ptr<PhysicalPlan> optimize(const std::shared_ptr<Query>& query,
+                                                      std::shared_ptr< LogicalPlan>& logicalPlan) = 0;
 
-    static boost::shared_ptr<Optimizer> create();
+    static std::shared_ptr<Optimizer> create();
 };
 
 } // namespace

@@ -4,7 +4,7 @@
 
 create array unbounded <a:int32>[x=1:*,5,0]
 load(unbounded,'${TEST_DATA_DIR}/unbounded_empty.txt')
-create array unbounded2 <x:int64>[a(int32)=*,128,0] 
+create array unbounded2 <x:int64>[a(int32)=*,128,0]
 create array unbounded3 <a:int64>[x(int32)=*,128,0]
 
 --test
@@ -47,33 +47,31 @@ bernoulli(unbounded2,1,1)
 dimensions(unbounded2)
 cast(unbounded2,unbounded3)
 dimensions(unbounded2)
---error "normalize(unbounded)"
 store(unbounded2,unbounded2_new)
 substitute(unbounded2,build(<a:bool>[x=0:30,2,0],true))
 aggregate(unbounded2,var(x))
 project(versions(unbounded2), version_id)
 
 #not supported for 1-D
-#multiply(unbounded2,unbounded2)   
-#slice(unbounded2,a,1)  
+#multiply(unbounded2,unbounded2)
+#slice(unbounded2,a,1)
 
 #not supported for unbounded - #1497
 #multiply
 #reshape  -as of 4392
 #reverse
-#concat
 #build
 #xgrid
 
 #not supported
 #unpack
-           
+
 # ticket #1510
-# sort(unbounded2,x desc)	   
+# sort(unbounded2,x desc)
 
 
 show(unbounded2)
-allversions(unbounded2)
+
 --cleanup
 remove(unbounded)
 remove(unbounded2)

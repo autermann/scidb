@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -96,12 +96,12 @@ public:
     	ADD_PARAM_SCHEMA()
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         assert(_parameters.size() == 1);
 
-        ArrayDesc schemaParam = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc schemaParam = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         ArrayDesc const& srcArrayDesc = schemas[0];
         Attributes const& srcAttributes = srcArrayDesc.getAttributes();
@@ -114,7 +114,7 @@ public:
             schemaParam.setName(srcArrayDesc.getName());
         }
 
-        const boost::shared_ptr<ParsingContext> &pc = _parameters[0]->getParsingContext();
+        const std::shared_ptr<ParsingContext> &pc = _parameters[0]->getParsingContext();
         if (srcAttributes.size() != dstAttributes.size()
             && srcAttributes.size() != schemaParam.getAttributes(true).size())
         {
@@ -176,11 +176,14 @@ public:
                                              srcDim.getStartMin(),
                                              srcDim.getCurrStart(),
                                              srcDim.getCurrEnd(),
-                                             dstDim.getEndMax() == MAX_COORDINATE && srcDim.getCurrEnd() != MIN_COORDINATE ? srcDim.getEndMax() : dstDim.getEndMax(),
+                                             dstDim.getEndMax() == CoordinateBounds::getMax() &&
+                                                 srcDim.getCurrEnd() != CoordinateBounds::getMin()
+                                                      ? srcDim.getEndMax() : dstDim.getEndMax(),
                                              srcDim.getChunkInterval(),
                                              srcDim.getChunkOverlap());
         }
-        return ArrayDesc(schemaParam.getName(), dstAttributes, dstDimensions, schemaParam.getFlags());
+        return ArrayDesc(schemaParam.getName(), dstAttributes, dstDimensions,
+                         defaultPartitioning(), schemaParam.getFlags());
     }
 };
 

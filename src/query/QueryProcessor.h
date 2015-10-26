@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,7 +36,7 @@
 #ifndef QUERY_PROCESSOR_H_
 #define QUERY_PROCESSOR_H_
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <string>
 #include <queue>
 #include <stdio.h>
@@ -55,6 +55,7 @@
 
 namespace scidb
 {
+  class Session;
 
 /**
  * The stub for data type
@@ -77,63 +78,66 @@ public:
     /**
      * Creates query from query received from the user.
      */
-   virtual boost::shared_ptr<Query> createQuery(std::string queryString, QueryID queryId) = 0;
+    virtual std::shared_ptr<Query> createQuery(
+        std::string                         queryString,
+        QueryID                             queryId,
+        const std::shared_ptr<Session> &    session) = 0;
 
     //TODO: [ap] want to combine parseLogical, semanticCheck and inferTypes into single function called prepareLogical(). Objections?
 
     /**
      * Parse the query string into logical plan
      */
-    virtual void parseLogical(boost::shared_ptr<Query> query, bool afl) = 0;
+    virtual void parseLogical(std::shared_ptr<Query> query, bool afl) = 0;
 
     /**
      * Parse the query string into physical plan
      */
-    virtual void parsePhysical(const std::string& plan, boost::shared_ptr<Query> query) = 0;
+    virtual void parsePhysical(const std::string& plan, std::shared_ptr<Query> query) = 0;
 
     /**
      * Infers types through logical tree
      */
-    virtual const ArrayDesc& inferTypes(boost::shared_ptr<Query> query) = 0;
+    virtual const ArrayDesc& inferTypes(std::shared_ptr<Query> query) = 0;
 
     /**
      * Examine the logical tree and let the operators request array locks
      */
-    virtual void inferArrayAccess(boost::shared_ptr<Query> query) = 0;
+    virtual void inferArrayAccess(std::shared_ptr<Query> query) = 0;
 
     /**
      * Optimizes current logical tree. It must leave the rest of logical plan in query and assign to physical plan
      * new one for sending out and execution.
      * @return true if there is physical plan for execution, false - if there is nothing to execute.
      */
-    virtual bool optimize(boost::shared_ptr< Optimizer> optimizer, boost::shared_ptr<Query> query) = 0;
+    virtual bool optimize(std::shared_ptr< Optimizer> optimizer, std::shared_ptr<Query> query) = 0;
 
     /**
      * Set parameters of query before execution
      */
-    virtual void setParameters(boost::shared_ptr<Query> query, QueryParamMap queryParams) = 0;
+    virtual void setParameters(std::shared_ptr<Query> query, QueryParamMap queryParams) = 0;
 
     /**
      * Execute the physical plan in query only for coordinator instance.
      * It's useful for some preparations before execution.
      */
-    virtual void preSingleExecute(boost::shared_ptr<Query> query) = 0;
+    virtual void preSingleExecute(std::shared_ptr<Query> query) = 0;
 
     /**
      * Execute the physical plan in query only for coordinator instance after execute part on all instances.
      */
-    virtual void postSingleExecute(boost::shared_ptr<Query> query) = 0;
+    virtual void postSingleExecute(std::shared_ptr<Query> query) = 0;
 
     /**
      * Execute the physical plan in query. It doesn't perform any additional check. Just perform operators.
      * All operators must presents and system consistency must be checked before.
      */
-    virtual void execute(boost::shared_ptr<Query> query) = 0;
+    virtual void execute(std::shared_ptr<Query> query) = 0;
 
     /**
      * Creates an object implementing QueryProcessor interface.
      */
-    static boost::shared_ptr<QueryProcessor> create();
+    static std::shared_ptr<QueryProcessor> create();
 };
 
 }

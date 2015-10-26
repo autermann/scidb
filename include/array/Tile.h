@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -44,17 +44,19 @@
 #include <iostream>         // For the operator<< and the dump().
 #include <vector>
 #include <algorithm>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
-#include <util/CoordinatesMapper.h>
-#include <array/TileInterface.h>
-#include <util/Utility.h>
-
+#include <memory>
 #include <log4cxx/logger.h>
 
-namespace scidb {
+#include <util/CoordinatesMapper.h>
+#include <array/TileInterface.h>
+#include <array/RLESegment.h>
+#include <util/Utility.h>
+
+namespace scidb
+{
 
     /**
      * The ArrayEncoding simply writes values to the end of the data, and
@@ -138,107 +140,6 @@ namespace scidb {
 
     namespace rle
     {
-        /**
-         * Representation of an RLE segment.
-         * An ordered (by _startPosition) list of segments in conjunction with a list of data elements ("payload")
-         * is used to represent RLE encoded data.
-         * The _dataIndex field points to the first data element inside the payload, which is the first value of the segment.
-         * Each segment can either be a "run" or a "literal".
-         * In a run segment all values are the same and are represented by a single payload value @ payload [ _dataIndex ].
-         * In a literal segment the values may or may not be the same and each value in the segment
-         * is represented by a separate value in the payload.
-         * In the literal segment Si, the first value is payload [ Si._dataIndex ],
-         * the last value is payload [ Si+1._startPosition - Si._startPosition - 1 ].
-         * The terminating segment exists strictly for computing the length of the last data segment as in
-         * Sterm._startPosition - Slast._startPosition.
-         * To accomodate SciDB NULLs with missing codes, there are NULL segments.
-         * They dont index into the payload and cannot be literals.
-         * They represent runs (possibly of length 1) of NULLs with missing codes recorded in the _dataIndex field.
-         */
-        class Segment {
-
-        private:
-
-            uint64_t _startPosition;  // position of first cell in segment.
-            struct bits {
-                uint32_t     _dataIndex : 30; // index of element into payload
-                uint32_t     _isRun : 1;      // Is segment run of same value or literal.
-                uint32_t     _isNull : 1;    // _dataIndex is missing code
-            } __attribute__ ((packed));
-
-            union {
-                struct bits _bits;
-                uint32_t _allBits;
-            };
-            static const uint32_t MAX_DATA_INDEX = 0x3FFFFFFF; // 30bits
-
-        public:
-
-            Segment ()
-            : _startPosition(0), _allBits(0)
-            {
-                assert(sizeof(_bits) <= sizeof(_allBits));
-            }
-            Segment ( const uint64_t position, const uint32_t dataIndex,
-                      const uint32_t isRun,    const int32_t isNull )
-            : _startPosition(position)
-            {
-                _bits._dataIndex = dataIndex;
-                _bits._isRun = isRun;
-                _bits._isNull = isNull;
-
-                assert(dataIndex <= MAX_DATA_INDEX);
-                assert(isNull==0 || isNull==1);
-                assert(isRun==0 || isRun==1);
-            }
-            bool isLiteral() const
-            {
-                return ( 0 == _bits._isRun );
-            }
-            bool isRun() const
-            {
-                return !isLiteral();
-            }
-            bool isNull() const
-            {
-                return ( 1 == _bits._isNull );
-            }
-            int32_t getMissingCode() const
-            {
-                assert(isRun());
-                assert(isNull());
-                return static_cast<int32_t>(_bits._dataIndex);
-            }
-            uint32_t getDataIndex() const
-            {
-                return _bits._dataIndex;
-            }
-            uint64_t getStartPosition() const
-            {
-                return _startPosition;
-            }
-            void setStartPosition(uint64_t pos)
-            {
-                _startPosition = pos;
-            }
-            void setMissingCode(int32_t code)
-            {
-                // the missing code is not stored in payload _data
-                // but rather directly in _bits._dataIndex
-                assert(isNull());
-                assert(isRun());
-                assert(code>=0);
-                setDataIndex(code);
-            }
-            void setDataIndex(uint32_t i)
-            {
-                assert(i <= MAX_DATA_INDEX);
-                _bits._dataIndex = i;
-            }
-            void setRun(bool b)  { _bits._isRun = b; }
-            void setNull(bool b) { _bits._isNull = b; }
-        };
-
         std::ostream& operator << ( std::ostream& out,
                                     const scidb::rle::Segment& segment );
         /**
@@ -411,88 +312,94 @@ namespace scidb {
             size_t endValueSegIndx = 0;
             // offset relative to the start of non-NULL data (in case off points into the middle of a litteral segment)
             size_t startValueIndexShift = 0;
+            // number of values in the new payload
+            size_t valueNum = 0;
 
-            for (size_t i=0, n=_segments.size()-1; i <n; ++i) {
+            for (size_t i=0, n=_segments.size()-1; i < n; ++i) {
 
                 assert(startSegIndx+i < maxSegIndx);
                 ConstRLEPayload::Segment const& srcSeg = rlePayload->getSegment(startSegIndx+i);
                 rle::Segment& nextSeg = _segments[i];
 
-                assert( srcSeg._pPosition > off || i==0);
-                nextSeg.setStartPosition(srcSeg._pPosition - off);
+                assert( srcSeg.pPosition() > off || i==0);
+                nextSeg.setStartPosition(srcSeg.pPosition() - off);
                 assert(nextSeg.getStartPosition()>0 || i==0);
 
-                nextSeg.setRun(srcSeg._same);
-                nextSeg.setNull(srcSeg._null);
+                nextSeg.setRun(srcSeg.same());
+                nextSeg.setNull(srcSeg.null());
 
                 // initialize non-NULL segment boundaries & setDataIndex()
-                if (srcSeg._null==0) {
-                    size_t dataIndexOff = startValueIndexShift;
+                if (!srcSeg.null()) {
                     if (startValueSegIndx > startSegIndx+i) {
                         startValueSegIndx = startSegIndx+i;
                         assert(&srcSeg == &rlePayload->getSegment(startValueSegIndx));
                         startValueSeg = &srcSeg;
                         assert(startValueSeg);
-                        if (startValueSegIndx==startSegIndx && startValueSeg->_same==0) {
-                            // the first segment is non-null and is not compressed (i.e. literal)
-                            // the first value we want can be in the middle of the segment
-                            assert(off >= startValueSeg->_pPosition);
-                            startValueIndexShift = off - startValueSeg->_pPosition;
-                            dataIndexOff = 0;
-                        }
                     }
                     endValueSegIndx = startSegIndx+i;
-                    assert(srcSeg._valueIndex >= (startValueSeg->_valueIndex + dataIndexOff));
-                    nextSeg.setDataIndex(srcSeg._valueIndex - startValueSeg->_valueIndex - dataIndexOff);
+                    // set the data index to the original payload,
+                    // it will be used later to locate the right data for the segment
+                    nextSeg.setDataIndex(srcSeg.valueIndex());
+
+                    // adjust the payload value count
+                    if (srcSeg.same()) { // it is a run
+                        valueNum += 1;
+                    } else { // it is a literal
+                        assert(startSegIndx+i+1 <= maxSegIndx);
+                        ConstRLEPayload::Segment const& pastSrcSeg = rlePayload->getSegment(startSegIndx+i+1);
+                        assert(pastSrcSeg .pPosition() > srcSeg.pPosition());
+                        valueNum += (pastSrcSeg.pPosition() - srcSeg.pPosition());
+                    }
                 } else {
                     // assign the missing code for the null segment
-                    nextSeg.setMissingCode(srcSeg._valueIndex);
+                    nextSeg.setMissingCode(srcSeg.valueIndex());
                 }
             }
+
             assert(_segments.size() > 1);
             _segments[0].setStartPosition(0);
-            if (!_segments[0].isNull()) {
-                _segments[0].setDataIndex(0);
-            }
 
-            if (startValueSeg) {
-                assert(startValueSeg->_null==0);
-                // We have non-NULL data, so calculate the data boundaries inside rlePaylaod.
-                char* startData(NULL);
-                char* endData(NULL);
-                computePayloadDataBoundaries(rlePayload, off, nElems,
-                                             startValueSeg, startValueIndexShift,
-                                             startSegIndx, startValueSegIndx,
-                                             endSegIndx, endValueSegIndx,
-                                             startData, endData);
-                assert(rlePayload->getSegment(endValueSegIndx)._null==0);
-                assert(rlePayload->getSegment(startValueSegIndx)._null==0);
-                assert(endData <= (rlePayload->getRawValue(0) + rlePayload->payloadSize()));
+            if (startValueSeg) { // there are non-NULL segments
+
+                assert(startValueSeg->null()==0);
+                assert(rlePayload->getSegment(endValueSegIndx).null()==0);
+                assert(rlePayload->getSegment(startValueSegIndx).null()==0);
                 assert(maxSegIndx >= (endSegIndx+1));
 
-                // make sure that the end of the data buffer does not stretch beyond the offset indicated by endValueSeg
-                // (i.e. the last non-null segment we care about)
-                assert( ( (maxSegIndx > endSegIndx+1) &&
-                          (endData <= ( rlePayload->getRawValue(rlePayload->getSegment(endValueSegIndx)._valueIndex) +
-                                        (rlePayload->getSegment(endValueSegIndx+1)._pPosition -
-                                         rlePayload->getSegment(endValueSegIndx)._pPosition) * rlePayload->elementSize())) )
-                        ||
-                        (maxSegIndx == endSegIndx+1)
-                        );
+                // adjust the first segment value count if we dont need the entire literal
+                if (startValueSegIndx==startSegIndx && startValueSeg->same()==0) {
+                    // the first segment is non-null and is not compressed (i.e. literal)
+                    // the first value we want can be in the middle of the segment
+                    assert(off >= startValueSeg->pPosition());
+                    startValueIndexShift = off - startValueSeg->pPosition();
 
-                // Initialize data values
-                const size_t elemSize = rlePayload->elementSize();
-                size_t nVals = (endData - startData) / elemSize;
-                assert(nVals<=nElems);
-                _data.resize(nVals);
+                    assert(valueNum > startValueIndexShift);
+                    valueNum -= startValueIndexShift;
 
-                initializeInternalData(startData, endData, elemSize);
+                    _segments[0].setDataIndex(startValueSeg->valueIndex() + startValueIndexShift);
+                }
+
+                // adjust the last segment value count if we dont need the entire literal
+                ConstRLEPayload::Segment const& endValSeg = rlePayload->getSegment(endValueSegIndx);
+                if (endValSeg.same()==0) { // a literal of different values
+                    ConstRLEPayload::Segment const& pastEndValSeg = rlePayload->getSegment(endValueSegIndx+1);
+                    assert(pastEndValSeg .pPosition() > endValSeg.pPosition());
+                    if (size_t(pastEndValSeg.pPosition()) > (off+nElems)) {
+                        assert(endSegIndx == endValueSegIndx);
+                        const size_t endValueIndexShift = pastEndValSeg.pPosition() - (off+nElems);
+                        valueNum -= endValueIndexShift;
+                    }
+                }
+
+                initializeInternalData(rlePayload, valueNum);
             }
+            assert(_segments[0].getStartPosition()==0);
+            assert(_segments[0].isNull() || _segments[0].getDataIndex()==0);
 
             // finalize
             ConstRLEPayload::Segment const& pastLastSeg = rlePayload->getSegment(endSegIndx+1);
-            assert(pastLastSeg._pPosition >= off);
-            _nextPosition = size_t(pastLastSeg._pPosition) > (off+nElems) ? nElems : pastLastSeg._pPosition-off;
+            assert(pastLastSeg.pPosition() >= off);
+            _nextPosition = size_t(pastLastSeg.pPosition()) > (off+nElems) ? nElems : pastLastSeg.pPosition()-off;
             assert(_data.size() <= _nextPosition);
             finalizeInternal(true);
 
@@ -502,6 +409,52 @@ namespace scidb {
             assert(checkConsistency());
 
             assert(logEncodingContents());
+        }
+
+        void initializeInternalData(const ConstRLEPayload* rlePayload, size_t valueNum)
+        {
+            // allocate the value data
+            _data.resize(valueNum);
+            const size_t elemSize = rlePayload->elementSize();
+
+            // assign the value indeces & copy the data
+            for (size_t i=0, dataOff=0, n=_segments.size()-1; i <n; ++i)  {
+
+                rle::Segment& nextSeg = _segments[i];
+
+                if (nextSeg.isNull()) { // null segment
+                    continue;
+                }
+                size_t segValueNum = 1; // run segment
+
+                if (i+1 == n) { // last segement
+                    assert(_data.size() > dataOff);
+
+                    segValueNum = _data.size() - dataOff;
+                    assert(segValueNum > 0);
+                } else if (!nextSeg.isRun()) { // literal segment
+                    assert((i+1) < (_segments.size()-1));
+                    rle::Segment& pastNextSeg = _segments[i+1];
+
+                    assert(pastNextSeg.getStartPosition() > nextSeg.getStartPosition());
+                    segValueNum = (pastNextSeg.getStartPosition() - nextSeg.getStartPosition());
+                }
+                // use the index into the source payload
+                char* segValueData = rlePayload->getRawValue(nextSeg.getDataIndex());
+                assert(segValueData);
+
+                // set the new data index
+                nextSeg.setDataIndex(dataOff);
+
+                // copy the value data
+                for (size_t valueCount=0;
+                     valueCount < segValueNum;
+                     ++valueCount, segValueData += elemSize, ++dataOff) {
+                    assert(segValueData < (rlePayload->getRawValue(0) + rlePayload->payloadSize()));
+
+                    initializeInternalDatum(segValueData, dataOff, elemSize);
+                }
+            }
         }
 
         /**
@@ -934,7 +887,7 @@ namespace scidb {
             // may be between the first & last segments we are extracting.
             // So, the logic below figures out where the value data (we need) starts and ends
             const size_t elemSize = rlePayload->elementSize();
-            startData = rlePayload->getRawValue(startValueSeg->_valueIndex);
+            startData = rlePayload->getRawValue(startValueSeg->valueIndex());
             startData += startValueIndexShift*elemSize;
             assert(startData);
 
@@ -944,28 +897,28 @@ namespace scidb {
             assert(endValueSegIndx>=startValueSegIndx);
 
             ConstRLEPayload::Segment const& endValSeg = rlePayload->getSegment(endValueSegIndx);
-            endData = rlePayload->getRawValue(endValSeg._valueIndex);
-            if (endValSeg._same!=0) { //run of same values
+            endData = rlePayload->getRawValue(endValSeg.valueIndex());
+            if (endValSeg.same()) { //run of same values
                 endData += elemSize;
             } else { // literal of different values
                 ConstRLEPayload::Segment const& pastEndValSeg = rlePayload->getSegment(endValueSegIndx+1);
-                assert(pastEndValSeg ._pPosition > endValSeg._pPosition);
+                assert(pastEndValSeg .pPosition() > endValSeg.pPosition());
                 size_t endValueIndexShift = 0;
                 // adjust if we dont need the entire literal
-                if (size_t(pastEndValSeg._pPosition) > (off+nElems)) {
+                if (size_t(pastEndValSeg.pPosition()) > (off+nElems)) {
                     assert(endSegIndx == endValueSegIndx);
-                    endValueIndexShift = pastEndValSeg._pPosition - (off+nElems);
+                    endValueIndexShift = pastEndValSeg.pPosition() - (off+nElems);
                 }
                 // advance past the end of literal minus what we dont want
-                endData += elemSize*(pastEndValSeg._pPosition - endValSeg._pPosition - endValueIndexShift);
+                endData += elemSize*(pastEndValSeg.pPosition() - endValSeg.pPosition() - endValueIndexShift);
             }
 
             assert(endData!=NULL);
             assert(startData!=NULL);
             assert(endData > startData);
             assert(size_t(endData-startData) <= rlePayload->payloadSize());
-            assert(startData >= rlePayload->getRawValue(startValueSeg->_valueIndex));
-            assert(endData   >  rlePayload->getRawValue(rlePayload->getSegment(endValueSegIndx)._valueIndex));
+            assert(startData >= rlePayload->getRawValue(startValueSeg->valueIndex()));
+            assert(endData   >  rlePayload->getRawValue(rlePayload->getSegment(endValueSegIndx).valueIndex()));
             assert((endData - startData) % elemSize == 0);
         }
 
@@ -984,7 +937,8 @@ namespace scidb {
                 if (!nextSeg.isNull()) {
                     assert(nextSeg.getStartPosition() > lastStart);
                     assert(nextSeg.getDataIndex() > lastDataIndex ||
-                           (lastDataIndex==0 && nextSeg.getDataIndex()==0 && _segments[0].isNull() && !foundFirstValueSeg) );
+                           (lastDataIndex==0 && nextSeg.getDataIndex()==0
+                            && _segments[0].isNull() && !foundFirstValueSeg) );
                     assert(nextSeg.getDataIndex() < nVals);
                     lastDataIndex = nextSeg.getDataIndex();
                     foundFirstValueSeg = true;
@@ -1031,7 +985,7 @@ namespace scidb {
             return true;
         }
 
-        void initializeInternalData(const char* startData, const char* endData, size_t elemSize);
+        void initializeInternalDatum(const char* buf, size_t dataIndx, size_t elemSize);
 
         /**
          * @return true if the encoding has been finalized
@@ -1244,18 +1198,13 @@ namespace scidb {
     template<typename Type>
     const Type RLEEncoding<Type>::_dummy=Type();
     template<>
-    void RLEEncoding<scidb::Value>::initializeInternalData(const char* startData, const char* endData, size_t elemSize);
+    void RLEEncoding<scidb::Value>::initializeInternalDatum(const char* buf, size_t dataIndx, size_t elemSize);
     template<typename Type>
-    void RLEEncoding<Type>::initializeInternalData(const char* startData, const char* endData, size_t elemSize)
+    void RLEEncoding<Type>::initializeInternalDatum(const char* buf, size_t dataIndx, size_t elemSize)
     {
-        for (typename DataType::iterator iter = _data.begin();
-             startData != endData;
-             ++iter, startData +=elemSize) {
-            assert(iter != _data.end());
-            Type& el = *iter;
-            assert(startData <= (endData-elemSize));
-            el = *reinterpret_cast<const Type*>(startData);
-        }
+        assert(dataIndx < _data.size());
+        Type& el = _data[dataIndx];
+        el = *reinterpret_cast<const Type*>(buf);
     }
 
     /**
@@ -1706,11 +1655,11 @@ namespace scidb {
          * @param ctx the context required to construct the tile (or NULL)
          * @return a heap-allocated Tile<T,E> based on typeId & encodingId
          */
-        boost::shared_ptr<BaseTile> operator() (const scidb::TypeId typeId,
+        std::shared_ptr<BaseTile> operator() (const scidb::TypeId typeId,
                                                 const BaseEncoding::EncodingID encodingId,
                                                 const BaseTile::Context* ctx)
         {
-            return boost::make_shared< Tile<T, E> > (typeId, encodingId, ctx);
+            return std::make_shared< Tile<T, E> > (typeId, encodingId, ctx);
         }
     };
 
@@ -1720,7 +1669,7 @@ namespace scidb {
                                       const BaseEncoding::EncodingID encodingId)
     {
         TileBuilder < T, E > tb;
-        TileConstructor constructor = boost::bind<boost::shared_ptr<BaseTile> >(tb, _1, _2, _3);
+        TileConstructor constructor = boost::bind<std::shared_ptr<BaseTile> >(tb, _1, _2, _3);
         registerConstructor(typeId, encodingId, constructor);
     }
 

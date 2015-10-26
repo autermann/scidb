@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -56,26 +56,28 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& inputDistributions,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
             std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return ArrayDistribution(psLocalInstance);
+        return RedistributeContext(psLocalInstance);
     }
 
-    void preSingleExecute(boost::shared_ptr<Query> query)
+    void preSingleExecute(std::shared_ptr<Query> query)
     {
         assert(_parameters.size() == 1);
-        string arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        string arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         SystemCatalog& catalog = * SystemCatalog::getInstance();
         ArrayDesc arrayDesc;
-        catalog.getArrayDesc(arrayName, LAST_VERSION, arrayDesc);
-        Coordinates lowBoundary = catalog.getLowBoundary(arrayDesc.getId());
-        Coordinates highBoundary = catalog.getHighBoundary(arrayDesc.getId());
+        catalog.getArrayDesc(arrayName, query->getCatalogVersion(arrayName), LAST_VERSION, arrayDesc);
+
+        Coordinates lowBoundary = arrayDesc.getLowBoundary();
+        Coordinates highBoundary = arrayDesc.getHighBoundary();
         Dimensions const& dims = arrayDesc.getDimensions();
-        
-        boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
+        assert(dims.size() == size_t(_schema.getDimensions()[0].getChunkInterval()));
+
+        std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
         for (size_t i = 0, size = dims.size(); i < size; i++)
         {
             Value tuple[8];
@@ -100,18 +102,18 @@ public:
         _result = tuples;
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
         if (!_result)
         {
-            _result = boost::make_shared<MemArray>(_schema, query);
+            _result = std::make_shared<MemArray>(_schema, query);
         }
         return _result;
     }
 
 private:
-    boost::shared_ptr<Array> _result;
+    std::shared_ptr<Array> _result;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalDimensions, "dimensions", "physicalDimensions")

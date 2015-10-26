@@ -90,6 +90,7 @@ BuildRequires: python-devel
 BuildRequires: libicu-devel
 BuildRequires: chrpath
 BuildRequires: python-libs
+BuildRequires: devtoolset-3
 #BuildRequires: openmpi-libs
 
 %description
@@ -306,13 +307,13 @@ web page (http://www.boost.org/doc/libs/1_40_0).
 %patch13 -p1
 
 %build
-./bootstrap.sh --prefix=/usr
-./bjam --without-mpi %{?_smp_mflags}
+scl enable devtoolset-3 "/bin/bash -c 'cd %{_builddir}/%{srcdir} ; ./bootstrap.sh --prefix=/usr'"
+scl enable devtoolset-3 "/bin/bash -c 'cd %{_builddir}/%{srcdir} ; ./bjam --without-mpi %{?_smp_mflags} cxxflags=-std=c++14'"
 
 %install
 rm -rf $RPM_BUILD_ROOT
 cd %{_builddir}/%{srcdir}/
-./bjam --prefix=$RPM_BUILD_ROOT/usr install
+scl enable devtoolset-3 "/bin/bash -c 'cd %{_builddir}/%{srcdir} ; ./bjam --prefix=$RPM_BUILD_ROOT/usr install cxxflags=-std=c++14'"
 mkdir -p "$RPM_BUILD_ROOT/%{scidb_path}"
 mv       "$RPM_BUILD_ROOT/usr/lib"     "$RPM_BUILD_ROOT/%{scidb_path}"
 mv       "$RPM_BUILD_ROOT/usr/include" "$RPM_BUILD_ROOT/%{scidb_path}"

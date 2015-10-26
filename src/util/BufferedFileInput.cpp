@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -44,7 +44,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.util.Buffered
  * @throws scidb::SystemExeption via validateQueryPtr if the query is not valid.
  * @return true if query is valid AND if the state is not TERMINATED.
  */
-bool queryAndScannerValid(shared_ptr<Query>& query, BufferedFileInput::State* pState)
+bool queryAndScannerValid(std::shared_ptr<Query>& query, BufferedFileInput::State* pState)
 {
     Query::validateQueryPtr(query);
     return *pState != BufferedFileInput::TERMINATED;
@@ -63,7 +63,7 @@ BufferedFileInput::Buffer::Buffer()
 }
 
 BufferedFileInput::FillBufferJob::FillBufferJob(
-        shared_ptr<Query> const& query,
+        std::shared_ptr<Query> const& query,
         Buffer* buffers,
         FILE* f,
         int64_t bufferSize,
@@ -76,7 +76,7 @@ BufferedFileInput::FillBufferJob::FillBufferJob(
 {
 }
 
-BufferedFileInput::BufferedFileInput(FILE* f, boost::shared_ptr<Query>& query)
+BufferedFileInput::BufferedFileInput(FILE* f, std::shared_ptr<Query>& query)
 : _state(UNINITIALIZED),
   _f(f),
   _which(0),
@@ -99,7 +99,7 @@ bool BufferedFileInput::initialize()
 
     // start the prefetching thread
     PhysicalOperator::getGlobalQueueForOperators()->pushJob( _fillBufferJob =
-            shared_ptr<FillBufferJob>(new FillBufferJob(Query::getValidQueryPtr(_query), _buffers, _f, _bufferSize, &_state)) );
+            std::shared_ptr<FillBufferJob>(new FillBufferJob(Query::getValidQueryPtr(_query), _buffers, _f, _bufferSize, &_state)) );
 
     // lock buffer[0]
     Buffer& theBuffer = _buffers[0];

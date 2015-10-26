@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,37 +30,34 @@
  */
 
 
-#ifndef QUERY_HELPER_H_
-#define QUERY_HELPER_H_
-
+#ifndef QUERYPLANUTILITIES_H_
+#define QUERYPLANUTILITIES_H_
 
 #include <iostream>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <log4cxx/logger.h>
 
 namespace scidb
 {
 
-
 class IndentBy
 {
-  public:
+public:
     const int count;
     const char by;
 
-  public:
+public:
     IndentBy(int _count, char _by) : count(_count), by(_by)
     {
     }
 };
 
-
 class Indent
 {
-  public:
+public:
     const int count;
 
-  public:
+public:
     Indent(int _count) : count(_count)
     {
     }
@@ -71,7 +68,6 @@ class Indent
     }
 };
 
-
 inline std::ostream& operator<<(std::ostream& str, IndentBy const& indent)
 {
     std::string pad(indent.count, indent.by);
@@ -79,20 +75,15 @@ inline std::ostream& operator<<(std::ostream& str, IndentBy const& indent)
     return str;
 }
 
-
 class PhysicalQueryPlanNode;
-typedef boost::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
-
+typedef std::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
 
 const PhysNodePtr getRoot(PhysNodePtr node);
-
 
 void printPlan(PhysNodePtr, int indent = 0, bool children = true);
 void logPlanDebug(log4cxx::LoggerPtr, PhysNodePtr, int indent = 0, bool children = true);
 void logPlanTrace(log4cxx::LoggerPtr, PhysNodePtr, int indent = 0, bool children = true);
 
+} // namespace
 
-} /* namespace scidb */
-
-
-#endif /* QUERY_HELPER_H_ */
+#endif

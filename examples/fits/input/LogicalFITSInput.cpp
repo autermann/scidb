@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -49,9 +49,9 @@ public:
         ADD_PARAM_VARIES();
     }
 
-    vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const vector< ArrayDesc> &schemas)
+    vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const vector< ArrayDesc> &schemas)
     {
-        vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         switch (_parameters.size()) {
             case 2:
@@ -68,19 +68,19 @@ public:
         return res;
     }
 
-    ArrayDesc inferSchema(vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         if (_parameters.size() == 4) {  // Check for valid instance ID
-            InstanceID instanceID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&) _parameters[3])->getExpression(), query, TID_UINT64).getUint64();
+            InstanceID instanceID = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&) _parameters[3])->getExpression(), query, TID_UINT64).getUint64();
             if (instanceID >= query->getInstancesCount()) {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID, _parameters[3]->getParsingContext()) << instanceID;
             }
         }
-        
-        const string& arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        
+
+        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
         ArrayDesc arrayDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, query->getCatalogVersion(arrayName), arrayDesc);
 
         return arrayDesc;
     }

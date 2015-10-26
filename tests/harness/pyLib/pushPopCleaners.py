@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -63,7 +63,7 @@ class DataDirCleaner(object):
         self._initDataFiles = set([])
         self._pushed = False
         self._dbgWriter = DebugStreamWriter(debug,stream)
-                    
+
     def push(self):
         if (os.path.isdir(os.path.abspath(self._dataDir))):
             self._dataDir = os.path.abspath(self._dataDir)
@@ -75,7 +75,7 @@ class DataDirCleaner(object):
             delta = dataFiles - (dataFiles & self._initDataFiles)
             #-----------------------------------------------------------------
             # Take out the folders that fall into the "do-not-touch" category:
-            # some operators create 'mpi*' folders in the data folder.  We 
+            # some operators create 'mpi*' folders in the data folder.  We
             # cannot delete them easily (so, we do not touch them).
             delta = set([x for x in delta if not any([p in x for p in IGNORE_PATTERNS])])
             #-----------------------------------------------------------------
@@ -101,7 +101,7 @@ class ArrayCleaner(object):
     #                the "raw" data returned by the list-array query.  The names
     #                are returned as a set back to the caller.
     def _getArrayNames(self, iqueryData):
-        # Run the regular expression check to grab the names of the arrays with 
+        # Run the regular expression check to grab the names of the arrays with
         # some extraneous characters.  L will contain regular expression match
         # objects.
         lines = iqueryData.split('\n')
@@ -114,7 +114,7 @@ class ArrayCleaner(object):
     def getSciDBArrays(self):
         # Run iquery to get the list of arrays.
         _,stdoutData,stderrData = self._iquery.runQuery(listSciDBArraysCmd,opts=['-o','csv','-aq'])
-        
+
         # Get the names from the "raw" data and return them:
         return self._getArrayNames(stdoutData)
     #-----------------------------------------------------------------------------
@@ -128,7 +128,7 @@ class ArrayCleaner(object):
 
         for A in arraySet:
             # Substitute the name of the array in the command list (quick and
-            # dirty way: no need to remember which parameter needs the 
+            # dirty way: no need to remember which parameter needs the
             # replacement).
             removeArrayCmd = removeSciDBArrayCmd
             removeArrayCmd = removeArrayCmd.replace('<array>',A)
@@ -138,7 +138,7 @@ class ArrayCleaner(object):
         # Get the arrays out of the database and store them in temp file
         self._pushedArrayNames = self.getSciDBArrays()
         self._pushed = True
-        
+
     def pop(self):
         if (self._pushed):
             currentArrayNames = self.getSciDBArrays()
@@ -147,7 +147,7 @@ class ArrayCleaner(object):
                 )
             self._pushed = False
 #-----------------------------------------------------------------------------
-# getTempFileName: get a name for a temporary file based on a seed for the 
+# getTempFileName: get a name for a temporary file based on a seed for the
 #                  random number generator.  The seed provides pseudo-random
 #                  mode of operation: if the function is called with the same
 #                  seed several times, the exact same name will be generated
@@ -155,12 +155,12 @@ class ArrayCleaner(object):
 def getTempFileName(seed, prefix='scidb_arr_',fext='.txt'):
     # Initialize random number generator.
     random.seed(seed)
-    
+
     # Compute the temporary name and return it:
     tempFile = ''.join(random.sample(string.letters,10)) + fext
     tempFile = prefix + tempFile
     tempPath = os.path.join('/','tmp',tempFile)
-    
+
     print tempPath
     return tempPath
 #-----------------------------------------------------------------------------
@@ -187,20 +187,20 @@ def getTempFileName(seed, prefix='scidb_arr_',fext='.txt'):
 # from the database, and the pseudo-random file is deleted from the system.
 #
 # The proposed operation of this script is as follows:
-# 1) call the script once at the start of testharness run with any random 
+# 1) call the script once at the start of testharness run with any random
 #    seed (ignored in this case) to clean out the database of all arrays
 # 2) next, call the script with a random seed and setup mode at the
 #    beginning of a single test execution (array names will be stored)
 # 3) finally, call the script again with the same random seed and cleanup
-#    mode to remove any "leftover" arrays the test did not cleanup for 
+#    mode to remove any "leftover" arrays the test did not cleanup for
 #    some reason.
 #
 # This scheme of opertion will not work, of course, in a multi-threaded
-# harness: if several tests want to create and remove arrays with exactly 
-# the same names.  Some other cleanup method will have to be designed for 
+# harness: if several tests want to create and remove arrays with exactly
+# the same names.  Some other cleanup method will have to be designed for
 # that execution of tests.
-# 
-def cleanArrays(seed,mode):   
+#
+def cleanArrays(seed,mode):
     cleaner = pushPopCleaner()
     tempPath = getTempFileName(seed)
     if (mode == 'setup'):
@@ -210,8 +210,8 @@ def cleanArrays(seed,mode):
             pickle.dump(currentArrayNames,fd)
     elif (mode == 'cleanup'):
         # Get the current array names from the database:
-        currentArrayNames = cleaner.getSciDBArrays()       
-        
+        currentArrayNames = cleaner.getSciDBArrays()
+
         # Retrieve the array names stored in the temp file during setup mode:
         origArrayNames = set([])
         if (os.path.isfile(tempPath)):
@@ -219,7 +219,7 @@ def cleanArrays(seed,mode):
                 origArrayNames = pickle.load(fd)
             # Remove the temp file since it is no longer needed:
             os.remove(tempPath)
-        
+
         # Delete the difference left by the test (if any):
         cleaner.removeSciDBArrays(
             currentArrayNames - (origArrayNames & currentArrayNames)

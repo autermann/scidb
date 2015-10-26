@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -81,15 +81,15 @@ class LogicalSubstitute: public LogicalOperator
     	ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
         res.push_back(PARAM_IN_ATTRIBUTE_NAME("void"));
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 2);
         ArrayDesc const& inputDesc = schemas[0];
@@ -117,7 +117,7 @@ class LogicalSubstitute: public LogicalOperator
         vector<bool> substituteAttrs (inputAttrs.size(), _parameters.size() == 0 ? true : false);
         for (size_t i = 0, n = _parameters.size(); i < n; i++)
         {
-            size_t attId = ((boost::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
+            size_t attId = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo();
             substituteAttrs[attId] = true;
         }
 
@@ -145,7 +145,7 @@ class LogicalSubstitute: public LogicalOperator
                 newAttributes[i] = inputAttrs[i];
             }
         }
-        return ArrayDesc(inputDesc.getName() + "_subst", newAttributes, inputDesc.getDimensions());
+        return ArrayDesc(inputDesc.getName() + "_subst", newAttributes, inputDesc.getDimensions(), defaultPartitioning());
     }
 
 

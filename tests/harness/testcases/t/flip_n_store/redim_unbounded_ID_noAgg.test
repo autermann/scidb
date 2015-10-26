@@ -1,7 +1,7 @@
 --setup
 
 CREATE array Raw_Test_Data < I : int64, J : int64, V : double NULL > [ Line=0:*,100,0 ]
-load ( Raw_Test_Data, '../tests/harness/testcases/data/redim_data2.txt')
+--shell --store-all --command "iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -aq "load ( Raw_Test_Data, '${TEST_DATA_DIR}/redim_data2.txt')""
 
 --test
 --start-query-logging

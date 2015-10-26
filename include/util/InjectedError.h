@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -23,7 +23,7 @@
 /**
  * @file InjectedError.h
  *
- * @brief 
+ * @brief
  *
  */
 
@@ -31,9 +31,7 @@
 #define INJECTEDERROR_H_
 
 #include <map>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/bind.hpp>
 #include <util/Mutex.h>
 #include <util/Notification.h>
@@ -62,7 +60,7 @@ class InjectedError
  *
  */
 class WriteChunkInjectedError
-: public InjectedError, public boost::enable_shared_from_this<WriteChunkInjectedError>
+: public InjectedError, public std::enable_shared_from_this<WriteChunkInjectedError>
 {
  public:
     const static long int ID = 1;
@@ -71,13 +69,13 @@ class WriteChunkInjectedError
 
 };
 typedef Notification<WriteChunkInjectedError> WriteChunkInjectedErrorNotification;
- 
+
 /**
  * @class ReplicaSendInjectedError - a specific error injected into the ReplicationManager::sendItem code path
  *
  */
 class ReplicaSendInjectedError
-: public InjectedError, public boost::enable_shared_from_this<ReplicaSendInjectedError>
+: public InjectedError, public std::enable_shared_from_this<ReplicaSendInjectedError>
 {
  public:
     const static long int ID = 2;
@@ -90,11 +88,11 @@ typedef Notification<ReplicaSendInjectedError> ReplicaSendInjectedErrorNotificat
 /**
  * @class ReplicaWaitInjectedError - a specific error injected into the ReplicationManager::wait code path
  * which is triggered when the ReplicationManager is trying to wait until more buffer/queue space
- * is available in NetworkManager. This path is often taken when replication network flow control is pushing back. 
+ * is available in NetworkManager. This path is often taken when replication network flow control is pushing back.
  *
  */
 class ReplicaWaitInjectedError
-: public InjectedError, public boost::enable_shared_from_this<ReplicaWaitInjectedError>
+: public InjectedError, public std::enable_shared_from_this<ReplicaWaitInjectedError>
 {
  public:
     const static long int ID = 3;
@@ -106,13 +104,13 @@ typedef Notification<ReplicaWaitInjectedError> ReplicaWaitInjectedErrorNotificat
 
 /**
  * @class OperatorInjectedError - a generic error to be interpreted by a specific operator
- *  store(),redim_store(),sg(),rename() error out after they have done 99% of the work
+ *  store(),redim_store(),_sg(),rename() error out after they have done 99% of the work
  *  (99% because a coordinator will error out before creating a new version in the catalog).
  *  remove() errors out before it does any work.
  *
  */
 class OperatorInjectedError
-: public InjectedError, public boost::enable_shared_from_this<OperatorInjectedError>
+: public InjectedError, public std::enable_shared_from_this<OperatorInjectedError>
 {
  public:
     const static long int ID = 4;
@@ -126,7 +124,7 @@ typedef Notification<OperatorInjectedError> OperatorInjectedErrorNotification;
  * which is triggered when the ThreadPool spawns off its threads. This error should cause one or more scidb::Threads to be created but not started.
  */
 class ThreadStartInjectedError
-: public InjectedError, public boost::enable_shared_from_this<ThreadStartInjectedError>
+: public InjectedError, public std::enable_shared_from_this<ThreadStartInjectedError>
 {
  public:
     const static long int ID = 5;
@@ -141,7 +139,7 @@ typedef Notification<ThreadStartInjectedError> ThreadStartInjectedErrorNotificat
  * code path.
  */
 class DataStoreInjectedError
-: public InjectedError, public boost::enable_shared_from_this<DataStoreInjectedError>
+: public InjectedError, public std::enable_shared_from_this<DataStoreInjectedError>
 {
  public:
     const static long int ID = 6;
@@ -150,7 +148,7 @@ class DataStoreInjectedError
 
 };
 typedef Notification<DataStoreInjectedError> DataStoreInjectedErrorNotification;
- 
+
 /**
  * @class InjectedErrorLibrary - a library of all injected error identified by their IDs
  *
@@ -160,14 +158,14 @@ class InjectedErrorLibrary
  public:
     InjectedErrorLibrary();
     virtual ~InjectedErrorLibrary();
-    bool registerError(long int id, const boost::shared_ptr<const InjectedError>& err);
-    boost::shared_ptr<const InjectedError> getError(long int id);
+    bool registerError(long int id, const std::shared_ptr<const InjectedError>& err);
+    std::shared_ptr<const InjectedError> getError(long int id);
     static InjectedErrorLibrary* getLibrary()
     {
         return &_injectedErrorLib;
     }
  private:
-    typedef std::map<long int, boost::shared_ptr<const InjectedError> > IdToErrorMap;
+    typedef std::map<long int, std::shared_ptr<const InjectedError> > IdToErrorMap;
 #ifndef NDEBUG
     IdToErrorMap _registeredErrors;
     Mutex _mutex;

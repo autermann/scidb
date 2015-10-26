@@ -13,6 +13,7 @@ Source0:	http://downloads.paradigm4.com/centos6.3/3rdparty_sources/mpich2-%{vers
 BuildRequires:	libXt-devel, libuuid-devel
 BuildRequires:	java-devel-openjdk, gcc-gfortran
 BuildRequires:	emacs-common, perl, python
+BuildRequires:	devtoolset-3
 Requires:	python
 
 %define _unpackaged_files_terminate_build 0
@@ -124,7 +125,7 @@ Contains documentations, examples and manpages for mpich2
 	MPICH2LIB_F90FLAGS="%{?opt_fc_fflags}"			\
 	MPICH2LIB_FFLAGS="%{?opt_f77_fflags}"	
 
-make VERBOSE=1
+scl enable devtoolset-3 "/bin/bash -c 'cd %{_builddir}/%{srcdir} ; make VERBOSE=1'"
 
 %install
 rm -rf %{buildroot}

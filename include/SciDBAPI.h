@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,8 +43,8 @@
 #include <stdint.h>
 #include <queue>
 
-#include "array/Array.h"
-#include "system/Warnings.h"
+#include <array/Array.h>
+#include <system/Warnings.h>
 
 #define EXPORTED_FUNCTION extern "C" __attribute__((visibility("default")))
 
@@ -59,9 +59,10 @@ typedef std::queue<Warning> WarningsQueue;
 class QueryResult
 {
 public:
- QueryResult(): queryID(0), selective(false), requiresExclusiveArrayAccess(false), executionTime(0)
-	{
-	}
+    QueryResult(): queryID(0), selective(false), requiresExclusiveArrayAccess(false), executionTime(0)
+    {
+    }
+
 #ifdef SCIDB_CLIENT
     ~QueryResult();
 #endif
@@ -70,7 +71,7 @@ public:
     QueryID queryID;
     bool selective;
     bool requiresExclusiveArrayAccess;
-    boost::shared_ptr<Array> array;
+    std::shared_ptr<Array> array;
 
     // Statistics fields
     uint64_t executionTime;  // In milliseconds
@@ -78,7 +79,7 @@ public:
     std::string explainPhysical; // Every executed physical plan separated by ';'
 
     std::vector<std::string> plugins; /**< a list of plugins containing UDT in result array */
-    std::vector< boost::shared_ptr<Array> > mappingArrays;
+    std::vector< std::shared_ptr<Array> > mappingArrays;
 
 #ifdef SCIDB_CLIENT
     bool hasWarnings();
@@ -110,14 +111,17 @@ public:
      * Destructor
      */
     virtual ~SciDB() {}
+
     /**
      * Connect client to a coordinator of scidb cluster.
      * @param connectionString an address of scidb coordinator instance.
      * @param port a TCP/IP port of a coordinator instance.
      * @return a handle for connection
      */
-    virtual void* connect( const std::string& connectionString = "localhost",
-            uint16_t port = 1239) const = 0;
+    virtual void* connect(
+        const std::string& connectionString = "localhost",
+        uint16_t port = 1239) const = 0;
+
 
     /**
      * Disconnect client from a coordinator of scidb cluster.
@@ -144,8 +148,8 @@ public:
 
     /**
      * @param connection is handle to connection returned by connect method
-     * Cancel current query execution, rollback any changes on disk, free the query reqources 
-     */   
+     * Cancel current query execution, rollback any changes on disk, free the query reqources
+     */
     virtual void cancelQuery(QueryID queryID, void* connection = NULL) const = 0;
 
     /**
@@ -164,6 +168,17 @@ public:
                                    QueryResult& queryResult) const = 0;
 #endif
 
+    /**
+     * @brief Notify the SciDB server that a new client is starting.
+     * Provide SciDB server with the username and password details.
+     *
+     * @param - name The name of the user to use.
+     * @param - password The password of the user to use.
+     */
+    virtual void newClientStart(
+        void*                   connection,
+        const std::string &     name,
+        const std::string &     password) const = 0;
 };
 
 
@@ -180,7 +195,5 @@ const SciDB& getSciDB();
 EXPORTED_FUNCTION const SciDB& getSciDB();
 #endif
 
-
-}
-
+} // namespace scidb
 #endif /* SCIDBAPI_H_ */

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -49,7 +49,7 @@ namespace scidb
         array.in2out(inputIterator->getPosition(), outPos);
         return outPos;
     }
- 
+
     ShiftChunkIterator::ShiftChunkIterator(ShiftArray const& arr, DelegateChunk const* chunk, int iterationMode)
     : DelegateChunkIterator(chunk, iterationMode),
       array(arr),
@@ -87,7 +87,7 @@ namespace scidb
       lastPos(arr.outDims.size())
     {
     }
-      
+
     //
     // Shift array iterator
     //
@@ -101,10 +101,10 @@ namespace scidb
     {
         chunkInitialized = false;
         array.out2in(newPos, inPos);
-        return inputIterator->setPosition(inPos); 
+        return inputIterator->setPosition(inPos);
     }
 
-    ShiftArrayIterator::ShiftArrayIterator(ShiftArray const& arr, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator)
+    ShiftArrayIterator::ShiftArrayIterator(ShiftArray const& arr, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator)
     : DelegateArrayIterator(arr, attrID, inputIterator),
       array(arr),
       inPos(arr.inDims.size()),
@@ -118,15 +118,15 @@ namespace scidb
     //
 
     void ShiftArray::in2out(Coordinates const& inPos, Coordinates& outPos)  const
-    { 
-        for (size_t i = 0, n = inDims.size(); i < n; i++) { 
+    {
+        for (size_t i = 0, n = inDims.size(); i < n; i++) {
             outPos[i] = inPos[i] + outDims[i].getStartMin() - inDims[i].getStartMin();
         }
     }
 
     void ShiftArray::out2in(Coordinates const& outPos, Coordinates& inPos)  const
-    { 
-        for (size_t i = 0, n = outDims.size(); i < n; i++) { 
+    {
+        for (size_t i = 0, n = outDims.size(); i < n; i++) {
             inPos[i] = outPos[i] + inDims[i].getStartMin() - outDims[i].getStartMin();
         }
     }
@@ -144,13 +144,13 @@ namespace scidb
     DelegateArrayIterator* ShiftArray::createArrayIterator(AttributeID id) const
     {
         return new ShiftArrayIterator(*this, id, inputArray->getConstIterator(id));
-    }    
+    }
 
-    ShiftArray::ShiftArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array)
+    ShiftArray::ShiftArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array)
     : DelegateArray(desc, array),
       inDims(array->getArrayDesc().getDimensions()),
       outDims(desc.getDimensions())
     {
-    } 
+    }
 }
 

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,7 +27,7 @@
  *              Donghui Zhang
  */
 #include <query/Operator.h>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 
 using namespace std;
@@ -108,10 +108,10 @@ public:
     /**
      *  @see LogicalOperator::nextVaryParamPlaceholder()
      */
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> >
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> >
                  nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
 
         assert(_parameters.size()>0); // at least one aggregate call was already in there
@@ -132,7 +132,7 @@ public:
      *
      */
     ArrayDesc inferSchema( std::vector<ArrayDesc> inputArraySchemas,
-                           boost::shared_ptr<Query> query)
+                           std::shared_ptr<Query> query)
     {
         //  Check that there is exactly one input array, and at least one
         // aggregate in the _parameters list.
@@ -151,7 +151,7 @@ public:
         ArrayDesc const& inputSchema = inputArraySchemas[0];
         Dimensions const& inputDims  = inputSchema.getDimensions();
 
-        ArrayDesc outputSchema( inputSchema.getName(), Attributes(), inputDims );
+        ArrayDesc outputSchema( inputSchema.getName(), Attributes(), inputDims, defaultPartitioning());
 
         // TO-DO: deal with dimensions with overlaps later
         //
@@ -177,7 +177,7 @@ public:
                 }
                 bool isInOrderAggregation = true;
                 addAggregatedAttribute(
-                       (shared_ptr <OperatorParamAggregateCall> &)_parameters[i],
+                       (std::shared_ptr <OperatorParamAggregateCall> &)_parameters[i],
                        inputSchema,
                        outputSchema,
                        isInOrderAggregation);

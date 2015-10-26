@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -35,7 +35,7 @@
 #include <log4cxx/basicconfigurator.h>
 #include <log4cxx/helpers/exception.h>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 
 #include "query/OperatorLibrary.h"
@@ -74,7 +74,7 @@ OperatorLibrary::OperatorLibrary()
 }
 
 
-boost::shared_ptr<LogicalOperator> OperatorLibrary::createLogicalOperator(const std::string& logicalName,
+std::shared_ptr<LogicalOperator> OperatorLibrary::createLogicalOperator(const std::string& logicalName,
         const std::string& alias)
 {
     LOG4CXX_TRACE(logger, "Creating logical operator: " << logicalName);
@@ -90,7 +90,7 @@ boost::shared_ptr<LogicalOperator> OperatorLibrary::createLogicalOperator(const 
 }
 
 
-boost::shared_ptr<PhysicalOperator> OperatorLibrary::createPhysicalOperator(const std::string& logicalName,
+std::shared_ptr<PhysicalOperator> OperatorLibrary::createPhysicalOperator(const std::string& logicalName,
         const std::string& physicalName, const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema)
 {
     LOG4CXX_TRACE(logger, "Creating physical operator: " << physicalName << " for logical operator: " << logicalName);
@@ -112,7 +112,7 @@ boost::shared_ptr<PhysicalOperator> OperatorLibrary::createPhysicalOperator(cons
 
 
 void OperatorLibrary::createPhysicalOperators(const std::string& logicalName,
-        std::vector< boost::shared_ptr<PhysicalOperator> >& physicalOperators,
+        std::vector< std::shared_ptr<PhysicalOperator> >& physicalOperators,
         const PhysicalOperator::Parameters& parameters, const ArrayDesc& schema)
 {
     // Adding build-in operators
@@ -151,12 +151,24 @@ void OperatorLibrary::addPhysicalOperatorFactory(BasePhysicalOperatorFactory* fa
     const string& logicalName = factory->getLogicalName();
     const string& physicalName = factory->getPhysicalName();
 
-    LOG4CXX_DEBUG(logger, "Add physical operator factory: " << physicalName << " for logical operator: " << logicalName);
+    LOG4CXX_DEBUG(logger, "Add physical operator factory: " << physicalName
+                  << " for logical operator: " << logicalName);
 
-    if (_physicalOperatorFactories[logicalName][physicalName] == NULL)
+    // Logical operator MUST already exist.  This catches inconsistent naming
+    // of the logical operator across DECLARE_*_OPERATOR_FACTORY() macros.
+    // For example, if you want to hide the foo() operator by changing its name
+    // to _foo(), you must change the name in both macro calls, else we throw.
+    if (_logicalOperatorFactories[logicalName] == NULL) {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL,
+                               SCIDB_LE_LOGICAL_OP_DOESNT_EXIST) << logicalName;
+    }
+
+    if (_physicalOperatorFactories[logicalName][physicalName] == NULL) {
         _physicalOperatorFactories[logicalName][physicalName] = factory;
-    else
-        throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_PHYSICAL_OP_ALREADY_REGISTERED) << physicalName << logicalName;
+    } else {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_PHYSICAL_OP_ALREADY_REGISTERED)
+            << physicalName << logicalName;
+    }
 }
 
 
@@ -179,12 +191,13 @@ void OperatorLibrary::getPhysicalNames(const string& logicalName,
 }
 
 
-void OperatorLibrary::getLogicalNames(vector<string> &logicalOperatorsNames)
+void OperatorLibrary::getLogicalNames(vector<string> &logicalOperatorsNames, bool showHidden)
 {
-    for(LogicalOperatorFactories::iterator it = _logicalOperatorFactories.begin(); it != _logicalOperatorFactories.end(); ++it)
+    LogicalOperatorFactories::iterator it;
+    for(it = _logicalOperatorFactories.begin(); it != _logicalOperatorFactories.end(); ++it)
     {
-        shared_ptr<LogicalOperator> logicalOperator = it->second->createLogicalOperator("");
-        if (!logicalOperator->getProperties().secondPhase) {
+        std::shared_ptr<LogicalOperator> logicalOperator = it->second->createLogicalOperator("");
+        if (showHidden || !isHiddenOp(logicalOperator->getLogicalName())) {
             logicalOperatorsNames.push_back(it->first);
         }
     }
@@ -194,6 +207,5 @@ bool OperatorLibrary::hasLogicalOperator(const string &logicalOperatorName)
 {
     return (_logicalOperatorFactories.find(logicalOperatorName) != _logicalOperatorFactories.end());
 }
-
 
 } // namespace

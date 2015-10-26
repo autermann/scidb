@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,8 +29,7 @@
 #define SHAREDMEMORYIPC_H_
 
 #include <stdint.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/mapped_region.hpp>
@@ -313,8 +312,8 @@ public:
      */
     void preallocateShmMemory();
 
-    boost::scoped_ptr<boost::interprocess::shared_memory_object> _shm;
-    boost::scoped_ptr<boost::interprocess::mapped_region> _region;
+    std::unique_ptr<boost::interprocess::shared_memory_object> _shm;
+    std::unique_ptr<boost::interprocess::mapped_region> _region;
     bool _isPreallocate;
 };
 
@@ -324,7 +323,7 @@ public:
 template<class MemoryType_tt>
 class SharedMemoryPtr {
 public:
-    SharedMemoryPtr(const boost::shared_ptr<SharedMemoryIpc>& shm)
+    SharedMemoryPtr(const std::shared_ptr<SharedMemoryIpc>& shm)
     : _shm(shm),_ptr(0)
     {
         _ptr = reinterpret_cast<MemoryType_tt*>(_shm->get());
@@ -333,7 +332,7 @@ public:
     ~SharedMemoryPtr() { }
     MemoryType_tt* get() const  { return _ptr; }
 private:
-    boost::shared_ptr<SharedMemoryIpc> _shm;
+    std::shared_ptr<SharedMemoryIpc> _shm;
     MemoryType_tt* _ptr;
 };
 
@@ -383,8 +382,8 @@ public:
      */
     void preallocateShmMemory();
 
-    boost::scoped_ptr<boost::interprocess::file_mapping> _file;
-    boost::scoped_ptr<boost::interprocess::mapped_region> _region;
+    std::unique_ptr<boost::interprocess::file_mapping> _file;
+    std::unique_ptr<boost::interprocess::mapped_region> _region;
     bool _isPreallocate;
 };
 

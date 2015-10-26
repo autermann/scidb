@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -179,6 +179,7 @@ namespace scidb
     class ListChunkDescriptorsArrayBuilder;
     class ListChunkMapArrayBuilder;
     class PersistentChunk;
+    class ChunkDescriptor;
     class DataStores;
 
     /**
@@ -186,6 +187,14 @@ namespace scidb
      */
     class Storage
     {
+      public:
+        typedef boost::function<void(const ArrayUAID&,
+                                     const StorageAddress&,
+                                     const PersistentChunk*,
+                                     uint64_t,
+                                     bool)>    ChunkMapVisitor;
+        typedef boost::function<void(const ChunkDescriptor&,bool)>                                      ChunkDescriptorVisitor;
+
       public:
         virtual ~Storage() {}
         /**
@@ -201,7 +210,7 @@ namespace scidb
          * @param url implementation dependent database url
          * @param cacheSize chunk cache size: amount of memory in bytes which can be used to cache most frequently used
          */
-        virtual void open(const string& url, size_t cacheSize) = 0;
+        virtual void open(const std::string& url, size_t cacheSize) = 0;
 
         /**
          * Get write iterator through array chunks available in the storage.
@@ -215,9 +224,9 @@ namespace scidb
          * @param query in the context of which the iterator is requeted
          * @return shared pointer to the array iterator
          */
-        virtual boost::shared_ptr<ArrayIterator> getArrayIterator(boost::shared_ptr<const Array>& arr,
+        virtual std::shared_ptr<ArrayIterator> getArrayIterator(std::shared_ptr<const Array>& arr,
                                                                   AttributeID attId,
-                                                                  boost::shared_ptr<Query>& query) = 0;
+                                                                  std::shared_ptr<Query>& query) = 0;
 
         /**
          * Get const array iterator through array chunks available in the storage.
@@ -226,9 +235,9 @@ namespace scidb
          * @param query in the context of which the iterator is requeted
          * @return shared pointer to the array iterator
          */
-        virtual boost::shared_ptr<ConstArrayIterator> getConstArrayIterator(boost::shared_ptr<const Array>& arr,
+        virtual std::shared_ptr<ConstArrayIterator> getConstArrayIterator(std::shared_ptr<const Array>& arr,
                                                                             AttributeID attId,
-                                                                            boost::shared_ptr<Query>& query) = 0;
+                                                                            std::shared_ptr<Query>& query) = 0;
 
         /**
          * Flush all changes to the physical device(s) for the indicated array.  (optionally flush data
@@ -297,7 +306,7 @@ namespace scidb
          * Method for creating a list of chunk descriptors. Implemented by LocalStorage.
          * @param builder a class that creates a list array
          */
-        virtual void listChunkDescriptors(ListChunkDescriptorsArrayBuilder& builder)
+        virtual void visitChunkDescriptors(const ChunkDescriptorVisitor&) const
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk header retrieval is not supported by this storage type.";
         }
@@ -306,7 +315,7 @@ namespace scidb
          * Method for creating a list of chunk map elements. Implemented by LocalStorage.
          * @param builder a class that creates a list array
          */
-        virtual void listChunkMap(ListChunkMapArrayBuilder& builder)
+        virtual void visitChunkMap(const ChunkMapVisitor&) const
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk map retrieval is not supported by this storage type.";
         }
@@ -342,7 +351,7 @@ namespace scidb
          * @param chunk new chunk created by newChunk Method
          * @param query performing the operation
          */
-        virtual void writeChunk(ArrayDesc const& desc, PersistentChunk* chunk, boost::shared_ptr<Query> const& query) = 0;
+        virtual void writeChunk(ArrayDesc const& desc, PersistentChunk* chunk, std::shared_ptr<Query> const& query) = 0;
 
         /**
          * Find and fetch a chunk from a particular array. Throws exception if chunk does not exist.
@@ -351,9 +360,9 @@ namespace scidb
          * @param query performing the operation
          * @return the pointer to the chunk.
          */
-        virtual boost::shared_ptr<PersistentChunk> readChunk(ArrayDesc const& desc,
+        virtual std::shared_ptr<PersistentChunk> readChunk(ArrayDesc const& desc,
                                                              StorageAddress const& addr,
-                                                             const boost::shared_ptr<Query>& query) = 0;
+                                                             const std::shared_ptr<Query>& query) = 0;
 
         /**
          * Load chunk body from the storage.
@@ -383,10 +392,10 @@ namespace scidb
          * @param query performing the operation
          * @throw SystemException if the chunk with such address already exists
          */
-        virtual boost::shared_ptr<PersistentChunk> createChunk(ArrayDesc const& desc,
+        virtual std::shared_ptr<PersistentChunk> createChunk(ArrayDesc const& desc,
                                                                StorageAddress const& addr,
                                                                int compressionMethod,
-                                                               const boost::shared_ptr<Query>& query) = 0;
+                                                               const std::shared_ptr<Query>& query) = 0;
         /**
          * Delete chunk
          * @param chunk chunk to be deleted
@@ -413,7 +422,7 @@ namespace scidb
          * @param[in] query the query context.
          * @param[out] chunks the set of coordinates to which the chunk positions of the array shall be appended.
          */
-        virtual void getChunkPositions(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, CoordinateSet& chunks) = 0;
+        virtual void getChunkPositions(ArrayDesc const& desc, std::shared_ptr<Query> const& query, CoordinateSet& chunks) = 0;
 
          /**
           * Given an array descriptor and a storage address for a chunk - find the storage address in the next chunk along the same attribute
@@ -427,7 +436,7 @@ namespace scidb
           * @param address the address of the previous chunk
           * @return true if the chunk was found, false otherwise
           */
-         virtual bool findNextChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address) =0;
+         virtual bool findNextChunk(ArrayDesc const& desc, std::shared_ptr<Query> const& query, StorageAddress& address) =0;
 
          /**
           * Given and array descriptor and a desired storage address for the chunk, determine if there is a chunk at
@@ -438,7 +447,7 @@ namespace scidb
           * @param address the address of the desired chunk
           * @return true if the chunk was found, false otherwise
           */
-         virtual bool findChunk(ArrayDesc const& desc, boost::shared_ptr<Query> const& query, StorageAddress& address) =0;
+         virtual bool findChunk(ArrayDesc const& desc, std::shared_ptr<Query> const& query, StorageAddress& address) =0;
 
          /**
           * Remove a previously existing chunk from existence in the given version on this instance.
@@ -450,7 +459,7 @@ namespace scidb
           */
          virtual void removeLocalChunkVersion(ArrayDesc const& arrayDesc,
                                               Coordinates const& coord,
-                                              boost::shared_ptr<Query> const& query) =0;
+                                              std::shared_ptr<Query> const& query) =0;
 
          /**
           * Remove a previously existing chunk from existence in the given version in the system.
@@ -462,7 +471,7 @@ namespace scidb
           */
          virtual void removeChunkVersion(ArrayDesc const& arrayDesc,
                                          Coordinates const& coords,
-                                         boost::shared_ptr<Query> const& query) =0;
+                                         std::shared_ptr<Query> const& query) =0;
 
          /**
           * Given an array descriptor desc and the coordinate set liveChunks - remove the chunk version for every
@@ -473,14 +482,13 @@ namespace scidb
           * @param query the query context
           */
          virtual void removeDeadChunks(ArrayDesc const& arrayDesc,
-                                       set<Coordinates, CoordinatesLess> const& liveChunks,
-                                       boost::shared_ptr<Query> const& query) = 0;
+                 std::set<Coordinates, CoordinatesLess> const& liveChunks,
+                 std::shared_ptr<Query> const& query) = 0;
 
          /**
           * Return DataStores object used by storage manager to store data
           */
          virtual DataStores& getDataStores() = 0;
-
     };
 
     /**

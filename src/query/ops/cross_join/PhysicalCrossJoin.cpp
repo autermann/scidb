@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -36,7 +36,7 @@ using namespace boost;
 
 namespace scidb {
 
-inline OperatorParamDimensionReference* dimref_cast( const shared_ptr<OperatorParam>& ptr )
+inline OperatorParamDimensionReference* dimref_cast( const std::shared_ptr<OperatorParam>& ptr )
 {
     return dynamic_cast<OperatorParamDimensionReference*>(ptr.get());
 }
@@ -133,24 +133,25 @@ public:
         return true;
     }
 
-    virtual ArrayDistribution getOutputDistribution(
-            std::vector<ArrayDistribution> const& inputDistributions,
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
             std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     /**
      * Ensure input array chunk sizes and overlaps match along join-dimension pairs.
      */
-    virtual void requiresRepart(vector<ArrayDesc> const& inputSchemas,
-                                vector<ArrayDesc const*>& repartPtrs) const
+    virtual void requiresRedimensionOrRepartition(
+        vector<ArrayDesc> const& inputSchemas,
+        vector<ArrayDesc const*>& modifiedPtrs) const
     {
         assert(inputSchemas.size() == 2);
-        assert(repartPtrs.size() == 2);
+        assert(modifiedPtrs.size() == 2);
 
         // We don't expect to be called twice, but that may change later on: wipe any previous result.
-        _repartSchemas.clear();
+        _redimRepartSchemas.clear();
 
         Dimensions const& leftDims = inputSchemas[0].getDimensions();
         Dimensions rightDims = inputSchemas[1].getDimensions();
@@ -180,16 +181,22 @@ public:
         }
 
         if (needRepart) {
+            // If right array was manually repartitioned, it was done wrong!
+            if (modifiedPtrs[1]) {
+                throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_BAD_EXPLICIT_REPART)
+                    << getLogicalName() << inputSchemas[1].getDimensions() << rightDims;
+            }
+
             // Copy of right array schema, with newly tweaked dimensions.
-            _repartSchemas.push_back(make_shared<ArrayDesc>(inputSchemas[1]));
-            _repartSchemas.back()->setDimensions(rightDims);
+            _redimRepartSchemas.push_back(make_shared<ArrayDesc>(inputSchemas[1]));
+            _redimRepartSchemas.back()->setDimensions(rightDims);
 
             // Leave left array alone, repartition right array.
-            repartPtrs[0] = 0;
-            repartPtrs[1] = _repartSchemas.back().get();
+            modifiedPtrs[0] = 0;
+            modifiedPtrs[1] = _redimRepartSchemas.back().get();
         } else {
             // The preferred way of saying "no repartitioning needed".
-            repartPtrs.clear();
+            modifiedPtrs.clear();
         }
     }
 
@@ -197,13 +204,13 @@ public:
      * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
-    boost::shared_ptr<Array> execute(
-            vector< boost::shared_ptr<Array> >& inputArrays,
-            boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(
+            vector< std::shared_ptr<Array> >& inputArrays,
+            std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
 
-        shared_ptr<Array> input1 = inputArrays[1];
+        std::shared_ptr<Array> input1 = inputArrays[1];
         if (query->getInstancesCount() == 1 )
         {
             input1 = ensureRandomAccess(input1, query);
@@ -217,10 +224,10 @@ public:
 
         for (size_t p = 0, np = _parameters.size(); p < np; p += 2)
         {
-            const shared_ptr<OperatorParamDimensionReference> &lDim =
-                (shared_ptr<OperatorParamDimensionReference>&)_parameters[p];
-            const shared_ptr<OperatorParamDimensionReference> &rDim =
-                (shared_ptr<OperatorParamDimensionReference>&)_parameters[p+1];
+            const std::shared_ptr<OperatorParamDimensionReference> &lDim =
+                (std::shared_ptr<OperatorParamDimensionReference>&)_parameters[p];
+            const std::shared_ptr<OperatorParamDimensionReference> &rDim =
+                (std::shared_ptr<OperatorParamDimensionReference>&)_parameters[p+1];
 
             rjd[rDim->getObjectNo()] = lDim->getObjectNo();
         }
@@ -234,11 +241,11 @@ public:
                 k++;
             }
         }
-        shared_ptr<Array> replicated = redistributeToRandomAccess(input1, query, psReplication,
+        std::shared_ptr<Array> replicated = redistributeToRandomAccess(input1, query, psReplication,
                                                                   ALL_INSTANCE_MASK,
-                                                                  shared_ptr<DistributionMapper>(),
+                                                                  std::shared_ptr<CoordinateTranslator>(),
                                                                   0,
-                                                                  shared_ptr<PartitioningSchemaData>());
+                                                                  std::shared_ptr<PartitioningSchemaData>());
         return make_shared<CrossJoinArray>(_schema, inputArrays[0],
                                            replicated,
                                            ljd, rjd);

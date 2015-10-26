@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,150 +22,253 @@
 
 /****************************************************************************/
 
-#include <util/Singleton.h>                              // For Singleton
-#include <util/Mutex.h>                                  // For Mutex
+#include <pthread.h>                                     // For pthread_mutex
+#include <errno.h>                                       // For the code EBUSY
+#include "Platform.h"                                    // For getBlockSize()
 #include "ArenaDetails.h"                                // For implementation
 
 /****************************************************************************/
-namespace scidb { namespace arena {
+namespace scidb { namespace arena { namespace {
+/****************************************************************************/
+
+size_t          _bytes  = 0;                             // Bytes  allocated
+size_t          _blocks = 0;                             // Blocks allocated
+size_t          _peak   = 0;                             // High water mark
+size_t          _limit  = SIZE_MAX;                      // Max memory limit
+pthread_mutex_t _mutex  = PTHREAD_MUTEX_INITIALIZER;     // Guards counters
+
+/**
+ *  Acquire and release the mutex that guards our various counters.
+ */
+struct Lock : noncopyable, stackonly
+{
+    Lock() {if (pthread_mutex_lock  (&_mutex)) abort();} // Acquire the mutex
+   ~Lock() {if (pthread_mutex_unlock(&_mutex)) abort();} // Release the mutex
+};
+
+/****************************************************************************/
+}
 /****************************************************************************/
 
 /**
- *  @brief      Implements the root %arena, a threading, recycling %arena from
- *              which all other arenas ultimately obtain their memory.
+ *  Release the (copy of) the root arena mutex when forking a child process.
  *
- *  @details    Class RootArena represents what is  in some sense the simplest
- *              possible implementation of the %arena interface, by forwarding
- *              its calls directly on through to the system free store, namely
- *              'malloc' and 'free'.  It forms the root of a parent-child tree
- *              that runs from all other arenas up to this singleton instance,
- *              and is automatically supplied as the default when constructing
- *              an %arena for which no other parent has been specified.
+ *  Call from the one and only child process thread immediately upon forking.
  *
- *  @todo       Add support for routing allocation requests made using global
- *              operator new and friends though this %arena too.
- *
- *  @author     jbell@paradigm4.com.
+ *  @see http://cppwisdom.quora.com/Why-threads-and-fork-dont-mix
  */
-class RootArena : public Arena
+void onForkOfChild()
 {
- public:                   // Construction
-                              RootArena();
+    int e = pthread_mutex_trylock(&_mutex);              // But do not block
 
- public:                   // Attributes
-    virtual name_t            name()               const {return "root";}
-    virtual size_t            allocated()          const {return _allocated;}
-    virtual size_t            peakusage()          const {return _peakusage;}
-    virtual size_t            allocations()        const {return _allocations;}
-    virtual features_t        features()           const {return finalizing|recycling|threading;}
-
- public:                   // Operations
-    virtual void              reset();                   // Reset statistics
-
- public:                   // Allocation
-    virtual void*             doMalloc(size_t);          // Calls ::malloc()
-    virtual void              doFree  (void*,size_t);    // Calls ::free()
-
- protected:                // Implementation
-            bool              consistent()         const;
-
- protected:                // Representation
-            size_t            _allocated;                // Bytes allocated
-            size_t            _peakusage;                // High water mark
-            size_t            _allocations;              // Total allocations
-            Mutex             _mutex;                    // Guards our members
-};
-
-/**
- *  Initialize the root arena's allocation statistics.
- */
-    RootArena::RootArena()
-             : _allocated(0),
-               _peakusage(0),
-               _allocations(0)
-{
-    assert(consistent());                                // Check consistency
-}
-
-/**
- *  The root %arena does not support resetting; at least not in the sense that
- *  it tracks allocations and frees those  that were never explictly recycled,
- *  as does class ScopedArena; nevertheless, it can still reset its allocation
- *  statistics to their original default values.
- */
-void RootArena::reset()
-{
-    ScopedMutexLock x(_mutex);                           // Acquire our mutex
-
-    _allocated = _peakusage = _allocations = 0;          // Reset statistics
-
-    assert(consistent());                                // Check consistency
-}
-
-/**
- *  Allocate 'size' bytes of raw storage from the system free store.
- */
-void* RootArena::doMalloc(size_t const size)
-{
-    assert(size != 0);                                   // Validate arguments
-
-    if (void* p = ::malloc(size))                        // Allocate raw memory
+    if (e==0 || e==EBUSY)                                // So we acquired it?
     {
-        ScopedMutexLock x(_mutex);                       // ...grab our mutex
+        if (pthread_mutex_unlock(&_mutex) == 0)          // ...we released it?
+        {
+         /* So we now know for sure that the (copy of) the root arena _mutex
+            is definately not locked within the one and only thread that now
+            runs in the forked child process...*/
 
-        _allocated   += size;                            // ...allocated size
-        _allocations += 1;                               // ...allocated one
-        _peakusage    = std::max(_allocated,_peakusage); // ...update the peak
+            _bytes  = 0;                                 // ...bytes allocated
+            _blocks = 0;                                 // ...blocks allocated
+            _peak   = 0;                                 // ...high water mark
+            _limit  = SIZE_MAX;                          // ...max memory limit
+            return;                                      // ...and we're good
+        }
+    }
 
-        assert(consistent());                            // ...check consistent
-        assert(aligned(p));                              // ...check alignment
+    abort();                                             // Malloc is unusable
+}
+
+/**
+ *  Return the maximum memory limit in bytes. An attempt to allocate more than
+ *  this number of bytes should fail; malloc() and friends return 0, while the
+ *  root arena and operator new throw a std::bad_alloc exception.
+ */
+size_t getMemoryLimit()
+{
+    return _limit;                                       // The current limit
+}
+
+/**
+ *  Assign the maximum memory limit in bytes. An attempt to allocate more than
+ *  this number of bytes should fail; malloc() and friends return 0, while the
+ *  root arena and operator new throw a std::bad_alloc exception.
+ */
+bool setMemoryLimit(size_t limit)
+{
+    Lock l;                                              // Lock the counters
+
+    if (_bytes <= limit)                                 // Not yet exceeded?
+    {
+        _limit = limit;                                  // ...ok, then set it
+
+        return true;                                     // ...set succeeded
+    }
+
+    return false;                                        // Assignment failed
+}
+
+/**
+ *  An arena-compatible version of the standard freestore function.
+ *
+ *  @see http://www.cplusplus.com/reference/cstdlib/malloc
+ */
+void* malloc(size_t size)
+{
+    Lock l;                                              // Lock the counters
+
+    if (_bytes + size > _limit)                          // Exceeds the limit?
+    {
+        return NULL;                                     // ...don't even try
+    }
+
+    if (void* p = std::malloc(size))                     // Allocate as normal
+    {
+        size_t n = getBlockSize(p);                      // ...the actual size
+
+        _bytes  += n;                                    // ...current bytes
+        _blocks += 1;                                    // ...current blocks
+        _peak    = std::max(_peak,_bytes);               // ...record the max
+
         return p;                                        // ...the allocation
     }
 
-    this->exhausted(size);                               // Signal exhaustion
+    return NULL;                                         // Failed to allocate
 }
 
 /**
- *  Return the 'size' bytes of raw storage pointed to by 'payload' to the free
- *  store for recycling.
+ *  An arena-compatible version of the standard freestore function.
+ *
+ *  @see http://www.cplusplus.com/reference/cstdlib/calloc
  */
-void RootArena::doFree(void* payload,size_t const size)
+void* calloc(count_t count,size_t size)
 {
-    assert(aligned(payload) && size!=0);                 // Validate arguments
-    assert(size<=_allocated && _allocated!=0);           // Check counts match
+    assert(count < SIZE_MAX/size);                       // Beware of overlow
 
-    ::free(payload);                                     // Return the storage
+    Lock l;                                              // Lock the counters
 
-    ScopedMutexLock x(_mutex);                           // Acquire root mutex
+    if (_bytes + count * size > _limit)                  // Exceeds the limit?
+    {
+        return NULL;                                     // ...don't even try
+    }
 
-    _allocated   -= size;                                // Update allocated
-    _allocations -= 1;                                   // Update allocations
-    assert(consistent());                                // Check consistency
+    if (void* p = std::calloc(count,size))               // Allocate as normal
+    {
+        size_t n = getBlockSize(p);                      // ...the actual size
+
+        _bytes  += n;                                    // ...current bytes
+        _blocks += 1;                                    // ...current blocks
+        _peak    = std::max(_peak,_bytes);               // ...record the max
+
+        return p;                                        // ...the allocation
+    }
+
+    return NULL;                                         // Failed to allocate
 }
 
 /**
- *  Return true if the object looks to be in good shape.  Centralizes a number
- *  of consistency checks that would otherwise clutter up the code, and, since
- *  only ever called from within assertions, can be eliminated entirely by the
- *  compiler from the release build.
+ *  An arena-compatible version of the standard freestore function.
+ *
+ *  @see http://www.cplusplus.com/reference/cstdlib/realloc
  */
-bool RootArena::consistent() const
+void* realloc(void* payload,size_t size)
 {
-    return true;                                         // Seems to be kosher
+    Lock l;                                              // Lock the counters
+
+    size_t f = getBlockSize(payload);                    // Fetch current size
+
+    assert(f <= _bytes);                                 // Verify accounting
+
+    if (_bytes - f + size > _limit)                      // Exceeds the limit?
+    {
+        return NULL;                                     // ...don't even try
+    }
+
+    if (void* p = std::realloc(payload,size))            // Allocate as normal
+    {
+        size_t n = getBlockSize(p);                      // ...the actual size
+
+        _bytes -= f;                                     // ...bytes reclaimed
+        _bytes += n;                                     // ...bytes consumed
+        _blocks+= size_t(f==0) - size_t(size==0);        // ...is allocation?
+        _peak   = std::max(_peak,_bytes);                // ...record the max
+
+        return p;                                        // ....the allocation
+    }
+
+    return NULL;                                         // Failed to allocate
 }
 
 /**
- *  Return a reference to the one and only root arena. All other arenas end up
- *  attaching to, and allocating from, this root object, one way or the other.
+ *  An arena-compatible version of the standard freestore function.
+ *
+ *  @see http://www.cplusplus.com/reference/cstdlib/free
+ */
+void free(void* payload)
+{
+    if (size_t n = getBlockSize(payload))                // Fetch actual size
+    {
+        std::free(payload);                              // ...free as normal
+
+        Lock l;                                          // ...lock counters
+
+        assert(_blocks>0 && n<=_bytes);                  // ...check counters
+
+        _bytes  -= n;                                    // ...current bytes
+        _blocks -= 1;                                    // ...current blocks
+    }
+}
+
+/**
+ *  Return the root arena,  the singleton %arena from which every other %arena
+ *  ultimately obtains its memory.
+ *
+ *  The root arena forms the root of a parent-child tree that runs through all
+ *  other arenas up to this singleton instance,  and is automatically supplied
+ *  as the  default when constructing an %arena for  which no other parent has
+ *  been specified.
+ *
+ *  It's implemented as a stateless wrapper around the global counters defined
+ *  above, delegating to arena::malloc() and arena::free() to manipulate these
+ *  counters and so adhere to the maximum memory limit installed at startup.
  */
 ArenaPtr getRootArena()
 {
- /* Class Singleton - perhaps erroneously? - takes  over the  deletion of its
-    instance,  which does not sit all that well with passing arenas around by
-    shared_ptr. We can work around this, however, by supplying our own custom
-    deleter function...*/
+    static struct RootArena : Arena
+    {
+        name_t      name()                         const {return "root";}
+        size_t      available()                    const {return _limit - _bytes;}
+        size_t      allocated()                    const {return _bytes;}
+        size_t      peakusage()                    const {return _peak;}
+        size_t      allocations()                  const {return _blocks;}
+        features_t  features()                     const {return finalizing|recycling|threading;}
 
-    return ArenaPtr(Singleton<RootArena>::getInstance(),null_deleter());
+        void* doMalloc(size_t size)
+        {
+            assert(size != 0);                           // Validate arguments
+
+            if (void* p = arena::malloc(size))           // Use our own malloc
+            {
+                return p;                                // ...yes, succeeded
+            }
+
+            this->exhausted(size);                       // Failed to allocate
+        }
+
+        void doFree(void* payload,size_t size)
+        {
+            assert(aligned(payload));                    // Validate argument
+            assert(size <= getBlockSize(payload));       // Validate its size
+
+            arena::free(payload);                        // Use our own free
+
+            (void)size;                                  // Unused in release
+        }
+
+    } theRootArena;                                      // The singleton root
+
+    return ArenaPtr(static_cast<Arena*>(&theRootArena),null_deleter());
 }
 
 /****************************************************************************/

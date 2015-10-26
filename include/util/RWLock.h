@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -62,7 +62,7 @@ public:
      * @return false if an error is detected
      */
     typedef boost::function<bool()> ErrorChecker;
-    
+
     RWLock(): _nested(0), _readers(0), _pendingWriters(0), _currentWriter(0)
     {
     }
@@ -71,11 +71,11 @@ public:
     {
         ScopedMutexLock mutexLock(_mutex);
 
-        if (_currentWriter == pthread_self()) { 
+        if (_currentWriter == pthread_self()) {
             _nested += 1;
-        } else { 
+        } else {
             while (_pendingWriters || _currentWriter) {
-                if (!_noWriter.wait(_mutex, errorChecker)) { 
+                if (!_noWriter.wait(_mutex, errorChecker)) {
                     return false;
                 }
             }
@@ -89,28 +89,28 @@ public:
     {
         ScopedMutexLock mutexLock(_mutex);
 
-        if (_nested != 0) { 
+        if (_nested != 0) {
             _nested -= 1;
         } else {
             --_readers;
             assert(_readers >= 0);
-            
+
             if (!_readers) {
                 _noReaders.signal();
             }
         }
     }
 
-    struct PendingWriter 
+    struct PendingWriter
     {
         RWLock& lock;
-        PendingWriter(RWLock& rwlock) : lock(rwlock) 
+        PendingWriter(RWLock& rwlock) : lock(rwlock)
         {
             lock._pendingWriters += 1;
         }
         ~PendingWriter() {
             lock._pendingWriters -= 1;
-            if (lock._currentWriter == 0) { 
+            if (lock._currentWriter == 0) {
                 lock._noWriter.signal();
             }
         }
@@ -120,23 +120,23 @@ public:
     {
         ScopedMutexLock mutexLock(_mutex);
 
-        if (_currentWriter == pthread_self()) { 
+        if (_currentWriter == pthread_self()) {
             _nested += 1;
-        } else { 
+        } else {
             PendingWriter writer(*this);
-            
+
             while (_readers > 0) {
-                if (!_noReaders.wait(_mutex, errorChecker)) { 
+                if (!_noReaders.wait(_mutex, errorChecker)) {
                     return false;
                 }
             }
-            
+
             while (_currentWriter) {
-                if (!_noWriter.wait(_mutex, errorChecker)) { 
+                if (!_noWriter.wait(_mutex, errorChecker)) {
                     return false;
                 }
             }
-            
+
             assert(_pendingWriters > 0);
             assert(!_readers);
             _currentWriter = pthread_self();
@@ -148,14 +148,14 @@ public:
     {
         ScopedMutexLock mutexLock(_mutex);
 
-        if (_nested != 0) { 
+        if (_nested != 0) {
             _nested -= 1;
         } else {
             _currentWriter = (pthread_t)0;
             _noWriter.signal();
         }
     }
-   
+
     int getNumberOfReaders() const
     {
         return _readers;
@@ -165,14 +165,14 @@ public:
     {
         ScopedMutexLock mutexLock(_mutex);
 
-        if (_nested != 0) { 
+        if (_nested != 0) {
             _nested -= 1;
         } else {
-            if (_readers > 0) { 
-                if (--_readers == 0) { 
+            if (_readers > 0) {
+                if (--_readers == 0) {
                     _noReaders.signal();
-                } 
-            } else { 
+                }
+            } else {
                 _currentWriter = (pthread_t)0;
                 _noWriter.signal();
             }
@@ -197,7 +197,7 @@ public:
     }
     ~ScopedRWLockRead()
     {
-        if (locked) { 
+        if (locked) {
             _rwLock.unLockRead();
         }
     }
@@ -221,7 +221,7 @@ public:
     }
     ~ScopedRWLockWrite()
     {
-        if (locked) { 
+        if (locked) {
             _rwLock.unLockWrite();
         }
     }
@@ -249,10 +249,10 @@ public:
     }
     ~ScopedRWLock()
     {
-        if (locked) { 
-            if (_writeAccess) { 
+        if (locked) {
+            if (_writeAccess) {
                 _rwLock.unLockWrite();
-            } else { 
+            } else {
                 _rwLock.unLockRead();
             }
         }

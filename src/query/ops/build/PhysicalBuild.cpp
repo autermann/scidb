@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,6 +37,13 @@ using namespace boost;
 
 namespace scidb {
 
+namespace {
+
+log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.build"));
+#define debug(e) LOG4CXX_DEBUG(logger, "PhysicalBuild: " << e)
+#define trace(e) LOG4CXX_TRACE(logger, "PhysicalBuild: " << e)
+
+
 
 class PhysicalBuild: public PhysicalOperator
 {
@@ -47,29 +54,44 @@ public:
 	{
         if (_parameters.size() == 3)
         {
-            _asArrayLiteral = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getBool();
+            _asArrayLiteral = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getBool();
         }
 	}
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
-                                                    const std::vector< ArrayDesc> & inputSchemas) const
+    PartitioningSchema getOutDist() const
     {
-        if (_asArrayLiteral)
-            return ArrayDistribution(psLocalInstance);
-        return ArrayDistribution(psHashPartitioned);
+        if (_asArrayLiteral) {
+            debug("getOutDist: returning psLocalInstance =" << psLocalInstance);
+            return psLocalInstance;
+        }
+        debug("getOutputDistribution: returning defaultPartitioning =" << defaultPartitioning());
+        return defaultPartitioning();
     }
 
-	/***
-	 * Build is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-	 * that overrides the chunkiterator method.
-	 */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
+                                                    const std::vector< ArrayDesc> & inputSchemas) const
+    {
+        assert(inputDistributions.size() == 0);
+        assert(getOutDist() == _schema.getPartitioningSchema());
+        return RedistributeContext(_schema.getPartitioningSchema());
+    }
+
+    //
+    // Build is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+    // that overrides the chunkiterator method.
+    //
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
+        debug("execute: _schema  partitioning:  " << _schema.getPartitioningSchema() << ", getOutDist(): " << getOutDist());
+        assert(_schema.getPartitioningSchema() == getOutDist());
 
-        boost::shared_ptr<Expression> expr = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression();
+        std::shared_ptr<Array> result;
+
+        std::shared_ptr<Expression> expr = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression();
         if (_asArrayLiteral)
         {
+            assert(_schema.getPartitioningSchema() == psLocalInstance);   // cf getOutputDistribution
             //We will produce this array only on coordinator
             if (query->isCoordinator())
             {
@@ -77,26 +99,40 @@ public:
                 //So why don't we just materialize the whole literal array:
                 static const bool dontEnforceDataIntegrity = false;
                 static const bool notInEmptyMode = false;
-                InputArray* ary = new InputArray(_schema, "", query, notInEmptyMode, dontEnforceDataIntegrity);
-                shared_ptr<Array> input(ary);
+                static const int64_t maxCnvErrors(0);
+                static const std::shared_ptr<PhysicalUpdate> noShadowArrayOp;
+                static const bool notParallelLoad = false;
+                InputArray* ary = new InputArray(_schema, "",
+                                                 query,
+                                                 notInEmptyMode,
+                                                 dontEnforceDataIntegrity,
+                                                 maxCnvErrors,
+                                                 ArrayDesc(),
+                                                 notParallelLoad);
+                std::shared_ptr<Array> input(ary);
                 ary->openString(expr->evaluate().getString());
-                shared_ptr<Array> materializedInput(new MemArray(input,query,false));
-                return materializedInput;
+                result = make_shared<MemArray>(input,query,false);
             }
             else
             {
-                return boost::shared_ptr<Array>(new MemArray(_schema,query));
+                result = make_shared<MemArray>(_schema,query);
             }
         }
         else
         {
-            return boost::shared_ptr<Array>(new BuildArray(query, _schema, expr));
+            result = make_shared<BuildArray>(query, _schema, expr);
         }
+
+        debug("execute: returning array with  partitioning:  " << result->getArrayDesc().getPartitioningSchema() << ", getOutDist(): " << getOutDist());
+        assert(result->getArrayDesc().getPartitioningSchema() == getOutDist());
+        return result;
     }
 
 private:
     bool _asArrayLiteral;
 };
+
+} // namespace
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalBuild, "build", "physicalBuild")
 

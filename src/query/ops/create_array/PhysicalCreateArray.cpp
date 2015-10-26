@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -25,6 +25,9 @@
 #include <system/SystemCatalog.h>
 #include <query/Operator.h>
 #include <array/TransientCache.h>
+#include <util/session/Session.h>
+
+using namespace std;
 
 /****************************************************************************/
 namespace scidb {
@@ -37,51 +40,58 @@ struct PhysicalCreateArray : PhysicalOperator
     {}
 
     virtual void
-    fixDimensions(PointerRange<shared_ptr<Array> >,PointerRange<DimensionDesc>)
+    fixDimensions(PointerRange<std::shared_ptr<Array> >,PointerRange<DimensionDesc>)
     {}
 
-    virtual shared_ptr<Array>
-    execute(vector<shared_ptr<Array> >& in,shared_ptr<Query> query)
+    virtual std::shared_ptr<Array>
+    execute(vector<std::shared_ptr<Array> >& in,std::shared_ptr<Query> query)
     {
-        bool const temp(param<OperatorParamPhysicalExpression>(2)->getExpression()->evaluate().getBool());
+        bool const temp(
+            param<OperatorParamPhysicalExpression>(2)->
+                getExpression()->evaluate().getBool());
 
         if (query->isCoordinator())
         {
-            string    n(param<OperatorParamArrayReference>(0)->getObjectName());
-            ArrayDesc s(param<OperatorParamSchema>        (1)->getSchema());
+            string    arrName(param<OperatorParamArrayReference>(0)->getObjectName());
+            ArrayDesc arrSchema(param<OperatorParamSchema>        (1)->getSchema());
+            assert(ArrayDesc::isNameUnversioned(arrName));
 
-            s.setName(n);
-            s.setTransient(temp);
+            arrSchema.setName(arrName);
+            arrSchema.setTransient(temp);
 
          /* Give our subclass a chance to compute missing dimension details
             such as a wild-carded chunk interval, for example...*/
 
-            this->fixDimensions(in,s.getDimensions());
-
-            SystemCatalog::getInstance()->addArray(s,psHashPartitioned);
+            this->fixDimensions(in,arrSchema.getDimensions());
+            arrSchema.setPartitioningSchema(defaultPartitioning());
+            ArrayID uAId = SystemCatalog::getInstance()->getNextArrayId();
+            arrSchema.setIds(uAId, uAId, VersionID(0));
+            SystemCatalog::getInstance()->addArray(
+                query->getSession()->getNamespace(),
+                arrSchema);
         }
 
         syncBarrier(0,query);                            // Workers wait here
 
         if (temp)                                        // 'temp' flag given?
         {
-            string    n(param<OperatorParamArrayReference>(0)->getObjectName());
-            ArrayDesc s;
+            string    arrName(param<OperatorParamArrayReference>(0)->getObjectName());
+            ArrayDesc arrSchema;
+            // XXX TODO: this needs to change to eliminate worker catalog access
+            SystemCatalog::getInstance()->getArrayDesc(arrName,SystemCatalog::ANY_VERSION,arrSchema);
 
-            SystemCatalog::getInstance()->getArrayDesc(n,s,false);
-
-            transient::record(make_shared<MemArray>(s,query));
+            transient::record(make_shared<MemArray>(arrSchema,query));
         }
 
-        return shared_ptr<Array>();
+        return std::shared_ptr<Array>();
     }
 
     template<class t>
-    shared_ptr<t>& param(size_t i) const
+    std::shared_ptr<t>& param(size_t i) const
     {
         assert(i < _parameters.size());
 
-        return (shared_ptr<t>&)_parameters[i];
+        return (std::shared_ptr<t>&)_parameters[i];
     }
 };
 
@@ -118,14 +128,17 @@ struct PhysicalCreateArrayUsing : PhysicalCreateArray
 
     typedef boost::array<Value,distinct+1> statistics;
 
-    PhysicalCreateArrayUsing(const string& logicalName,const string& physicalName,const Parameters& parameters,const ArrayDesc& schema)
+    PhysicalCreateArrayUsing(const string& logicalName,
+                             const string& physicalName,
+                             const Parameters& parameters,
+                             const ArrayDesc& schema)
       : PhysicalCreateArray(logicalName,physicalName,parameters,schema)
     {}
 
     /**
      *
      */
-    virtual void fixDimensions(PointerRange<shared_ptr<Array> > in,
+    virtual void fixDimensions(PointerRange<std::shared_ptr<Array> > in,
                                PointerRange<DimensionDesc>      dims)
     {
         assert(in.size()==2 && !dims.empty());           // Validate arguments
@@ -136,7 +149,7 @@ struct PhysicalCreateArrayUsing : PhysicalCreateArray
         size_t                           N(0);           // Inferred intervals
         vector<statistics>               S(dims.size()); // Array of statistics
         DimensionDesc*                   d(dims.begin());// Dimension iterator
-        int64_t                  remain(INFINITE_LENGTH);// Cells to play with
+        int64_t                  remain(CoordinateBounds::getMaxLength());// Cells to play with
 
         getStatistics(S,*in[0]);                         // Read in statistics
 
@@ -220,12 +233,13 @@ struct PhysicalCreateArrayUsing : PhysicalCreateArray
     {
         for (size_t a=0; a!=statistics::size(); ++a)     // For each attribute
         {
-            shared_ptr<ConstArrayIterator> ai(A.getConstIterator(a));
+            std::shared_ptr<ConstChunkIterator> i(A.getConstIterator(a)->getChunk().getConstIterator());
 
             for (size_t d=0; d!=v.size(); ++d)           // ...for each dimension
             {
-                v[d][a] = ai->getChunk().getConstIterator()->getItem();
-                ai->operator++();                        // ....next chunk
+                v[d][a] = i->getItem();                  // ....read the item
+
+                i->operator++();                         // ....to next item
             }
         }
     }

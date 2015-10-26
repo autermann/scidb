@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -79,8 +79,8 @@ int SciDBTCExecutor :: execute (int mode)
 		{
 			if (_rc.record)                 // PASS
 			{
-				bfs::remove (_ie.expected_rfile);	
-				bfs::rename (_ie.actual_rfile, _ie.expected_rfile);	
+				bfs::remove (_ie.expected_rfile);
+				bfs::rename (_ie.actual_rfile, _ie.expected_rfile);
 				result = RESULT_RECORDED;
 				result_str = "RECORDED";
 				failureReason = "";

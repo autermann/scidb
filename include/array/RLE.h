@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,28 +20,41 @@
 * END_COPYRIGHT
 */
 
-#ifndef __RLE_H__
-#define __RLE_H__
+#ifndef RLE_H
+#define RLE_H
+
+#include <array/Coordinate.h>
+#include <array/RLESegment.h>
+#include <query/Value.h>
+#include <system/Exceptions.h>
+#include <util/arena/Map.h>
 
 #include <map>
 #include <vector>
 #include <boost/utility.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/split_member.hpp>
-#include <system/Exceptions.h>
-#include <array/Coordinate.h>
-#include <util/arena/Map.h>
-#include <query/Value.h>
+#include <limits>
 
 namespace scidb
 {
+const uint64_t RLE_EMPTY_BITMAP_MAGIC = 0xEEEEAAAA00EEBAACLL;
+const uint64_t RLE_PAYLOAD_MAGIC      = 0xDDDDAAAA000EAAACLL;
+
 class ConstChunk;
 class RLEPayload;
 class Query;
 class ArrayDesc;
 
 typedef mgd::map<position_t, Value> ValueMap;
+
+/**
+ * Type for offsets into the variable length part ("VarPart") of a payload.
+ * A change to this type will require a new on-disk storage version.
+ */
+typedef uint32_t varpart_offset_t;
+const size_t RLE_MAX_VARPART_OFFSET = std::numeric_limits<varpart_offset_t>::max();
 
 extern void checkChunkMagic(ConstChunk const& chunk);
 
@@ -69,6 +82,7 @@ public:
     };
 
   protected:
+    // Pointers are to memory not owned by this object.
     size_t _nSegs;
     Segment const* _seg;
     uint64_t _nNonEmptyElements;
@@ -78,18 +92,21 @@ public:
     /**
      * Default constructor
      */
-    ConstRLEEmptyBitmap() {
-        _nSegs = 0;
-        _nNonEmptyElements = 0;
-        _seg = NULL;
-        _chunk  = NULL;
-    }
+    ConstRLEEmptyBitmap()
+        : _nSegs(0)
+        , _seg(NULL)
+        , _nNonEmptyElements(0)
+        , _chunk(NULL)
+        , _chunkPinned(false)
+    {}
 
   public:
 
     size_t getValueIndex(position_t pos) const {
         size_t r = findSegment(pos);
-        return (r < _nSegs && _seg[r]._lPosition <= pos) ? _seg[r]._pPosition + pos - _seg[r]._lPosition : size_t(-1);
+        return (r < _nSegs && _seg[r]._lPosition <= pos)
+            ? _seg[r]._pPosition + pos - _seg[r]._lPosition
+            : size_t(-1);
     }
 
     /**
@@ -153,6 +170,9 @@ public:
 
     virtual ~ConstRLEEmptyBitmap();
 
+    std::ostream& getInfo(std::ostream& stream, bool verbose=false) const;
+
+    /// Iterate over the non-empty cells in a ConstRLEEmptyBitmap.
     class iterator
     {
       private:
@@ -161,12 +181,15 @@ public:
         Segment const* _cs;
         position_t _currLPos;
 
+        bool const_end() const { return _currSeg >= _bm->nSegments(); }
+
       public:
         iterator(ConstRLEEmptyBitmap const* bm):
         _bm(bm), _currSeg(0), _cs(NULL), _currLPos(-1)
         {
             reset();
         }
+
         iterator():
         _bm(NULL), _currSeg(0), _cs(NULL), _currLPos(-1)
         {}
@@ -183,18 +206,18 @@ public:
 
         bool end()
         {
-            return _currSeg >= _bm->nSegments();
+            return const_end();
         }
 
-        position_t const& getLPos()
+        position_t const& getLPos() const
         {
-            assert(!end());
+            assert(!const_end());
             return _currLPos;
         }
 
-        position_t getPPos()
+        position_t getPPos() const
         {
-            assert(!end());
+            assert(!const_end());
             return _cs->_pPosition + _currLPos - _cs->_lPosition;
         }
 
@@ -234,7 +257,8 @@ public:
 
     /**
      * An iterator that iterates through the segments, rather than the individual non-empty cells.
-     * It also helps remember an 'offset' within a segment, enabling the caller to take a partial segment out and treat the remains of the segment as another virtual segment.
+     * It also helps remember an 'offset' within a segment, enabling the caller to take a partial
+     * segment out and treat the remains of the segment as another virtual segment.
      */
     class SegmentIterator
     {
@@ -326,7 +350,7 @@ public:
      *
      * @return bitmap with same shape and zeros in (Original MINUS Subarray) areas.
      */
-    boost::shared_ptr<RLEEmptyBitmap> cut(
+    std::shared_ptr<RLEEmptyBitmap> cut(
             Coordinates const& lowerOrigin,
             Coordinates const& upperOrigin,
             Coordinates const& lowerResult,
@@ -340,7 +364,11 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
   private:
     std::vector<Segment> _container;
 
-    position_t addRange(position_t lpos, position_t ppos, uint64_t sliceSize, size_t level, Coordinates const& chunkSize, Coordinates const& origin, Coordinates const& first, Coordinates const& last);
+    position_t addRange(position_t lpos, position_t ppos, uint64_t sliceSize, size_t level,
+                        Coordinates const& chunkSize,
+                        Coordinates const& origin,
+                        Coordinates const& first,
+                        Coordinates const& last);
 
   public:
     void reserve(size_t size) {
@@ -390,11 +418,17 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
 
     RLEEmptyBitmap& operator=(ConstRLEEmptyBitmap const& other)
     {
-        _nSegs = other.nSegments();
-        _nNonEmptyElements = other._nNonEmptyElements;
-        _container.resize(_nSegs);
-        memcpy(&_container[0], other._seg, _nSegs*sizeof(Segment));
-        _seg = &_container[0];
+        if (static_cast<ConstRLEEmptyBitmap*>(this) != &other) {
+            _nSegs = other.nSegments();
+            _nNonEmptyElements = other._nNonEmptyElements;
+            _container.resize(_nSegs);
+            if (_container.empty()) {
+                _seg = NULL;
+            } else {
+                memcpy(&_container[0], other._seg, _nSegs*sizeof(Segment));
+                _seg = &_container[0];
+            }
+        }
         return *this;
     }
 
@@ -406,10 +440,12 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
 
     RLEEmptyBitmap& operator=(RLEEmptyBitmap const& other)
     {
-        _nSegs = other._nSegs;
-        _nNonEmptyElements = other._nNonEmptyElements;
-        _container = other._container;
-        _seg = &_container[0];
+        if (this != &other) {
+            _nSegs = other._nSegs;
+            _nNonEmptyElements = other._nNonEmptyElements;
+            _container = other._container;
+            _seg = _container.empty() ? NULL : &_container[0];
+        }
         return *this;
     }
 
@@ -459,11 +495,12 @@ class RLEEmptyBitmap : public ConstRLEEmptyBitmap
 class RLEPayload;
 
 /**
-  * class ConstRLEPayload
   * This class stores values in a stride-major-ordered array with RLE-packing of data.
+  *
+  * @description
   * We have the payload array where we store values.
   * The payload array is split into separated parts called segments.
-  * Each segment has description (struct Segment).  All Segments stored within a container.
+  * Each segment has description (rle::Segment).  All Segments stored within a container.
   * Every segment has the following fields:
   *  - pPosition:  physical position (stride-major-order) of first value from segment
   *  - valueIndex:  byte number inside the payload array where the data for this segment is
@@ -471,76 +508,16 @@ class RLEPayload;
   *  - same:  true if all values in the segment are equal
   *  - null:  bit describing valueIndex
   *
-  * NOTE: This class doesn't take ownership of passed-in payloads.
-  * NOTE: Cannot add values
+  * @note This class does NOT take ownership of passed-in payloads.
+  * @note Cannot add values.
   */
 class ConstRLEPayload
 {
 friend class boost::serialization::access;
 friend class RLEPayload;
 public:
-    struct Segment {
-        position_t _pPosition; // position in chunk of first element
-        uint32_t   _valueIndex : 30; // index of element in payload array or missing reason
-        uint32_t   _same:1; // sequence of same values
-        uint32_t   _null:1; // trigger if value is NULL (missingReason) or normal value (valueIndex)
 
-        Segment()
-        : _pPosition(-1),
-        _valueIndex(static_cast<uint32_t>(0)),
-        _same(uint8_t(0)),
-        _null(uint8_t(0)) {}
-
-        Segment(position_t pPos,
-                uint32_t vIndex,
-                bool isSame,
-                bool isNull)
-        : _pPosition(pPos),
-        _valueIndex(vIndex),
-        _same(isSame),
-        _null(isNull) {}
-
-        /**
-         * NOTE: Danger method implementation!!!
-         * If you copy structure to separate variable this method will not work
-         * without any warnings.
-         * First Idea to remove this method at all and force implement it directly in code.
-         * This prevents user from wrong usage.
-         */
-        uint64_t length() const {
-            return this[1]._pPosition - _pPosition;
-        }
-
-        template<class Archive>
-        void save(Archive & ar, const unsigned int version) const
-        {
-            position_t pPosition__ = _pPosition;
-            uint32_t valueIndex__ = _valueIndex;
-            uint8_t same__ = _same;
-            uint8_t null__ = _null;
-            ar & pPosition__;
-            ar & valueIndex__;
-            ar & same__;
-            ar & null__;
-        }
-        template<class Archive>
-        void load(Archive & ar, const unsigned int version)
-        {
-            position_t pPosition__;
-            uint32_t valueIndex__;
-            uint8_t same__;
-            uint8_t null__;
-            ar & pPosition__;
-            ar & valueIndex__;
-            ar & same__;
-            ar & null__;
-            _pPosition = pPosition__;
-            _valueIndex = valueIndex__;
-            _same = same__;
-            _null = null__;
-        }
-        BOOST_SERIALIZATION_SPLIT_MEMBER()
-    } __attribute__ ((packed));
+    typedef rle::Segment Segment;
 
     // This structure must have platform independent data types because we use it in chunk format data structure
     struct Header {
@@ -549,7 +526,7 @@ public:
         uint64_t  _elemSize;
         uint64_t  _dataSize;
         uint64_t  _varOffs;
-        bool      _isBoolean;
+        uint8_t   _isBoolean;
     };
 
   protected:
@@ -568,13 +545,24 @@ public:
     // seg = {0,0,false}, {5,5,true}, {10}
     char* _payload;
 
-    ConstRLEPayload(): _nSegs(0), _elemSize(0), _dataSize(0), _varOffs(0), _isBoolean(false), _seg(NULL), _payload(NULL)
+    ConstRLEPayload()
+        : _nSegs(0), _elemSize(0), _dataSize(0), _varOffs(0), _isBoolean(false), _seg(NULL), _payload(NULL)
     {}
+
+    static varpart_offset_t* idxToVoffAddr(const char* payload, uint32_t index)
+    {
+        return ((varpart_offset_t*)payload) + index;
+    }
+
+    static varpart_offset_t idxToVoff(const char* payload, uint32_t index)
+    {
+        return *idxToVoffAddr(payload, index);
+    }
 
   public:
 
     size_t count() const {
-        return _nSegs == 0 ? 0 : _seg[_nSegs]._pPosition;
+        return _nSegs == 0 ? 0 : _seg[_nSegs].pPosition();
     }
 
     bool isBool() const
@@ -621,16 +609,16 @@ public:
 
     /**
      * Get value data by the given index
-     * @param placeholder for exracted value
+     * @param placeholder for extracted value
      * @param index of value obtained through Segment::valueIndex
      */
     void getValueByIndex(Value& value, size_t index) const;
 
     /**
-     * Get pointer to raw value data for the given poistion
+     * Get pointer to raw value data for the given position.
      * @param placeholder for exracted value
      * @param pos element position
-     * @return true if values exists i payload, false othrwise
+     * @return true if values exists in payload, false otherwise
      */
     bool getValueByPosition(Value& value, position_t pos) const;
 
@@ -638,7 +626,7 @@ public:
      * Return pointer for raw data for non-nullable types
      */
     char* getRawValue(size_t index) const {
-        return _payload + index*(_elemSize == 0 ? 4 : _elemSize);
+        return _payload + index*(_elemSize == 0 ? sizeof(varpart_offset_t) : _elemSize);
     }
 
     /**
@@ -665,13 +653,13 @@ public:
      */
     size_t payloadSize() const {
         return _dataSize;
-        }
+    }
 
     /**
      * Get number of items in payload
      */
     size_t payloadCount() const {
-        return _dataSize / (_elemSize == 0 ? 4 : _elemSize);
+        return _dataSize / (_elemSize == 0 ? sizeof(varpart_offset_t) : _elemSize);
     }
 
     /**
@@ -684,13 +672,39 @@ public:
     }
 
     /**
+     * Get next i-th segment and also return its length.
+     *
+     * Faster than two method calls when both are needed.
+     * @see getSegLength
+     */
+    Segment const& getSegment(size_t i, size_t& length) const {
+        assert(i < _nSegs);     // _nSegs disallowed: its length cannot be known
+        assert(_seg);
+        length = _seg[i+1].pPosition() - _seg[i].pPosition();
+        return _seg[i];
+    }
+
+    /**
+     * Get length of i-th segment.
+     *
+     * @note Only this container, and not the segment itself, can know the length of a segment:
+     * it depends on values in the "next" segment, and this container ensures that a next
+     * segment exists.  Hence rle::Segment does not itself have a length() method.
+     */
+    size_t getSegLength(size_t i) const {
+        assert(i < _nSegs);
+        assert(_seg);
+        return _seg[i+1].pPosition() - _seg[i].pPosition();
+    }
+
+    /**
      * Find segment containing elements with position greater or equal than specified
      */
     size_t findSegment(position_t pos) const {
         size_t l = 0, r = _nSegs;
         while (l < r) {
             size_t m = (l + r) / 2;
-            position_t mpos =_seg[m+1]._pPosition;
+            position_t mpos =_seg[m+1].pPosition();
             if (mpos == pos) {
                 return (m+1);
             } else if (mpos < pos) {
@@ -715,13 +729,18 @@ public:
         return sizeof(Header) + (_nSegs+1)*sizeof(Segment) + _dataSize;
     }
 
-
     /**
      * Constructor for initializing payload with raw chunk data
      */
     ConstRLEPayload(char const* src);
 
-    void getCoordinates(ArrayDesc const& array, size_t dim, Coordinates const& chunkPos, Coordinates const& tilePos, boost::shared_ptr<Query> const& query, Value& dst, bool withOverlap) const;
+    void getCoordinates(ArrayDesc const& array,
+                        size_t dim,
+                        Coordinates const& chunkPos,
+                        Coordinates const& tilePos,
+                        std::shared_ptr<Query> const& query,
+                        Value& dst,
+                        bool withOverlap) const;
 
     bool checkBit(size_t bit) const {
         return (_payload[bit >> 3] & (1 << (bit & 7))) != 0;
@@ -740,8 +759,7 @@ public:
 
     class iterator
     {
-    protected:
-        ConstRLEPayload const* _payload;
+        ConstRLEPayload const* _referent;
         size_t _currSeg;
         Segment const* _cs;
         position_t _currPpos;
@@ -749,7 +767,7 @@ public:
     public:
         //defined in .cpp because of value constructor
         iterator(ConstRLEPayload const* payload);
-        iterator() : _payload(NULL), _currSeg(0), _cs(0), _currPpos(-1) {}
+        iterator() : _referent(NULL), _currSeg(0), _cs(0), _currPpos(-1) {}
 
         size_t getCurrSeg()
         {
@@ -761,32 +779,32 @@ public:
             _currSeg = 0;
             if(!end())
             {
-                _cs = &_payload->getSegment(_currSeg);
-                _currPpos = _cs->_pPosition;
+                _cs = &_referent->getSegment(_currSeg);
+                _currPpos = _cs->pPosition();
             }
         }
 
         bool end() const
         {
-            return _currSeg >= _payload->nSegments();
+            return _currSeg >= _referent->nSegments();
         }
 
-        int getMissingReason() const
+        unsigned getMissingReason() const
         {
             assert(!end());
-            return _cs->_valueIndex;
+            return _cs->valueIndex();
         }
 
         bool isNull() const
         {
             assert(!end());
-            return _cs->_null;
+            return _cs->null();
         }
 
         bool isSame() const
         {
             assert(!end());
-            return _cs->_same;
+            return _cs->same();
         }
 
         position_t const& getPPos() const
@@ -798,31 +816,33 @@ public:
         uint32_t getValueIndex() const
         {
             assert(!end());
-            return (_cs->_same || _cs->_null) ? _cs->_valueIndex : _cs->_valueIndex + _currPpos - _cs->_pPosition;
+            return (_cs->same() || _cs->null())
+                ? _cs->valueIndex()
+                : _cs->valueIndex() + _currPpos - _cs->pPosition();
         }
 
         uint64_t getSegLength() const
         {
             assert(!end());
-            return _cs->length();
+            return _cs[1].pPosition() - _cs->pPosition();
         }
 
         uint64_t getRepeatCount() const
         {
             assert(!end());
-            return _cs->_same ? _cs->length() - _currPpos + _cs->_pPosition : 1;
+            return _cs->same() ? getSegLength() - _currPpos + _cs->pPosition() : 1;
         }
 
         uint64_t available() const
         {
             assert(!end());
-            return _cs->length() - _currPpos + _cs->_pPosition;
+            return getSegLength() - _currPpos + _cs->pPosition();
         }
 
        bool checkBit() const
         {
-            assert(_payload->_isBoolean);
-            return _payload->checkBit(_cs->_valueIndex + (_cs->_same ? 0 : _currPpos - _cs->_pPosition));
+            assert(_referent->_isBoolean);
+            return _referent->checkBit(_cs->valueIndex() + (_cs->same() ? 0 : _currPpos - _cs->pPosition()));
         }
 
         void toNextSegment()
@@ -831,21 +851,21 @@ public:
             _currSeg ++;
             if (!end())
             {
-                _cs = &_payload->getSegment(_currSeg);
-                _currPpos = _cs->_pPosition;
+                _cs = &_referent->getSegment(_currSeg);
+                _currPpos = _cs->pPosition();
             }
         }
 
         char* getRawValue(size_t& valSize)
         {
-            size_t index = _cs->_same ? _cs->_valueIndex : _cs->_valueIndex + _currPpos - _cs->_pPosition;
-            return _payload->getRawVarValue(index, valSize);
+            size_t index = _cs->same() ? _cs->valueIndex() : _cs->valueIndex() + _currPpos - _cs->pPosition();
+            return _referent->getRawVarValue(index, valSize);
         }
 
         char* getFixedValues()
         {
-            size_t index = _cs->_same ? _cs->_valueIndex : _cs->_valueIndex + _currPpos - _cs->_pPosition;
-            return _payload->_payload + index*_payload->_elemSize;
+            size_t index = _cs->same() ? _cs->valueIndex() : _cs->valueIndex() + _currPpos - _cs->pPosition();
+            return _referent->_payload + index*_referent->_elemSize;
         }
 
         bool isDefaultValue(Value const& defaultValue);
@@ -856,7 +876,7 @@ public:
         void operator ++()
         {
             assert(!end());
-            if (_currPpos + 1 < position_t(_cs->_pPosition + _cs->length()))
+            if (_currPpos + 1 < position_t(_cs->pPosition() + getSegLength()))
             {
                 _currPpos ++;
             }
@@ -865,59 +885,77 @@ public:
                 _currSeg ++;
                 if(!end())
                 {
-                    _cs = &_payload->getSegment(_currSeg);
-                    _currPpos = _cs->_pPosition;
+                    _cs = &_referent->getSegment(_currSeg);
+                    _currPpos = _cs->pPosition();
                 }
             }
         }
 
         bool setPosition(position_t pPos)
         {
-            _currSeg = _payload->findSegment(pPos);
+            _currSeg = _referent->findSegment(pPos);
             if (end())
             {
                 return false;
             }
 
-            assert (_payload->getSegment(_currSeg)._pPosition <= pPos);
+            assert (_referent->getSegment(_currSeg).pPosition() <= pPos);
 
-            _cs = &_payload->getSegment(_currSeg);
+            _cs = &_referent->getSegment(_currSeg);
             _currPpos = pPos;
             return true;
         }
 
         /**
-          * Should applied just for bool-typed RLE (bitmap tiles).
-          * Skip @param count positions in payload and return number of "1" values.
-          * Data Tile just store values without knowledge about physical positions inside tile, while a bitmap helps to understand where which value stay.
-          * It is important for skip data from data tile:
-          *   you call dataReader += bitmapReader.skip(physicalPositionsCount) and receive the consistent positions inside bitmapReader and dataReader.
-          */
+         * Move ahead @c count physical positions in a tile.
+         *
+         * @param count number of physical positions to move ahead
+         * @return if tile is a bitmap, count of 1 bits seen while moving, otherwise 0
+         *
+         * @description A data tile just stores values without knowledge
+         * about physical positions inside the tile.  The corresponding
+         * bitmap tile (that is, @c *this ) helps to understand where
+         * each data value is actually positioned.  Hence if you call
+         *
+         *      dataReader += bitmapReader.skip(physicalPositionsCount);
+         *
+         * you will have consistent positioning in both dataReader and
+         * bitmapReader.
+         *
+         * @note The return value of this method is ONLY useful if
+         * called on a bitmap tile iterator, that is, on iterators for
+         * boolean ConstRLEPayloads.
+         */
         uint64_t skip(uint64_t count)
         {
             uint64_t setBits = 0;
+            bool countBits = _referent->_isBoolean;
             while (!end()) {
-                if (_currPpos + count >= _cs->_pPosition + _cs->length()) {
-                    uint64_t tail = _cs->length() - _currPpos + _cs->_pPosition;
+                if (_currPpos + count >= _cs->pPosition() + getSegLength()) {
+                    uint64_t tail = getSegLength() - _currPpos + _cs->pPosition();
                     count -= tail;
-                    if (_cs->_same)  {
-                        setBits += _payload->checkBit(_cs->_valueIndex) ? tail : 0;
-                    }  else {
-                        position_t beg = _cs->_valueIndex + _currPpos - _cs->_pPosition;
-                        position_t end = _cs->_valueIndex + _cs->length();
-                        while (beg < end) {
-                            setBits += _payload->checkBit(beg++);
+                    if (countBits) {
+                        if (_cs->same())  {
+                            setBits += _referent->checkBit(_cs->valueIndex()) ? tail : 0;
+                        }  else {
+                            position_t beg = _cs->valueIndex() + _currPpos - _cs->pPosition();
+                            position_t end = _cs->valueIndex() + getSegLength();
+                            while (beg < end) {
+                                setBits += _referent->checkBit(beg++);
+                            }
                         }
                     }
                     toNextSegment();
                 } else {
-                    if (_cs->_same)  {
-                        setBits += _payload->checkBit(_cs->_valueIndex) ? count : 0;
-                    } else {
-                        position_t beg = _cs->_valueIndex + _currPpos - _cs->_pPosition;
-                        position_t end = beg + count;
-                        while (beg < end) {
-                            setBits += _payload->checkBit(beg++);
+                    if (countBits) {
+                        if (_cs->same())  {
+                            setBits += _referent->checkBit(_cs->valueIndex()) ? count : 0;
+                        } else {
+                            position_t beg = _cs->valueIndex() + _currPpos - _cs->pPosition();
+                            position_t end = beg + count;
+                            while (beg < end) {
+                                setBits += _referent->checkBit(beg++);
+                            }
                         }
                     }
                     _currPpos += count;
@@ -931,10 +969,10 @@ public:
         {
             assert(!end());
             _currPpos += count;
-            if (_currPpos >= position_t(_cs->_pPosition + _cs->length())) {
-                if (++_currSeg < _payload->nSegments()) {
-                    _cs = &_payload->getSegment(_currSeg);
-                    if (_currPpos < position_t(_cs->_pPosition + _cs->length())) {
+            if (_currPpos - _cs->pPosition() >= static_cast<position_t>(getSegLength())) {
+                if (++_currSeg < _referent->nSegments()) {
+                    _cs = &_referent->getSegment(_currSeg);
+                    if (_currPpos - _cs->pPosition() < static_cast<position_t>(getSegLength())) {
                         return;
                     }
                 }
@@ -995,25 +1033,28 @@ public:
         }
 
         /**
-         * Get information for SegmentWithLength of the current virtual segment (could be in the middle of an actual segment).
-         * @param[out] ret     the segment to be returned
+         * Get information for SegmentWithLength of the current virtual
+         * segment (could be in the middle of an actual segment).
          *
+         * @param[out] ret     the segment to be returned
          */
         void getVirtualSegment(ConstRLEPayload::SegmentWithLength& ret) const
         {
             assert(!end());
 
-            ret._pPosition = _it.getPPos();
+            ret.setPPosition(_it.getPPos());
             ret._length = _it.available();
-            ret._same = _it.isSame();
-            ret._null = _it.isNull();
-            ret._valueIndex = _it.getValueIndex();
+            ret.setSame(_it.isSame());
+            ret.setNull(_it.isNull());
+            ret.setValueIndex(_it.getValueIndex());
         }
 
         /**
          * Advance the position, within the same segment.
          * @param stepSize  how many positions to skip
-         * @pre stepSize must be LESS than the remaining length of the virtual segment; to advance to the end of the segment you should use operator++()
+         * @pre stepSize must be LESS than the remaining length of the
+         *      virtual segment; to advance to the end of the segment you
+         *      should use operator++()
          */
         void advanceWithinSegment(uint64_t stepSize)
         {
@@ -1056,42 +1097,83 @@ public:
 std::ostream& operator<<(std::ostream& stream, ConstRLEPayload const& payload);
 
 /**
- * A class that enables the construction of an RLEPayload object.
- * @note
- *   - For a variable-size type, until setVarPart() is called, _dataSize is the byte size of the fixed-size part (and _payload only contains the fixed-size part);
- *     After setVarPart() is called, _dataSize is the total byte size of the fixed-size part and the variable-size part (and the var part is copied into _payload).
- *   - For a fixed-size type, there is no var part. So _dataSize is both the size of the fixed-size part and the size of all the data.
- *   - For a boolean type, _dataSize is _valuesCount divided by 8 -- just enough to hold all the boolean values.
- *   - Each call to appendValue takes as input a vector of bytes (as the var part of the data), to receive the var part of the new value.
- *   - When constructing an RLEPayload, don't forget the last segment (which helps tell the length of the previous segment). You may call flush().
+ * A class for building a ConstRLEPayload object.
  *
  * @note
- *   Donghui believes the class should be rewritten in several ways:
- *   - It is better to store the variable part of the data inside the RLEPayload object, not somewhere else.
- *   - getValuesCount() returns _dataSize/elementSize, which is simply wrong after setVarPart() is called.
- *   - It is not clear when _valuesCount can be trusted. Seems that while data are being appended, _valuesCount is trustworthy only if the data type is boolean.  DJG While this is true, you never access _valuesCount directly.  The getValuesCount accessor returns the correct number of elements regardless of whether or not _isBoolean is true.  _valuesCount is an optimization for the _isBoolean = true case only.
- *   - addBoolValues() updates _dataSize and _valuesCount, but addRawValues() and addRawVarValues() do NOT update any of them. This is very inconsistent.
- *   - It is redundant to have both RLEPayload::append_iterator and RLEPayloadAppender.
- *   - append(RLEPayload& other) may set _data = other._data. This seems to violate the theme of the class -- storing its own copy of the data.
+ * Some remarks on the implementation...
+ *
+ * - For a variable-size type, until setVarPart() is called, _dataSize
+ *   is the byte size of the fixed-size part (and _payload only
+ *   contains the fixed-size part).  In the meantime, variable-sized
+ *   values accumulate in an external vector.  See appendValue() .
+ *
+ * - After setVarPart() is called (passing in the accumulated
+ *   variable-sized values), _dataSize is the total byte size of the
+ *   fixed-size part and the variable-size part (and the var part is
+ *   copied into _payload).
+ *
+ * - For a fixed-size type, there is no var part. So _dataSize is both
+ *   the size of the fixed-size part and the size of all the data.
+ *
+ * - For a boolean type, _dataSize is _valuesCount divided by NBBY
+ *   (bits per byte, i.e. 8) -- just enough to hold all the boolean
+ *   values.
+ *
+ * - Each call to appendValue() takes as input a vector of bytes (as the
+ *   var part of the data), to receive the var part of the new value.
+ *
+ * - When constructing an RLEPayload, don't forget the last segment
+ *   (which helps tell the length of the previous segment). You may
+ *   call flush() to accomplish this.
+ *
+ * @note
+ * Donghui believes the class should be rewritten in several ways:
+ *
+ * - It is better to store the variable part of the data inside the
+ *   RLEPayload object, not somewhere else.
+ *
+ * - getValuesCount() returns _dataSize/elementSize, which is simply
+ *   wrong after setVarPart() is called.
+ *
+ * - It is not clear when _valuesCount can be trusted. Seems that while
+ *   data are being appended, _valuesCount is trustworthy only if the
+ *   data type is boolean.  [DJG: While this is true, you never access
+ *   _valuesCount directly.  The getValuesCount accessor returns the
+ *   correct number of elements regardless of whether or not
+ *   _isBoolean is true.  _valuesCount is an optimization for the
+ *   _isBoolean = true case only.]
+ *
+ * - addBoolValues() updates _dataSize and _valuesCount, but
+ *   addRawValues() and addRawVarValues() do NOT update any of
+ *   them. This is very inconsistent.
  */
 class RLEPayload : public ConstRLEPayload
 {
   private:
     std::vector<Segment> _container;
     std::vector<char> _data;
-    uint64_t _valuesCount;
+    uint64_t _valuesCount;      // Used only for _isBoolean case.
 
   public:
+
+    /**
+     * Append a single Value to either the fixed-size part of the array, or to @c varPart.
+     *
+     * @param[in,out] varPart   append val here iff payload is for variable-length attributes
+     * @param[in] val           value to append (or if attribute is Boolean, whether to set/clear)
+     * @param[in] valueIndex    for Boolean attributes only, set or clear this bit position
+     */
     void appendValue(std::vector<char>& varPart, Value const& val, size_t valueIndex);
 
     /**
      * Append a (partial) segment of values from another RLEPayload.
      *
      * @param[in]    dstSegmentToAppend   a segment to be appended
-     * @param[inout] varPart              the variable-size part of the data
+     * @param[in,out] varPart             the variable-size part of the data
      * @param[in]    srcPayload           the source ConstRLEPayload to copy data from
      * @param[in]    valueIndexInSrc      the valueIndex in the src, corresponding to the first value to append
-     * @param[in]    realLength           the number of values to append; 1 if dstSegmentToAppend._same==true; 0 if dstSegmentToAppend._null==true
+     * @param[in]    realLength           the number of values to append; 1 if dstSegmentToAppend._same==true;
+     *                                    0 if dstSegmentToAppend._null==true
      *
      * @note _valuesCount needs to be accurate before and after the call.
      * @note _dataSize needs to be the byte size of the fixed data before and after the call.
@@ -1103,8 +1185,7 @@ class RLEPayload : public ConstRLEPayload
     void setVarPart(char const* data, size_t size);
     void setVarPart(std::vector<char>& varPart);
 
-    friend class RLEPayloadAppender;
-
+    /** Append the contents of another RLEPayload object. */
     void append(RLEPayload& payload);
 
     /**
@@ -1124,10 +1205,11 @@ class RLEPayload : public ConstRLEPayload
      * Add raw var data for non-nullable types
      * @param n a number of new items
      * @return index of the first new item
+     * @note We are resizing the fixed-size portion of the payload only.
      */
     size_t addRawVarValues(size_t n = 1) {
         assert(_elemSize == 0);
-        const size_t fixedSize = sizeof(int);
+        const size_t fixedSize = sizeof(varpart_offset_t);
         const size_t ret = _dataSize / fixedSize;
         _data.resize(_dataSize += fixedSize * n);
         _payload = &_data[0];
@@ -1155,7 +1237,7 @@ class RLEPayload : public ConstRLEPayload
     size_t getValuesCount() const  {
         if (_isBoolean)
             return _valuesCount;
-        const size_t fixedSize = _elemSize == 0 ? 4 : _elemSize;
+        const size_t fixedSize = _elemSize == 0 ? sizeof(varpart_offset_t) : _elemSize;
         return _dataSize / fixedSize;
     }
 
@@ -1163,7 +1245,7 @@ class RLEPayload : public ConstRLEPayload
      * Add new segment
      */
     void addSegment(const Segment& segment) {
-        assert(_container.size() == 0 || _container[_container.size() - 1]._pPosition < segment._pPosition);
+        assert(_container.empty() || _container[_container.size() - 1].pPosition() < segment.pPosition());
         _container.push_back(segment);
         _seg = &_container[0];
         _nSegs = _container.size() - 1;
@@ -1173,17 +1255,21 @@ class RLEPayload : public ConstRLEPayload
      * Assign segments pointer from other payload.
      * Sometimes it's safe to just copy pointer but for conversion
      * constant inplace it's impossible for example.
-     * That's why copy param is tru by default
+     * That's why copy param is true by default.
      */
     void assignSegments(const ConstRLEPayload& payload, bool copy = true)
     {
-
         if (copy) {
             _nSegs = payload.nSegments();
             _container.resize(_nSegs + 1);
             memcpy(&_container[0], payload._seg, (_nSegs + 1) * sizeof(Segment));
             _seg = &_container[0];
         } else {
+            // XXX This code looks suspect to me: what about
+            // _container[] ???  I don't believe that "it's safe to
+            // just copy the pointer".  Fortunately it doesn't seem to
+            // be getting called anywhere at the moment.  -mjl
+            SCIDB_UNREACHABLE();
             _seg = payload._seg;
             _nSegs = payload._nSegs;
         }
@@ -1194,17 +1280,19 @@ class RLEPayload : public ConstRLEPayload
      */
     RLEPayload& operator=(ConstRLEPayload const& other)
     {
-        _nSegs = other.nSegments();
-        _elemSize = other._elemSize;
-        _dataSize = other._dataSize;
-        _varOffs = other._varOffs;
-        _isBoolean = other._isBoolean;
-        _container.resize(_nSegs+1);
-        memcpy(&_container[0], other._seg, (_nSegs+1)*sizeof(Segment));
-        _seg = &_container[0];
-        _data.resize(_dataSize);
-        memcpy(&_data[0], other._payload, _dataSize);
-        _payload = &_data[0];
+        if (dynamic_cast<ConstRLEPayload*>(this) != &other) {
+            _nSegs = other.nSegments();
+            _elemSize = other._elemSize;
+            _dataSize = other._dataSize;
+            _varOffs = other._varOffs;
+            _isBoolean = other._isBoolean;
+            _container.resize(_nSegs+1);
+            memcpy(&_container[0], other._seg, (_nSegs+1)*sizeof(Segment));
+            _seg = &_container[0];
+            _data.resize(_dataSize);
+            memcpy(&_data[0], other._payload, _dataSize);
+            _payload = &_data[0];
+        }
         return *this;
     }
 
@@ -1216,16 +1304,18 @@ class RLEPayload : public ConstRLEPayload
 
     RLEPayload& operator=(RLEPayload const& other)
     {
-        _nSegs = other._nSegs;
-        _elemSize = other._elemSize;
-        _dataSize = other._dataSize;
-        _varOffs = other._varOffs;
-        _isBoolean = other._isBoolean;
-        _container = other._container;
-        _seg = &_container[0];
-        _data = other._data;
-        _payload = &_data[0];
-        _valuesCount = other._valuesCount;
+        if (this != &other) {
+            _nSegs = other._nSegs;
+            _elemSize = other._elemSize;
+            _dataSize = other._dataSize;
+            _varOffs = other._varOffs;
+            _isBoolean = other._isBoolean;
+            _container = other._container;
+            _seg = &_container[0];
+            _data = other._data;
+            _payload = &_data[0];
+            _valuesCount = other._valuesCount;
+        }
         return *this;
     }
 
@@ -1248,7 +1338,8 @@ class RLEPayload : public ConstRLEPayload
      * @param defaultValue default value used to fill holes (elements not specified in ValueMap)
      * @param subsequent all elements in ValueMap are assumed to be subsequent
      */
-    RLEPayload(ValueMap& vm, size_t nElems, size_t elemSize, Value const& defaultVal, bool isBoolean, bool subsequent);
+    RLEPayload(ValueMap const& vm, size_t nElems, size_t elemSize,
+               Value const& defaultVal, bool isBoolean, bool subsequent);
 
     /**
      * Constructor which is used to fill a non-emptyable RLE chunk with default values.
@@ -1274,21 +1365,32 @@ class RLEPayload : public ConstRLEPayload
     //
     class append_iterator : boost::noncopyable
     {
-        RLEPayload* result;
-        std::vector<char> varPart;
-        RLEPayload::Segment segm;
-        Value prevVal;
-        size_t valueIndex;
-        size_t segLength;
+        RLEPayload* _result;
+        std::vector<char> _varPart;
+        RLEPayload::Segment _segm;
+        Value _prevVal;
+        size_t _valueIndex;
+        size_t _segLength;
 
       public:
         RLEPayload* getPayload() {
-            return result;
+            return _result;
         }
 
         explicit append_iterator(RLEPayload* dstPayload);
         void flush();
         void add(Value const& v, uint64_t count = 1);
+
+        /**
+         * @name Compatibility aliases.
+         * Backward compatibility methods to make replacing the obsolete
+         * RLEPayloadAppender class easier.
+         */
+        /**@{*/
+        void finalize() { flush(); }
+        void append(Value const& v, uint64_t count = 1) { add(v,count); }
+        /**@}*/
+
         /**
          * add not more than @param limit values from @param inputIterator
          * Flag @param setupPrevVal just a workaround for bug with mixed
@@ -1304,9 +1406,6 @@ class RLEPayload : public ConstRLEPayload
          * (if @param inputIterator still has values, of course).
          */
         uint64_t add(iterator& inputIterator, uint64_t limit, bool setupPrevVal = false);
-        ~append_iterator();
-    private:
-        append_iterator();
     };
 
     /**
@@ -1322,7 +1421,10 @@ class RLEPayload : public ConstRLEPayload
      * @param [in] vStart a logical position of start from data should be copied
      * @param [in] vEnd a logical position of stop where data should be copied
      */
-    void unPackTile(const ConstRLEPayload& payload, const ConstRLEEmptyBitmap& emptyMap, position_t vStart, position_t vEnd);
+    void unPackTile(const ConstRLEPayload& payload,
+                    const ConstRLEEmptyBitmap& emptyMap,
+                    position_t vStart,
+                    position_t vEnd);
 
     /**
      * Use this method to copy empty bitmask to payload
@@ -1354,49 +1456,6 @@ class RLEPayload : public ConstRLEPayload
             _seg = &_container[0];
             _payload = &_data[0];
         }
-    }
-};
-
-class RLEPayloadAppender
-{
-private:
-    RLEPayload _payload;
-
-    ssize_t _nextSeg;
-    ssize_t _nextPPos;
-    ssize_t _nextValIndex;
-    bool _finalized;
-
-public:
-    RLEPayloadAppender(size_t bitSize): _payload(bitSize), _nextSeg(0), _nextPPos(0), _nextValIndex(0), _finalized(false)
-    {
-        //no boolean yet!
-        if (bitSize <= 1)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_NOT_IMPLEMENTED) << "payload appender for size <= 1";
-    }
-
-    ~RLEPayloadAppender()
-    {}
-
-    void append(Value const& v);
-
-    void finalize()
-    {
-        _payload._container.resize(_nextSeg+1);
-        _payload._container[_nextSeg]._pPosition = _nextPPos;
-        _payload._valuesCount = _nextValIndex;
-        _payload._dataSize = _nextValIndex * _payload._elemSize;
-        _payload._isBoolean = false;
-        _payload._nSegs = _nextSeg;
-        _payload._payload = &_payload._data[0];
-        _payload._seg = &_payload._container[0];
-        _finalized = true;
-    }
-
-    RLEPayload const* getPayload()
-    {
-        assert(_finalized);
-        return &_payload;
     }
 };
 

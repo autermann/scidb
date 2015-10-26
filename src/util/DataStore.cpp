@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -38,10 +38,10 @@
 
 #include <log4cxx/logger.h>
 #include <util/DataStore.h>
+#include <util/Platform.h>
 #include <util/FileIO.h>
 #include <util/Thread.h>
 #include <system/Config.h>
-#include <query/ops/list/ListArrayBuilder.h>
 
 namespace scidb
 {
@@ -59,7 +59,7 @@ const size_t DataStore::DiskChunkHeader::freeValue = 0xdeadbeefdeadbeef;
  */
 DataStore::FreelistBucket::FreelistBucket(size_t key, std::set<off_t>& bucket)
 {
-    size_t bucketsize = 
+    size_t bucketsize =
         (2 * sizeof(size_t)) +
         (bucket.size() * sizeof(off_t)) +
         sizeof(uint32_t);
@@ -72,7 +72,7 @@ DataStore::FreelistBucket::FreelistBucket(size_t key, std::set<off_t>& bucket)
     */
 
     char* pos;
-    
+
     pos = _buf.get();
     _size = reinterpret_cast<size_t*>(pos);
     pos += sizeof(size_t);
@@ -95,7 +95,7 @@ DataStore::FreelistBucket::FreelistBucket(size_t key, std::set<off_t>& bucket)
          bucket_it != bucket.end();
          ++bucket_it)
     {
-        
+
         _offsets[offset++] = *bucket_it;
     }
 
@@ -151,7 +151,7 @@ DataStore::FreelistBucket::write(File::FilePtr& f, off_t offset)
     */
     f->writeAll(_buf.get(), (*_size + sizeof(size_t)), offset);
 }
-        
+
 /* Unserialize the flb into the freelist
  */
 void
@@ -163,7 +163,7 @@ DataStore::FreelistBucket::unload(DataStoreFreelists& fl)
     for (size_t offset = 0; offset < *_nelements; ++offset)
     {
         fl[*_key].insert(_offsets[offset]);
-    } 
+    }
 }
 
 /* Find space for the chunk of indicated size in the DataStore.
@@ -174,8 +174,8 @@ DataStore::allocateSpace(size_t requestedSize, size_t& allocatedSize)
     ScopedMutexLock sm(_dslock);
     off_t ret = 0;
 
-    LOG4CXX_TRACE(logger, "datastore: allocate space " << requestedSize << " for " << 
-                  _file->getPath());   
+    LOG4CXX_TRACE(logger, "datastore: allocate space " << requestedSize << " for " <<
+                  _file->getPath());
 
     invalidateFreelistFile();
 
@@ -203,8 +203,8 @@ DataStore::allocateSpace(size_t requestedSize, size_t& allocatedSize)
      */
     calcLargestFreeChunk();
 
-    LOG4CXX_TRACE(logger, "datastore: allocate space " << requestedSize << " for " 
-                  << _file->getPath() << " returned " << ret);   
+    LOG4CXX_TRACE(logger, "datastore: allocate space " << requestedSize << " for "
+                  << _file->getPath() << " returned " << ret);
 
     return ret;
 }
@@ -261,7 +261,7 @@ DataStore::readData(off_t off, void* buffer, size_t len)
     /* Issue the read
      */
     _file->readAllv(iovs, 2, off);
-    
+
     /* Check validity of header
      */
     if (!hdr.isValid())
@@ -299,13 +299,13 @@ DataStore::flush()
 /* Mark chunk as free both in the free lists and on
    disk
  */
-void 
+void
 DataStore::freeChunk(off_t off, size_t allocated)
 {
     ScopedMutexLock sm(_dslock);
 
-    LOG4CXX_TRACE(logger, "datastore: free chunk " << off << " for " << 
-                  _file->getPath());   
+    LOG4CXX_TRACE(logger, "datastore: free chunk " << off << " for " <<
+                  _file->getPath());
 
     invalidateFreelistFile();
 
@@ -321,8 +321,7 @@ DataStore::freeChunk(off_t off, size_t allocated)
 void
 DataStore::getSizes(off_t& filesize,
                     blkcnt_t& fileblocks,
-                    off_t& reservedbytes,
-                    off_t& freebytes) const
+                    off_t& filefree) const
 {
     ScopedMutexLock sm(_dslock);
 
@@ -337,11 +336,13 @@ DataStore::getSizes(off_t& filesize,
                << "fstat" << rc << errno << ::strerror(errno) << _file->getPath());
     }
 
-    filesize = st.st_size;
+    ASSERT_EXCEPTION((size_t)st.st_size == _allocatedSize,
+                     "Inconsistent datastore size in getSizes");
+    filesize = _allocatedSize;
     fileblocks = st.st_blocks;
-    freebytes = 0;
+    filefree = 0;
 
-    /* Calc the number of free and reserved bytes
+    /* Calc the number of free bytes in the file
      */
     DataStoreFreelists::iterator dsit = _freelists.begin();
     while (dsit != _freelists.end())
@@ -349,12 +350,11 @@ DataStore::getSizes(off_t& filesize,
         set<off_t>::iterator bucketit = dsit->second.begin();
         while (bucketit != dsit->second.end())
         {
-            freebytes += dsit->first;
+            filefree += dsit->first;
             ++bucketit;
         }
         ++dsit;
     }
-    reservedbytes = _allocatedSize - freebytes;
 }
 
 /* Persist free lists to disk
@@ -375,7 +375,7 @@ DataStore::persistFreelists()
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_PATH)
             << filename;
     }
-    
+
     /* Iterate the freelists, writing as we go
        File format:
        <# of buckets><bucket 1>...<bucket n>
@@ -384,15 +384,15 @@ DataStore::persistFreelists()
     size_t nbuckets = _freelists.size();
     DataStoreFreelists::iterator freelist_it;
     std::set<off_t>::iterator bucket_it;
-    
-    LOG4CXX_TRACE(logger, "datastore: persisting freelist for " << 
-                  _file->getPath() << " buckets " << nbuckets);   
-    
+
+    LOG4CXX_TRACE(logger, "datastore: persisting freelist for " <<
+                  _file->getPath() << " buckets " << nbuckets);
+
     flfile->writeAll((void*)&nbuckets, sizeof(size_t), fileoff);
     fileoff += sizeof(size_t);
-   
-    for (freelist_it = _freelists.begin(); 
-         freelist_it != _freelists.end(); 
+
+    for (freelist_it = _freelists.begin();
+         freelist_it != _freelists.end();
          ++freelist_it)
     {
         std::set<off_t>& bucket = freelist_it->second;
@@ -415,47 +415,37 @@ DataStore::persistFreelists()
 void
 DataStore::initializeFreelist()
 {
-    /* Calc the correct new block size
-     */
     struct stat st;
-    size_t roundUpSize;
-    
-    _allocatedSize = _dsm->getMinAllocSize();
-    _allocatedSize = roundUpPowerOf2(_allocatedSize);
+
     if (_file->fstat(&st) != 0)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
                                SCIDB_LE_SYSCALL_ERROR)
-            << "fstat" << -1 << errno << ::strerror(errno) << _file->getPath(); 
-    }    
-    roundUpSize = roundUpPowerOf2(st.st_size);
-    if (roundUpSize > _allocatedSize)
-    {
-        _allocatedSize = roundUpSize;
+            << "fstat" << -1 << errno << ::strerror(errno) << _file->getPath();
     }
+    _allocatedSize = roundUpPowerOf2(st.st_size);
 
-    /* Try to read the freelist from the md file.
-       If we fail, assume that the file is fully allocated,
-       but we should at least mark the area between eof
-       and allocated size as free.
-     */
-    if (readFreelistFromFile() == 0)
+    /* If the file is empty, initialize with a single free
+       block of the minimum size.
+    */
+    if (_allocatedSize < _dsm->getMinAllocSize())
     {
-        roundUpSize = _allocatedSize;
-        while (roundUpSize > static_cast<size_t>(st.st_size))
+        _allocatedSize = _dsm->getMinAllocSize();
+        _allocatedSize = roundUpPowerOf2(_allocatedSize);
+        _freelists[_allocatedSize].insert(0);
+        if (_file->ftruncate(_allocatedSize) != 0)
         {
-            size_t gap = roundUpSize - st.st_size;
-            gap = roundUpPowerOf2(gap) / 2;
-            if (gap < _dsm->getMinAllocSize())
-            {
-                break;
-            }
-            size_t off = roundUpSize - gap;
-            _freelists[gap].insert(off);
-            roundUpSize = off;
+            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
+                                   SCIDB_LE_SYSCALL_ERROR)
+                << "ftruncate" << -1 << errno << ::strerror(errno) 
+                << _file->getPath();
         }
-        calcLargestFreeChunk();
     }
+    else
+    {
+        readFreelistFromFile();
+    }
+    calcLargestFreeChunk();
 }
 
 /* Read free lists from disk file
@@ -534,7 +524,7 @@ DataStore::invalidateFreelistFile()
         std::string filename;
         size_t nbuckets = 0;
 
-        LOG4CXX_TRACE(logger, "datastore: invalidating freelist for " << _file->getPath());   
+        LOG4CXX_TRACE(logger, "datastore: invalidating freelist for " << _file->getPath());
 
         filename = _file->getPath() + ".fl";
         flfile = FileManager::getInstance()->openFileObj(filename, O_CREAT | O_TRUNC | O_RDWR);
@@ -562,16 +552,16 @@ DataStore::dumpFreelist()
 {
     DataStoreFreelists::iterator fl_it = _freelists.begin();
 
-    LOG4CXX_DEBUG(logger, "Freelists for datastore " << 
+    LOG4CXX_DEBUG(logger, "Freelists for datastore " <<
                   _file->getPath() << ": ");
 
     while (fl_it != _freelists.end())
     {
         set<off_t>::iterator bucket_it = fl_it->second.begin();
-        
+
         LOG4CXX_DEBUG(logger, "   bucket [ " <<
                       fl_it->first << " ] :");
-        
+
         while (bucket_it != fl_it->second.end())
         {
             LOG4CXX_DEBUG(logger, "     offset : " << *bucket_it);
@@ -587,7 +577,7 @@ DataStore::dumpFreelist()
 bool
 DataStore::isParentBlockFree(off_t off, size_t size)
 {
-    DataStoreFreelists::iterator fl_it = 
+    DataStoreFreelists::iterator fl_it =
         _freelists.upper_bound(size);
 
     while (fl_it != _freelists.end())
@@ -628,14 +618,14 @@ DataStore::verifyFreelistInternal()
         {
             if (isParentBlockFree(*bucket_it, fl_it->first))
             {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, 
+                throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
                                        SCIDB_LE_DATASTORE_CORRUPT_FREELIST)
                     << _file->getPath();
             }
             ++bucket_it;
         }
         ++fl_it;
-    }  
+    }
 }
 
 /* Remove the free-list file from disk
@@ -675,7 +665,7 @@ DataStore::DataStore(char const* filename, Guid guid, DataStores& parent) :
     if (_file.get() == NULL)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
-                               SCIDB_LE_CANT_OPEN_FILE) 
+                               SCIDB_LE_CANT_OPEN_FILE)
             << filenamestr << ::strerror(errno) << errno;
     }
 
@@ -717,6 +707,13 @@ DataStore::makeMoreSpace(size_t request)
         _freelists[_allocatedSize].insert(_allocatedSize);
         _largestFreeChunk = _allocatedSize;
         _allocatedSize *= 2;
+        if (_file->ftruncate(_allocatedSize) != 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
+                                   SCIDB_LE_SYSCALL_ERROR)
+                << "ftruncate" << -1 << errno << ::strerror(errno) 
+                << _file->getPath();
+        }
     }
 }
 
@@ -752,7 +749,7 @@ DataStore::searchFreelist(size_t request)
         ret = searchFreelist(request * 2);
         _freelists[request].insert(ret + request);
     }
-    
+
     return ret;
 }
 
@@ -864,7 +861,7 @@ DataStores::initDataStores(char const* basepath)
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_CREATE_DIRECTORY)
                 << _basePath;
         }
-        
+
         /* Start background flusher
          */
         int syncMSeconds = Config::getInstance()->getOption<int> (CONFIG_SYNC_IO_INTERVAL);
@@ -883,13 +880,13 @@ DataStores::initDataStores(char const* basepath)
 
 /* Get a reference to a specific DataStore
  */
-shared_ptr<DataStore> 
+std::shared_ptr<DataStore>
 DataStores::getDataStore(DataStore::Guid guid)
 {
     DataStoreMap::iterator it;
-    shared_ptr<DataStore> retval;
+    std::shared_ptr<DataStore> retval;
     ScopedMutexLock sm(_dataStoreLock);
-    
+
     SCIDB_ASSERT(_theDataStores);
 
     /* Check the map
@@ -904,8 +901,8 @@ DataStores::getDataStore(DataStore::Guid guid)
      */
     stringstream filepath;
     filepath << _basePath << guid << ".data";
-    retval = boost::make_shared<DataStore>(filepath.str().c_str(), 
-                                           guid, 
+    retval = std::make_shared<DataStore>(filepath.str().c_str(),
+                                           guid,
                                            boost::ref(*this));
     (*_theDataStores)[guid] = retval;
 
@@ -919,7 +916,7 @@ DataStores::closeDataStore(DataStore::Guid guid, bool remove)
 {
     DataStoreMap::iterator it;
     ScopedMutexLock sm(_dataStoreLock);
-    
+
     SCIDB_ASSERT(_theDataStores);
 
     /* Check the map
@@ -938,7 +935,7 @@ DataStores::closeDataStore(DataStore::Guid guid, bool remove)
                 _theDataStores->insert(
                     make_pair(
                         guid,
-                        boost::make_shared<DataStore>(filepath.str().c_str(),
+                        std::make_shared<DataStore>(filepath.str().c_str(),
                                                       guid,
                                                       boost::ref(*this))
                         )
@@ -949,6 +946,10 @@ DataStores::closeDataStore(DataStore::Guid guid, bool remove)
             return;
         }
     }
+
+    /* Flush it
+     */
+    it->second->flush();
 
     /* Remove it from the map
      */
@@ -966,7 +967,7 @@ void
 DataStores::flushAllDataStores()
 {
     DataStoreMap::iterator it;
-    shared_ptr<DataStore> current;
+    std::shared_ptr<DataStore> current;
     DataStore::Guid lastGuid = 0;
 
     while (true)
@@ -1035,7 +1036,7 @@ DataStores::clearAllDataStores()
 
         /* Check if entry ends in ".fl" or ".data"
          */
-        if (((entrylen > fllen) && 
+        if (((entrylen > fllen) &&
              (strcmp(entryend - fllen, ".fl") == 0)) ||
             ((entrylen > datalen) &&
              (strcmp(entryend - datalen, ".data") == 0))
@@ -1051,14 +1052,14 @@ DataStores::clearAllDataStores()
 /* List information about all datastores using the builder
  */
 void
-DataStores::listDataStores(ListDataStoresArrayBuilder& builder)
+DataStores::visitDataStores(const Visitor& visit) const
 {
     ScopedMutexLock sm(_dataStoreLock);
     DataStoreMap::iterator it = _theDataStores->begin();
-    
+
     while (it != _theDataStores->end())
     {
-        builder.listElement(*(it->second));
+        visit(*(it->second));
         ++it;
     }
 }
@@ -1108,12 +1109,12 @@ DataStoreFlusher::FlushJob::run()
                 }
                 _flusher->_datastores.clear();
             }
-            
+
             /* Flush the collected data stores
              */
             for (it = dss.begin(); it != dss.end(); ++it)
             {
-                shared_ptr<DataStore> ds;
+                std::shared_ptr<DataStore> ds;
 
                 int64_t t0 = getTimeNanos();
                 ds = _flusher->_dsm.getDataStore(*it);
@@ -1122,7 +1123,7 @@ DataStoreFlusher::FlushJob::run()
                 totalSyncTime = totalSyncTime + t1 - t0;
             }
         }
-        
+
         if ( totalSyncTime < _timeIntervalNanos )
         {
             uint64_t sleepTime = _timeIntervalNanos - totalSyncTime;
@@ -1142,13 +1143,13 @@ DataStoreFlusher::FlushJob::run()
 
 /* Start the data store flusher
  */
-void 
+void
 DataStoreFlusher::start(int timeIntervalMSecs)
 {
     ScopedMutexLock cs(_lock);
     if (_running)
     {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED) << 
+        throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_OPERATION_FAILED) <<
             "DataStoreFlusher: error on start; already running";
     }
 
@@ -1183,7 +1184,7 @@ DataStoreFlusher::stop()
     {
         LOG4CXX_ERROR(logger, "DataStoreFlusher: error on stop.");
     }
-    
+
     _datastores.clear();
 }
 

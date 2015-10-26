@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -23,7 +23,7 @@
 /*
  * @file PluginManager.h
  *
- * @author roman.simakov@gmail.com
+ * @author roman.simakov@gmail.com and friends.
  *
  * @brief A manager of plugable modules.
  *
@@ -31,30 +31,41 @@
  * May have different implementations for different OSs.
  */
 
-#ifndef PLUGINMANAGER_H_
-#define PLUGINMANAGER_H_
+#ifndef UTIL_PLUGIN_MANAGER_H_
+#define UTIL_PLUGIN_MANAGER_H_
 
 #include <map>
 
-#include "util/Singleton.h"
+#include <boost/function.hpp>
 #include "util/Mutex.h"
+#include "util/Singleton.h"
 
 namespace scidb
 {
-
-struct PluginDesc
+class PluginManager : public Singleton<PluginManager>
 {
-    void* handle;
-    uint32_t major;
-    uint32_t minor;
-    uint32_t patch;
-    uint32_t build;
-};
+public:
+    struct Plugin
+    {
+        std::string _name;      ///< The plugin name (or "SciDB" for core)
+        void*       _handle;    ///< The plugin file handle
+        uint32_t    _major;     ///< The major version number
+        uint32_t    _minor;     ///< The minor version number
+        uint32_t    _patch;     ///< The patch version number
+        uint32_t    _build;     ///< The build version number
+        std::string _buildType; ///< The build type string (e.g. "Debug")
 
-class ListLibrariesArrayBuilder;
+        Plugin(std::string const& name      = std::string(),
+               void*              handle    = NULL,
+               uint32_t           major     = 0,
+               uint32_t           minor     = 0,
+               uint32_t           patch     = 0,
+               uint32_t           build     = 0,
+               std::string const& buildType = std::string());
+    };
 
-class PluginManager: public Singleton<PluginManager>
-{
+    typedef boost::function<void(const Plugin&)> Visitor;
+
 private:
     /**
      * The function finds symbol in the given module handle.
@@ -73,7 +84,7 @@ private:
      */
     void* findSymbol(const std::string& moduleName, const std::string& symbolName)
     {
-        return openSymbol(findModule(moduleName).handle, symbolName, true);
+        return openSymbol(findModule(moduleName)._handle, symbolName, true);
     }
 
     /**
@@ -82,12 +93,11 @@ private:
      * @param moduleName a name of module to load
      * @return a reference to loaded module descriptor
      */
-    PluginDesc& findModule(const std::string& moduleName, bool* was = NULL);
+    Plugin& findModule(const std::string& moduleName, bool* was = NULL);
 
 public:
     PluginManager();
-
-    ~PluginManager();
+   ~PluginManager();
 
     /**
      * This method loads module and all user defined objects.
@@ -109,10 +119,10 @@ public:
     void preLoadLibraries();
 
     /**
-     * Iterate over all of the loaded, plugins and apply the builder to each of them. Include one entry for SciDB itself.
-     * @param builder the lister object
+     * Take the given visitor to each loaded plugin, as well as to a pseudo-
+     * plugin that represents SciDB itself.
      */
-    void listPlugins(ListLibrariesArrayBuilder& builder);
+    void visitPlugins(const Visitor&) const;
 
     /**
      *  Get the name of the library that is currently being loaded.
@@ -131,12 +141,14 @@ public:
     void setPluginsDirectory(const std::string &pluginsDirectory);
 
 private:
-    Mutex _mutex;
-    std::map<std::string, PluginDesc> _plugins;
-    std::string _loadingLibrary;
-    std::string _pluginsDirectory;
-};
+    typedef std::map<std::string,Plugin> Plugins;
 
+private:
+    Mutex   mutable _mutex;
+    Plugins         _plugins;
+    std::string     _loadingLibrary;
+    std::string     _pluginsDirectory;
+};
 
 } // namespace
 

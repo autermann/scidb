@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,6 +20,7 @@
 * END_COPYRIGHT
 */
 
+/****************************************************************************/
 /**
  *  @file       prelude.txt
  *
@@ -33,6 +34,7 @@
  *              defined as below,  so it is bad idea to edit, hide, rename, or
  *              change in any other way the meaning of these entities.
  */
+/****************************************************************************/
 
 /**
  * Return the number of non empty cells in the _ARRAY_ array. A simple alias
@@ -156,11 +158,24 @@ op_set_cell_attr_2D( _ARRAY_, _DIM_NAME_1_, _DIM_COORD_VALUE_1_, _DIM_NAME_2_, _
 );
 
 /****************************************************************************/
+/*
+ *  The following macros are implemented in the desugager (because they depend
+ *  upon supprted macro features such as variadic arguments), but are stubbed
+ *  here so that they nevertheless appear in "list('macros')".
+ */
+/****************************************************************************/
 
-/**
+load(output_array,input_file,instance_id,format,max_errors,shadow_array,isStrict) = 
+  store(
+    input(output_array,input_file,instance_id,format,max_errors,shadow_array,isStrict),
+    output_array);
+
+/****************************************************************************/
+/*
  *  The following macros are undocumented, and are strictly for use within the
  *  engine: certain translations emitted by the compiler rely upon them.
  */
+/****************************************************************************/
 
 /**
  *  @see [wiki:Development/components/Client_Tools/ChunkLengthCalculator_NewPythonVersion]
@@ -181,30 +196,41 @@ sys_create_array_aux(_A_,_E_,_C_) =
  *  string '_S_' as being either meaningful (true), or to be inferred (false),  
  *  where '_S' has the form:
  *
- *      [(loBound,hiBound,chunkInterval,chunkOverlap)]
+ *      [(rowNumber,loBound,hiBound,chunkInterval,chunkOverlap)]
  *
  *  and each component is a boolean literal.
  *
  *  @see [wiki:Development/components/Client_Tools/ChunkLengthCalculator_NewPythonVersion]
  */
 sys_create_array_att(_L_,_S_,_D_) =
-  join(
-    build(
-      <lo:int64,
-       hi:int64,
-       ci:int64,
-       co:int64>
-       [No=0:0,1,0],_S_,true),
-    cast(
-      aggregate(
-        _L_,
-        min(_D_),
-        max(_D_),
-        approxdc(_D_)),
-      <min  :int64 null,
-       max  :int64 null,
-       count:int64 null> 
-      [No=0:0,1,0]));
+  redimension(
+    join(
+      build(
+        <n :int64,
+         lo:int64,
+         hi:int64,
+         ci:int64,
+         co:int64>
+         [No=0:0,1,0],_S_,true),
+      cast(
+        aggregate(
+          _L_,
+          min(_D_),
+          max(_D_),
+          approxdc(_D_)),
+        <min  :int64 null,
+         max  :int64 null,
+         count:int64 null> 
+        [No=0:0,1,0])),
+    <lo    :int64,
+     hi    :int64,
+     ci    :int64,
+     co    :int64,
+     min   :int64 null,
+     max   :int64 null,
+     count:int64 null>
+     [n]      
+);
 
  /**
  *  Computes summary statistics for a proposed  dimension '_D_' of a new array
@@ -215,32 +241,42 @@ sys_create_array_att(_L_,_S_,_D_) =
  *  string '_S_' as being either meaningful (true), or to be inferred (false),  
  *  where '_S' has the form:
  *
- *      [(loBound,hiBound,chunkInterval,chunkOverlap)]
+ *      [(rowNumber,loBound,hiBound,chunkInterval,chunkOverlap)]
  *
  *  and each component is a boolean literal.
  *
  *  @see [wiki:Development/components/Client_Tools/ChunkLengthCalculator_NewPythonVersion]
  */
 sys_create_array_dim(_L_,_S_,_D_) =
-  join(
-    build(
-      <lo:int64,
-       hi:int64,
-       ci:int64,
-       co:int64>
-       [No=0:0,1,0],_S_,true),
-    cast(
-      aggregate(
-        apply(
-          aggregate(_L_,count(*),_D_),
-          _t_,
-          _D_),
-        min(_t_),
-        max(_t_),
-        count(*)),
-      <min  :int64 null,
-       max  :int64 null,
-       count:int64 null> 
-      [No=0:0,1,0]));
+  redimension(
+    join(
+      build(
+        <n :int64,
+         lo:int64,
+         hi:int64,
+         ci:int64,
+         co:int64>
+         [No=0:0,1,0],_S_,true),
+      cast(
+        aggregate(
+          apply(
+            aggregate(_L_,count(*),_D_),
+            _t_,
+            _D_),
+          min(_t_),
+          max(_t_),
+          count(*)),
+        <min  :int64 null,
+         max  :int64 null,
+         count:int64 null> 
+        [No=0:0,1,0])),
+    <lo   :int64,
+     hi   :int64,
+     ci   :int64,
+     co   :int64,
+     min  :int64 null,
+     max  :int64 null,
+     count:int64 null>
+     [n]);
 
 /****************************************************************************/

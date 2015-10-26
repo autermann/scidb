@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,9 +24,8 @@
 #include <signal.h>
 #include <ostream>
 #include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
 #include <log4cxx/logger.h>
 #include <system/Cluster.h>
 #include <system/Utils.h>
@@ -97,7 +96,7 @@ MpiManager::MpiManager()
 void MpiManager::initiateCleanup()
 {
     scidb::WorkQueue::WorkItem item = boost::bind(&MpiErrorHandler::cleanAll);
-    boost::shared_ptr<scidb::WorkQueue> q = scidb::getWorkQueue();
+    std::shared_ptr<scidb::WorkQueue> q = scidb::getWorkQueue();
     try {
         q->enqueue(item);
     } catch (const scidb::WorkQueue::OverflowException& e) {
@@ -113,9 +112,9 @@ void MpiManager::cleanup()
 }
 void MpiManager::init()
 {
-    boost::shared_ptr<scidb::NetworkMessageFactory> factory = scidb::getNetworkMessageFactory();
+    std::shared_ptr<scidb::NetworkMessageFactory> factory = scidb::getNetworkMessageFactory();
 
-    boost::shared_ptr<MpiMessageHandler> msgHandler(new MpiMessageHandler());
+    std::shared_ptr<MpiMessageHandler> msgHandler(new MpiMessageHandler());
     factory->addMessageType(scidb::mtMpiSlaveHandshake,
                             boost::bind(&MpiMessageHandler::createMpiSlaveHandshake, msgHandler,_1),
                             boost::bind(&MpiMessageHandler::handleMpiSlaveHandshake, msgHandler,_1));
@@ -166,7 +165,7 @@ void MpiManager::forceInitMpi()
 
 void MpiManager::initMpi()
 {
-    const boost::shared_ptr<const InstanceMembership> membership =
+    const std::shared_ptr<const InstanceMembership> membership =
         Cluster::getInstance()->getInstanceMembership();
     const std::string& installPath = MpiManager::getInstallPath(membership);
 
@@ -202,9 +201,9 @@ bool MpiManager::checkForError(scidb::QueryID queryId, double startTime, double 
     return (!mpi::hasExpired(startTime, timeout));
 }
 
-boost::shared_ptr<MpiOperatorContext>
-MpiManager::checkAndSetCtx(const boost::shared_ptr<Query>& query,
-                           const boost::shared_ptr<MpiOperatorContext>& ctx)
+std::shared_ptr<MpiOperatorContext>
+MpiManager::checkAndSetCtx(const std::shared_ptr<Query>& query,
+                           const std::shared_ptr<MpiOperatorContext>& ctx)
 {
     const scidb::QueryID queryId = query->getQueryID();
     LOG4CXX_TRACE(logger, "MpiManager::checkAndSetCtx: queryID="<<queryId << ", ctx=" << ctx.get());
@@ -213,34 +212,19 @@ MpiManager::checkAndSetCtx(const boost::shared_ptr<Query>& query,
         assert(ctx);
         initMpi();
     }
-    // XXX TODO: Currently we cannot run more than one query which use scalapack concurrently.
-    //           The issue is that scidb_blacs_gridinfo_() from src/dense_linear_algebra/dlaScaLA/scalapackEmulation/blacs_info_fake.c
-    //           uses a set of static variables. Note though that cascading scalapack operators is allowed because
-    //           each scalapack operator is followed by a blocking SG and the operator tree is executed sequentially
-    //           in a depth-first order. The other sources of concurrency such as
-    //           ParrallelAccumulatorArray, Physical(Redimension)Store
-    //           should not be a problem for the same reason (of blocking SG).
-    //           This also implies that MpiOperatorContext must be inserted by the operator first (not by the slave messages).
-    //           Hence, assert(ctx) above.
-    const double start = mpi::getTimeInSecs();
-    const double timeout(_mpiResourceTimeout);
-    bool waitResult(true);
-    while (_ctxMap.find(queryId) == _ctxMap.end() && _ctxMap.size() != 0) {
-        if (!waitResult) {
-            // we alredy unsuccessfully tried to wait
-            throw (SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_RESOURCE_BUSY)
-                   << "too many queries");
-        }
-        Event::ErrorChecker ec =
-           boost::bind(&MpiManager::checkForError, queryId, start, timeout);
-        waitResult = _event.wait(_mutex, ec);
-    }
+
+    // Note: cascading of scalapack operators is allowed even though we use the same ctx for all of them,
+    // because each of them only runs in their execute, not concurrently, producing a result in
+    // (once-shared-but-no-longer)  memory that should have no dependence on MPI after the execute() returns.
+    // This implies that MpiOperatorContext must be inserted by the operator at the beginning of execution
+    // (not by the slave messages, which are during).
+    // Hence, assert(ctx) above.
     return checkAndSetCtxAsync(query, ctx);
 }
 
-boost::shared_ptr<MpiOperatorContext>
-MpiManager::checkAndSetCtxAsync(const boost::shared_ptr<Query>& query,
-                                const boost::shared_ptr<MpiOperatorContext>& ctx)
+std::shared_ptr<MpiOperatorContext>
+MpiManager::checkAndSetCtxAsync(const std::shared_ptr<Query>& query,
+                                const std::shared_ptr<MpiOperatorContext>& ctx)
 {
     const scidb::QueryID queryId = query->getQueryID();
 
@@ -258,7 +242,7 @@ MpiManager::checkAndSetCtxAsync(const boost::shared_ptr<Query>& query,
                 throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE)
                        << "MpiManager::checkAndSetCtxAsync");
             }
-            boost::shared_ptr<MpiErrorHandler> eh(new MpiErrorHandler(ctx));
+            std::shared_ptr<MpiErrorHandler> eh(new MpiErrorHandler(ctx));
             Query::Finalizer f = boost::bind(&MpiErrorHandler::finalize, eh, _1);
             query->pushFinalizer(f);
             query->pushErrorHandler(eh);
@@ -279,14 +263,14 @@ bool MpiManager::removeCtx(scidb::QueryID queryId)
     return (_ctxMap.erase(queryId) > 0);
 }
 
-void MpiOperatorContext::setSlave(const boost::shared_ptr<MpiSlaveProxy>& slave)
+void MpiOperatorContext::setSlave(const std::shared_ptr<MpiSlaveProxy>& slave)
 {
     setSlaveInternal(slave->getLaunchId(), slave);
 }
 
 void
 MpiOperatorContext::setSlaveInternal(uint64_t launchId,
-                                     const boost::shared_ptr<MpiSlaveProxy>& slave)
+                                     const std::shared_ptr<MpiSlaveProxy>& slave)
 {
     ScopedMutexLock lock(_mutex);
     LaunchMap::iterator iter = getIter(launchId);
@@ -295,7 +279,7 @@ MpiOperatorContext::setSlaveInternal(uint64_t launchId,
 
 void
 MpiOperatorContext::setLauncherInternal(uint64_t launchId,
-                                        const boost::shared_ptr<MpiLauncher>& launcher)
+                                        const std::shared_ptr<MpiLauncher>& launcher)
 {
     ScopedMutexLock lock(_mutex);
     LaunchMap::iterator iter = getIter(launchId);
@@ -304,7 +288,7 @@ MpiOperatorContext::setLauncherInternal(uint64_t launchId,
 
 bool
 MpiOperatorContext::addSharedMemoryIpc(uint64_t launchId,
-                                       const boost::shared_ptr<SharedMemoryIpc>& ipc)
+                                       const std::shared_ptr<SharedMemoryIpc>& ipc)
 {
     ScopedMutexLock lock(_mutex);
     LaunchMap::iterator iter = getIter(launchId);
@@ -313,45 +297,45 @@ MpiOperatorContext::addSharedMemoryIpc(uint64_t launchId,
     return isInserted;
 }
 
-boost::shared_ptr<MpiSlaveProxy>
+std::shared_ptr<MpiSlaveProxy>
 MpiOperatorContext::getSlave(uint64_t launchId)
 {
     ScopedMutexLock lock(_mutex);
     LaunchMap::iterator iter = _launches.find(launchId);
     if (iter == _launches.end()) {
-        return boost::shared_ptr<MpiSlaveProxy>();
+        return std::shared_ptr<MpiSlaveProxy>();
     }
     return iter->second->_slave;
 }
 
-boost::shared_ptr<MpiLauncher>
+std::shared_ptr<MpiLauncher>
 MpiOperatorContext::getLauncher(uint64_t launchId)
 {
     ScopedMutexLock lock(_mutex);
     LaunchMap::iterator iter = _launches.find(launchId);
     if (iter == _launches.end()) {
-        return boost::shared_ptr<MpiLauncher>();
+        return std::shared_ptr<MpiLauncher>();
     }
     return iter->second->_launcher;
 }
 
-boost::shared_ptr<SharedMemoryIpc>
+std::shared_ptr<SharedMemoryIpc>
 MpiOperatorContext::getSharedMemoryIpc(uint64_t launchId, const std::string& name)
 {
     ScopedMutexLock lock(_mutex);
     LaunchMap::iterator iter = _launches.find(launchId);
     if (iter == _launches.end()) {
-        return boost::shared_ptr<SharedMemoryIpc>();
+        return std::shared_ptr<SharedMemoryIpc>();
     }
-    boost::shared_ptr<SharedMemoryIpc> key(new SharedMemory(name));
+    std::shared_ptr<SharedMemoryIpc> key(new SharedMemory(name));
     LaunchInfo::ShmIpcSet::iterator ipcIter = iter->second->_shmIpcs.find(key);
     if (ipcIter == iter->second->_shmIpcs.end()) {
-        return boost::shared_ptr<SharedMemoryIpc>();
+        return std::shared_ptr<SharedMemoryIpc>();
     }
     return (*ipcIter);
 }
 
-boost::shared_ptr<scidb::ClientMessageDescription>
+std::shared_ptr<scidb::ClientMessageDescription>
 MpiOperatorContext::popMsg(uint64_t launchId,
                            LaunchErrorChecker& errChecker)
 {
@@ -364,14 +348,14 @@ MpiOperatorContext::popMsg(uint64_t launchId,
         _event.wait(_mutex, ec);
         iter = _launches.find(launchId);
     }
-    boost::shared_ptr<scidb::ClientMessageDescription> msg;
+    std::shared_ptr<scidb::ClientMessageDescription> msg;
     (iter->second->_msg).swap(msg);
     return msg;
 }
 
 void
 MpiOperatorContext::pushMsg(uint64_t launchId,
-                            const boost::shared_ptr<scidb::ClientMessageDescription>& msg)
+                            const std::shared_ptr<scidb::ClientMessageDescription>& msg)
 {
     ScopedMutexLock lock(_mutex);
     const bool dontUpdateLastInUse = false;
@@ -428,7 +412,7 @@ MpiOperatorContext::getIter(uint64_t launchId, bool updateLastLaunchId)
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                    << "MPI-based operator context is corrupted");
         }
-        boost::shared_ptr<LaunchInfo> linfo(new LaunchInfo);
+        std::shared_ptr<LaunchInfo> linfo(new LaunchInfo);
         iter = _launches.insert(make_pair(launchId, linfo)).first;
     }
     if (updateLastLaunchId) {
@@ -447,7 +431,7 @@ MessagePtr MpiMessageHandler::createMpiSlaveHandshake(MessageID id)
     return scidb::MessagePtr(new scidb_msg::MpiSlaveHandshake());
 }
 
-void MpiMessageHandler::handleMpiSlaveHandshake(const boost::shared_ptr<scidb::MessageDescription>& messageDesc)
+void MpiMessageHandler::handleMpiSlaveHandshake(const std::shared_ptr<scidb::MessageDescription>& messageDesc)
 {
     handleMpiSlaveMessage<scidb_msg::MpiSlaveHandshake, scidb::mtMpiSlaveHandshake>(messageDesc);
 }
@@ -457,18 +441,18 @@ MessagePtr MpiMessageHandler::createMpiSlaveResult(MessageID id)
     return scidb::MessagePtr(new scidb_msg::MpiSlaveResult());
 }
 
-void MpiMessageHandler::handleMpiSlaveResult(const boost::shared_ptr<scidb::MessageDescription>& messageDesc)
+void MpiMessageHandler::handleMpiSlaveResult(const std::shared_ptr<scidb::MessageDescription>& messageDesc)
 {
     handleMpiSlaveMessage<scidb_msg::MpiSlaveResult, scidb::mtMpiSlaveResult>(messageDesc);
 }
 
 void MpiMessageHandler::handleMpiSlaveDisconnect(uint64_t launchId,
-                                                 const boost::shared_ptr<scidb::Query>& query)
+                                                 const std::shared_ptr<scidb::Query>& query)
 {
     if (!query) {
         return;
     }
-    boost::shared_ptr< scidb::ClientMessageDescription >
+    std::shared_ptr< scidb::ClientMessageDescription >
         cliMsg(new MpiOperatorContext::EofMessageDescription());
     try {
         MpiMessageHandler::processMessage(launchId, cliMsg, query);
@@ -478,12 +462,12 @@ void MpiMessageHandler::handleMpiSlaveDisconnect(uint64_t launchId,
 }
 
 void MpiMessageHandler::processMessage(uint64_t launchId,
-                                       const boost::shared_ptr<scidb::ClientMessageDescription>& cliMsg,
-                                       const boost::shared_ptr<scidb::Query>& query)
+                                       const std::shared_ptr<scidb::ClientMessageDescription>& cliMsg,
+                                       const std::shared_ptr<scidb::Query>& query)
 {
     try {
-        boost::shared_ptr<MpiOperatorContext> emptyCtx;
-        boost::shared_ptr<MpiOperatorContext> ctx =
+        std::shared_ptr<MpiOperatorContext> emptyCtx;
+        std::shared_ptr<MpiOperatorContext> ctx =
             MpiManager::getInstance()->checkAndSetCtxAsync(query, emptyCtx);
         assert(ctx);
 
@@ -525,7 +509,7 @@ void MpiMessageHandler::processMessage(uint64_t launchId,
 MpiErrorHandler::~MpiErrorHandler()
 {}
 
-void MpiErrorHandler::handleError(const boost::shared_ptr<Query>& query)
+void MpiErrorHandler::handleError(const std::shared_ptr<Query>& query)
 {
     MpiManager::getInstance()->removeCtx(query->getQueryID());
 
@@ -534,7 +518,7 @@ void MpiErrorHandler::handleError(const boost::shared_ptr<Query>& query)
     _ctx->clear(cleaner);
 }
 
-void MpiErrorHandler::finalize(const boost::shared_ptr<Query>& query)
+void MpiErrorHandler::finalize(const std::shared_ptr<Query>& query)
 {
     MpiManager::getInstance()->removeCtx(query->getQueryID());
 
@@ -542,7 +526,7 @@ void MpiErrorHandler::finalize(const boost::shared_ptr<Query>& query)
 
     LOG4CXX_TRACE(logger, "MpiErrorHandler::finalize: destorying last slave for launch = " << lastIdInUse);
 
-    boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(lastIdInUse);
+    std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(lastIdInUse);
     if (slave) {
         slave->destroy();
     }
@@ -554,7 +538,7 @@ void MpiErrorHandler::clean(scidb::QueryID queryId, uint64_t launchId,
     MpiOperatorContext::LaunchInfo::ShmIpcSet& ipcs = info->_shmIpcs;
     for (MpiOperatorContext::LaunchInfo::ShmIpcSet::const_iterator ipcIter = ipcs.begin();
          ipcIter != ipcs.end(); ++ipcIter) {
-        const boost::shared_ptr<SharedMemoryIpc>& ipc = *ipcIter;
+        const std::shared_ptr<SharedMemoryIpc>& ipc = *ipcIter;
 
         ipc->close();
         if (!ipc->remove()) {
@@ -587,7 +571,7 @@ void MpiErrorHandler::clean(scidb::QueryID queryId, uint64_t launchId,
 }
 
 static void getQueryId(std::set<scidb::QueryID>* queryIds,
-                       const boost::shared_ptr<scidb::Query>& q)
+                       const std::shared_ptr<scidb::Query>& q)
 {
     queryIds->insert(q->getQueryID());
     LOG4CXX_DEBUG(logger, "Next query ID: "<<q->getQueryID());
@@ -647,7 +631,7 @@ void MpiErrorHandler::cleanAll()
 {
     const char *myFuncName = "MpiErrorHandler::cleanAll";
     // read ipc files
-    const boost::shared_ptr<const InstanceMembership> membership =
+    const std::shared_ptr<const InstanceMembership> membership =
         Cluster::getInstance()->getInstanceMembership();
     const std::string& installPath = MpiManager::getInstallPath(membership);
 
@@ -688,9 +672,7 @@ void MpiErrorHandler::cleanAll()
 
     // collect query IDs AFTER reading the files
     std::set<QueryID> queryIds;
-    boost::function<void (const boost::shared_ptr<scidb::Query>&)> f;
-    f = boost::bind(&getQueryId, &queryIds, _1);
-    scidb::Query::listQueries(f);
+    scidb::Query::visitQueries(Query::Visitor(boost::bind(&getQueryId, &queryIds, _1)));
 
     // identify dead shm objects
     for (std::list<std::string>::iterator iter = ipcFiles.begin();
@@ -733,7 +715,7 @@ void MpiErrorHandler::cleanAll()
         QueryID queryId=INVALID_QUERY_ID;
         uint64_t launchId=0;
         int n=0;
-        int rc = ::sscanf(fileName.c_str(), "%"PRIu64".%"PRIu64".%n", &queryId, &launchId, &n);
+        int rc = ::sscanf(fileName.c_str(), "%" PRIu64 ".%" PRIu64 ".%n", &queryId, &launchId, &n);
         if (rc == EOF || rc < 2) {
             // ignore file with unknown name
             continue;
@@ -758,7 +740,7 @@ void MpiErrorHandler::killAllMpiProcs()
 {
     const char *myFuncName = "MpiErrorHandler::killAllMpiProcs";
 
-    const boost::shared_ptr<const InstanceMembership> membership =
+    const std::shared_ptr<const InstanceMembership> membership =
         Cluster::getInstance()->getInstanceMembership();
     const std::string& installPath = MpiManager::getInstallPath(membership);
 
@@ -881,7 +863,7 @@ bool MpiManager::canRecognizeProc(const std::string& installPath,
 }
 
 ///XXX TODO tigor: find a better place and implementation
-const std::string& MpiManager::getInstallPath(const boost::shared_ptr<const InstanceMembership>& membership)
+const std::string& MpiManager::getInstallPath(const std::shared_ptr<const InstanceMembership>& membership)
 {
     const Instances& instances = membership->getInstanceConfigs();
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
@@ -908,7 +890,7 @@ const std::string& MpiManager::getInstallPath(const boost::shared_ptr<const Inst
     return *p;
 }
 
-MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q)
+MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const std::shared_ptr<scidb::Query>& q)
 {
   if (_mpiType == mpi::MPICH12 ) {
     return new MpiLauncherMPICH12(launchId, q);
@@ -922,7 +904,7 @@ MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_p
   return NULL;
 }
 
-MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout)
+MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const std::shared_ptr<scidb::Query>& q, uint32_t timeout)
 {
   if (_mpiType == mpi::MPICH12 ) {
     return new MpiLauncherMPICH12(launchId, q, timeout);

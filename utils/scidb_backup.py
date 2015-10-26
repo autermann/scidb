@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -34,10 +34,24 @@ import functools
 import signal
 from distutils.util import strtobool
 
+def print_and_flush(msg,stream=sys.stdout):
+    """ Write the string message to the specified output stream and flush that
+    stream.
+    @param msg string message to write
+    @param stream output stream (sys.stdout, sys.stderr, etc.)
+    """
+    stream.write('{0}\n'.format(msg))
+    stream.flush()
+
+class AppError(Exception):
+    """ Exception class that wraps backup utility errors.
+    """
+    pass
+
 #-------------------------------------------------------------------------------
 class ProgramArgs:
     #-------------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self,args):
         descMsg = 'Backup and restore utility for SciDB array data.  ' \
             'The utility saves/restores scidb arrays into folder(s) specified by the user (positional dir argument).  ' \
             'It must be run on the coordinator host in either save or restore mode (--save or --restore options respectively).  ' \
@@ -50,7 +64,7 @@ class ProgramArgs:
             'if --parallel option was used to save, then it has to be specified during the restore).  By default, the utility saves all arrays. ' \
             'However, if user decides to save only a few arrays, that can be accomplished by filtering the array names via --filter option.  ' \
             'IMPORTANT: iquery executable must be in the PATH.'
-            
+
         self._parser = argparse.ArgumentParser(
             description=descMsg,
             epilog='To run the program, either save or restore option is required.'
@@ -62,44 +76,54 @@ class ProgramArgs:
             )
         self._parser.add_argument(
             '-s',
-            '--save', 
-            metavar='SAVE', 
+            '--save',
+            metavar='SAVE',
             type=types.StringType,
             nargs=1,
-            choices=['binary','text','opaque'],
-            help='format for saving array data in files (allowed values are binary, text, or opaque)'
+            choices=['binary','text','store','opaque'],
+            help="""Format for saving array data in files (allowed values are binary, text, store, or opaque).
+                 Using text format to backup/restore array data is not recommended because overlap regions are not saved;
+                 use store format instead."""
             )
         self._parser.add_argument(
             '-r',
-            '--restore', 
-            metavar='RESTORE', 
+            '--restore',
+            metavar='RESTORE',
             type=types.StringType,
             nargs=1,
-            choices=['binary','text','opaque'],
-            help='format for restoring array data from previously saved files (allowed values are binary, text, or opaque)'
+            choices=['binary','text','store','opaque'],
+            help="""Format for saving array data in files (allowed values are binary, text, store, or opaque).
+                 Using text format to backup/restore array data is not recommended because overlap regions are not saved;
+                 use store format instead."""
             )
         self._parser.add_argument(
             '-d',
-            '--delete', 
+            '--delete',
             default=False,
             action='store_true',
             help='delete all saved array data files and folder(s) on all cluster hosts'
             )
         self._parser.add_argument(
-            '--port', 
+            '--port',
             default='1239',
             type=types.StringType,
             help='network port used by iquery'
             )
         self._parser.add_argument(
-            '--host', 
+            '--ssh-port',
+            default=22,
+            type=int,
+            help='network port to use for ssh communication'
+            )
+        self._parser.add_argument(
+            '--host',
             default='localhost',
             type=types.StringType,
             help='network host used by iquery'
             )
         self._parser.add_argument(
             '-a',
-            '--allVersions', 
+            '--allVersions',
             default=False,
             action='store_true',
             help='saves/restores all versions of arrays (potentially a lot of data)'
@@ -107,35 +131,35 @@ class ProgramArgs:
         self._parser.add_argument(
             '-f',
             '--filter',
-            metavar='PATTERN', 
-            type=types.StringType, 
+            metavar='PATTERN',
+            type=types.StringType,
             nargs=1,
             help='Python regex pattern to match against array names (escape and/or quote as necessary to avoid shell expansion)'
             )
         self._parser.add_argument(
             '-p',
-            '--parallel', 
+            '--parallel',
             default=False,
             action='store_true',
             help='backup/restore array data in parallel mode (to all scidb instances simultaneously)'
             )
         self._parser.add_argument(
             '-z',
-            '--zip', 
+            '--zip',
             default=False,
             action='store_true',
             help='compress data files with gzip when saving/restoring array data'
             )
         self._parser.add_argument(
-            '--force', 
+            '--force',
             default=False,
             action='store_true',
             help='force silent removal of arrays before restoring them'
             )
 
-        # Put all of the parser arguments and values into a dictionary for 
+        # Put all of the parser arguments and values into a dictionary for
         # easier retrieval.
-        self._args = self._parser.parse_args()
+        self._args = self._parser.parse_args(args)
         self._argsDict = {}
         self._argsDict['dir'] = os.path.abspath(self._args.dir)
         self._argsDict['allVersions'] = self._args.allVersions
@@ -148,16 +172,17 @@ class ProgramArgs:
         self._argsDict['force'] = self._args.force
         self._argsDict['host'] = self._args.host
         self._argsDict['port'] = self._args.port
+        self._argsDict['ssh_port'] = self._args.ssh_port
 
         if (types.ListType == type(self._argsDict['save'])):
             self._argsDict['save'] = self._argsDict['save'][0]
-            
+
         if (types.ListType == type(self._argsDict['restore'])):
             self._argsDict['restore'] = self._argsDict['restore'][0]
-            
+
         if (types.ListType == type(self._argsDict['filter'])):
             self._argsDict['filter'] = self._argsDict['filter'][0]
-            
+
         if (not (self._argsDict['filter'] is None)):
             self._argsDict['filter'] = self._argsDict['filter'].replace('\"','')
             self._argsDict['filter'] = self._argsDict['filter'].replace('\'','')
@@ -169,7 +194,7 @@ class ProgramArgs:
             return self._argsDict[arg]
         return None
     #-------------------------------------------------------------------------
-    # getAllArgs: small function for getting the entire dictionary of 
+    # getAllArgs: small function for getting the entire dictionary of
     #             command line arguments.
     def getAllArgs(self):
         D = {}
@@ -187,11 +212,11 @@ def yesNoQuestion(q):
 
 ##############################################################################
 # abnormalExitWatchdog:
-#    This function "wraps" or decorates the waitForProcesses method in 
+#    This function "wraps" or decorates the waitForProcesses method in
 #    CommandRunner class.  The function traps SystemExit and KeyboardInterrupt
-#    signals in order to attempt some cleanup.  The function terminates 
-#    processes that were being waited on.  This is a partial cleanup since 
-#    there could be processes that were started on remote hosts which this 
+#    signals in order to attempt some cleanup.  The function terminates
+#    processes that were being waited on.  This is a partial cleanup since
+#    there could be processes that were started on remote hosts which this
 #    program has little control over.
 def abnormalExitWatchdog(procWaitFunc):
     @functools.wraps(procWaitFunc)
@@ -214,11 +239,11 @@ def abnormalExitWatchdog(procWaitFunc):
 
         if (abnormalExit):
             obj.kill_all_started_pids()
-            
+
             cmd = thisCommand[0]
             msg_list = [exceptMsg]
             msg_list.append('Exception(s) encountered while running command:')
-            raise Exception('\n'.join(msg_list))
+            raise AppError('\n'.join(msg_list))
         if (exitCode != 0):
             msg_list = ['Abnormal return encountered while running command:']
             msg_list.append(thisCommand[0])
@@ -227,12 +252,13 @@ def abnormalExitWatchdog(procWaitFunc):
                 errs = output[1]
             if (raiseOnError):
                 obj.kill_all_started_pids()
-                raise Exception('\n'.join(msg_list))
+                raise AppError('\n'.join(msg_list))
         return (exitCode,output)
     return wrapper
 ##############################################################################
 class CommandRunner:
-    def __init__(self):
+    def __init__(self,ssh_port=22):
+        self._ssh_port = ssh_port
         self.pids = {}
 
     def get_command_from_pid(self,pid):
@@ -244,7 +270,7 @@ class CommandRunner:
     def pop_pid_from_table(self,pid):
         cmdInfo = ['',None]
         if (str(pid) in self.pids.keys()):
-            cmdInfo = self.pids.pop(str(pid)) 
+            cmdInfo = self.pids.pop(str(pid))
 
         return cmdInfo
 
@@ -269,7 +295,7 @@ class CommandRunner:
         localCmd = localCmd.replace('\'','\\\'')
         localCmd = '/bin/bash -c $\'' + localCmd + '\''
         return localCmd
-        
+
     def runSubProcess(
         self,
         cmd, # Command to run (list of string options).
@@ -278,16 +304,16 @@ class CommandRunner:
         se=subprocess.PIPE, # Standard error.
         useShell=False # Flag to use shell option when starting process.
         ):
-        
-        localCmd = list(cmd) # Copy list to make sure it is not referenced 
+
+        localCmd = list(cmd) # Copy list to make sure it is not referenced
                              # elsewhere.
 
-        stringLocalCmd = ' '.join(localCmd) 
+        stringLocalCmd = ' '.join(localCmd)
         exe = None
         if (useShell): # If command is for shell, flatten it into a single
             exe = '/bin/bash'
             localCmd = [stringLocalCmd]
-        
+
         try:
             proc = subprocess.Popen( # Run the command.
                 localCmd,
@@ -303,14 +329,14 @@ class CommandRunner:
 
             self.kill_all_started_pids()
 
-            raise Exception('\n'.join(msg_list))
+            raise AppError('\n'.join(msg_list))
         self.pids[str(proc.pid)] = [stringLocalCmd,proc]
         return proc
     #-------------------------------------------------------------------------
     # runSShCommand: execute one command via ssh; the function relies on the
     #                fact that the specified user has the ability to run ssh
     #                commands without entering password.  The function starts
-    #                the ssh subprocess with all three standard streams 
+    #                the ssh subprocess with all three standard streams
     #                attached (stdin, stdout, and stderr).  Once ssh starts,
     #                the function writes the entire user-specified command
     #                to the stdin of the ssh subprocess and closes it.  The
@@ -323,9 +349,9 @@ class CommandRunner:
         si=subprocess.PIPE, # Standard in.
         so=subprocess.PIPE, # Standard error.
         se=subprocess.PIPE # Standard error.
-        ):       
-        sshCmd = ['ssh', user + '@' + host] # Actual ssh command to run.
-        
+        ):
+        sshCmd = ['ssh', '-p', str(self._ssh_port), user + '@' + host] # Actual ssh command to run.
+
         try:
             # Start the ssh command with out any actual useful things to
             # execute.
@@ -339,7 +365,7 @@ class CommandRunner:
             sys.stderr.write(localCmd + '\n')
             if (proc is not None):
                 proc.kill()
-            raise Exception('Error running ssh command!')
+            raise AppError('Error running ssh command!')
         finally:
             if (proc is not None):
                 proc.stdin.close() # Closing ssh standard in possibly
@@ -395,14 +421,14 @@ class CommandRunner:
 #
 class ScidbCommander:
     #-------------------------------------------------------------------------
-    # __init__: collects some initial info; the assumption here is that the 
+    # __init__: collects some initial info; the assumption here is that the
     #           currently logged in user will do all of the ssh and scidb
     #           queries.
     def __init__(self, progArgs):
         self._iqueryHost = progArgs.get('host')
         self._iqueryPort = progArgs.get('port')
         self._user = pwd.getpwuid(os.getuid())[0] # Collect some info: get username.
-        self._cmdRunner = CommandRunner()
+        self._cmdRunner = CommandRunner(ssh_port=progArgs.get('ssh_port'))
         # Run iquery and stash the cluster instance data for later use.
         self._hosts,self._instanceData = self._getHostInstanceData()
         self._coordinator = self._hosts[0] # Coordinator is always first.
@@ -425,7 +451,7 @@ class ScidbCommander:
             'sort(filter(list(\'arrays\',true),temporary=false),aid)'
             )
     #-------------------------------------------------------------------------
-    # _getHostInstanceData: gets the information about all scidb instances 
+    # _getHostInstanceData: gets the information about all scidb instances
     #     currently running.  Basically, the function internalizes the scidb
     #     query list('instances') and keeps the information for later use by
     #     others.
@@ -441,7 +467,7 @@ class ScidbCommander:
     #         [portX+1,idX,start time,data folderX+1],
     #         ...
     #       ],
-    #       [ # Host N instances 
+    #       [ # Host N instances
     #         ...
     #         [portN,idN,start time,data folderN]
     #       ]
@@ -461,10 +487,10 @@ class ScidbCommander:
             '-aq',
             "list('instances')"
             ] # Instances query.
-        
+
         proc = self._cmdRunner.runSubProcess(cmd)
         exits,outs = self._cmdRunner.waitForProcesses([proc],True)
-        
+
         # Once the process has finished, get the outputs and split them into
         # internals lists.
         text = outs[0][0].strip().replace('\'','')
@@ -477,7 +503,7 @@ class ScidbCommander:
                 key=lambda x: int(x[2])
                 )
         except:
-            raise Exception('Error: unable to parse instance data from output!')
+            raise AppError('Unable to parse instance data from output!')
 
         hosts = reduce( # Make a list of host names and preserve the order.
             lambda hList,hostData: hList + hostData if hostData[0] not in hList else hList,
@@ -490,8 +516,8 @@ class ScidbCommander:
             )
         return hosts,instanceData
     #-------------------------------------------------------------------------
-    # _getExistingScidbArrays: returns a list of arrays currently in the 
-    #    database.  
+    # _getExistingScidbArrays: returns a list of arrays currently in the
+    #    database.
     def _getExistingScidbArrays(self):
 
         exits,outs = self._cmdRunner.waitForProcesses(
@@ -500,7 +526,7 @@ class ScidbCommander:
             )
 
         if (any(exits)):
-            raise Exception('Error: could not run array list query!')
+            raise AppError('Could not run array list query!')
 
         text = outs[0][0].strip() # Get the raw text
         lines = text.split('\n')
@@ -519,7 +545,7 @@ class ScidbCommander:
             '-naq'
             ]
         removeCmds = [iqueryCmd + ['remove(' + a + ')'] for a in arrays]
-        
+
         exits = []
         outs = []
         for cmd in removeCmds:
@@ -531,13 +557,13 @@ class ScidbCommander:
             if (procExitCode != 0):
                 if ('SCIDB_LE_ARRAY_DOESNT_EXIST' not in stdErrText):
                     msgList = []
-                    msgList.append('Error: command \"' + ' '.join(cmd) + '\" failed!\n')
+                    msgList.append('Command \"{0}\" failed!\n'.format(' '.join(cmd)))
                     msgList.extend([stdOutText,stdErrText])
-                    raise Exception(''.join(msgList))
-        
+                    raise AppError(''.join(msgList))
+
     #-------------------------------------------------------------------------
-    # _prepInstanceCommands: replicates the command over all instances 
-    #     of scidb and groups the results by host (returned command list is 
+    # _prepInstanceCommands: replicates the command over all instances
+    #     of scidb and groups the results by host (returned command list is
     #     grouped by hosts).  For instance, if user has a scidb cluster with
     #     2 hosts and 2 scidb instances on each host, then this function will
     #     return a list of commands like this:
@@ -551,12 +577,12 @@ class ScidbCommander:
     #     generator function receives the instance list as the parameter and
     #     produces a list of replacement pairs - for instance,
     #     [('<i>',x[1])].  In this case, the function will replace any
-    #     occurrence of string '<i>' with instance id.  Replacement 
+    #     occurrence of string '<i>' with instance id.  Replacement
     #     generator can return as many pairs as needed.
-    #     
+    #
     #     Trim option removes the shell-separator strings (i.e. &, &&, ||,
     #     etc.) from the last command in the server's list.
-    #     
+    #
     #     Combine option collapses all individual command lists into commands-
     #     per-host lists:
     #     [
@@ -577,7 +603,7 @@ class ScidbCommander:
         # cluster: N commands for N instances grouped into lists for each host.
         # The lines also perform token replacements on each individual option
         # string within the command (see above).  So, for each host's instances,
-        # for each instance, for each option in template - replace tokens and 
+        # for each instance, for each option in template - replace tokens and
         # place the option into a new command list.  The result is the list of
         # command lists grouped by host (into lists, of course).
         cmds = [
@@ -598,17 +624,17 @@ class ScidbCommander:
             cmds = [
                 hCmds[:-1] + [hCmds[-1] + [end]] for hCmds in cmds
                 ]
-            
-        # Otionally combine commands for each host into a single list of 
+
+        # Otionally combine commands for each host into a single list of
         # options.
-        if (combine):    
+        if (combine):
             cmds = [
                 [c for c in itertools.chain(*hCmds)]for hCmds in cmds
                 ]
         return cmds
 
     #-------------------------------------------------------------------------
-    # _replaceTokensInCommand: replace placeholder string tokens found in 
+    # _replaceTokensInCommand: replace placeholder string tokens found in
     #    specified command's options.  The function replaces every occurrence
     #    of tokens in every option of the command list with the corresponding
     #    replacement values.
@@ -620,11 +646,11 @@ class ScidbCommander:
         ):
 
         # Reducer is a short function that takes a string and a token/value
-        # pair.  It then returns the string with the token replaced by the 
+        # pair.  It then returns the string with the token replaced by the
         # value.  The * operator converts the token/value pair argument into
         # two arguments to the string replace method.
         reducer = lambda option,tokenAndVal: option.replace(*tokenAndVal)
-        
+
         # Apply the reducer onto every option in the command and return the
         # result with the appropriate replacements made back to the caller.
         return [
@@ -660,9 +686,9 @@ class ScidbCommander:
         _,baseFolderName = os.path.split(baseFolder)
         if (baseFolder[-1] == os.sep):
             baseFolder = baseFolder[:-1]
-        
+
         rmCmd = ['rm', '-f', '<dd>' + os.sep + baseFolderName + ';']
-        
+
         rmCmds = self._prepInstanceCommands(
             rmCmd,
             lambda x: [('<i>',x[1]),('<dd>',x[-1])]
@@ -683,7 +709,7 @@ class ScidbCommander:
 
         if (baseFolder[-1] == os.sep):
             baseFolder = baseFolder[:-1]
-            
+
         rmCmd = ['rm', '-rf', baseFolder + '*']
         rmCmds = [list(rmCmd) for i in range(len(self._hosts))]
         question = 'Delete backup folder(s) ' + baseFolder + '*' + ' on all hosts? [y/n]:'
@@ -697,14 +723,14 @@ class ScidbCommander:
                     ),
                 False # Outputs not checked.
                 )
-            print 'Backup folder(s) deleted.'
+            print_and_flush('Backup folder(s) deleted.')
     #-------------------------------------------------------------------------
     def verifyBackup(self,args,arrayNames):
         baseFolder = args.get('dir')
         _,baseFolderName = os.path.split(baseFolder)
         if (baseFolder[-1] == os.sep):
             baseFolder = baseFolder[:-1]
-        
+
         if (args.get('parallel')):
             cmd = ['ls', baseFolder + '.<i>' + ' &&']
             cmds = self._prepInstanceCommands(list(cmd),lambda x: [('<i>',x[1])])
@@ -716,7 +742,7 @@ class ScidbCommander:
             hosts = [self._coordinator]
             instData = self._instanceData[0]
             countCheck = lambda z: z[0].count(a) == 1
-        
+
         R = self._cmdRunner.waitForProcesses(
             self._cmdRunner.runSshCommands(
                 self._user,
@@ -731,12 +757,12 @@ class ScidbCommander:
         arrayChecks = [[ countCheck(z) for a in arrayNames] for z in zip(text,nInst)]
         totalChecks = [all(ac) for ac in arrayChecks]
         if (not all(totalChecks)):
-            # Backup is corrupted: pinpoint the host and exit.            
+            # Backup is corrupted: pinpoint the host and exit.
             badBkpHosts = [z[0] for z in zip(hosts,totalChecks) if not z[1]]
             for badHost in badBkpHosts:
-                print 'Backup folders are missing files on host',badHost,'.'
-            raise Exception('Backup folders are corrupted!  Exiting...')
-        print 'Ok.'
+                print_and_flush('Backup folders are missing files on host {0}.'.format(badHost),stream=sys.stderr)
+            raise AppError('Backup folders are corrupted!  Exiting...')
+        print_and_flush('Ok.')
     #-------------------------------------------------------------------------
     # setupDataFolders: prepares backup data folders for the save operations.
     #     In case of parallel mode, multiple data folders have to be set up
@@ -753,7 +779,7 @@ class ScidbCommander:
         if (args.get('parallel')):
             # For save operation, both the folders and the links must be
             # created.
-            setupDirsTemplate = [ 
+            setupDirsTemplate = [
                 'mkdir',
                 '-p',
                 baseFolder + '.<i>;',
@@ -782,11 +808,11 @@ class ScidbCommander:
                     True
                     )
                 if (any([x != 0 for x in exits])):
-                    raise Exception('Error: not all backup folders found (bad exit codes); verify that backup folders exist on on cluster hosts!')
+                    raise AppError('Not all backup folders found (bad exit codes); verify that backup folders exist on on cluster hosts!')
                 lsErrMsg = 'ls: cannot access'
                 errorOuts = [e[1] for e in outs]
                 if (any([ lsErrMsg in x for x in errorOuts ])):
-                    raise Exception('Error: not all backup folders found (error messages); verify that backup folders exist on on cluster hosts!')
+                    raise AppError('Not all backup folders found (error messages); verify that backup folders exist on on cluster hosts!')
             # Set up the folder and/or link making commands.
             cmds = self._prepInstanceCommands(
                 setupDirsTemplate,
@@ -804,7 +830,7 @@ class ScidbCommander:
             if (not (os.path.isdir(baseFolder))):
                 os.makedirs(baseFolder)
     #-------------------------------------------------------------------------
-    # _getArrayListingFromScidb: runs the specified array listing query and 
+    # _getArrayListingFromScidb: runs the specified array listing query and
     #     and returns the array info list.
     def _getArrayListingFromScidb(
         self,
@@ -825,11 +851,36 @@ class ScidbCommander:
         ):
         with open(manifest,'r') as fd:
             contents = fd.read()
-        contents = contents.split('\n')
-        return contents
+        lines = [x for x in map(str.strip, contents.split('\n')) if x]
+        return lines
+
+    def _charEscapesInStringLists(self,s_list,action='add'):
+        """
+        The function works with a list of string lists to replace single
+        quote characters with escaped single quotes.  The function has 2
+        modes: replace single quotes with escaped single quotes and the
+        opposite (replace escaped single quotes with plain single quotes).
+        This is necessary in certain situations to deal with the shell
+        and afl syntax.
+        @param s_list list of string lists
+        @param action optional parameter that tells the function which
+               kind of replacements should take place ('add' or 'remove').
+        @return copy of the original list of string lists with all of the
+                strings correctly altered.
+        """
+        new_list = [list(l) for l in s_list]
+        for i in xrange(len(new_list)):
+            for j in xrange(len(new_list[i])):
+                if (action == 'add'):
+                    new_list[i][j] = new_list[i][j].replace('\'','\\\'')
+                    continue
+                if (action == 'remove'):
+                    new_list[i][j] = new_list[i][j].replace('\\\'','\'')
+                    continue
+        return new_list
 
     #-------------------------------------------------------------------------
-    # _formatArrayInfo: puts the raw array listing information into a more 
+    # _formatArrayInfo: puts the raw array listing information into a more
     #     useful list structure for later use.
     #     The listing info for arrays have the following structure:
     #     [
@@ -858,7 +909,13 @@ class ScidbCommander:
         arrayInfo = [
             [x.group(1),x.group(2),x.group(3)] for x in arrayInfo if not (x is None)
             ]
-        arrayInfo = [[y.replace('\'','') for y in x] for x in arrayInfo]
+
+        # Remove single quotes from the array names.
+        for aInfo in arrayInfo:
+            aInfo[0] = aInfo[0].replace('\'','')
+
+        # Need to remove \' characters from DEFAULT 'c' modifiers for char-type attributes.
+        arrayInfo = self._charEscapesInStringLists(arrayInfo,action='remove')
 
         # Run the array names through the filter.
         if (not (nameFilter is None)):
@@ -874,31 +931,61 @@ class ScidbCommander:
 
         if (binFmt):
             # In case of binary format, we add extra fields to the listings.
-            
+
+            # Need to temporarily put back \' characters into DEFAULT 'c' modifiers
+            # for char-type operators; show operator will enclose everything in single
+            # quotes: so inside single quotes need to be \-escaped.
+            tempArrayInfo = self._charEscapesInStringLists(arrayInfo,action='add')
+
             # Prepare the command to query the database for additional info:
             # binary format operations require redimensioning.
             cmdTemplate = binFmtQTemplate
             nameTokens = ['<name>','<id>','<schema>']
-            cmds = [[reduce(lambda x,y: x.replace(*y),zip(nameTokens,ai),c) for c in cmdTemplate] for ai in arrayInfo]
+            cmds = [[reduce(lambda x,y: x.replace(*y),zip(nameTokens,ai),c) for c in cmdTemplate] for ai in tempArrayInfo]
             exits,outs = self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSubProcesses(cmds),
                 True
                 )
             # Brush up the raw query output.
             textOuts = [o[0].split('\n')[1] for o in outs]
-            textOuts = [ 
-                z[0].replace(z[1].group(),'') for z in zip(textOuts,[re.compile('^[^\<]*').search(t) for t in textOuts]) if not (z[1] is None)
-                ]
-            textOuts = [x.replace('\'','') for x in textOuts]
-            
-            binFmts = [reduce(lambda x,y: x.replace(y,''),re.findall('[^\<]*\<',z),z) for z in textOuts]
-            binFmts = [reduce(lambda x,y: x.replace(y,''),re.findall('\>[^\>]*',z),z) for z in binFmts]
-            binFmts = [reduce(lambda x,y: x.replace(y,''),re.findall('[^:,]+?:',z),z) for z in binFmts]
-            binFmts = [reduce(lambda x,y: x.replace(y,''),re.findall('\s*DEFAULT[^,]*',z),z) for z in binFmts]
-            binFmts = ['(' + z + ')' for z in binFmts]
-            
+            binFmts = []
+            bin_schemas = []
+            for text in textOuts:
+                m = re.compile('<[^\]]+?\]').search(text)
+                if (m is None):
+                    msg = ['Unable to extract schema string from show output:']
+                    msg.append(text)
+                    raise AppError('\n'.join(msg))
+                bin_schema = m.group().strip()
+                bin_schemas.append(bin_schema)
+                m = re.compile('<[^>]+?>').search(bin_schema)
+                if (m is None):
+                    msg = ['Unable to extract schema attributes string from show output:']
+                    msg.append(text)
+                    raise AppError('\n'.join(msg))
+                attr_list = m.group().replace('>','')
+                attr_list = attr_list.replace('<','').split(',')
+                array_bin_fmt = []
+                for attr in attr_list:
+                    m = re.compile('([^:]+:)([^\s]+)(.*)').match(attr)
+                    if (m is None):
+                        msg = ['Unable to extract attribute type:']
+                        msg.append(attr)
+                        raise AppError('\n'.join(msg))
+                    fmt_string = m.group(2).strip()
+                    modifiers = m.group(3).strip()
+                    if (len(modifiers) > 0):
+                        if (modifiers[:4].upper() == 'NULL'):
+                            fmt_string += ' NULL'
+                    array_bin_fmt.append(fmt_string)
+                binFmts.append(array_bin_fmt)
+
+            binFmts = ['(' + ','.join(bf) + ')' for bf in binFmts]
+
+            bin_schemas = self._charEscapesInStringLists([bin_schemas],action='remove')[0]
+
             # Attach extra fields to the array info listings.
-            arrayInfo = [x[0] + [x[1],x[2]] for x in zip(arrayInfo,textOuts,binFmts)]
+            arrayInfo = [x[0] + [x[1],x[2]] for x in zip(arrayInfo,bin_schemas,binFmts)]
 
         return arrayInfo
     #-------------------------------------------------------------------------
@@ -931,12 +1018,12 @@ class ScidbCommander:
         if (args.get('zip')):
             text.append('-z')
         text.append(args.get('dir'))
-        
+
         fd = open(optsFile,'w')
         fd.write(' '.join(text))
         fd.close()
     #-------------------------------------------------------------------------
-    # _runSave: saves all arrays (one-by-one) in either parallel or 
+    # _runSave: saves all arrays (one-by-one) in either parallel or
     #     non-parallel mode without zip option.
     def _runSave(
         self,
@@ -946,19 +1033,19 @@ class ScidbCommander:
         baseFolder, # Backup folder path.
         parallel=False # Parallel mode flag.
         ):
-       
+
         # Extract plain array names from array information.
         arrayNames = [x[0] for x in fmtArrayInfo]
-        
-        # Set up a list of formats for the save operator; the format could be 
-        # a simple string like 'auto' or a more complicated string like 
+
+        # Set up a list of formats for the save operator; the format could be
+        # a simple string like 'auto' or a more complicated string like
         # '(int64,double)' for binary save.
         fmts = [saveFmts[i] for i in range(len(fmtArrayInfo))]
-        
-        idNum = '0' # Zero means "save to coordinator", while "-1" means 
+
+        idNum = '0' # Zero means "save to coordinator", while "-1" means
                     # "save to all instances" (parallel mode).
         saveFolder = baseFolder # By default, absolute save folder is assumed.
-        
+
         if (parallel):
             idNum = '-1' # Parallel mode: save to all instances
             # Similarly, in parallel mode save folder value for the save
@@ -967,8 +1054,8 @@ class ScidbCommander:
             # links ).
             _,baseFolderName = os.path.split(baseFolder)
             saveFolder = baseFolderName
-        
-        # This is the main save query command template: it still contains 
+
+        # This is the main save query command template: it still contains
         # unreplaced tokens like <name> (will be replaced by array name).
         q = 'save(' + inputArrayExp + ',' + \
             '\'' + os.path.join(saveFolder,'<name>') + '\',' + \
@@ -979,19 +1066,19 @@ class ScidbCommander:
         # function to insert real array names and folder paths where
         # necessary.
         # A side note: the commands are organized into a generator (not a
-        # list).  This is done to control the size of the list since it 
+        # list).  This is done to control the size of the list since it
         # can get rather large.  During the array save loop, each command is
         # evaluated/"materialized" by the generator.
         cmds = (
             ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', reduce(lambda x,y: x.replace(*y),[('<name>',z[0]),('<fmt>',z[1])],q)] \
             for z in zip(arrayNames,fmts)
         )
-        
+
         savedArrays = 0
         for i in range(len(arrayNames)): # Save all of the arrays.
             cmd = cmds.next()
-            print 'Archiving array ' + arrayNames[i]
-            
+            print_and_flush('Archiving array {0}'.format(arrayNames[i]))
+
             # Run save command, wait for its completion, and get its exit
             # codes and output.
             exits,outs = self._cmdRunner.waitForProcesses(
@@ -1000,9 +1087,9 @@ class ScidbCommander:
                 )
 
             text = outs[0][0].strip() # Print iquery output for the user.
-            print text
+            print_and_flush(text)
             savedArrays += 1
-        print 'Saved arrays:',savedArrays
+        print_and_flush('Saved arrays: {0}'.format(savedArrays))
     #-------------------------------------------------------------------------
     # _runZipSave: save arrays with gzip in non-parallel mode.
     #
@@ -1013,16 +1100,16 @@ class ScidbCommander:
         saveFmts, # Format to save arrays in (different for formats).
         baseFolder # Backup folder path.
         ):
-        
+
         # Extract plain array names from array information.
         arrayNames = [x[0] for x in fmtArrayInfo]
-        
-        # Set up a list of formats for the save operator; the format could be 
-        # a simple string like 'auto' or a more complicated string like 
+
+        # Set up a list of formats for the save operator; the format could be
+        # a simple string like 'auto' or a more complicated string like
         # '(int64,double)' for binary save.
         fmts = [saveFmts[i] for i in range(len(fmtArrayInfo))]
-        
-        # This is the main save query command template: it still contains 
+
+        # This is the main save query command template: it still contains
         # unreplaced tokens like <name> (will be replaced by array name).
         q = 'save(' + inputArrayExp + ',' + \
             '\'' + os.path.join(baseFolder,'<name>') + '\',' + \
@@ -1031,10 +1118,10 @@ class ScidbCommander:
 
         # Path to the named pipe where the save operator will be storing data.
         pipeName = os.path.join(baseFolder,'<name>')
-        
+
         # Set up pipe making shell commands here for each array.
         makePipeCmd = ['rm', '-f',pipeName, ';','mkfifo','--mode=666',pipeName]
-        
+
         # Set up the gzip commands here for each array.  The command lists
         # have several shell commands in them: gzip the pipe contents and
         # move/rename the named pipe to the array name (final file name).
@@ -1050,8 +1137,8 @@ class ScidbCommander:
             os.path.join(baseFolder,'<name>.gz'),
             os.path.join(baseFolder,'<name>')
             ]
-        
-        # These are the save commands: one for each array.  They are 
+
+        # These are the save commands: one for each array.  They are
         # "reduced": each string in the command is run through the replacement
         # function to insert real array names and folder paths where
         # necessary.
@@ -1062,7 +1149,7 @@ class ScidbCommander:
         repTokens = ['<name>','<fmt>']
         repData = zip(arrayNames,fmts)
         fullQuery = ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-ocsv','-naq', q]
-        
+
         cmds = self._getCommandIterator(repTokens,repData,fullQuery,True)
         makePipeCmds = self._getCommandIterator(repTokens,repData,makePipeCmd,True)
         gzipCmds = self._getCommandIterator(repTokens,repData,gzipCmd,True)
@@ -1073,8 +1160,9 @@ class ScidbCommander:
             makePipeCmd = makePipeCmds.next()
             saveArrayCmd = cmds.next()
             gzipCmd = gzipCmds.next()
-            
-            print 'Archiving array ' + arrayName
+
+            print_and_flush('Archiving array {0}'.format(arrayName))
+
             # Make the named pipe and wait for the command to complete (no
             # need to read the output).
             self._cmdRunner.waitForProcesses(
@@ -1084,7 +1172,7 @@ class ScidbCommander:
             # Start the iquery save command into the named pipe and do not
             # wait for completion.
             mainProc = self._cmdRunner.runSubProcess(saveArrayCmd)
-            
+
             # Start gzip/move shell command and wait for its completion: when
             # this command is done, save operator is done, gzip is done, and
             # the file has been renamed with the proper name (array name).
@@ -1096,10 +1184,10 @@ class ScidbCommander:
             exits,outs = self._cmdRunner.waitForProcesses([mainProc],True)
 
             text = outs[0][0].strip() # Print iquery output for user.
-            print text
+            print_and_flush(text)
             savedArrays += 1
 
-        print 'Saved arrays:',savedArrays
+        print_and_flush('Saved arrays: {0}'.format(savedArrays))
     #-------------------------------------------------------------------------
     # _runParallelZipSave: save all arrays in parallel mode and with gzip.
     #
@@ -1110,24 +1198,24 @@ class ScidbCommander:
         saveFmts, # Format to save arrays in (different for formats).
         baseFolder # Backup folder path.
         ):
-        
+
         # Extract plain array names from array information.
         arrayNames = [x[0] for x in fmtArrayInfo]
-        
-        # Set up a list of formats for the save operator; the format could be 
-        # a simple string like 'auto' or a more complicated string like 
+
+        # Set up a list of formats for the save operator; the format could be
+        # a simple string like 'auto' or a more complicated string like
         # '(int64,double)' for binary save.
         fmts = [saveFmts[i] for i in range(len(fmtArrayInfo))]
-        
+
         _,baseFolderName = os.path.split(baseFolder);
-        
-        # This is the main save query command template: it still contains 
+
+        # This is the main save query command template: it still contains
         # unreplaced tokens like <name> (will be replaced by array name).
         q = 'save(' + inputArrayExp + ',' + \
             '\'' + os.path.join(baseFolderName,'<name>') + '\',' + \
             '-1' + \
             ', <fmt>)'
-            
+
         # These are the save commands: one for each array.  The list is
         # "reduced": each string in the command is run through the replacement
         # function to insert real array names and folder paths where
@@ -1139,7 +1227,7 @@ class ScidbCommander:
         )
         # Path to the named pipe where the save operator will be storing data.
         pipeName = os.path.join(baseFolder + '.<i>','<name>')
-        
+
         # Set up pipe making shell commands here for each array.
         makePipeCmd = ['rm', '-f',pipeName, ';','mkfifo','--mode=666',pipeName + ';']
 
@@ -1169,15 +1257,15 @@ class ScidbCommander:
         allMakePipeCmds = (self._prepInstanceCommands(list(makePipeCmd),r) for r in reducers)
         allGzipCmds = (self._prepInstanceCommands(list(gzipCmd),r,trim=False,end='wait $GZ_EXIT_CODES') for r in reducers)
         allMoveCmds = (self._prepInstanceCommands(list(moveCmd),r) for r in reducers)
-        
+
         savedArrays = 0
         for i in range(len(arrayNames)):
             makePipeCmdList = allMakePipeCmds.next()
             saveArrayCmd = cmds.next()
             gzipCmdList = allGzipCmds.next()
             moveCmdList = allMoveCmds.next()
-            
-            print 'Archiving array ' + arrayNames[i]
+
+            print_and_flush('Archiving array {0}'.format(arrayNames[i]))
             # Make the named pipe and wait for the command to complete (no
             # need to read the output).
             self._cmdRunner.waitForProcesses(
@@ -1191,7 +1279,7 @@ class ScidbCommander:
             # Start the iquery save command into the named pipes and do not
             # wait for completion.
             mainProc = self._cmdRunner.runSubProcess(saveArrayCmd)
-            
+
             # Start gzip/move shell command and wait for its completion: when
             # this command is done, save operator is done, gzip is done, and
             # the file has been renamed with the proper name (array name).
@@ -1217,25 +1305,25 @@ class ScidbCommander:
                 )
 
             text = outs[0][0].strip() # Print iquery output for user.
-            print text
+            print_and_flush(text)
 
             savedArrays += 1
-        print 'Saved arrays:',savedArrays
+        print_and_flush('Saved arrays: {0}'.format(savedArrays))
     #-------------------------------------------------------------------------
     # _runRestore: restore all arrays in parallel or in non-parallel modes.
     #
     def _runRestore(
         self,
         fmtArrayInfo,  # Formatted array info listing.
-        restoreQuery, # Query with the store operator. 
+        restoreQuery, # Query with the store operator.
         restoreFmts, # Format to restore arrays in (different for formats).
         baseFolder, # Base backup folder path.
         parallel=False # Parallel mode flag.
         ):
-        
+
         # Extract plain array names from array information.
         arrayNames = [x[0] for x in fmtArrayInfo]
-        
+
         # If names have version numbers, strip them out and keep unversioned
         # array names separately.
         noVerArrayNames = list(arrayNames)
@@ -1243,12 +1331,12 @@ class ScidbCommander:
 
         if (all(m)):
             noVerArrayNames = [z[0].replace(z[1].group(),'') for z in zip(noVerArrayNames,m)]
-        
-        idNum = '0' # Zero means "save to coordinator", while "-1" means 
+
+        idNum = '0' # Zero means "save to coordinator", while "-1" means
                     # "save to all instances" (parallel mode).
         restoreFolder = baseFolder # By default, absolute restore folder is
                                    # assumed.
-        
+
         if (parallel):
             idNum = '-1' # Parallel mode: save to all instances
             # Similarly, in parallel mode save folder value for the save
@@ -1256,12 +1344,12 @@ class ScidbCommander:
             # for all instances have been outfitted with the appropriate sym.
             # links ).
             _,baseFolderName = os.path.split(baseFolder) # Use relative path.
-            restoreFolder = baseFolderName 
-        
-        # This is the main save query command template: it still contains 
+            restoreFolder = baseFolderName
+
+        # This is the main save query command template: it still contains
         # unreplaced tokens like <name> (will be replaced by array name).
         q = restoreQuery
-        
+
         # These are replacement tokens and values that will be used below to
         # transform command templates into actual commands.
         repTokens = ['<fname>','<id>','<schema>','<fmt>','<opt>']
@@ -1287,7 +1375,7 @@ class ScidbCommander:
             ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', reduce(lambda x,y: x.replace(*y),zip(repTokens,repData[i]),q)] \
             for i in range(len(fmtArrayInfo))
             )
-        
+
         restoredArrays = 0
 
         for i in range(len(arrayNames)):
@@ -1295,7 +1383,7 @@ class ScidbCommander:
             cmd = cmds.next()
             noVerName = noVerArrayNames[i]
 
-            print 'Restoring array ' + arrayName
+            print_and_flush('Restoring array {0}'.format(arrayName))
             # Run restore command, wait for its completion, and get its exit
             # codes and output.
             exits,outs = self._cmdRunner.waitForProcesses(
@@ -1304,9 +1392,9 @@ class ScidbCommander:
                 )
 
             text = outs[0][0].strip() # Print iquery output for the user.
-            print text
+            print_and_flush(text)
             restoredArrays += 1
-        print 'Restored arrays:',restoredArrays
+        print_and_flush('Restored arrays: {0}'.format(restoredArrays))
     #-------------------------------------------------------------------------
     # _runZipRestore: restore all arrays with gzip option.
     #
@@ -1317,29 +1405,29 @@ class ScidbCommander:
         restoreFmts, # Format to restore arrays in (different for formats).
         baseFolder # Backup folder path.
         ):
-        
+
         # Extract plain array names from array information.
         arrayNames = [x[0] for x in fmtArrayInfo]
-        
+
         # If names have version numbers, strip them out and keep unversioned
         # array names separately.
         noVerArrayNames = list(arrayNames)
         m = map(re.compile('\@[0-9]+').search,arrayNames)
         if (all([not(x is None) for x in m])):
             noVerArrayNames = [z[0].replace(z[1].group(),'') for z in zip(noVerArrayNames,m)]
-        
-        idNum = '0' # Zero means "save to coordinator", while "-1" means 
+
+        idNum = '0' # Zero means "save to coordinator", while "-1" means
                     # "save to all instances" (parallel mode).
-        
-        # This is the main save query command template: it still contains 
+
+        # This is the main save query command template: it still contains
         # unreplaced tokens like <name> (will be replaced by array name).
         q = restoreQuery
-        
+
         # These are replacement tokens and values that will be used below to
         # transform command templates into actual commands.
         repTokens = ['<fname>','<id>','<schema>','<fmt>','<opt>']
         repData = [fmtArrayInfo[i] + [restoreFmts[i],idNum] for i in range(len(fmtArrayInfo))]
-        
+
         if (len(fmtArrayInfo[0]) > 3): # Binary restore requires extra info.
             repTokens = ['<fname>','<id>','<schema>','<bin_schema>','<fmt>','<opt>']
             repData = [fmtArrayInfo[i] + [idNum] for i in range(len(fmtArrayInfo))]
@@ -1352,7 +1440,7 @@ class ScidbCommander:
 
         # Start preparing the store query.
         q = q.replace('<in_path>', pipeName)
-        
+
         # Array name might be different from the non-versioned name.  During
         # restore operation array info is coming from the manifest file.  If
         # user saved all versions of arrays, filenames will have @X suffixes,
@@ -1362,7 +1450,7 @@ class ScidbCommander:
         repData = [z[1] + [z[0]] for z in zip(noVerArrayNames,repData)]
 
         # These are the actual commands for scidb hosts.  They are put
-        # together by sending command templates through a series of 
+        # together by sending command templates through a series of
         # string replacements.  Note that these are kept in "generator" form
         # in order to keep memory usage in check as these lists can get rather
         # large.
@@ -1375,18 +1463,18 @@ class ScidbCommander:
         cleanupCmds = self._getCommandIterator(repTokens,repData,cleanupCmd,True)
 
         restoredArrays = 0
-        
+
         for i in range(len(arrayNames)):
-        
-            arrayName = arrayNames[i] 
-            cmd = cmds.next() 
+
+            arrayName = arrayNames[i]
+            cmd = cmds.next()
             pipeCmd = pipeCmds.next()
             gzipCmd = gzipCmds.next()
             cleanupCmd = cleanupCmds.next()
             noVerName = noVerArrayNames[i]
-            
-            print 'Restoring array ' + arrayName
-            
+
+            print_and_flush('Restoring array {0}'.format(arrayName))
+
             self._cmdRunner.waitForProcesses(
                 [self._cmdRunner.runSubProcess(pipeCmd,useShell=True)],
                 False
@@ -1399,11 +1487,11 @@ class ScidbCommander:
             self._cmdRunner.waitForProcesses(
                 [self._cmdRunner.runSubProcess(cleanupCmd,useShell=True)],
                 False
-                )            
+                )
             text = outs[0][0].strip() # Print iquery output for user.
-            print text
+            print_and_flush(text)
             restoredArrays += 1
-        print 'Restored arrays:',restoredArrays
+        print_and_flush('Restored arrays: {0}'.format(restoredArrays))
     #-----------------------------------------------------------------------------
     # _runParallelZipRestore: restore all arrays in parallel mode and with gzip
     #     option.
@@ -1414,30 +1502,30 @@ class ScidbCommander:
         restoreFmts, # Format to restore arrays in (different for formats).
         baseFolder # Backup folder path.
         ):
-        
+
         # Extract plain array names from array information.
         arrayNames = [x[0] for x in fmtArrayInfo]
-        
+
         # If names have version numbers, strip them out and keep unversioned
         # array names separately.
         noVerArrayNames = list(arrayNames)
         m = map(re.compile('\@[0-9]+').search,arrayNames)
         if (all([not(x is None) for x in m])):
             noVerArrayNames = [z[0].replace(z[1].group(),'') for z in zip(noVerArrayNames,m)]
-        
-        idNum = '-1' # Zero means "save to coordinator", while "-1" means 
+
+        idNum = '-1' # Zero means "save to coordinator", while "-1" means
                     # "save to all instances" (parallel mode).
-        
+
         _,baseFolderName = os.path.split(baseFolder)
-        # This is the main save query command template: it still contains 
+        # This is the main save query command template: it still contains
         # unreplaced tokens like <name> (will be replaced by array name).
         q = restoreQuery
-        
+
         # These are replacement tokens and values that will be used below to
         # transform command templates into actual commands.
         repTokens = ['<fname>','<id>','<schema>','<fmt>','<opt>']
         repData = [fmtArrayInfo[i] + [restoreFmts[i],idNum] for i in range(len(fmtArrayInfo))]
-        
+
         if (len(fmtArrayInfo[0]) > 3): # Binary restore requires extra info.
             repTokens = ['<fname>','<id>','<schema>','<bin_schema>','<fmt>','<opt>']
             repData = [fmtArrayInfo[i] + [idNum] for i in range(len(fmtArrayInfo))]
@@ -1448,8 +1536,8 @@ class ScidbCommander:
         # but we need unversion-ed names of those same array for restoring
         # them.
         repTokens.append('<name>')
-        repData = [z[1] + [z[0]] for z in zip(noVerArrayNames,repData)] 
-       
+        repData = [z[1] + [z[0]] for z in zip(noVerArrayNames,repData)]
+
         # Set up all command templates.
         pipeName = os.path.join(baseFolder + '.<i>','<fname>.p')
         pipeCmd = ['rm','-f',pipeName,'>','/dev/null','2>&1',';','mkfifo','--mode=666',pipeName + '&&']
@@ -1470,7 +1558,7 @@ class ScidbCommander:
         q = q.replace('<in_path>',os.path.join(baseFolderName,'<fname>.p'))
 
         # These are the actual commands for scidb hosts.  They are put
-        # together by sending command templates through a series of 
+        # together by sending command templates through a series of
         # string replacements.  Note that these are kept in "generator" form
         # in order to keep memory usage in check as these lists can get rather
         # large.
@@ -1496,19 +1584,19 @@ class ScidbCommander:
 
         # Put together cleanup commands generator.
         allCleanupCmds = (self._prepInstanceCommands(cleanupCmd,x) for x in reducers)
-        
+
         arraysRestored = 0
 
         for i in range(len(arrayNames)):
 
             arrayName = arrayNames[i]
-            cmd=cmds.next() 
+            cmd=cmds.next()
             pipeCmds = allPipeCmds.next()
             gzipCmds = allGzipCmds.next()
             cleanupCmds = allCleanupCmds.next()
             noVerName = noVerArrayNames[i]
 
-            print 'Restoring array ' + arrayName
+            print_and_flush('Restoring array {0}'.format(arrayName))
 
             self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSshCommands(self._user,self._hosts,pipeCmds),
@@ -1522,24 +1610,28 @@ class ScidbCommander:
             self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSshCommands(self._user,self._hosts,cleanupCmds),
                 False
-                )            
+                )
             text = outs[0][0].strip() # Print iquery output for user.
-            print text
+            print_and_flush(text)
             arraysRestored += 1
-        print 'Restored arrays:',arraysRestored
+        print_and_flush('Restored arrays: {0}'.format(arraysRestored))
     #-----------------------------------------------------------------------------
-    # restoreArrays: determines what kind of restore function to call based on 
+    # restoreArrays: determines what kind of restore function to call based on
     #     specified user arguments.
     def restoreArrays(self,args,manifestPath):
-    
+
         # Grab the initial specified backup folder.
         baseFolder = args.get('dir')
         _,baseFolderName = os.path.split(baseFolder)
         if (baseFolder[-1] == os.sep):
             baseFolder = baseFolder[:-1]
-                
+
         # Obtain array list here.
         arrayInfo = self._getArrayListingFromBackup(manifestPath)
+
+        if (len(arrayInfo) == 0):
+            print_and_flush('No arrays found in backup: eixiting.')
+            return
 
         binFmt = False # Flag for binary format.
         binQTemplate = None # Template to find out binary (1D) array schema.
@@ -1561,7 +1653,7 @@ class ScidbCommander:
                 '-aq',
                 'show(\'unpack(input(<schema>,\\\'/dev/null\\\'),__row)\',\'afl\')'
                 ]
-        
+
         fmtArrayInfo = self._formatArrayInfo(
             arrayInfo,
             args.get('allVersions'),
@@ -1569,20 +1661,20 @@ class ScidbCommander:
             binFmt,
             binQTemplate
             )
-        
-        print 'Verifying backup...'
+
+        print_and_flush('Verifying backup...')
         self.verifyBackup(args,[x[0] for x in fmtArrayInfo])
 
         # Get the simple restore formats (in case of non-binary restore).
         restoreFmts = ['\'' + args.get('restore') + '\'' for i in range(len(fmtArrayInfo))]
-        
+
         if (args.get('save') == 'binary'):
             # In case of the binary restore, formats are not simple, and must
             # be gathered from the formatted array listing info.
             restoreFmts = [f[4] for f in fmtArrayInfo]
-            
+
         # Prior to restoring an array, it has to be deleted from the database.
-        # Usually, the list of arrays to remove is the same as the list of 
+        # Usually, the list of arrays to remove is the same as the list of
         # arrays to create (when --allVersions is specified, arrays to remove
         # have no versioning suffixes).
         arraysToRemove = set([fmtInfo[0].split('@')[0] for fmtInfo in fmtArrayInfo])
@@ -1595,7 +1687,7 @@ class ScidbCommander:
             # about to remove.
             existingArrays = self._getExistingScidbArrays()
 
-            # Just in case array names are version-ed, remove the versions for 
+            # Just in case array names are version-ed, remove the versions for
             # set comparison.
             intersection = set(existingArrays) & arraysToRemove
 
@@ -1603,9 +1695,9 @@ class ScidbCommander:
                 msgList = ['The following arrays still exist:']
                 msgList.extend([a for a in intersection])
                 msgList.append('Please remove them manually and re-run the restore operation!')
-                raise Exception('\n'.join(msgList))
+                raise AppError('\n'.join(msgList))
         else:
-            self._removeArrays(arraysToRemove) # Remove all 
+            self._removeArrays(arraysToRemove) # Remove all
 
         if (args.get('parallel')):
             if (args.get('zip')):
@@ -1626,8 +1718,8 @@ class ScidbCommander:
                 restoreQuery = restoreQuery.replace('<in_path>',os.path.join(baseFolder,'<fname>'))
                 self._runRestore(fmtArrayInfo,restoreQuery,restoreFmts,baseFolder)
     #-------------------------------------------------------------------------
-    # saveArrays: determine which save method to call based on user-specified 
-    #     options        
+    # saveArrays: determine which save method to call based on user-specified
+    #     options
     def saveArrays(self,args,manifestPath,optsFilePath):
 
         # Get the user-specified value for the backup folder.
@@ -1635,7 +1727,7 @@ class ScidbCommander:
         _,baseFolderName = os.path.split(baseFolder)
         if (baseFolder[-1] == os.sep):
             baseFolder = baseFolder[:-1]
-            
+
         # Query for listing arrays in scidb database.
         listArraysCmd = self._list_arrays_query_command
 
@@ -1649,12 +1741,12 @@ class ScidbCommander:
 
         # Obtain array list here (filter out temp arrays).
         arrayInfo = self._getArrayListingFromScidb(listArraysCmd)
-        
+
         binQTemplate = None # Query for determining 1d schema (binary format).
         binFmt = False # Binary format flag.
-        
+
         inputArrayExp = '<name>' # For non-binary format, it is array name.
-        
+
         if (args.get('save') == 'binary'):
             binFmt = True
             binQTemplate = [ # Query to get array 1d schema (for binary).
@@ -1668,7 +1760,7 @@ class ScidbCommander:
                 'show(\'unpack(input(<name>,\\\'/dev/null\\\'),__row)\',\'afl\')'
                 ]
             inputArrayExp = 'unpack(<name>,__row)' # For binary, it is an expression.
-        
+
         fmtArrayInfo = self._formatArrayInfo(
             arrayInfo,
             args.get('allVersions'),
@@ -1679,21 +1771,21 @@ class ScidbCommander:
 
         # For non-binary saves, formats are simple string specifiers.
         saveFmts = [args.get('save') for i in range(len(fmtArrayInfo))]
-        
+
         if (args.get('save') == 'binary'):
             # For binary operations, formats are actual data types (already
             # in formatted array listings).
             saveFmts = [f[4] for f in fmtArrayInfo]
-        
+
         # Even though users specify "text", the actual parameter to the save
         # operator is named "auto".
         saveFmts = ['\'' + x.replace('text','auto') + '\'' for x in saveFmts]
-        
+
         # Save array listings in manifest and user selected options in
         # save_opts file.
         self._saveManifest(manifestPath,fmtArrayInfo)
         self._saveOptsFile(optsFilePath,args)
-        
+
         if (args.get('parallel')):
             if (args.get('zip')):
                 self._runParallelZipSave(
@@ -1711,89 +1803,97 @@ class ScidbCommander:
             else:
                 self._runSave(fmtArrayInfo,inputArrayExp,saveFmts,baseFolder)
 
-        print 'Verifying backup...'
+        print_and_flush('Verifying backup...')
         self.verifyBackup(args,[x[0] for x in fmtArrayInfo])
 
 #-----------------------------------------------------------------------------
-# checkProgramArgs: perform checks on specified arguments beyond what the 
+# checkProgramArgs: perform checks on specified arguments beyond what the
 #     options parser has already done.
 def checkProgramArgs(args):
     actions = [args.get('save'),args.get('restore')]
     if (args.get('delete') and actions.count(None) <= 1):
-        print 'Error: delete action cannot be combined with other actions!'
-        sys.exit(1)
-        
+        raise AppError('Delete action cannot be combined with other actions!')
+
     if (args.get('delete')): # Done checking: this is a simple delete job.
         return
-    
+
     if (actions.count(None) > 1):
-        print 'Error: no action specified (--save FMT, --restore FMT)!'
-        sys.exit(1)
+        raise AppError('No action specified (--save FMT, --restore FMT)!')
+
     if (actions.count(None) <= 0):
-        print 'Error: both save and restore actions specified; please choose only one!'
-        sys.exit(1)
-    
+        raise AppError('Both save and restore actions specified; please choose only one!')
+
     if (args.get('save') is None): # This is a restore.
         # Check manifest and saved options files.
         bkpDir = args.get('dir')
         if (bkpDir[-1] == os.sep):
             bkpDir = bkpDir[:-1]
-        if (program_args.get('parallel')):
+        if (args.get('parallel')):
             inst0bkpDir = bkpDir + '.0'
             if (not os.path.isdir(inst0bkpDir )):
-                print 'Error: coordinator backup directory ' + inst0bkpDir + ' is missing!'
-                sys.exit(1)
+                raise AppError('Coordinator backup directory {0} is missing!'.format(inst0bkpDir))
+
         manifestPath = os.path.join(bkpDir,'.manifest')
         optsFilePath = os.path.join(bkpDir,'.save_opts')
-        if (program_args.get('parallel')):
+        if (args.get('parallel')):
             manifestPath = os.path.join(inst0bkpDir,'.manifest')
             optsFilePath = os.path.join(inst0bkpDir,'.save_opts')
         if (not (os.path.isfile(manifestPath))):
-            print 'Error: backup is corrupted; manifest file  ' + manifestPath + ' is missing!'
-            sys.exit(1)
+            raise AppError('Backup is corrupted; manifest file {0} is missing!'.format(manifestPath))
+
         if (not (os.path.isfile(optsFilePath))):
-            print 'Error: backup is corrupted; saved options file  ' + optsFilePath + ' is missing!'
-            sys.exit(1)
+            raise AppError('Backup is corrupted; saved options file {0} is missing!'.format(optsFilePath))
+
+def main(argv=None):
+    if (argv is None):
+        argv = sys.argv[1:]
+    # For proper subprocess management:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+    # Collect program arguments first:
+    program_args = ProgramArgs(argv)
+
+    try:
+        checkProgramArgs(program_args)
+
+        sh = ScidbCommander(program_args)
+
+        sh.setupDataFolders(program_args)
+
+        baseFolder = program_args.get('dir')
+        if (baseFolder[-1] == os.sep):
+            baseFolder = baseFolder[:-1]
+        manifestPath = os.path.join(baseFolder,'.manifest')
+        optsFilePath = os.path.join(baseFolder,'.save_opts')
+        if (program_args.get('parallel')):
+            manifestPath = os.path.join(baseFolder + '.0','.manifest')
+            optsFilePath = os.path.join(baseFolder + '.0','.save_opts')
+
+        if (program_args.get('delete')):
+            sh.removeBackup(program_args)
+            sys.exit(0)
+
+        if (not (program_args.get('save') is None)):
+            sh.saveArrays(
+                program_args,
+                manifestPath,
+                optsFilePath
+                )
+        else:
+            sh.restoreArrays(
+                program_args,
+                manifestPath
+                )
+        # Remove links to backup folders from instance data folders.
+        sh.cleanUpLinks(program_args)
+    except AppError as e:
+        print >>sys.stderr, "Error:", str(e)
+        return 2
+
+    return 0
+
 #-----------------------------------------------------------------------------
 # Script main entry point.
 #
 if __name__ == '__main__':
-    # For proper subprocess management:
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    
-    # Collect program arguments first:
-    program_args = ProgramArgs()
-    
-    checkProgramArgs(program_args)
-
-    sh = ScidbCommander(program_args)
-    
-    sh.setupDataFolders(program_args)
-    
-    baseFolder = program_args.get('dir')
-    if (baseFolder[-1] == os.sep):
-        baseFolder = baseFolder[:-1]
-    manifestPath = os.path.join(baseFolder,'.manifest')
-    optsFilePath = os.path.join(baseFolder,'.save_opts')
-    if (program_args.get('parallel')):
-        manifestPath = os.path.join(baseFolder + '.0','.manifest')
-        optsFilePath = os.path.join(baseFolder + '.0','.save_opts')
-        
-    if (program_args.get('delete')):
-        sh.removeBackup(program_args)
-        sys.exit(0)
-    
-    if (not (program_args.get('save') is None)):
-        sh.saveArrays(
-            program_args,
-            manifestPath,
-            optsFilePath
-            )
-    else:
-        sh.restoreArrays(
-            program_args,
-            manifestPath
-            )
-    # Remove links to backup folders from instance data folders.
-    sh.cleanUpLinks(program_args) 
-    
+    sys.exit(main())

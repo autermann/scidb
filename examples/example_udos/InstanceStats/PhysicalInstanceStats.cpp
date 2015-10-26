@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -30,6 +30,8 @@
 #include "InstanceStatsSettings.h"
 #include <query/Operator.h>
 #include <util/Network.h>
+
+using namespace std;
 
 namespace scidb
 {
@@ -67,7 +69,7 @@ public:
          * Note: the scidb::SharedBuffer is a thin wrapper over a block of allocated memory.
          * @param statData the buffer of data; must be exactly getMarshalledSize() bytes.
          */
-        Stats(shared_ptr<SharedBuffer>& statData)
+        Stats(std::shared_ptr<SharedBuffer>& statData)
         {
             /* assert-like defensive exception */
             if (statData->getSize() != getMarshalledSize())
@@ -90,9 +92,9 @@ public:
          * Marshall stats into a buffer
          * @return a buffer of size getMarshalledSize() containing the data.
          */
-        shared_ptr<SharedBuffer> marshall()
+        std::shared_ptr<SharedBuffer> marshall()
         {
-            shared_ptr <SharedBuffer> result (new MemoryBuffer(NULL, getMarshalledSize()));
+            std::shared_ptr <SharedBuffer> result (new MemoryBuffer(NULL, getMarshalledSize()));
             size_t* ptr = static_cast<size_t*> (result->getData());
             *ptr = chunkCount;
             ++ptr;
@@ -146,14 +148,14 @@ public:
      * @param settings the operator settings
      * @return an object that describes the data
      */
-    Stats computeLocalStats(shared_ptr<Array>& inputArray, InstanceStatsSettings const& settings)
+    Stats computeLocalStats(std::shared_ptr<Array>& inputArray, InstanceStatsSettings const& settings)
     {
         Stats result;
 
         /* The ConstArrayIterator allows one to read the array data, one attribute at a time.
          * We obtain the iterator for attribute 0.
          */
-        shared_ptr<ConstArrayIterator> arrayIter = inputArray->getConstIterator(0);
+        std::shared_ptr<ConstArrayIterator> arrayIter = inputArray->getConstIterator(0);
         while (!arrayIter->end())
         {
             /* The ConstArrayIterator will iterate once for every chunk in the array, in row-major order */
@@ -186,13 +188,13 @@ public:
      * @param stats the statistics to record
      * @param query the query context
      */
-    shared_ptr<Array> writeStatsToMemArray(Stats const& stats, shared_ptr<Query>& query)
+    std::shared_ptr<Array> writeStatsToMemArray(Stats const& stats, std::shared_ptr<Query>& query)
     {
         /* This is very similar to the write code seen in PhysicalHelloInstances, except we are writing multiple
          * attributes - all at the same position.
          */
-        shared_ptr<Array> outputArray(new MemArray(_schema, query));
-        shared_ptr<ArrayIterator> outputArrayIter = outputArray->getIterator(0);
+        std::shared_ptr<Array> outputArray(new MemArray(_schema, query));
+        std::shared_ptr<ArrayIterator> outputArrayIter = outputArray->getIterator(0);
         Coordinates position(1, query->getInstanceID());
 
         /* The first attribute is opened with only SEQUENTIAL_WRITE. Other attributes are also opened with
@@ -202,7 +204,7 @@ public:
          */
 
         //chunk count
-        shared_ptr<ChunkIterator> outputChunkIter = outputArrayIter->newChunk(position).getIterator(query,
+        std::shared_ptr<ChunkIterator> outputChunkIter = outputArrayIter->newChunk(position).getIterator(query,
                                                                                        ChunkIterator::SEQUENTIAL_WRITE);
         outputChunkIter->setPosition(position);
         Value value;
@@ -275,12 +277,12 @@ public:
      *                        information on instance 0. Not changed on other instances.
      * @param query the query context
      */
-    void exchangeStats(Stats& myStats, shared_ptr<Query>& query)
+    void exchangeStats(Stats& myStats, std::shared_ptr<Query>& query)
     {
         if (query->getInstanceID() != 0)
         {
             /* I am not instance 0, so send my stuff to instance 0 */
-            shared_ptr<SharedBuffer> buf = myStats.marshall();
+            std::shared_ptr<SharedBuffer> buf = myStats.marshall();
             /* Non-blocking send. Must be matched by a BufReceive call on the recipient */
             BufSend(0, buf, query);
         }
@@ -290,7 +292,7 @@ public:
             for (InstanceID i = 1; i<query->getInstancesCount(); ++i)
             {
                 /* Blocking receive. */
-                shared_ptr<SharedBuffer> buf = BufReceive(i, query);
+                std::shared_ptr<SharedBuffer> buf = BufReceive(i, query);
                 Stats otherInstanceStats(buf);
                 /* add data to myStats */
                 myStats.merge(otherInstanceStats);
@@ -302,10 +304,10 @@ public:
          */
     }
 
-    shared_ptr<Array> execute(vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         InstanceStatsSettings settings(_parameters, false, query);
-        shared_ptr<Array> inputArray = inputArrays[0];
+        std::shared_ptr<Array> inputArray = inputArrays[0];
         if ( settings.dumpDataToLog())
         {
             /* Most arrays in the system allow the user to iterate over them multiple times, and in arbitrary order.
@@ -330,7 +332,7 @@ public:
             else
             {
                 /* Just return an empty array if I am not instance 0*/
-                return shared_ptr<Array>(new MemArray(_schema, query));
+                return std::shared_ptr<Array>(new MemArray(_schema, query));
             }
         }
         else

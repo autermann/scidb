@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -259,7 +259,7 @@ void PersistentChunk::allocate(size_t size)
 void PersistentChunk::reallocate(size_t size)
 {
     assert(size>0);
-    void* tmp = ::realloc(_data, size);
+    void* tmp = arena::realloc(_data, size);
     if (!tmp) {
         throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_REALLOCATE_MEMORY);
     }
@@ -270,7 +270,7 @@ void PersistentChunk::reallocate(size_t size)
 void PersistentChunk::free()
 {
     if (isDebug() && _data) { memset(_data,0,_hdr.size); }
-    ::free(_data);
+    arena::free(_data);
     _data = NULL;
 }
 

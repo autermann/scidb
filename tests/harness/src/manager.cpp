@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -122,18 +122,18 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 			/* rename all the files with extra extension .bak */
 			if (Is_regular (ie.actual_rfile))
 			{
-				bfs::remove (actualrfile_backup);	
-				bfs::rename (ie.actual_rfile, actualrfile_backup);	
+				bfs::remove (actualrfile_backup);
+				bfs::rename (ie.actual_rfile, actualrfile_backup);
 			}
 			if (Is_regular (ie.diff_file))
 			{
-				bfs::remove (difffile_backup);	
-				bfs::rename (ie.diff_file, difffile_backup);	
+				bfs::remove (difffile_backup);
+				bfs::rename (ie.diff_file, difffile_backup);
 			}
 			if (Is_regular (ie.log_file))
 			{
-				bfs::remove (logfile_backup);	
-				bfs::rename (ie.log_file, logfile_backup);	
+				bfs::remove (logfile_backup);
+				bfs::rename (ie.log_file, logfile_backup);
 			}
 		}
 		else
@@ -142,9 +142,9 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 			bfs::remove (ie.actual_rfile);
 			bfs::remove (ie.diff_file);
 			bfs::remove (ie.log_file);
-			bfs::remove (actualrfile_backup);	
-			bfs::remove (difffile_backup);	
-			bfs::remove (logfile_backup);	
+			bfs::remove (actualrfile_backup);
+			bfs::remove (difffile_backup);
+			bfs::remove (logfile_backup);
 		}
 
 		if ((caseexecutor = f.getExecutor (g_executor_type)) == NULL)
@@ -375,7 +375,7 @@ static void worker_function (void)
 	{
 		/* wait for the new job */
 		{
-			communication_var_mutex.lock();	
+			communication_var_mutex.lock();
 			{
 				boost::unique_lock<boost::mutex> lock(mut);
 				while (!command_from_manager)
@@ -397,17 +397,17 @@ static void worker_function (void)
 			{
                 LOG4CXX_DEBUG (logger, "Got terminate_on_failure notification. Returning.");
 				LOGGER_POP_NDCTAG;
-				communication_var_mutex.unlock();	
+				communication_var_mutex.unlock();
 				return;
 			}
 			else if (whole_job_completed == 1)
 			{
                 LOG4CXX_DEBUG (logger, "Got whole_job_completed notification. Returning.");
 				LOGGER_POP_NDCTAG;
-				communication_var_mutex.unlock();	
+				communication_var_mutex.unlock();
 				return;
 			}
-			communication_var_mutex.unlock();	
+			communication_var_mutex.unlock();
 		}
 
 		/* read the new job */
@@ -492,10 +492,10 @@ void MANAGER :: cleanup (void)
 	LogString saved_context;
 	LOGGER_PUSH_NDCTAG (LOGGER_TAG_MANAGER);
 
-	LOG4CXX_INFO (_logger, "Cleaning up by joining all the workers."); 
+	LOG4CXX_INFO (_logger, "Cleaning up by joining all the workers.");
 	if (_nWorkers <= 0)
 	{
-		LOG4CXX_INFO (_logger, "There are no workers in the pool. Hence no cleanup is required. Returning..."); 
+		LOG4CXX_INFO (_logger, "There are no workers in the pool. Hence no cleanup is required. Returning...");
 		LOGGER_POP_NDCTAG;
 		return;
 	}
@@ -694,10 +694,10 @@ void MANAGER :: createWorkgroup (int number_of_workers)
     LogString saved_context;
 	LOGGER_PUSH_NDCTAG (LOGGER_TAG_MANAGER);
 
-	LOG4CXX_INFO (_logger, "Creating a pool of " << number_of_workers << " worker(s)."); 
+	LOG4CXX_INFO (_logger, "Creating a pool of " << number_of_workers << " worker(s).");
 	if (_nWorkers > 0)
 	{
-		LOG4CXX_INFO (_logger, "Worker pool is already created with " << _nWorkers << " worker(s). Returning..."); 
+		LOG4CXX_INFO (_logger, "Worker pool is already created with " << _nWorkers << " worker(s). Returning...");
 		LOGGER_POP_NDCTAG;
 		return;
 	}
@@ -707,7 +707,7 @@ void MANAGER :: createWorkgroup (int number_of_workers)
 	{
 		_G.create_thread (worker_function);
 	}
-	LOG4CXX_INFO (_logger, "Created a pool of " << _nWorkers << " worker(s)."); 
+	LOG4CXX_INFO (_logger, "Created a pool of " << _nWorkers << " worker(s).");
 	LOGGER_POP_NDCTAG;
 }
 
@@ -726,6 +726,8 @@ void MANAGER :: getInfoForExecutorFromharness (const HarnessCommandLineOptions &
     _ie.selftesting        = c.selfTesting;
     _ie.log_queries        = c.log_queries;
     _ie.save_failures      = c.save_failures;
+    _ie.userName           = c.userName;
+    _ie.userPassword       = c.userPassword;
     _terminateOnFailure    = c.terminateOnFailure;
     _executorType          = executor_type;
 }

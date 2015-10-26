@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -19,7 +19,7 @@
 *
 * END_COPYRIGHT
 */
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/numeric/conversion/cast.hpp>
 #include <log4cxx/logger.h>
 
@@ -62,7 +62,7 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_line
 // eh.reset();
 // query->setOperatorContext(ctx);
 // membership check
-// getInstallPath(membership, query); 
+// getInstallPath(membership, query);
 // new MpiSlaveProxy(...)
 // ctx->setSlave()
 // new MpiLauncher()
@@ -71,8 +71,8 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.libdense_line
 // slave->waitForHandshae(ctx);
 // cleanup oldSlave
 void pdgesvdMaster(Query* query,  // or do I need only the ctx?
-                   boost::shared_ptr<MpiOperatorContext>& ctx, // query->getOperatorCtxt returns superclass
-                   boost::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
+                   std::shared_ptr<MpiOperatorContext>& ctx, // query->getOperatorCtxt returns superclass
+                   std::shared_ptr<MpiSlaveProxy>& slave,  // need ctx->getSlave();
                    const string& ipcName, // can this be in the ctx too?
                    void*  argsBuf,
                    const slpp::int_t& NPROW, const slpp::int_t& NPCOL,
@@ -80,14 +80,14 @@ void pdgesvdMaster(Query* query,  // or do I need only the ctx?
                    const char &jobU, const char &jobVT,
                    const slpp::int_t& M, const slpp::int_t &N,
                    double* A, const slpp::int_t& IA, const slpp::int_t& JA, const slpp::desc_t& DESC_A,
-                   double* S, 
+                   double* S,
                    double* U,  const slpp::int_t& IU,  const slpp::int_t& JU,  const slpp::desc_t& DESC_U,
                    double* VT, const slpp::int_t& IVT, const slpp::int_t& JVT, const slpp::desc_t& DESC_VT,
                    slpp::int_t& INFO)
 {
     enum dummy { DBG=0 };
     static const char ARG_NUM_SHM_BUFFERS[] = "5";  // ARGS + A, S, U, and VT
-    INFO = 1 ; 
+    INFO = 1 ;
 
     pdgesvdMarshallArgs(argsBuf, NPROW,  NPCOL, MYPROW, MYPCOL, MYPNUM,
                                  jobU, jobVT, M, N,

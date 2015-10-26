@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -68,6 +68,7 @@ bool Thread::isStarted()
     ScopedMutexLock lock(_threadPool._mutex);
     return _isStarted;
 }
+
 void Thread::start()
 {
     ScopedMutexLock lock(_threadPool._mutex);
@@ -124,7 +125,7 @@ void* Thread::threadFunction(void* arg)	// static member
 void Thread::_threadFunction()
 {
     // pin the semaphore
-    boost::shared_ptr<Semaphore> sem(_threadPool._terminatedThreads);
+    std::shared_ptr<Semaphore> sem(_threadPool._terminatedThreads);
     ThreadPool* tp = &_threadPool;
 
     LOG4CXX_TRACE(logger, "Thread::threadFunction: begin tid = "
@@ -134,7 +135,7 @@ void Thread::_threadFunction()
     {
         try
         {
-            boost::shared_ptr<Job> job = _threadPool.getQueue()->popJob();
+            std::shared_ptr<Job> job = _threadPool.getQueue()->popJob();
             {
                 ScopedMutexLock lock(_threadPool._mutex);
                 if (_threadPool._shutdown) {

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,24 +32,23 @@
  * Maybe useful for debugging and embedding scidb into users applications.
  */
 
-#include "stdlib.h"
+#include <stdlib.h>
 #include <string>
-#include "boost/shared_ptr.hpp"
-#include "boost/make_shared.hpp"
-#include "boost/bind.hpp"
-#include "log4cxx/logger.h"
+#include <memory>
+#include <boost/bind.hpp>
+#include <log4cxx/logger.h>
+
+#include <network/Connection.h>
+#include <array/StreamArray.h>
+#include <system/Exceptions.h>
+#include <query/QueryProcessor.h>
+#include <query/Serialize.h>
+#include <network/NetworkManager.h>
+#include <network/MessageUtils.h>
+#include <system/Cluster.h>
+#include <util/RWLock.h>
 
 #include "SciDBAPI.h"
-#include "network/Connection.h"
-#include "array/StreamArray.h"
-#include "system/Exceptions.h"
-#include "query/QueryProcessor.h"
-#include "query/Serialize.h"
-#include "network/NetworkManager.h"
-#include "network/MessageUtils.h"
-#include "system/Cluster.h"
-#include "util/RWLock.h"
-
 
 using namespace std;
 using namespace boost;
@@ -66,17 +65,36 @@ class SciDBExecutor: public scidb::SciDB
 {
     public:
     virtual ~SciDBExecutor() {}
-    void* connect(const std::string& connectionString, uint16_t port) const {
-        // Not needed to implement in engine
-        assert(false);
+
+    virtual void* connect(
+        const std::string & userName,
+        const std::string & userPassword,
+        const std::string & connectionString,
+        uint16_t port) const
+    {
+        ASSERT_EXCEPTION_FALSE(
+            "connect - not needed, to implement in engine");
 
         // Shutting down warning
         return NULL;
     }
 
-    void disconnect(void* connection = NULL) const {
-        // Not needed to implement in engine
-        assert(false);
+    virtual void* connect(
+        const std::string& connectionString,
+        uint16_t port) const
+    {
+        ASSERT_EXCEPTION_FALSE(
+            "connect - not needed, to implement in engine");
+
+        // Shutting down warning
+        return NULL;
+    }
+
+    void disconnect(void* connection = NULL) const
+    {
+        ASSERT_EXCEPTION(
+            false,
+            "disconnect - not needed, to implement in engine");
     }
 
     void fillUsedPlugins(const ArrayDesc& desc, vector<string>& plugins) const
@@ -94,6 +112,8 @@ class SciDBExecutor: public scidb::SciDB
                       QueryResult& queryResult,
                       void* connection) const
     {
+        ASSERT_EXCEPTION(connection, "NULL connection");
+
         // Parsing query string
         if (Query::getQueryByID(queryResult.queryID, false)) {
             assert(false);
@@ -106,19 +126,28 @@ class SciDBExecutor: public scidb::SciDB
             throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_QUERY_TOO_BIG) << querySize << maxSize;
         }
 
-        shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
-        boost::shared_ptr<Query> query = queryProcessor->createQuery(queryString, queryResult.queryID);
-        assert(queryResult.queryID == query->getQueryID());
+        std::shared_ptr<Connection> &scidb_connection =
+            *reinterpret_cast<std::shared_ptr<Connection> *>(connection);
+        ASSERT_EXCEPTION(scidb_connection.get()!=nullptr, "NULL scidb_connection");
+
+        std::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+        std::shared_ptr<Query> query = queryProcessor->createQuery(
+            queryString,
+            queryResult.queryID,
+            scidb_connection->getSession());
+        ASSERT_EXCEPTION(
+            queryResult.queryID == query->getQueryID(),
+            "queryResult.queryID == query->getQueryID()");
+
+
         StatisticsScope sScope(&query->statistics);
         LOG4CXX_DEBUG(logger, "Parsing query(" << query->getQueryID() << "): " << queryString << "");
 
+
         try {
             prepareQueryBeforeLocking(query, queryProcessor, afl, programOptions);
-
             query->acquireLocks(); //can throw "try-again", i.e. SystemCatalog::LockBusyException
-
             prepareQueryAfterLocking(query, queryProcessor, afl, queryResult);
-
         } catch (const scidb::SystemCatalog::LockBusyException& e) {
             e.raise();
 
@@ -134,7 +163,7 @@ class SciDBExecutor: public scidb::SciDB
                                  const std::string& programOptions,
                                  QueryResult& queryResult) const
     {
-        boost::shared_ptr<Query>  query = Query::getQueryByID(queryResult.queryID);
+        std::shared_ptr<Query>  query = Query::getQueryByID(queryResult.queryID);
 
         assert(queryResult.queryID == query->getQueryID());
         StatisticsScope sScope(&query->statistics);
@@ -142,7 +171,7 @@ class SciDBExecutor: public scidb::SciDB
 
             query->retryAcquireLocks();  //can throw "try-again", i.e. SystemCatalog::LockBusyException
 
-            shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+            std::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
 
             prepareQueryAfterLocking(query, queryProcessor, afl, queryResult);
 
@@ -156,8 +185,8 @@ class SciDBExecutor: public scidb::SciDB
         LOG4CXX_DEBUG(logger, "Prepared query(" << query->getQueryID() << "): " << queryString << "");
    }
 
-    void prepareQueryBeforeLocking(boost::shared_ptr<Query>& query,
-                                   boost::shared_ptr<QueryProcessor>& queryProcessor,
+    void prepareQueryBeforeLocking(std::shared_ptr<Query>& query,
+                                   std::shared_ptr<QueryProcessor>& queryProcessor,
                                    bool afl,
                                    const std::string& programOptions) const
     {
@@ -171,8 +200,8 @@ class SciDBExecutor: public scidb::SciDB
        queryProcessor->inferArrayAccess(query);
    }
 
-    void prepareQueryAfterLocking(boost::shared_ptr<Query>& query,
-                                  boost::shared_ptr<QueryProcessor>& queryProcessor,
+    void prepareQueryAfterLocking(std::shared_ptr<Query>& query,
+                                  std::shared_ptr<QueryProcessor>& queryProcessor,
                                   bool afl,
                                   QueryResult& queryResult) const
     {
@@ -203,8 +232,8 @@ class SciDBExecutor: public scidb::SciDB
         assert(queryResult.queryID>0);
 
         // Executing query string
-        boost::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
-        boost::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
+        std::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
+        std::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
 
         assert(query->getQueryID() == queryResult.queryID);
         StatisticsScope sScope(&query->statistics);
@@ -216,7 +245,7 @@ class SciDBExecutor: public scidb::SciDB
         query->logicalPlan->toString(planString);
         queryResult.explainLogical = planString.str();
         // Note: Optimization will be performed while execution
-        boost::shared_ptr<Optimizer> optimizer =  Optimizer::create();
+        std::shared_ptr<Optimizer> optimizer =  Optimizer::create();
         bool isDdl = true;
         try {
             query->start();
@@ -247,19 +276,21 @@ class SciDBExecutor: public scidb::SciDB
 
                     // Serialize physical plan and sending it out
                     const string physicalPlan = serializePhysicalPlan(query->getCurrentPhysicalPlan());
-                    LOG4CXX_DEBUG(logger, "Query is serialized: " << planString.str());
-                    boost::shared_ptr<MessageDesc> preparePhysicalPlanMsg = boost::make_shared<MessageDesc>(mtPreparePhysicalPlan);
-                    boost::shared_ptr<scidb_msg::PhysicalPlan> preparePhysicalPlanRecord =
+                    LOG4CXX_DEBUG(logger, "The query plan is: " << planString.str());
+                    LOG4CXX_DEBUG(logger, "The serialized form of the physical plan: queryID="
+                                  << queryResult.queryID << ", physicalPlan='" << physicalPlan << "'");
+                    std::shared_ptr<MessageDesc> preparePhysicalPlanMsg = std::make_shared<MessageDesc>(mtPreparePhysicalPlan);
+                    std::shared_ptr<scidb_msg::PhysicalPlan> preparePhysicalPlanRecord =
                         preparePhysicalPlanMsg->getRecord<scidb_msg::PhysicalPlan>();
                     preparePhysicalPlanMsg->setQueryID(query->getQueryID());
                     preparePhysicalPlanRecord->set_physical_plan(physicalPlan);
-                    boost::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
+                    std::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
                     serializeQueryLiveness(queryLiveness, preparePhysicalPlanRecord);
 
-                    uint32_t redundancy = Config::getInstance()->getOption<int>(CONFIG_REDUNDANCY);
+                    size_t redundancy = Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY);
                     Cluster* cluster = Cluster::getInstance();
                     assert(cluster);
-                    shared_ptr<const InstanceMembership> membership(cluster->getInstanceMembership());
+                    std::shared_ptr<const InstanceMembership> membership(cluster->getInstanceMembership());
                     assert(membership);
                     if ((membership->getViewId() != queryLiveness->getViewId()) ||
                         ((instancesCount + redundancy) < membership->getInstances().size())) {
@@ -303,7 +334,7 @@ class SciDBExecutor: public scidb::SciDB
         queryResult.queryID = query->getQueryID();
         queryResult.executionTime = query->statistics.executionTime;
         queryResult.explainPhysical = query->statistics.explainPhysical;
-        queryResult.selective = query->getCurrentResultArray();
+        queryResult.selective = query->getCurrentResultArray().get()!=nullptr;
         if (queryResult.selective) {
             queryResult.array = query->getCurrentResultArray();
         }
@@ -313,7 +344,7 @@ class SciDBExecutor: public scidb::SciDB
     void cancelQuery(QueryID queryID, void* connection) const
     {
         LOG4CXX_TRACE(logger, "Cancelling query " << queryID)
-        boost::shared_ptr<Query> query = Query::getQueryByID(queryID);
+        std::shared_ptr<Query> query = Query::getQueryByID(queryID);
 
         StatisticsScope sScope(&query->statistics);
 
@@ -323,11 +354,20 @@ class SciDBExecutor: public scidb::SciDB
     void completeQuery(QueryID queryID, void* connection) const
     {
         LOG4CXX_TRACE(logger, "Completing query " << queryID)
-        boost::shared_ptr<Query> query = Query::getQueryByID(queryID);
+        std::shared_ptr<Query> query = Query::getQueryByID(queryID);
 
         StatisticsScope sScope(&query->statistics);
 
         query->handleComplete();
+    }
+
+    virtual void newClientStart(
+        void*                   connection,
+        const std::string &     name,
+        const std::string &     password) const
+    {
+        ASSERT_EXCEPTION_FALSE(
+            "newClientStart - not needed, to implement in engine");
     }
 
 } _sciDBExecutor;

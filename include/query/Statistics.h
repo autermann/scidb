@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 #include <string>
 #include <stdint.h>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 namespace scidb
 {
@@ -119,17 +119,20 @@ protected:
  */
 class Query;
 
-const size_t smLogger = 1; /**< Output into postgres database. String in create is logger name. */
-const size_t smPostgres = 2; /**< Output into postgres database. String in create is connection string. */
+/// Output into postgres database. String in create is logger name.
+const size_t smLogger = 1;
+
+/// Output into postgres database. String in create is connection string.
+const size_t smPostgres = 2;
 
 class StatisticsMonitor
 {
 public:
     virtual ~StatisticsMonitor() {}
     virtual void pushStatistics(const Query& query) = 0;
-    static boost::shared_ptr<StatisticsMonitor> create(size_t type, const std::string& params = "");
+    static std::shared_ptr<StatisticsMonitor> create(size_t type, const std::string& params = "");
 };
 
-}
+} // namespace
 
 #endif

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,8 +27,7 @@
  */
 
 #include <deque>
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include "query/Operator.h"
 
 namespace scidb
@@ -42,7 +41,7 @@ struct AggregatedValue
 
     Coordinate coord;
     uint32_t instanceId;
-    vector<Value> vals;
+    std::vector<Value> vals;
 };
 
 class WindowEdge
@@ -71,7 +70,7 @@ public:
         return _valueCoords.size();
     }
 
-    inline void clearCoords() 
+    inline void clearCoords()
     {
         _valueCoords.clear();
         _instanceIDs.clear();
@@ -121,7 +120,7 @@ public:
         }
     }
 
-    inline void addLeftEdge(shared_ptr<WindowEdge> const& leftEdge)
+    inline void addLeftEdge(std::shared_ptr<WindowEdge> const& leftEdge)
     {
         assert(leftEdge.get());
         if (_valueCoords.size())
@@ -138,12 +137,12 @@ public:
         _instanceIDs.insert(_instanceIDs.end(), leftEdge->_instanceIDs.begin(), leftEdge->_instanceIDs.end());
 
     }
- 
-    inline shared_ptr<WindowEdge> split(size_t nPreceding, size_t nFollowing)
+
+    inline std::shared_ptr<WindowEdge> split(size_t nPreceding, size_t nFollowing)
     {
         assert(_instanceIDs.size() == _valueCoords.size() && _values.size()>=_valueCoords.size() && _values.size() == nPreceding + nFollowing);
 
-        shared_ptr<WindowEdge> newEdge ( new WindowEdge());
+        std::shared_ptr<WindowEdge> newEdge ( new WindowEdge());
         newEdge->_values.assign(_values.begin(), _values.end());
         newEdge->_valueCoords.assign(_valueCoords.begin() + nPreceding, _valueCoords.end());
         newEdge->_instanceIDs.assign(_instanceIDs.begin() + nPreceding, _instanceIDs.end());
@@ -169,7 +168,7 @@ public:
         return newEdge;
     }
 
-    inline boost::shared_ptr<AggregatedValue> churn (size_t numPreceding, size_t numFollowing, vector<AggregatePtr> const& aggs)
+    inline std::shared_ptr<AggregatedValue> churn (size_t numPreceding, size_t numFollowing, std::vector<AggregatePtr> const& aggs)
     {
         assert(_instanceIDs.size() > 0 && _instanceIDs.size() == _valueCoords.size() && _values.size()>=_valueCoords.size());
         if(_instanceIDs.size() == 0 || _valueCoords.size()==0 || _values.size() == 0 || _instanceIDs.size() != _valueCoords.size())
@@ -177,7 +176,7 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Incorrect churn call";
         }
 
-        boost::shared_ptr<AggregatedValue> result (new AggregatedValue(_valueCoords.front(), _instanceIDs.front(), aggs.size()));
+        std::shared_ptr<AggregatedValue> result (new AggregatedValue(_valueCoords.front(), _instanceIDs.front(), aggs.size()));
         size_t currentPreceding = (size_t) std::max<int64_t>( (int64_t) (_values.size() - _numFollowing - 1), 0);
         assert(currentPreceding <= numPreceding); //yes; otherwise the result won't be centered around the right coordinate
         size_t windowSize = currentPreceding + std::min<size_t>((size_t)_numFollowing, numFollowing) + 1;
@@ -191,7 +190,7 @@ public:
 //        }
 //        iter.flush();
 //RIDICULOUS:
-//        boost::scoped_ptr<RLEPayload>payload(iter.getPayload());
+//        std::unique_ptr<RLEPayload>payload(iter.getPayload());
 //        agg->accumulateIfNeeded(state, payload.get());
 //        payload.reset();
 
@@ -405,7 +404,7 @@ public:
     }
 };
 
-class ChunkEdge : public unordered_map< Coordinates, shared_ptr<WindowEdge> >
+class ChunkEdge : public std::unordered_map< Coordinates, std::shared_ptr<WindowEdge>, CoordinatesHash >
 {
     friend std::ostream& operator<<(std::ostream& stream, const ChunkEdge& edge)
     {
@@ -413,7 +412,7 @@ class ChunkEdge : public unordered_map< Coordinates, shared_ptr<WindowEdge> >
         while (iter!= edge.end())
         {
             Coordinates const& coords = iter->first;
-            shared_ptr<WindowEdge> const& edge = iter->second;
+            std::shared_ptr<WindowEdge> const& edge = iter->second;
             stream<<CoordsToStr(coords)<<":"<<(*edge)<<"; ";
             iter++;
         }
@@ -437,8 +436,8 @@ public:
             {
                 return false;
             }
-            shared_ptr<WindowEdge> const& edge = iter->second;
-            shared_ptr<WindowEdge> const& other_edge = iter2->second;
+            std::shared_ptr<WindowEdge> const& edge = iter->second;
+            std::shared_ptr<WindowEdge> const& other_edge = iter2->second;
             if((edge.get() && !other_edge.get()) || (!edge.get() && other_edge.get()))
             {
                 return false;
@@ -459,17 +458,21 @@ public:
 
 };
 
+typedef std::unordered_map<Coordinates, std::shared_ptr<ChunkEdge>, CoordinatesHash> Coords2ChunkEdge;
+typedef std::unordered_map <Coordinates, std::vector<Value>, CoordinatesHash> Coords2ValueVector;
+typedef std::unordered_map<Coordinates, std::shared_ptr<Coords2ValueVector>, CoordinatesHash> Coords2Coords2ValueVector;
+
 struct VariableWindowMessage
 {
-    unordered_map<Coordinates, shared_ptr<ChunkEdge> > _chunkEdges;
-    unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > > _computedValues;
+    Coords2ChunkEdge _chunkEdges;
+    Coords2Coords2ValueVector _computedValues;
 
-    void addValues(Coordinates const& chunkPos, Coordinates const& valuePos, vector<Value> const& v)
+    void addValues(Coordinates const& chunkPos, Coordinates const& valuePos, std::vector<Value> const& v)
     {
-        shared_ptr< unordered_map<Coordinates, vector<Value> > >& mp = _computedValues[chunkPos];
+        std::shared_ptr< Coords2ValueVector >& mp = _computedValues[chunkPos];
         if(mp.get()==0)
         {
-            mp.reset(new unordered_map <Coordinates, vector<Value> > ());
+            mp.reset(new Coords2ValueVector());
         }
         assert(mp->count(valuePos)==0);
         (*mp)[valuePos] = v;
@@ -478,26 +481,26 @@ struct VariableWindowMessage
     friend std::ostream& operator<<(std::ostream& stream, const VariableWindowMessage& message)
     {
         stream<<"Chunk Edges: "<<message._chunkEdges.size()<<"\n";
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> >::const_iterator iter = message._chunkEdges.begin();
+        Coords2ChunkEdge::const_iterator iter = message._chunkEdges.begin();
         while(iter!= message._chunkEdges.end())
         {
             Coordinates const& coords = iter->first;
-            shared_ptr<ChunkEdge> const& edge = iter->second;
+            std::shared_ptr<ChunkEdge> const& edge = iter->second;
             stream<<"   "<<CoordsToStr(coords)<<": "<<(*edge)<<"\n";
             iter++;
         }
         stream<<"Computed Value Chunks: "<<message._computedValues.size()<<"\n";
-        unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > >::const_iterator iter2 = message._computedValues.begin();
+        Coords2Coords2ValueVector::const_iterator iter2 = message._computedValues.begin();
         while(iter2 != message._computedValues.end())
         {
             Coordinates const& coords = iter2->first;
             stream<<"   "<<CoordsToStr(coords)<<": ";
-            shared_ptr< unordered_map <Coordinates, vector<Value> > > const& valChunk = iter2->second;
-            unordered_map <Coordinates, vector<Value> >::const_iterator iter3 = valChunk->begin();
+            std::shared_ptr<Coords2ValueVector> const& valChunk = iter2->second;
+            Coords2ValueVector::const_iterator iter3 = valChunk->begin();
             while(iter3!=valChunk->end())
             {
                 Coordinates const& coords2 = iter3->first;
-                vector<Value> const& vals = iter3->second;
+                std::vector<Value> const& vals = iter3->second;
                 stream<<CoordsToStr(coords2)<<":{";
                 for(size_t j=0; j<vals.size(); j++)
                 {
@@ -529,36 +532,36 @@ struct VariableWindowMessage
     {
         //nChunkEdges, nValueChunks
         size_t totalSize = 2*sizeof(size_t);
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> >::const_iterator iter = _chunkEdges.begin();
+        Coords2ChunkEdge::const_iterator iter = _chunkEdges.begin();
         while(iter!=_chunkEdges.end())
         {
             //chunk edge coordinates + nWindowEdges
             totalSize+= nDims*sizeof(Coordinate) + sizeof(size_t);
-            shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
+            std::shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
             ChunkEdge::iterator innerIter = chunkEdge->begin();
             while(innerIter!=chunkEdge->end())
             {
                 //window edge coordinates
                 totalSize+= nDims*sizeof(Coordinate);
-                shared_ptr<WindowEdge> const& windowEdge = innerIter->second;
+                std::shared_ptr<WindowEdge> const& windowEdge = innerIter->second;
                 //window edge size
                 totalSize+= windowEdge->getBinarySize();
                 innerIter++;
             }
             iter++;
         }
-        unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > >::const_iterator iter2 = _computedValues.begin();
+        Coords2Coords2ValueVector::const_iterator iter2 = _computedValues.begin();
         while(iter2!=_computedValues.end())
         {
             //value chunk coordinates + nValues
             totalSize+= nDims*sizeof(Coordinate)+ sizeof(size_t);
 
-            shared_ptr <unordered_map<Coordinates, vector<Value> > >const& innerMap = iter2->second;
-            unordered_map<Coordinates, vector<Value> >::iterator innerIter = innerMap->begin();
+            std::shared_ptr <Coords2ValueVector>const& innerMap = iter2->second;
+            Coords2ValueVector::iterator innerIter = innerMap->begin();
             while(innerIter != innerMap->end())
             {
                 //valueCoords + VALSIZE or VALMC
-                vector<Value> const& v = innerIter->second;
+                std::vector<Value> const& v = innerIter->second;
                 assert(v.size() == nAggs);
                 totalSize += nDims*sizeof(Coordinate) + sizeof(int64_t)*nAggs;
                 for(size_t i =0; i<nAggs; i++)
@@ -581,8 +584,8 @@ struct VariableWindowMessage
         {
             return false;
         }
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> >::const_iterator iter = _chunkEdges.begin();
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> >::const_iterator oiter;
+        Coords2ChunkEdge::const_iterator iter = _chunkEdges.begin();
+        Coords2ChunkEdge::const_iterator oiter;
         while(iter!=_chunkEdges.end())
         {
             Coordinates const& chunkCoords = iter->first;
@@ -591,8 +594,8 @@ struct VariableWindowMessage
             {
                 return false;
             }
-            shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
-            shared_ptr<ChunkEdge> const& oChunkEdge = oiter->second;
+            std::shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
+            std::shared_ptr<ChunkEdge> const& oChunkEdge = oiter->second;
             if ((chunkEdge.get() && !oChunkEdge.get()) || (!chunkEdge.get() && oChunkEdge.get()))
             {
                 return false;
@@ -603,8 +606,8 @@ struct VariableWindowMessage
             }
             iter++;
         }
-        unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > >::const_iterator iter2 = _computedValues.begin();
-        unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > >::const_iterator oiter2;
+        Coords2Coords2ValueVector::const_iterator iter2 = _computedValues.begin();
+        Coords2Coords2ValueVector::const_iterator oiter2;
         while(iter2 != _computedValues.end())
         {
             Coordinates const& coords = iter2->first;
@@ -613,16 +616,16 @@ struct VariableWindowMessage
             {
                 return false;
             }
-            shared_ptr< unordered_map<Coordinates, vector<Value> > > const& valMap = iter2->second;
-            shared_ptr< unordered_map<Coordinates, vector<Value> > > const& oValMap = oiter2->second;
+            std::shared_ptr<Coords2ValueVector> const& valMap = iter2->second;
+            std::shared_ptr< Coords2ValueVector> const& oValMap = oiter2->second;
             if ((valMap.get() && !oValMap.get()) || (!valMap.get() && oValMap.get()) )
             {
                 return false;
             }
             if (valMap.get())
             {
-                unordered_map<Coordinates, vector<Value> >::const_iterator iter3 = valMap->begin();
-                unordered_map<Coordinates, vector<Value> >::const_iterator oiter3;
+                Coords2ValueVector::const_iterator iter3 = valMap->begin();
+                Coords2ValueVector::const_iterator oiter3;
                 while(iter3!=valMap->end())
                 {
                     Coordinates const& coords = iter3->first;
@@ -632,8 +635,8 @@ struct VariableWindowMessage
                         return false;
                     }
 
-                    vector<Value> const& v = iter3->second;
-                    vector<Value> const& v2 = oiter3->second;
+                    std::vector<Value> const& v = iter3->second;
+                    std::vector<Value> const& v2 = oiter3->second;
                     if(v.size()!=v2.size())
                     {
                         return false;
@@ -668,7 +671,7 @@ struct VariableWindowMessage
         *sizePtr = _chunkEdges.size();
         Coordinate* coordPtr = (Coordinate*) (sizePtr+1);
 
-        unordered_map<Coordinates, shared_ptr<ChunkEdge> >::const_iterator iter = _chunkEdges.begin();
+        Coords2ChunkEdge::const_iterator iter = _chunkEdges.begin();
         while(iter!=_chunkEdges.end())
         {
             Coordinates const& chunkCoords = iter->first;
@@ -679,7 +682,7 @@ struct VariableWindowMessage
                 coordPtr++;
             }
 
-            shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
+            std::shared_ptr<ChunkEdge> const& chunkEdge = iter->second;
             size_t *edgeSizePtr = (size_t*) coordPtr;
             *edgeSizePtr = chunkEdge->size();
             coordPtr = (Coordinate*) (edgeSizePtr+1);
@@ -693,7 +696,7 @@ struct VariableWindowMessage
                     *coordPtr = edgeCoords[i];
                     coordPtr++;
                 }
-                shared_ptr<WindowEdge>const& windowEdge = innerIter->second;
+                std::shared_ptr<WindowEdge>const& windowEdge = innerIter->second;
                 coordPtr = (Coordinate*) windowEdge->marshall((char*) coordPtr);
                 innerIter++;
             }
@@ -703,7 +706,7 @@ struct VariableWindowMessage
         size_t* valuesCountPtr = (size_t*) coordPtr;
         *valuesCountPtr = _computedValues.size();
         coordPtr = (Coordinate*) (valuesCountPtr+1);
-        unordered_map<Coordinates, shared_ptr< unordered_map <Coordinates, vector<Value> > > >::const_iterator iter2 = _computedValues.begin();
+        Coords2Coords2ValueVector::const_iterator iter2 = _computedValues.begin();
         while(iter2!=_computedValues.end())
         {
             Coordinates const& chunkCoords = iter2->first;
@@ -714,10 +717,10 @@ struct VariableWindowMessage
                 coordPtr++;
             }
             size_t* nValuesPtr = (size_t*) coordPtr;
-            shared_ptr <unordered_map<Coordinates,vector<Value> > > const& innerMap = iter2->second;
+            std::shared_ptr <Coords2ValueVector> const& innerMap = iter2->second;
             *nValuesPtr = innerMap->size();
             coordPtr = (Coordinate*) (nValuesPtr+1);
-            unordered_map<Coordinates,vector<Value> >::const_iterator innerIter = innerMap->begin();
+            Coords2ValueVector::const_iterator innerIter = innerMap->begin();
             while(innerIter != innerMap->end())
             {
                 Coordinates const& coords = innerIter->first;
@@ -727,7 +730,7 @@ struct VariableWindowMessage
                     *coordPtr = coords[i];
                     coordPtr++;
                 }
-                vector<Value> const& v = innerIter->second;
+                std::vector<Value> const& v = innerIter->second;
                 assert(v.size() == nAggs);
 
                 for(size_t i =0; i<nAggs; i++)
@@ -771,7 +774,7 @@ struct VariableWindowMessage
                 coordPtr++;
             }
 
-            shared_ptr<ChunkEdge> &rce = _chunkEdges[chunkCoords];
+            std::shared_ptr<ChunkEdge> &rce = _chunkEdges[chunkCoords];
             if(rce.get()==0)
             {
                 rce.reset(new ChunkEdge());
@@ -787,7 +790,7 @@ struct VariableWindowMessage
                     windowEdgeCoords[k]=*coordPtr;
                     coordPtr++;
                 }
-                shared_ptr<WindowEdge> rwe(new WindowEdge());
+                std::shared_ptr<WindowEdge> rwe(new WindowEdge());
                 coordPtr = (Coordinate*) rwe->unMarshall((char*) coordPtr);
                 (*rce)[windowEdgeCoords] = rwe;
             }
@@ -803,10 +806,10 @@ struct VariableWindowMessage
                 chunkCoords[j]=*coordPtr;
                 coordPtr++;
             }
-            shared_ptr< unordered_map <Coordinates, vector<Value> > >& valueChunk = _computedValues[chunkCoords];
+            std::shared_ptr<Coords2ValueVector>& valueChunk = _computedValues[chunkCoords];
             if(valueChunk.get()==0)
             {
-                valueChunk.reset(new unordered_map<Coordinates, vector<Value> >());
+                valueChunk.reset(new Coords2ValueVector());
             }
             size_t *numValuesPtr = (size_t*) coordPtr;
             size_t numValues = *numValuesPtr;
@@ -856,7 +859,7 @@ void testRightEdge()
     AggregatePtr sa = al->createAggregate("sum", tDouble);
     CPPUNIT_ASSERT(sa.get() != 0);
 
-    vector<AggregatePtr> sum;
+    std::vector<AggregatePtr> sum;
     sum.push_back(sa);
 
     WindowEdge re;
@@ -875,7 +878,7 @@ void testRightEdge()
     CPPUNIT_ASSERT(re.getNumCoords()==1);
     CPPUNIT_ASSERT(re.getNumValues()==4);
 
-    boost::shared_ptr<AggregatedValue> p = re.churn(3, 0, sum);
+    std::shared_ptr<AggregatedValue> p = re.churn(3, 0, sum);
     CPPUNIT_ASSERT(p->coord==0 && p->instanceId==0 && p->vals[0].getDouble() == 6);
     CPPUNIT_ASSERT(re.getNumCoords()==0);
     CPPUNIT_ASSERT(re.getNumValues()==3);
@@ -905,8 +908,8 @@ void testRightEdge()
 
     while(re.getNumCoords())
     {
-        boost::shared_ptr<AggregatedValue> p1 = re.churn(4, 1, sum);
-        boost::shared_ptr<AggregatedValue> p2 = re2.churn(4, 1, sum);
+        std::shared_ptr<AggregatedValue> p1 = re.churn(4, 1, sum);
+        std::shared_ptr<AggregatedValue> p2 = re2.churn(4, 1, sum);
 
         CPPUNIT_ASSERT(p1->coord==p2->coord);
         CPPUNIT_ASSERT(p1->instanceId==p2->instanceId);
@@ -980,7 +983,7 @@ void testMessageMarshalling()
     size_t nDims = 3;
     grindAndCompare(message, nDims);
 
-    shared_ptr <ChunkEdge> chunkEdge0 (new ChunkEdge());
+    std::shared_ptr <ChunkEdge> chunkEdge0 (new ChunkEdge());
     Coordinates coords(nDims);
 
     coords[0]=0;
@@ -990,7 +993,7 @@ void testMessageMarshalling()
     Value val;
     val.setDouble(0.0);
 
-    shared_ptr<WindowEdge> windowEdge0 (new WindowEdge());
+    std::shared_ptr<WindowEdge> windowEdge0 (new WindowEdge());
     windowEdge0->addPreceding(val);
     val.setDouble(0.1);
     windowEdge0->addPreceding(val);
@@ -1004,7 +1007,7 @@ void testMessageMarshalling()
     (*chunkEdge0)[coords] = windowEdge0;
 
     coords[1]=1;
-    shared_ptr<WindowEdge> windowEdge1 (new WindowEdge());
+    std::shared_ptr<WindowEdge> windowEdge1 (new WindowEdge());
     val.setDouble(0.5);
     windowEdge1->addPreceding(val);
     (*chunkEdge0)[coords] = windowEdge1;
@@ -1013,8 +1016,8 @@ void testMessageMarshalling()
     message._chunkEdges[coords]=chunkEdge0;
     grindAndCompare(message, nDims);
 
-    shared_ptr <ChunkEdge> chunkEdge1 (new ChunkEdge());
-    shared_ptr<WindowEdge> windowEdge3 (new WindowEdge());
+    std::shared_ptr <ChunkEdge> chunkEdge1 (new ChunkEdge());
+    std::shared_ptr<WindowEdge> windowEdge3 (new WindowEdge());
     val.setDouble(0.6);
     windowEdge3->addCentral(val, 3, 0);
     coords[0]=3;
@@ -1028,9 +1031,9 @@ void testMessageMarshalling()
     coords[0]=0;
     coords[1]=0;
     coords[2]=0;
-    message._computedValues[coords] = shared_ptr<unordered_map<Coordinates, vector<Value> > > (new unordered_map<Coordinates, vector<Value> >());
+    message._computedValues[coords] = std::shared_ptr<Coords2ValueVector> (new Coords2ValueVector());
 
-    vector<Value> vals(1,val);
+    std::vector<Value> vals(1,val);
 
     (*message._computedValues[coords])[coords] = vals;
     grindAndCompare(message, nDims);
@@ -1039,7 +1042,7 @@ void testMessageMarshalling()
     vals[0].setNull();
     (*message._computedValues[coords])[coords2] = vals;
     grindAndCompare(message, nDims);
-    message._computedValues[coords2]= shared_ptr<unordered_map<Coordinates, vector<Value> > > (new unordered_map<Coordinates, vector<Value> >());
+    message._computedValues[coords2]= std::shared_ptr<Coords2ValueVector> (new Coords2ValueVector());
     vals[0].setDouble(3.4);
     (*message._computedValues[coords2])[coords2] = vals;
     grindAndCompare(message, nDims);

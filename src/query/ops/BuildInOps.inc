@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,7 +28,7 @@
  * @brief Brief declaration of macroses for built-in operators to simplify adding new operators
  *
  * Add new declaration following by existing examples and use the real class names
- * which implementing logical and physical operators.
+ * which implement the logical and physical operators.
  */
 
 // unfold
@@ -40,9 +40,6 @@ LOGICAL_BUILDIN_OPERATOR(LogicalCreateArray);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalCreateArray);
 LOGICAL_BUILDIN_OPERATOR(LogicalCreateArrayUsing);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalCreateArrayUsing);
-
-// Load
-LOGICAL_BUILDIN_OPERATOR(LogicalLoad);
 
 // Project
 LOGICAL_BUILDIN_OPERATOR(LogicalProject);
@@ -133,12 +130,6 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalSlice);
 // Sort
 LOGICAL_BUILDIN_OPERATOR(LogicalSort);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalSort);
-LOGICAL_BUILDIN_OPERATOR(LogicalOldSort);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalOldSort);
-
-// Sort
-LOGICAL_BUILDIN_OPERATOR(LogicalSort2);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalSort2);
 
 // List
 LOGICAL_BUILDIN_OPERATOR(LogicalList);
@@ -155,11 +146,6 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalDimensions);
 // Rename
 LOGICAL_BUILDIN_OPERATOR(LogicalRename);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalRename);
-
-
-// Concat
-LOGICAL_BUILDIN_OPERATOR(LogicalConcat);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalConcat);
 
 // Unpack
 LOGICAL_BUILDIN_OPERATOR(LogicalUnpack);
@@ -189,33 +175,21 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalRemoveVersions);
 LOGICAL_BUILDIN_OPERATOR(LogicalMerge);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalMerge);
 
-// Normalize
-LOGICAL_BUILDIN_OPERATOR(LogicalNormalize);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalNormalize);
-
 // Save
 LOGICAL_BUILDIN_OPERATOR(LogicalSave);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalSave);
+
+//Non-streaming Save
+LOGICAL_BUILDIN_OPERATOR(LogicalSaveOld);
+PHYSICAL_BUILDIN_OPERATOR(PhysicalSaveOld);
 
 // Xgrid
 LOGICAL_BUILDIN_OPERATOR(LogicalXgrid);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalXgrid);
 
-// Thin
-LOGICAL_BUILDIN_OPERATOR(LogicalThin);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalThin);
-
 // Help
 LOGICAL_BUILDIN_OPERATOR(LogicalHelp);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalHelp);
-
-// Lookup
-LOGICAL_BUILDIN_OPERATOR(LogicalLookup);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalLookup);
-
-// Reverse
-LOGICAL_BUILDIN_OPERATOR(LogicalReverse);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalReverse);
 
 // Input
 LOGICAL_BUILDIN_OPERATOR(LogicalInput);
@@ -229,10 +203,6 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalExplainPhysical);
 LOGICAL_BUILDIN_OPERATOR(LogicalVersions);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalVersions);
 
-// AllVersions
-LOGICAL_BUILDIN_OPERATOR(LogicalAllVersions);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalAllVersions);
-
 // ExplainLogical
 LOGICAL_BUILDIN_OPERATOR(LogicalExplainLogical);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalExplainLogical);
@@ -240,10 +210,6 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalExplainLogical);
 // UnLoadLibrary
 LOGICAL_BUILDIN_OPERATOR(LogicalUnLoadLibrary);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalUnLoadLibrary);
-
-// AttributeRename
-LOGICAL_BUILDIN_OPERATOR(LogicalAttributeRename);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalAttributeRename);
 
 // Bernoulli
 LOGICAL_BUILDIN_OPERATOR(LogicalBernoulli);
@@ -272,10 +238,6 @@ PHYSICAL_BUILDIN_OPERATOR(PhysicalMaterialize);
 //DiskInfo
 LOGICAL_BUILDIN_OPERATOR(LogicalDiskInfo);
 PHYSICAL_BUILDIN_OPERATOR(PhysicalDiskInfo);
-
-//Analyze
-LOGICAL_BUILDIN_OPERATOR(LogicalAnalyze);
-PHYSICAL_BUILDIN_OPERATOR(PhysicalAnalyze);
 
 // Rank-Quantile
 LOGICAL_BUILDIN_OPERATOR(LogicalRank);

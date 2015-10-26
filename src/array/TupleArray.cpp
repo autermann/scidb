@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -136,7 +136,7 @@ TupleComparator::TupleComparator(PointerRange<const SortingAttributeInfo> sortin
 //
 // TupleArray
 //
-void TupleArray::sort(shared_ptr<TupleComparator> tcomp)
+void TupleArray::sort(std::shared_ptr<TupleComparator> tcomp)
 {
     iqsort(&_tuples.front(), _tuples.size(), *tcomp);
 }
@@ -146,13 +146,13 @@ ArrayDesc const& TupleArray::getArrayDesc() const
     return _desc;
 }
 
-boost::shared_ptr<ConstArrayIterator> TupleArray::getConstIterator(AttributeID attId) const
+std::shared_ptr<ConstArrayIterator> TupleArray::getConstIterator(AttributeID attId) const
 {
     return make_shared<TupleArrayIterator>(*this, attId);
 }
 
-TupleArray::TupleArray(ArrayDesc const& schema, arena::ArenaPtr const& parentArena,Coordinate offset)
-          :   _arena(arena::newArena(arena::Options("TupleArrayValues").parent(parentArena).resetting(true))),
+TupleArray::TupleArray(ArrayDesc const& schema, ArenaPtr const& parentArena,Coordinate offset)
+          :   _arena(newArena(Options("TupleArrayValues").scoped(parentArena).threading(0))),
               _desc(schema),
               _start(schema.getDimensions()[0].getStartMin() + offset),
               _end(_start - 1),
@@ -164,14 +164,14 @@ TupleArray::TupleArray(ArrayDesc const& schema, arena::ArenaPtr const& parentAre
 }
 
 TupleArray::TupleArray(ArrayDesc const& outputSchema,
-                       vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators,
+                       PointerRange<std::shared_ptr<ConstArrayIterator> const> arrayIterators,
                        ArrayDesc const& inputSchema,
                        size_t nChunks,
                        size_t sizeHint,
                        size_t pageSize,
-                       arena::ArenaPtr const& parentArena,
+                       ArenaPtr const& parentArena,
                        bool preservePositions)
-    : _arena(arena::newArena(arena::Options("TupleArrayValues").parent(parentArena).resetting(true).pagesize(pageSize))),
+    : _arena(newArena(Options("TupleArrayValues").scoped(parentArena,pageSize).threading(0))),
       _desc(outputSchema),
       _start(_desc.getDimensions()[0].getStartMin()),
       _end(_desc.getDimensions()[0].getEndMax()),
@@ -183,7 +183,7 @@ TupleArray::TupleArray(ArrayDesc const& outputSchema,
     if (_desc.getDimensions().size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
     append(inputSchema, arrayIterators, nChunks);
-    if (_start == MIN_COORDINATE || _end == MAX_COORDINATE) {
+    if (_start == CoordinateBounds::getMin() || _end == CoordinateBounds::getMax()) {
         _start = 0;
         _end = _tuples.size()-1;
     } else if (Coordinate(_start + _tuples.size()) <= _end) {
@@ -213,7 +213,7 @@ void TupleArray::truncate()
                                oldDim.getStartMin() + _tuples.size() - 1,
                                oldDim.getChunkInterval(),
                                0);
-    _desc = ArrayDesc(_desc.getName(), _desc.getAttributes(), newDims);
+    _desc = ArrayDesc(_desc.getName(), _desc.getAttributes(), newDims, defaultPartitioning());
     _start = newDims[0].getStartMin();
     _end = newDims[0].getEndMax();
 }
@@ -234,19 +234,19 @@ size_t TupleArray::getTupleFootprint(Attributes const& attrs)
    return res + sizeof(Value*);
 }
 
-void TupleArray::append(boost::shared_ptr<Array> const& inputArray)
+void TupleArray::append(std::shared_ptr<Array> const& inputArray)
 {
     ArrayDesc const& inputSchema = inputArray->getArrayDesc();
     const bool excludingEmptyBitmap = true;
     const size_t nAttrs = inputSchema.getAttributes(excludingEmptyBitmap).size();
-    vector< boost::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
+    vector< std::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
     for (size_t i = 0; i < nAttrs; i++) {
         arrayIterators[i] = inputArray->getConstIterator(i);
     }
     append(inputArray->getArrayDesc(), arrayIterators, (size_t)-1);
 }
 
-void TupleArray::append(ArrayDesc const& inputSchema, vector< boost::shared_ptr<ConstArrayIterator> > const& arrayIterators, size_t nChunks)
+void TupleArray::append(ArrayDesc const& inputSchema, PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators, size_t nChunks)
 {
     size_t nAttrsOut = getTupleArity();
     size_t nAttrsIn = arrayIterators.size();
@@ -264,7 +264,7 @@ void TupleArray::append(ArrayDesc const& inputSchema, vector< boost::shared_ptr<
         attrKinds[i] = getAttributeKind(i);
     }
 
-    vector< boost::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrsIn);
+    vector< std::shared_ptr<ConstChunkIterator> > chunkIterators(nAttrsIn);
     Coordinates lows(inputSchema.getDimensions().size());
     Coordinates intervals(inputSchema.getDimensions().size());
 
@@ -438,9 +438,9 @@ Coordinates const& TupleChunk::getLastPosition(bool withOverlap) const
     return _lastPos;
 }
 
-boost::shared_ptr<ConstChunkIterator> TupleChunk::getConstIterator(int iterationMode) const
+std::shared_ptr<ConstChunkIterator> TupleChunk::getConstIterator(int iterationMode) const
 {
-    return boost::make_shared<TupleChunkIterator>(*this, iterationMode);
+    return std::make_shared<TupleChunkIterator>(*this, iterationMode);
 }
 
 TupleChunk::TupleChunk(TupleArray const& arr, AttributeID att)
@@ -451,19 +451,19 @@ TupleChunk::TupleChunk(TupleArray const& arr, AttributeID att)
 //
 // TupleChunkIterator
 //
-int TupleChunkIterator::getMode()
+int TupleChunkIterator::getMode() const
 {
     return _mode;
 }
 
-Value& TupleChunkIterator::getItem()
+Value const& TupleChunkIterator::getItem()
 {
     if (_i > _last)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);
     return _array._tuples[_i][_attrID];
 }
 
-bool TupleChunkIterator::isEmpty()
+bool TupleChunkIterator::isEmpty() const
 {
     if (_i > _last)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_CHUNK);

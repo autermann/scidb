@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
 /****************************************************************************/
 
 #include <util/Arena.h>                                  // For Arena
-#include "array/Array.h"                                 // For SharedBuffer
+#include <array/Array.h>                                 // For SharedBuffer
 
 /****************************************************************************/
 namespace scidb {
@@ -49,28 +49,28 @@ namespace scidb {
  */
 class AllocationBuffer : public SharedBuffer, boost::noncopyable
 {
- public:                   // Construction
+public:                   // Construction
                               AllocationBuffer(const arena::ArenaPtr& = arena::getArena());
                              ~AllocationBuffer();
 
- public:                   // Operations
+public:                   // Operations
     virtual void*             getData()            const;
     virtual size_t            getSize()            const;
     virtual bool              pin()                const;
     virtual void              unPin()              const;
 
- public:                   // Operations
+public:                   // Operations
     virtual void              allocate(size_t n);
     virtual void              free();
 
- private:                  // Representation
+private:                  // Representation
      arena::ArenaPtr    const _arena;                    // The allocating arena
             void*             _data;                     // The allocation
             size_t            _size;                     // Its size
 };
 
 /****************************************************************************/
-}
+} // namespace
 /****************************************************************************/
 
 inline void* operator new(size_t sz,scidb::SharedBuffer& ab)

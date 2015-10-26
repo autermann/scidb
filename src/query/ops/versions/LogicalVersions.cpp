@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -79,17 +79,30 @@ public:
     	ADD_PARAM_IN_ARRAY_NAME()
     }
 
-    ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas, boost::shared_ptr<Query> query)
+    ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas, std::shared_ptr<Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 1);
 
-        const string &arrayName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         ArrayDesc arrayDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, arrayDesc);
+        const ArrayID catalogVersion = query->getCatalogVersion(arrayName);
+        SystemCatalog::getInstance()->getArrayDesc(arrayName, catalogVersion, arrayDesc);
+        std::vector<VersionDesc> versions = SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId());
 
-        size_t nVersions = SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId()).size();
+        size_t nVersions = versions.size();
+        for (size_t i = 0; i < versions.size(); ++i) {
+            const VersionDesc& verDesc = versions[i];
+            if (verDesc.getArrayID() > catalogVersion) {
+                //XXX tigor: this is a HACK to allow concurrent readers & writers
+                // instead, we should either remove this op or make getArrayVersions()
+                // respect the catalog version (or smthn like that)
+                nVersions = i;
+                break;
+            }
+        }
+
         Attributes attributes(2);
         attributes[0] = AttributeDesc((AttributeID)0, "version_id", TID_INT64, 0, 0);
         attributes[1] = AttributeDesc((AttributeID)1, "timestamp", TID_DATETIME, 0, 0);
@@ -101,7 +114,7 @@ public:
         }
 
         dimensions[0] = DimensionDesc("VersionNo", 1, 1, nVersions, nVersions, nVersions, 0);
-        return ArrayDesc("Versions", attributes, dimensions);
+        return ArrayDesc("Versions", attributes, dimensions, defaultPartitioning());
     }
 
 };

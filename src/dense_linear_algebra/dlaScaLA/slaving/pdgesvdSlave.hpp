@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -82,7 +82,7 @@ inline std::ostream& operator<<(std::ostream& os, const PdgesvdArgs& a)
     os << "MYPNUM:"<<a.MYPNUM                             << std::endl;
 
     os << "jobU:" << a.jobU << " jobVT:" << a.jobVT << std::endl;
-    os << "M:" << a.M << " N:" << a.N               << std::endl; 
+    os << "M:" << a.M << " N:" << a.N               << std::endl;
     os << "A{" << a.A << "}"                        << std::endl;
     os << "U{" << a.U << "}"                        << std::endl;
     os << "VT{" << a.VT << "}"                      << std::endl;

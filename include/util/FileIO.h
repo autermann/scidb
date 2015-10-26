@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,12 +24,12 @@
  * @file
  *
  * @brief Wrapper for file I/O operations.
- * 
+ *
  * @details FileIO is a pass-through layer that gives scidb
  * a chance to gather statistics, handle errors, and manage
  * resources for file i/o operations. There are two choices
  * for using this interface:
- * 
+ *
  * 1) Low-level static functions.  These functions wrap
  *    the standard posix fs system-call interface.  They
  *    function in largely the same way, but add error handling
@@ -75,7 +75,7 @@
 #define O_LARGEFILE 0
 #endif
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_comparison.hpp>
 #include <boost/atomic.hpp>
@@ -170,7 +170,7 @@ namespace scidb
         /* Object interface
          */
 
-        typedef boost::shared_ptr<File> FilePtr;
+        typedef std::shared_ptr<File> FilePtr;
 
         /**
          * Write data to the file
@@ -299,7 +299,7 @@ namespace scidb
             FileManager* _fm;
             File&        _f;
         };
-            
+
         /* State for object interface
          */
 
@@ -309,7 +309,7 @@ namespace scidb
         const std::string        _path;    // path used to open
         int                      _flags;   // flags passed to open
         bool                     _remove;  // true if the file should be removed on close
-        bool                     _closed;  // true if fd explicitly closed by user 
+        bool                     _closed;  // true if fd explicitly closed by user
         boost::atomic<uint64_t>  _pin;     // number of current users of this file
         FileList::iterator       _listPos; // location of this entry in _lru or _closed list
         FileManager*             _fm;      // pointer to singleton FileManager instance
@@ -328,7 +328,7 @@ namespace scidb
          * @param filePath if specified then this path is used for the temp file
          * @return shared pointer to file object or NULL on error
          */
-        File::FilePtr createTemporary(std::string const& arrName, 
+        File::FilePtr createTemporary(std::string const& arrName,
                                       char const* filePath = NULL);
 
         /**
@@ -338,7 +338,7 @@ namespace scidb
          * @param flags open flags to pass to ::open()
          *        such as O_APPEND, O_CREAT, O_EXCL, etc.
          */
-        File::FilePtr openFileObj(const std::string& fileName, 
+        File::FilePtr openFileObj(const std::string& fileName,
                                   int flags);
 
         /**

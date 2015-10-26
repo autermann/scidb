@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@
  *
  * @brief Config arguments for iquery executable
  *
- * @author Artyom Smirnov <smirnoffjr@gmail.com>
+ * @author Marty Corbett <mcorbett@paradigm4.com>
  */
 
 
@@ -53,7 +53,9 @@ enum
     CONFIG_PLUGINSDIR,
     CONFIG_HELP,
     CONFIG_VERSION,
-    CONFIG_IGNORE_ERRORS
+    CONFIG_IGNORE_ERRORS,
+    CONFIG_USER_NAME,
+    CONFIG_USER_PASSWORD
 };
 
 }

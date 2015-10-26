@@ -29,7 +29,6 @@
 --aql select * from aggregate(versions(B),count(*))
 --aql select version_id from versions(B)
 --aql select * into B from filter(build(B,x+2),1)
---aql select * from allversions(B)
 --aql select * from help()
 --aql rename array B to A
 --aql select * from dimensions(A)

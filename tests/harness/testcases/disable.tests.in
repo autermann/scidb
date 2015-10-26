@@ -79,6 +79,13 @@ other.random_check
 # re-enable after solving ticket 2234
 docscript.load
 
+# Commented out because we disabled the old python connector #4745.
+# Should examine (or replace) after implementing a new python connector #4767.
+client.python_1
+
+# Commented out because we disabled shim #4745
+checkin.other.sciDB-R_interpreter
+
 # for not-debug builds this line would be replaced by list of disabled tests
 @CONFIGURE_DISABLE_TESTS_NOT_DEBUG@
 
@@ -92,16 +99,15 @@ docscript.load
 # PART III
 #
 # THIS PART IS FOR TEMPORARILY DISABLED TESTS.  These test files all include
-# statements that use the olf NID syntax and are disabled while we rip out and
+# statements that use the old NID syntax and are disabled while we rip out and
 # de-NID the code base. Many of these just happen to use NIDS in arrays that
 # are then used to test other features, so we need to either replace them with
 # uses of the uniq/index_look operators - talk to Alex about this - or rewrite
 # the tests to not use NIDdled arrays at all.
 #
-# See #3691 Re-enable / rewrite tests that us NID's
+# See #3691 Re-enable / rewrite tests that use NID's
 #*****************************************************************************
 
-aggregates.symbols
 aql_misc.create_5
 aql_misc.udt_point
 aql_misc.udt_rational
@@ -186,20 +192,13 @@ flip_n_store.flip_store_ni_38
 flip_n_store.flip_store_nulls
 flip_n_store.flip_with_overlap
 flip_n_store.join_merge_cross_nid
-flip_n_store.join_merge_cross_nid2
+
 flip_n_store.largemap
 flip_n_store.literal_nid
-flip_n_store.mapping
+
 flip_n_store.mapping2
 flip_n_store.null_nid
-flip_n_store.redim_bounded_NID_Agg
-flip_n_store.redim_bounded_NID_Agg_nodef
-flip_n_store.redim_bounded_NID_Agg_overlap
-flip_n_store.redim_bounded_NID_Agg_overlap_nodef
-flip_n_store.redim_unbounded_NID_Agg
-flip_n_store.redim_unbounded_NID_Agg_nodef
-flip_n_store.redim_unbounded_NID_Agg_overlap
-flip_n_store.redim_unbounded_NID_Agg_overlap_nodef
+
 flip_n_store.remove_mapping
 flip_n_store.select_into_11
 flip_n_store.select_into_12

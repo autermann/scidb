@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -62,7 +62,7 @@ void Constant::toString(std::ostream &out, int indent) const
     Indent prefix(indent);
     out << prefix(' ', false);
     out << "[constant] type " << _type;
-    out <<" value "<< ValueToString(_type,_value) << "\n";
+    out <<" value "<< _value.toString(_type) << "\n";
 }
 
 void Function::toString(std::ostream &out, int indent) const

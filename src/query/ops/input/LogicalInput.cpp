@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -55,9 +55,9 @@ LogicalInput::LogicalInput(const std::string& logicalName, const std::string& al
     ADD_PARAM_VARIES();          //2
 }
 
-std::vector<boost::shared_ptr<OperatorParamPlaceholder> > LogicalInput::nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+std::vector<std::shared_ptr<OperatorParamPlaceholder> > LogicalInput::nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
 {
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
     res.reserve(2);
     res.push_back(END_OF_VARIES_PARAMS());
     switch (_parameters.size()) {
@@ -85,26 +85,26 @@ std::vector<boost::shared_ptr<OperatorParamPlaceholder> > LogicalInput::nextVary
     return res;
 }
 
-ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
 {
     assert(inputSchemas.size() == 0);
 
     InstanceID instanceID = COORDINATOR_INSTANCE_MASK;
     if (_parameters.size() >= 3)
     {
-        instanceID = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
+        instanceID = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
                                   query, TID_INT64).getInt64();
         if (instanceID != COORDINATOR_INSTANCE_MASK && instanceID != ALL_INSTANCE_MASK && (size_t)instanceID >= query->getInstancesCount())
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
                                        _parameters[2]->getParsingContext()) << instanceID;
     }
 
-    const string &path = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
+    const string &path = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                                   query, TID_STRING).getString();
 
     string format;
     if (_parameters.size() >= 4) {
-        format = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[3])->getExpression(),
+        format = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[3])->getExpression(),
                                             query, TID_STRING).getString();
         if (!InputArray::isSupportedFormat(format))
         {
@@ -216,47 +216,54 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, boost:
         }
     }
 
-    ArrayDesc arrayDesc = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+    ArrayDesc arrayDesc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
     Dimensions const& srcDims = arrayDesc.getDimensions();
-    size_t nDims = srcDims.size();
-    Dimensions dstDims(nDims);
 
     //Use array name from catalog if possible or generate temporary name
     string inputArrayName = arrayDesc.getName();
-    PartitioningSchema partitioningSchema = instanceID == ALL_INSTANCE_MASK ? psUndefined : psLocalInstance;
-    if (!SystemCatalog::getInstance()->containsArray(inputArrayName))
+    PartitioningSchema partitioningSchema = arrayDesc.getPartitioningSchema();
+
+    if (instanceID != ALL_INSTANCE_MASK) {
+        // loading from a single file/instance as in
+        // load(ARRAY, 'file.x', -2) or input(<XXX>[YYY], 'file.x', 0)
+        partitioningSchema = psLocalInstance;
+    } else if (partitioningSchema == psUninitialized) {
+        // in-line schema currently does not provide a distribution, i.e.
+        // input(<XXX>[YYY], 'file.x')
+        partitioningSchema = psUndefined;
+    } // else the user-specified schema will be used for generating the implicit coordinates.
+      // Notice that the optimizer will still be told psUndefined for any parallel ingest
+      // (e.g.  load(ARRAY, 'file.x', -1, ...)
+      // by PhysicalInput::getOutputDistribution() because some input formats (e.g. opaque, text)
+      // may specify the data coordinates (in any distribution).
+
+    if (inputArrayName.empty())
     {
         inputArrayName = "tmp_input_array";
     }
-    else
-    {
-        partitioningSchema = arrayDesc.getPartitioningSchema();
-    }
 
-    for (size_t i = 0; i < nDims; i++) {
-        DimensionDesc const& srcDim = srcDims[i];
-        dstDims[i] = srcDim;
-    }
-    ArrayDesc newDesc(inputArrayName, arrayDesc.getAttributes(), dstDims, arrayDesc.getFlags());
-    newDesc.setPartitioningSchema(partitioningSchema);
-    return newDesc;
+    return ArrayDesc(inputArrayName,
+                     arrayDesc.getAttributes(), srcDims,
+                     partitioningSchema, arrayDesc.getFlags());
 }
 
-void LogicalInput::inferArrayAccess(boost::shared_ptr<Query>& query)
+void LogicalInput::inferArrayAccess(std::shared_ptr<Query>& query)
 {
+    LogicalOperator::inferArrayAccess(query);
+
     string shadowArrayName;
     if (_parameters.size() >= 6 && _parameters[5]->getParamType() == PARAM_ARRAY_REF) {
-        shadowArrayName = ((boost::shared_ptr<OperatorParamArrayReference>&)_parameters[5])->getObjectName();
+        shadowArrayName = ((std::shared_ptr<OperatorParamArrayReference>&)_parameters[5])->getObjectName();
     }
     if (!shadowArrayName.empty()) {
         assert(shadowArrayName.find('@') == std::string::npos);
-        boost::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(shadowArrayName,
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(shadowArrayName,
                                                                                      query->getQueryID(),
                                                                                      Cluster::getInstance()->getLocalInstanceId(),
                                                                                      SystemCatalog::LockDesc::COORD,
                                                                                      SystemCatalog::LockDesc::WR));
-        boost::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
+        std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         assert(resLock);
         assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
     }

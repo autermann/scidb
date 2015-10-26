@@ -54,16 +54,27 @@ SCIDB QUERY : <scan(B)>
 {3} 6
 
 SCIDB QUERY : <insert(C,A)>
-[An error expected at this place for the query "insert(C,A)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH.]
+[An error expected at this place for the query "insert(C,A)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_START_INDEX_MISMATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_START_INDEX_MISMATCH.]
 
 SCIDB QUERY : <insert(A,C)>
-[An error expected at this place for the query "insert(A,C)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH.]
+[An error expected at this place for the query "insert(A,C)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_START_INDEX_MISMATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_START_INDEX_MISMATCH.]
 
 SCIDB QUERY : <insert(A,D)>
-[An error expected at this place for the query "insert(A,D)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH.]
+{x} sal
+{0} 0
+{1} 2
+{2} 4
+{3} 6
 
 SCIDB QUERY : <insert(repart(D,<val:double> [x=0:3,2,0]),D)>
-[An error expected at this place for the query "insert(repart(D,<val:double> [x=0:3,2,0]),D)". And it failed with error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH. Expected error code = scidb::SCIDB_SE_INFER_SCHEMA::SCIDB_LE_DIMENSIONS_DONT_MATCH.]
+[An error expected at this place for the query "insert(repart(D,<val:double> [x=0:3,2,0]),D)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN.]
+
+SCIDB QUERY : <insert(repart(D, <val:double> [x=0:3,4,0]),D)>
+{x} sal
+{0} 0
+{1} 2
+{2} 4
+{3} 6
 
 SCIDB QUERY : <insert(B, repart(D,<sal:double> [x=0:3,2,0]))>
 [An error expected at this place for the query "insert(B, repart(D,<sal:double> [x=0:3,2,0]))". And it failed with error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2. Expected error code = scidb::SCIDB_SE_QPROC::SCIDB_LE_WRONG_OPERATOR_ARGUMENT2.]

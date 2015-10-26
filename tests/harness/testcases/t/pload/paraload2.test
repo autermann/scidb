@@ -70,4 +70,4 @@ remove(para2_csv)
 remove(para2_tsv)
 remove(para2_opaque)
 remove(para2_text)
---shell --command "find ${SCIDB_DATA_PATH} -name para2_* | xargs rm"
+--shell --command "find ${SCIDB_DATA_PATH} -name 'para2_*' | xargs rm -f"

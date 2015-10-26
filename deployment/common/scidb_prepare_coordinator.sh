@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -25,10 +25,11 @@ set -eu
 username="${1}"
 database="${2}"
 SCIDB_VER="${3}"
+db_passwd="${4}"
 
 expect <<EOF
 set timeout -1
-spawn sudo -u postgres /opt/scidb/${SCIDB_VER}/bin/scidb.py init_syscat ${database}
+spawn sudo -u postgres /opt/scidb/${SCIDB_VER}/bin/scidb.py init-syscat --db-password ${db_passwd} ${database}
 expect eof
 catch wait result
 if {[lindex \$result 3]!=0} { exit [lindex \$result 3] }

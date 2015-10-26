@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include <cmath>
 
 
-namespace scidb { 
+namespace scidb {
     uint8_t DictionaryEncoding::Dictionary::createDictionary(uint8_t const * const src, const size_t elementSize, const size_t nElems, ByteOutputItr &out)
     {
 
@@ -49,7 +49,7 @@ namespace scidb {
 
 
         _encodeDictionary.clear();
-  
+
         for(i = 0; i < nElems; ++i)
         {
             memcpy((uint8_t *) &value, readPtr, elementSize);
@@ -59,7 +59,7 @@ namespace scidb {
                 _encodeDictionary[value] = count;
                 ++count;
                 if(count == 255) {  return 0; }
-                if(out.putArray((uint8_t *) &value, elementSize) == -1) {   return 0; } 
+                if(out.putArray((uint8_t *) &value, elementSize) == -1) {   return 0; }
             }
             readPtr += elementSize;
         }
@@ -77,15 +77,15 @@ namespace scidb {
 
 
         if(in.get(uniques) == -1) { return 0; }
-  
+
         _decodeDictionary.clear();
 
         for(i = 0; i < uniques; ++i)
         {
-            if(in.getArray((uint8_t *) &value, elementSize) == -1) { return 0; } 
+            if(in.getArray((uint8_t *) &value, elementSize) == -1) { return 0; }
             _decodeDictionary[i] = value;
         }
-  
+
         return uniques;
     }
 
@@ -103,7 +103,7 @@ namespace scidb {
     size_t DictionaryEncoding::Dictionary::compress(void* dst, const ConstChunk& chunk, size_t chunkSize)
     {
         uint8_t *readPtr = (uint8_t *)chunk.getData();
-        TypeId type = chunk.getAttributeDesc().getType();        
+        TypeId type = chunk.getAttributeDesc().getType();
         size_t elementSize = TypeLibrary::getType(type).byteSize();
         size_t nElems;
 
@@ -119,10 +119,10 @@ namespace scidb {
         BitOutputItr outBits(&out);
 
         uint32_t uniques = (uint32_t) createDictionary(readPtr, elementSize, nElems, out);
-  
+
         size_t codeLength;
         uniques <= 2 ? codeLength = 1 : codeLength = ceil(log2(uniques-1)) + 1;  // 0-indexed, so values span from 0...uniques-1, log is 0-based, so bring it back to 1...n bits
-  
+
         // project size and terminate if it will be too large
         size_t codesSize = (nElems * codeLength + 7) >> 3;
         size_t totalCompressed = 1 + uniques * elementSize + codesSize;
@@ -134,7 +134,7 @@ namespace scidb {
 
 
 
-        if(!nElems || !uniques) 
+        if(!nElems || !uniques)
         {
             return chunkSize;
         }
@@ -146,11 +146,11 @@ namespace scidb {
             outBits.put(code, codeLength);
             readPtr += elementSize;
         }
-  
+
         outBits.flush();
         size_t compressedSize = out.close();
 
-  
+
         return compressedSize;
 
     }
@@ -170,7 +170,7 @@ namespace scidb {
         uint32_t i;
         uint8_t code = 0;
         uint64_t value = 0;
-        TypeId type = chunk.getAttributeDesc().getType();        
+        TypeId type = chunk.getAttributeDesc().getType();
         size_t elementSize = TypeLibrary::getType(type).byteSize();
         size_t nElems;
 
@@ -203,5 +203,5 @@ namespace scidb {
 
         return chunkSize;
     }
- 
+
 }

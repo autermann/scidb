@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include <string>
 
 // de-facto standards
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <log4cxx/logger.h>
 
 // SciDB
@@ -61,18 +61,18 @@ class MPIInitPhysical: public MPIPhysical
      * It also has the side-effect of cleaning any MPI-related state left
      * in the filesystem by the previous incarnation (i.e. process) of this instance.
      */
-    shared_ptr<Array> execute(std::vector< shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         MpiManager::getInstance()->forceInitMpi();
 
         launchMPISlaves(query, query->getInstancesCount());
-        boost::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
+        std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
         mpi::Command cmd;
         cmd.setCmd(string("EXIT"));
         slave->sendCommand(cmd, _ctx);
         slave->waitForExit(_ctx); // wait for the slave to disconnect
         unlaunchMPISlaves();
-        return shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array> (new MemArray(_schema,query));
     }
 };
 REGISTER_PHYSICAL_OPERATOR_FACTORY(MPIInitPhysical, "mpi_init", "MPIInitPhysical");

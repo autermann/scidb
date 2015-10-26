@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -23,6 +23,7 @@ import subprocess
 import time
 import sys
 import os
+import find_java8
 
 def main():
     print 'SCIDB_INSTALL_PATH',os.environ['SCIDB_INSTALL_PATH']
@@ -33,12 +34,10 @@ def main():
     if (os.environ.has_key('IQUERY_PORT')):
         iquery_port = os.environ['IQUERY_PORT']
     cmd = [
-        'java',
+        find_java8.find(),
         '-classpath',
         ':'.join(('${SCIDB_INSTALL_PATH}/jdbc/scidb4j.jar',
                   '${SCIDB_INSTALL_PATH}/jdbc/jdbctest.jar',
-                  '/usr/share/java/protobuf.jar',
-                  '/usr/share/java/protobuf-java.jar',
                   '/usr/share/java/junit.jar')),
         'org.scidb.JDBCTest',
         iquery_host,

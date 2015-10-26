@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,6 +29,7 @@
 #include "reformat.hpp"
 #include "../scalapackUtil/scalapackFromCpp.hpp"
 
+using namespace std;
 using namespace scidb;
 
 namespace scidb
@@ -70,7 +71,7 @@ void redistScidbToScaLAPACK(double *A, const slpp::desc_t& DESCA, double *B, con
 {
     // see note above about how DESC_SCIDB is a view of Scidb data that ScaLAPACK
     // can access with a 1D block-cyclic
-    slpp::desc_t DESCA_SCIDB = scidbDistrib(DESCA) ; 
+    slpp::desc_t DESCA_SCIDB = scidbDistrib(DESCA) ;
 
     std::cerr << "redistScidbToScaLAPACK: DESCA ************" << std::endl ;
     std::cerr << DESCA  << std::endl;
@@ -89,11 +90,11 @@ void redistScidbToScaLAPACK(double *A, const slpp::desc_t& DESCA, double *B, con
         size_t Arow = rowChunk*heightInChunks;
         size_t A1Dcolumn = rowChunk*widthInChunks;
 
-        std::cerr <<"redistScidbToScaLAPACK: rowChunk: " << rowChunk << std::endl; 
-        std::cerr <<"redistScidbToScaLAPACK: blockRows: " << blockRows << std::endl; 
-        std::cerr <<"redistScidbToScaLAPACK: blockCols: " << DESCA.N << std::endl; 
-        std::cerr <<"redistScidbToScaLAPACK: JA: " << A1Dcolumn << std::endl; 
-        std::cerr <<"redistScidbToScaLAPACK: Arow: " << Arow << std::endl; 
+        std::cerr <<"redistScidbToScaLAPACK: rowChunk: " << rowChunk << std::endl;
+        std::cerr <<"redistScidbToScaLAPACK: blockRows: " << blockRows << std::endl;
+        std::cerr <<"redistScidbToScaLAPACK: blockCols: " << DESCA.N << std::endl;
+        std::cerr <<"redistScidbToScaLAPACK: JA: " << A1Dcolumn << std::endl;
+        std::cerr <<"redistScidbToScaLAPACK: Arow: " << Arow << std::endl;
         pdgemr2d_(blockRows, DESCA.N, A, /*IA*/0, /*JA*/A1Dcolumn, DESCA_SCIDB, B, Arow, 0, DESCB, DESCB.CTXT);
         // TODO: where's INFO in that call? how do I check for failure?
     }
@@ -124,6 +125,9 @@ void infoG2L_zero_based(slpp::int_t globalRow, slpp::int_t globalCol, const slpp
     localColOut = JJA-1 ;
 }
 
+//
+// ReformatToScalapack methods
+//
 ReformatToScalapack::ReformatToScalapack(double* data, const slpp::desc_t& desc,
                                          int64_t minrow, int64_t mincol,
                                          slpp::int_t  NPROW, slpp::int_t  NPCOL,
@@ -142,7 +146,8 @@ ReformatToScalapack::ReformatToScalapack(double* data, const slpp::desc_t& desc,
     _blockState(ReformatToScalapack::BlockEnded) // allow only blockBegin() next
 {}
 
-
-
+//
+// ReformatFromScalapack<Data_tt>  methods are in the header
+//
 
 } // end namespace scidb

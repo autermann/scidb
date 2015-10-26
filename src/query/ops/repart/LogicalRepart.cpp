@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -77,12 +77,12 @@ public:
         ADD_PARAM_SCHEMA()
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
         assert(_parameters.size() == 1);
 
-        ArrayDesc schemaParam = ((boost::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        ArrayDesc schemaParam = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         ArrayDesc const& srcArrayDesc = schemas[0];
         Attributes const& srcAttributes = srcArrayDesc.getAttributes();
@@ -107,15 +107,15 @@ public:
         {
             if (srcDimensions[i].getStartMin() != dstDimensions[i].getStartMin())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR3);
-            if (!(srcDimensions[i].getEndMax() == dstDimensions[i].getEndMax() 
-                               || (srcDimensions[i].getEndMax() < dstDimensions[i].getEndMax() 
+            if (!(srcDimensions[i].getEndMax() == dstDimensions[i].getEndMax()
+                               || (srcDimensions[i].getEndMax() < dstDimensions[i].getEndMax()
                                    && ((srcDimensions[i].getLength() % srcDimensions[i].getChunkInterval()) == 0
                                        || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR4);
-            if (srcDimensions[i].getStartMin() == MIN_COORDINATE)
+            if (srcDimensions[i].getStartMin() == CoordinateBounds::getMin())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR5);
         }
-        return ArrayDesc(schemaParam.getName(), srcAttributes, dstDimensions, schemaParam.getFlags());
+        return ArrayDesc(schemaParam.getName(), srcAttributes, dstDimensions, defaultPartitioning(), schemaParam.getFlags());
     }
 };
 

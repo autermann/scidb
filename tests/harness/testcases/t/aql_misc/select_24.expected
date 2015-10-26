@@ -114,12 +114,6 @@ SCIDB QUERY : <select version_id from versions(B)>
 {VersionNo} version_id
 {1} 1
 
-SCIDB QUERY : <select * from allversions(B)>
-{VersionNo,x} a
-{1,0} 10
-{1,1} 11
-{1,2} 12
-
 SCIDB QUERY : <select * from help()>
 {i} help
 {0} 'Use existing operator name as argument for help operator. You can see all operators by executing list(\'operators\').'

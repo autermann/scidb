@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -33,11 +33,11 @@
 #ifndef RANK_COMMON
 #define RANK_COMMON
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
 #include <log4cxx/logger.h>
 #include <sys/time.h>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 
 #include <query/Operator.h>
 #include <system/Exceptions.h>
@@ -52,10 +52,10 @@
 namespace scidb
 {
 
-typedef boost::unordered_map <Coordinates, uint64_t> CountsMap;
+typedef std::unordered_map <Coordinates, uint64_t, CoordinatesHash> CountsMap;
 
-boost::shared_ptr<SharedBuffer> rMapToBuffer( CountsMap const& input, size_t nCoords);
-void updateRmap(CountsMap& input, boost::shared_ptr<SharedBuffer> buf, size_t nCoords);
+std::shared_ptr<SharedBuffer> rMapToBuffer( CountsMap const& input, size_t nCoords);
+void updateRmap(CountsMap& input, std::shared_ptr<SharedBuffer> buf, size_t nCoords);
 
 class RankingStats
 {
@@ -90,7 +90,7 @@ class BlockTimer
 class PreSortMap
 {
 public:
-    PreSortMap(boost::shared_ptr<Array>& input, AttributeID neededAttributeID, Dimensions const& groupedDims):
+    PreSortMap(std::shared_ptr<Array>& input, AttributeID neededAttributeID, Dimensions const& groupedDims):
         _dimGrouping(input->getArrayDesc().getDimensions(), groupedDims)
     {}
 
@@ -111,13 +111,13 @@ protected:
 class ValuePreSortMap : public PreSortMap
 {
     typedef std::map<Value, uint64_t, AttributeComparator> ValueCountMap;
-    typedef boost::shared_ptr<ValueCountMap> ValueCountMapPtr;
-    typedef boost::unordered_map<Coordinates, ValueCountMapPtr> CoordinatesCountsMap;
-    typedef boost::unordered_map<Coordinates, uint64_t> CoordinatesMaxMap;
+    typedef std::shared_ptr<ValueCountMap> ValueCountMapPtr;
+    typedef std::unordered_map<Coordinates, ValueCountMapPtr, CoordinatesHash> CoordinatesCountsMap;
+    typedef std::unordered_map<Coordinates, uint64_t, CoordinatesHash> CoordinatesMaxMap;
 
 public:
 
-    ValuePreSortMap(boost::shared_ptr<Array>& input, AttributeID neededAttributeID, Dimensions const& groupedDims):
+    ValuePreSortMap(std::shared_ptr<Array>& input, AttributeID neededAttributeID, Dimensions const& groupedDims):
         PreSortMap(input, neededAttributeID, groupedDims)
     {
         ArrayDesc const& inputSchema = input->getArrayDesc();
@@ -135,15 +135,15 @@ public:
         CoordinatesCountsMap::iterator mIter;
         ValueCountMap::iterator iter;
         {
-            boost::shared_ptr<ConstArrayIterator> arrayIterator = input->getConstIterator(neededAttributeID);
+            std::shared_ptr<ConstArrayIterator> arrayIterator = input->getConstIterator(neededAttributeID);
             while (!arrayIterator->end())
             {
                 {
-                    boost::shared_ptr<ConstChunkIterator> chunkIterator =
+                    std::shared_ptr<ConstChunkIterator> chunkIterator =
                         arrayIterator->getChunk().getConstIterator(CHUNK_FLAGS);
                     while (!chunkIterator->end())
                     {
-                        Value &v = chunkIterator->getItem();
+                        Value const &v = chunkIterator->getItem();
                         if (v.isNull())
                         {
                             ++(*chunkIterator);
@@ -275,13 +275,13 @@ template <typename INPUT>
 class PrimitivePreSortMap : public PreSortMap
 {
     typedef std::map<INPUT, uint64_t> ValueCountMap;
-    typedef boost::shared_ptr<ValueCountMap> ValueCountMapPtr;
-    typedef boost::unordered_map<Coordinates, ValueCountMapPtr> CoordinatesCountsMap;
-    typedef boost::unordered_map<Coordinates, uint64_t> CoordinatesMaxMap;
+    typedef std::shared_ptr<ValueCountMap> ValueCountMapPtr;
+    typedef std::unordered_map<Coordinates, ValueCountMapPtr, CoordinatesHash> CoordinatesCountsMap;
+    typedef std::unordered_map<Coordinates, uint64_t, CoordinatesHash> CoordinatesMaxMap;
 
 public:
 
-    PrimitivePreSortMap(boost::shared_ptr<Array>& input, AttributeID neededAttributeID, Dimensions const& groupedDims):
+    PrimitivePreSortMap(std::shared_ptr<Array>& input, AttributeID neededAttributeID, Dimensions const& groupedDims):
         PreSortMap(input, neededAttributeID, groupedDims)
     {
         ArrayDesc const& inputSchema = input->getArrayDesc();
@@ -299,16 +299,16 @@ public:
         typename CoordinatesCountsMap::iterator mIter;
         typename ValueCountMap::iterator iter;
         {
-            boost::shared_ptr<ConstArrayIterator> arrayIterator = input->getConstIterator(neededAttributeID);
+            std::shared_ptr<ConstArrayIterator> arrayIterator = input->getConstIterator(neededAttributeID);
             while (!arrayIterator->end())
             {
                 {
-                    boost::shared_ptr<ConstChunkIterator> chunkIterator =
+                    std::shared_ptr<ConstChunkIterator> chunkIterator =
                         arrayIterator->getChunk().getConstIterator(CHUNK_FLAGS);
                     while (!chunkIterator->end())
                     {
-                        Value v = chunkIterator->getItem();
-                        if (v.isNull() || (IsFP<INPUT>::value && isnan( *(INPUT*) v.data())))
+                        Value const& v = chunkIterator->getItem();
+                        if (v.isNull() || (IsFP<INPUT>::value && std::isnan( *(INPUT*) v.data())))
                         {
                             ++(*chunkIterator);
                             continue;
@@ -370,7 +370,7 @@ public:
     virtual double lookupRanking( Value const& input, Coordinates const& inCoords)
     {
         INPUT* val = (INPUT*) input.data();
-        if(IsFP<INPUT>::value && isnan(*val))
+        if(IsFP<INPUT>::value && std::isnan(*val))
         {
             return -1;
         }
@@ -430,9 +430,9 @@ class RankChunkIterator : public DelegateChunkIterator
 public:
     RankChunkIterator (DelegateChunk const* sourceChunk,
                        int iterationMode,
-                       const boost::shared_ptr<PreSortMap>& preSortMap,
-                       const boost::shared_ptr<Array>& mergerArray,
-                       const boost::shared_ptr<RankingStats>& rStats):
+                       const std::shared_ptr<PreSortMap>& preSortMap,
+                       const std::shared_ptr<Array>& mergerArray,
+                       const std::shared_ptr<RankingStats>& rStats):
        DelegateChunkIterator(sourceChunk, (iterationMode & ~IGNORE_DEFAULT_VALUES) | IGNORE_OVERLAPS ),
        _preSortMap(preSortMap),
        _outputValue(TypeLibrary::getType(TID_DOUBLE)),
@@ -490,11 +490,11 @@ public:
     }
 
 protected:
-    boost::shared_ptr<PreSortMap> _preSortMap;
+    std::shared_ptr<PreSortMap> _preSortMap;
     Value _outputValue;
-    boost::shared_ptr<ConstArrayIterator> _mergerArrayIterator;
-    boost::shared_ptr<ConstChunkIterator> _mergerIterator;
-    boost::shared_ptr<RankingStats> _rStats;
+    std::shared_ptr<ConstArrayIterator> _mergerArrayIterator;
+    std::shared_ptr<ConstChunkIterator> _mergerIterator;
+    std::shared_ptr<RankingStats> _rStats;
 };
 
 class HiRankChunkIterator : public RankChunkIterator
@@ -502,9 +502,9 @@ class HiRankChunkIterator : public RankChunkIterator
 public:
     HiRankChunkIterator (DelegateChunk const* sourceChunk,
                           int iterationMode,
-                          const boost::shared_ptr<PreSortMap>& preSortMap,
-                          const boost::shared_ptr<Array>& mergerArray,
-                          const boost::shared_ptr<RankingStats>& rStats):
+                          const std::shared_ptr<PreSortMap>& preSortMap,
+                          const std::shared_ptr<Array>& mergerArray,
+                          const std::shared_ptr<RankingStats>& rStats):
         RankChunkIterator(sourceChunk, iterationMode, preSortMap, mergerArray, rStats)
     {
         if (mergerArray.get())
@@ -558,7 +558,7 @@ class AvgRankChunkIterator : public DelegateChunkIterator
 public:
     AvgRankChunkIterator (DelegateChunk const* sourceChunk,
                           int iterationMode,
-                          boost::shared_ptr<Array>& mergerArray):
+                          std::shared_ptr<Array>& mergerArray):
        DelegateChunkIterator(sourceChunk, iterationMode | IGNORE_OVERLAPS)
     {
         _mergerArrayIterator = mergerArray->getConstIterator(2);
@@ -603,7 +603,7 @@ private:
      * The data from this->inputIterator is averaged with the data
      * from _mergerArrayIterator to produce the average rank.
      */
-    boost::shared_ptr<ConstArrayIterator> _mergerArrayIterator;
+    std::shared_ptr<ConstArrayIterator> _mergerArrayIterator;
 
     /**
      * The high-rank chunk iterator.
@@ -611,18 +611,18 @@ private:
      * VERY IMPORTANT: this must be declared after _mergerArrayIterator to enforce proper order of destruction. Otherwise,
      * _mergerArrayIterator is destructed first, which could cause a crash.
      */
-    boost::shared_ptr<ConstChunkIterator> _mergerIterator;
+    std::shared_ptr<ConstChunkIterator> _mergerIterator;
 };
 
 class RankArray : public DelegateArray
 {
 public:
     RankArray (ArrayDesc const& desc,
-               boost::shared_ptr<Array> const& inputArray,
-               boost::shared_ptr<PreSortMap> const& preSortMap,
+               std::shared_ptr<Array> const& inputArray,
+               std::shared_ptr<PreSortMap> const& preSortMap,
                AttributeID inputAttributeID,
                bool merger,
-               boost::shared_ptr<RankingStats> const& rStats):
+               std::shared_ptr<RankingStats> const& rStats):
         DelegateArray(desc, inputArray),
         _preSortMap(preSortMap),
         _inputAttributeID(inputAttributeID),
@@ -670,7 +670,7 @@ public:
 
         if (chunk->getAttributeDesc().getId() == 1)
         {
-            boost::shared_ptr<Array> mergerArray;
+            std::shared_ptr<Array> mergerArray;
             if (_merger)
             {
                 mergerArray = inputArray;
@@ -685,10 +685,10 @@ public:
     }
 
 protected:
-    boost::shared_ptr<PreSortMap> _preSortMap;
+    std::shared_ptr<PreSortMap> _preSortMap;
     AttributeID _inputAttributeID;
     bool _merger;
-    boost::shared_ptr<RankingStats> _rStats;
+    std::shared_ptr<RankingStats> _rStats;
     bool _inputHasOlap;
 };
 
@@ -697,11 +697,11 @@ class DualRankArray : public RankArray
 {
 public:
     DualRankArray (ArrayDesc const& desc,
-                   boost::shared_ptr<Array> const& inputArray,
-                   boost::shared_ptr<PreSortMap>& preSortMap,
+                   std::shared_ptr<Array> const& inputArray,
+                   std::shared_ptr<PreSortMap>& preSortMap,
                    AttributeID inputAttributeID,
                    bool merger,
-                   boost::shared_ptr<RankingStats>& rStats):
+                   std::shared_ptr<RankingStats>& rStats):
        RankArray(desc, inputArray, preSortMap, inputAttributeID, merger, rStats)
     {}
 
@@ -734,7 +734,7 @@ public:
 
         if (chunk->getAttributeDesc().getId() == 1)
         {
-            boost::shared_ptr<Array> mergerArray;
+            std::shared_ptr<Array> mergerArray;
             if (_merger)
             {
                 mergerArray = inputArray;
@@ -743,7 +743,7 @@ public:
         }
         else if (chunk->getAttributeDesc().getId() == 2)
         {
-            boost::shared_ptr<Array> mergerArray;
+            std::shared_ptr<Array> mergerArray;
             if (_merger)
             {
                 mergerArray = inputArray;
@@ -761,7 +761,7 @@ class AvgRankArray : public DelegateArray
 {
 public:
     AvgRankArray (ArrayDesc const& desc,
-                  boost::shared_ptr<Array> const& inputArray):
+                  std::shared_ptr<Array> const& inputArray):
       DelegateArray (desc, inputArray)
     {}
 
@@ -794,7 +794,7 @@ public:
 
         if (chunk->getAttributeDesc().getId() == 1)
         {
-            boost::shared_ptr<Array> mergerArray = inputArray;
+            std::shared_ptr<Array> mergerArray = inputArray;
             return new AvgRankChunkIterator(chunk, iterationMode, mergerArray);
         }
         else
@@ -807,17 +807,17 @@ public:
 ArrayDesc getRankingSchema(ArrayDesc const& inputSchema, AttributeID rankedAttributeID, bool dualRank = false);
 
 //inputArray must be distributed round-robin
-boost::shared_ptr<Array> buildRankArray(boost::shared_ptr<Array>& inputArray,
+std::shared_ptr<Array> buildRankArray(std::shared_ptr<Array>& inputArray,
                                  AttributeID rankedAttributeID,
                                  Dimensions const& grouping,
-                                 boost::shared_ptr<Query>& query,
-                                 boost::shared_ptr<RankingStats> rstats = boost::shared_ptr<RankingStats>());
+                                 std::shared_ptr<Query>& query,
+                                 std::shared_ptr<RankingStats> rstats = std::shared_ptr<RankingStats>());
 //inputArray must be distributed round-robin
-boost::shared_ptr<Array> buildDualRankArray(boost::shared_ptr<Array>& inputArray,
+std::shared_ptr<Array> buildDualRankArray(std::shared_ptr<Array>& inputArray,
                                      AttributeID rankedAttributeID,
                                      Dimensions const& grouping,
-                                     boost::shared_ptr<Query>& query,
-                                     boost::shared_ptr<RankingStats> rstats = boost::shared_ptr<RankingStats>());
+                                     std::shared_ptr<Query>& query,
+                                     std::shared_ptr<RankingStats> rstats = std::shared_ptr<RankingStats>());
 
 /**
  * AllRankedOneChunkIterator.
@@ -877,7 +877,7 @@ class AllRankedOneArray : public DelegateArray
 {
 public:
     AllRankedOneArray (ArrayDesc const& outputSchema,
-               boost::shared_ptr<Array> const& inputArray,
+               std::shared_ptr<Array> const& inputArray,
                AttributeID inputAttributeID):
         DelegateArray(outputSchema, inputArray),
         _inputAttributeID(inputAttributeID)
@@ -959,7 +959,7 @@ public:
      * @param   projection      A vector of attributeIDs to project on, not including the empty tag.
      */
     SimpleProjectArray (ArrayDesc const& outputSchema,
-               boost::shared_ptr<Array> const& inputArray,
+               std::shared_ptr<Array> const& inputArray,
                std::vector<AttributeID> const& projection):
         DelegateArray(outputSchema, inputArray),
         _projection(projection)
@@ -1015,8 +1015,8 @@ public:
 
 typedef RowCollection<size_t> RCChunk;      // every chunk is a row
 typedef RowIterator<size_t> RIChunk;
-typedef boost::unordered_map<Coordinates, size_t> MapChunkPosToID;
-typedef boost::unordered_map<Coordinates, size_t>::iterator MapChunkPosToIDIter;
+typedef std::unordered_map<Coordinates, size_t, CoordinatesHash> MapChunkPosToID;
+typedef std::unordered_map<Coordinates, size_t, CoordinatesHash>::iterator MapChunkPosToIDIter;
 
 /**
  * ChunkIterator for GroupbyRankArray, to assign ranks from a RowCollection (one per chunk).
@@ -1034,7 +1034,7 @@ class GroupbyRankChunkIterator : public DelegateChunkIterator
 {
 public:
     GroupbyRankChunkIterator (DelegateChunk const* sourceChunk,
-            boost::shared_ptr<RIChunk>& rcIterator,
+            std::shared_ptr<RIChunk>& rcIterator,
             size_t chunkID):
        DelegateChunkIterator(sourceChunk, ChunkIterator::IGNORE_EMPTY_CELLS|ChunkIterator::IGNORE_OVERLAPS),
        _rcIterator(rcIterator),
@@ -1044,6 +1044,7 @@ public:
        _locInRow2D(2)
     {
         _locInRow2D[0] = _rcIterator->getRowId();
+        assert(doIteratorsMatch());
     }
 
     virtual ~GroupbyRankChunkIterator()
@@ -1055,6 +1056,7 @@ public:
 
     virtual Value &getItem()
     {
+        assert(doIteratorsMatch());
         assert(! _rcIterator->end());
         std::vector<Value> itemInRCChunk(2);
         _rcIterator->getItem(itemInRCChunk);
@@ -1067,22 +1069,28 @@ public:
     virtual void reset() {
         inputIterator->reset();
         _rcIterator->reset();
+        assert(doIteratorsMatch());
     }
 
     virtual bool end() {
-        bool ret = _rcIterator->end();
-        assert(ret == inputIterator->end());
-        return ret;
+        assert(doIteratorsMatch());
+        return _rcIterator->end();
     }
 
 protected:
-    boost::shared_ptr<RIChunk> _rcIterator;
+    /// The two iterators should both be valid or both be invalid.
+    inline bool doIteratorsMatch()
+    {
+        return _rcIterator->end() == inputIterator->end();
+    }
+
+    std::shared_ptr<RIChunk> _rcIterator;
     size_t _chunkID;
     Value _outputValue;
 
     // _posToLocInRow is used to turn a Coordinates to RowIterator::_locInRow,
     // which is needed to call RowIterator::setPosition()
-    boost::unordered_map<Coordinates, size_t> _posToLocInRow;
+    std::unordered_map<Coordinates, size_t, CoordinatesHash> _posToLocInRow;
 
     // _validPosToLocInRow indicates whether _posToLocInRow has been computed.
     // It is computed in the first call of setPosition().
@@ -1103,10 +1111,10 @@ protected:
 class GroupbyRankArray : public DelegateArray
 {
 protected:
-    boost::shared_ptr<RCChunk> _pRCChunk;
+    std::shared_ptr<RCChunk> _pRCChunk;
     AttributeID _inputAttributeID;
     bool _inputHasOlap;
-    boost::shared_ptr<MapChunkPosToID> _mapChunkPosToID;
+    std::shared_ptr<MapChunkPosToID> _mapChunkPosToID;
 
     /**
      *  mutex is used to protect concurrent access of shared data members:
@@ -1121,10 +1129,10 @@ protected:
 
 public:
     GroupbyRankArray (ArrayDesc const& desc,
-               boost::shared_ptr<Array> const& inputArray,
-               boost::shared_ptr<RCChunk>const& pRCChunk,
+               std::shared_ptr<Array> const& inputArray,
+               std::shared_ptr<RCChunk>const& pRCChunk,
                AttributeID const& inputAttributeID,
-               boost::shared_ptr<MapChunkPosToID> const& mapChunkPosToID
+               std::shared_ptr<MapChunkPosToID> const& mapChunkPosToID
                ):
         DelegateArray(desc, inputArray),
         _pRCChunk(pRCChunk),
@@ -1181,7 +1189,7 @@ public:
             assert(iter!=_mapChunkPosToID->end());
             size_t chunkID = iter->second;
             size_t rowId = _pRCChunk->rowIdFromExistingGroup(chunkID);
-            boost::shared_ptr<RIChunk> rcIterator(_pRCChunk->openRow(rowId));
+            std::shared_ptr<RIChunk> rcIterator(_pRCChunk->openRow(rowId));
             return new GroupbyRankChunkIterator(chunk, rcIterator, chunkID);
         }
         return DelegateArray::createChunkIterator(chunk,

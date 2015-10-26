@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -20,14 +20,16 @@
 * END_COPYRIGHT
 */
 #include <stdio.h>
+#include <sys/types.h>
 
-
-
-int S_contxt = -1;
-int S_nprow = -1;
-int S_npcol = -1;
-int S_myrow = -1;
-int S_mycol = -1;
+/* instead of
+ * #include "../../scalapackUtil/scalapackTypes.hpp"
+ * which is for c++
+ * just use the folowing so that the blas emulation is all straight C/Fortran
+ */
+typedef struct context {
+    int nprow, npcol, myrow, mycol;
+} context_t ;
 
 /**
  * a verson of the FORTRAN blacs_gridinfo interface that allows
@@ -41,31 +43,21 @@ int S_mycol = -1;
  * NOTE: this is iso C, not C++, to avoid name-mangling, so it will
  *       have the same symbol as the FORTRAN version
  */
-void scidb_blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
-                                        int *myrow, int *mycol)
+void scidb_blacs_gridinfo_(const context_t* contxt, int *nprow, int *npcol,
+                                                    int *myrow, int *mycol)
 {
-    *contxt = S_contxt;
-    *nprow = S_nprow;
-    *npcol = S_npcol;
-    *myrow = S_myrow;
-    *mycol= S_mycol;
+    *nprow = contxt->nprow;
+    *npcol = contxt->npcol;
+    *myrow = contxt->myrow;
+    *mycol = contxt->mycol;
 }
 
-void scidb_set_blacs_gridinfo_(int *contxt, int *nprow, int *npcol,
-                               int *myrow, int *mycol)
+void scidb_set_blacs_gridinfo_(context_t* contxt, int *nprow, int *npcol,
+                                                  int *myrow, int *mycol)
 {
-    S_contxt = *contxt;
-    S_nprow = *nprow;
-    S_npcol = *npcol;
-    S_myrow = *myrow;
-    S_mycol = *mycol;
-    /* 
-      fprintf(stderr, "****************************************\n");
-      fprintf(stderr, "WARNING: temporary hack that prevents multi-user and multi-op operation\n");
-      fprintf(stderr, "set_fake_blacs_gridinfo_ ...\n");
-      fprintf(stderr, "context: %d, nprow: %d, npcol %d, myrow %d, mycol %d\n",
-      S_contxt,  S_nprow,   S_npcol,  S_myrow,  S_mycol);
-      fprintf(stderr, "****************************************\n");
-    */
+    contxt->nprow = *nprow;
+    contxt->npcol = *npcol;
+    contxt->myrow = *myrow;
+    contxt->mycol = *mycol;
 }
 

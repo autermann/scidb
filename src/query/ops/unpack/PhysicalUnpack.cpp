@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -279,7 +279,7 @@ std::ostream& operator<<(std::ostream& stream, const UnpackArrayInfo& info)
  * @param[in] numIterators number of elements to flush
  */
 template <class T>
-inline void resetIterators(vector<shared_ptr<T> > & iterators, size_t const numIterators)
+inline void resetIterators(vector<std::shared_ptr<T> > & iterators, size_t const numIterators)
 {
     for (size_t i=0; i<numIterators && iterators[i]; i++)
     {
@@ -294,7 +294,7 @@ inline void resetIterators(vector<shared_ptr<T> > & iterators, size_t const numI
  * @param[in] numIterators number of elements to increment
  */
 template <class T>
-inline void incrementIterators(vector<shared_ptr<T> > & iterators, size_t const numIterators)
+inline void incrementIterators(vector<std::shared_ptr<T> > & iterators, size_t const numIterators)
 {
     for (size_t i=0; i<numIterators; i++)
     {
@@ -325,7 +325,7 @@ public:
         PhysicalOperator(logicalName, physicalName, parameters, schema),
         _outputChunkSize(schema.getDimensions()[0].getChunkInterval())
     {}
-    
+
     /**
      * @see PhysicalOperator::changesDistribution
      * @return true
@@ -365,9 +365,9 @@ public:
      * @return true if input is not emptyable and input chunk size matches output;
      *         false otherwise
      */
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
     {
-        return ArrayDistribution(psUndefined);
+        return RedistributeContext(psUndefined);
     }
 
     /**
@@ -385,7 +385,7 @@ public:
      * @param[in] inputArray the array to iterate over
      * @param[out] info the structure to populate
      */
-    void collectChunkInfo(shared_ptr<Array> const& inputArray, UnpackArrayInfo& info)
+    void collectChunkInfo(std::shared_ptr<Array> const& inputArray, UnpackArrayInfo& info)
     {
         ArrayDesc const& desc = inputArray->getArrayDesc();
         AttributeID victimAttribute = 0;
@@ -406,7 +406,7 @@ public:
                 }
             }
         }
-        shared_ptr<ConstArrayIterator> iter = inputArray->getConstIterator(victimAttribute);
+        std::shared_ptr<ConstArrayIterator> iter = inputArray->getConstIterator(victimAttribute);
         while (!iter->end())
         {
             UnpackChunkAddress addr;
@@ -425,12 +425,12 @@ public:
      * @param[in|out] info the structure to populate
      * @param[in] query the query context
      */
-    void exchangeChunkInfo(UnpackArrayInfo& info, shared_ptr<Query>& query)
+    void exchangeChunkInfo(UnpackArrayInfo& info, std::shared_ptr<Query>& query)
     {
         const size_t nInstances = query->getInstancesCount();
         if (! query->isCoordinator())
         {
-            shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, info.getBinarySize()));
+            std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, info.getBinarySize()));
             info.marshall(buf->getData());
             info.clear();
             BufSend(query->getCoordinatorID(), buf, query);
@@ -444,11 +444,11 @@ public:
             {
                 if(i != myId)
                 {
-                    shared_ptr<SharedBuffer> buf = BufReceive(i,query);
+                    std::shared_ptr<SharedBuffer> buf = BufReceive(i,query);
                     info.unMarshall(buf->getData());
                 }
             }
-            shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, info.getBinarySize()));
+            std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, info.getBinarySize()));
             info.marshall(buf->getData());
             for(InstanceID i=0; i<nInstances; i++)
             {
@@ -467,7 +467,7 @@ public:
      * @param[in] query the query context
      * @param[out] info the data to collect
      */
-    void computeGlobalChunkInfo(boost::shared_ptr<Array> const& inputArray, shared_ptr<Query>& query, UnpackArrayInfo& info)
+    void computeGlobalChunkInfo(std::shared_ptr<Array> const& inputArray, std::shared_ptr<Query>& query, UnpackArrayInfo& info)
     {
         collectChunkInfo(inputArray, info);
         exchangeChunkInfo(info, query);
@@ -487,9 +487,9 @@ public:
      * @param[in] query the query context
      * @return the output MemArray with partially filled chunks wherein all the data elements are at the right place
      */
-    shared_ptr<Array> fillOutputArray(shared_ptr<Array> const& inputArray, UnpackArrayInfo const& chunkInfo, shared_ptr<Query> &query)
+    std::shared_ptr<Array> fillOutputArray(std::shared_ptr<Array> const& inputArray, UnpackArrayInfo const& chunkInfo, std::shared_ptr<Query> &query)
     {
-        shared_ptr<Array> result = make_shared<MemArray>(_schema,query);
+        std::shared_ptr<Array> result = make_shared<MemArray>(_schema,query);
         ArrayDesc const& inputSchema = inputArray->getArrayDesc();
         size_t nSrcDims = inputSchema.getDimensions().size();
         size_t nSrcAttrs = inputSchema.getAttributes(true).size();
@@ -497,10 +497,10 @@ public:
         size_t nDstAttrs = _schema.getAttributes(true).size();
         Coordinates outputChunkPos(0);
         Coordinates outputCellPos(1,0);
-        vector<shared_ptr<ConstArrayIterator> > saiters (nSrcAttrs); //source array and chunk iters
-        vector<shared_ptr<ConstChunkIterator> > sciters (nSrcAttrs);
-        vector<shared_ptr<ArrayIterator> > daiters (nDstAttrs);      //destination array and chunk iters
-        vector<shared_ptr<ChunkIterator> > dciters (nDstAttrs);
+        vector<std::shared_ptr<ConstArrayIterator> > saiters (nSrcAttrs); //source array and chunk iters
+        vector<std::shared_ptr<ConstChunkIterator> > sciters (nSrcAttrs);
+        vector<std::shared_ptr<ArrayIterator> > daiters (nDstAttrs);      //destination array and chunk iters
+        vector<std::shared_ptr<ChunkIterator> > dciters (nDstAttrs);
         for(AttributeID i =0; i<nSrcAttrs; i++)
         {
             saiters[i] = inputArray->getConstIterator(i);
@@ -569,10 +569,10 @@ public:
      * @param[in] query the query context
      * @return the MemArray with partially filled chunks wherein each element is in the correct place
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
-        boost::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+        std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
         Dimensions const& dims = inputArray->getArrayDesc().getDimensions();
 
         UnpackArrayInfo info(dims.size());

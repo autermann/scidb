@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,17 +42,17 @@ namespace scidb {
     //
     // Build chunk iterator methods
     //
-    int BuildChunkIterator::getMode()
+    int BuildChunkIterator::getMode() const
     {
         return iterationMode;
     }
 
-    Value& BuildChunkIterator::getItem()
+    Value const& BuildChunkIterator::getItem()
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        
-        if (attrID != 0) { 
+
+        if (attrID != 0) {
             return _trueValue;
         }
         const size_t nBindings =  array._bindings.size();
@@ -105,7 +105,7 @@ namespace scidb {
         return !hasCurrent;
     }
 
-    bool BuildChunkIterator::isEmpty()
+    bool BuildChunkIterator::isEmpty() const
     {
         return false;
     }
@@ -161,8 +161,8 @@ namespace scidb {
     //
     // Build chunk methods
     //
-    Array const& BuildChunk::getArray() const 
-    { 
+    Array const& BuildChunk::getArray() const
+    {
         return array;
     }
 
@@ -186,9 +186,9 @@ namespace scidb {
         return withOverlap ? lastPosWithOverlap : lastPos;
     }
 
-        boost::shared_ptr<ConstChunkIterator> BuildChunk::getConstIterator(int iterationMode) const
+        std::shared_ptr<ConstChunkIterator> BuildChunk::getConstIterator(int iterationMode) const
     {
-        return boost::shared_ptr<ConstChunkIterator>(new BuildChunkIterator(array, this, attrID, iterationMode));
+        return std::shared_ptr<ConstChunkIterator>(new BuildChunkIterator(array, this, attrID, iterationMode));
     }
 
     int BuildChunk::getCompressionMethod() const
@@ -256,17 +256,17 @@ namespace scidb {
     void BuildArrayIterator::nextChunk()
     {
         chunkInitialized = false;
-        while (true) { 
+        while (true) {
             int i = dims.size() - 1;
-            while ((currPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) { 
-                if (i == 0) { 
+            while ((currPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) {
+                if (i == 0) {
                     hasCurrent = false;
                     return;
                 }
                 currPos[i] = dims[i].getStartMin();
                 i -= 1;
             }
-            if (array._desc.getHashedChunkNumber(currPos) % array.nInstances == array.instanceID) {
+            if (array._desc.getPrimaryInstanceId(currPos,array.nInstances) == array.instanceID) {
                 hasCurrent = true;
                 return;
             }
@@ -284,13 +284,13 @@ namespace scidb {
         currPos = pos;
         array._desc.getChunkPositionFor(currPos);
         chunkInitialized = false;
-        return hasCurrent = array._desc.getHashedChunkNumber(currPos) % array.nInstances == array.instanceID;
+        return hasCurrent = array._desc.getPrimaryInstanceId(currPos, array.nInstances) == array.instanceID;
     }
 
     void BuildArrayIterator::reset()
     {
         Query::getValidQueryPtr(array._query);
-        size_t nDims = currPos.size(); 
+        size_t nDims = currPos.size();
         for (size_t i = 0; i < nDims; i++) {
             currPos[i] = dims[i].getStartMin();
         }
@@ -304,7 +304,7 @@ namespace scidb {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
         }
         Query::getValidQueryPtr(array._query);
-        if (!chunkInitialized) { 
+        if (!chunkInitialized) {
             chunk.setPosition(currPos);
             chunkInitialized = true;
         }
@@ -314,7 +314,7 @@ namespace scidb {
 
     BuildArrayIterator::BuildArrayIterator(BuildArray& arr, AttributeID attrID)
     : array(arr),
-      chunk(arr, attrID), 
+      chunk(arr, attrID),
       dims(arr._desc.getDimensions()),
       currPos(dims.size())
     {
@@ -331,14 +331,14 @@ namespace scidb {
         return _desc;
     }
 
-    boost::shared_ptr<ConstArrayIterator> BuildArray::getConstIterator(AttributeID attr) const
+    std::shared_ptr<ConstArrayIterator> BuildArray::getConstIterator(AttributeID attr) const
     {
-        return boost::shared_ptr<ConstArrayIterator>(new BuildArrayIterator(*(BuildArray*)this, attr));
+        return std::shared_ptr<ConstArrayIterator>(new BuildArrayIterator(*(BuildArray*)this, attr));
     }
 
-    BuildArray::BuildArray(boost::shared_ptr<Query>& query,
+    BuildArray::BuildArray(std::shared_ptr<Query>& query,
                            ArrayDesc const& desc,
-                           boost::shared_ptr< Expression> expression)
+                           std::shared_ptr< Expression> expression)
     : _desc(desc),
       _expression(expression),
       _bindings(_expression->getBindings()),

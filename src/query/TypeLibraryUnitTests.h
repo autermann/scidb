@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -37,13 +37,12 @@
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
-#include "system/ErrorCodes.h"
-#include "query/TypeSystem.h"
-#include "query/ParsingContext.h"
+#include <system/ErrorCodes.h>
+#include <query/TypeSystem.h>
+#include <query/ParsingContext.h>
 
 class TypeLibraryTests: public CppUnit::TestFixture
 {

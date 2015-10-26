@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -27,8 +27,10 @@
  *              Donghui Zhang
  */
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/foreach.hpp>
+#include <unordered_map>
+
 #include <array/StreamArray.h>
 #include <util/CoordinatesToKey.h>
 #include <query/Operator.h>
@@ -70,6 +72,8 @@ public:
     ~PhysicalCumulate()
     {}
 
+    typedef unordered_map<Coordinates, Value, CoordinatesHash> Coords2Value;
+
     /**
      * A class that stores intermediate aggregate states.
      */
@@ -78,7 +82,7 @@ public:
         /**
          * for every position, store an aggregate state
          */
-        unordered_map<Coordinates, Value> _hash;
+        Coords2Value _hash;
 
         /**
          * the aggregate function
@@ -104,7 +108,7 @@ public:
          */
         void accumulateOrMerge(Coordinates const& pos, Value const& v, bool isState)
         {
-            unordered_map<Coordinates, Value>::iterator it = _hash.find(pos);
+            Coords2Value::iterator it = _hash.find(pos);
             Value state(_aggregate->getStateType());
             if (it == _hash.end()) {
                 _aggregate->initializeState(state);
@@ -140,7 +144,7 @@ public:
         /**
          * Getter for _hash.
          */
-        unordered_map<Coordinates, Value>& getHash()
+        Coords2Value& getHash()
         {
             return _hash;
         }
@@ -160,10 +164,10 @@ public:
         typedef Coordinates Key;
         typedef Coordinates ChunkPos;
         typedef vector<ChunkPos> VectorOfChunkPos;
-        typedef unordered_map<Key, shared_ptr<VectorOfChunkPos> > MyMap;
+        typedef unordered_map<Key, std::shared_ptr<VectorOfChunkPos>, CoordinatesHash > KeyToVectorOfChunkPos;
 
         // the map
-        MyMap _map;
+        KeyToVectorOfChunkPos _map;
 
         /**
          * @param[in]  aggrDim      the dimension to aggregate on
@@ -181,9 +185,9 @@ public:
         {
             Coordinates const& key = _coordsToKey.toKey(chunkPos);
 
-            MyMap::iterator it = _map.find(key);
+            KeyToVectorOfChunkPos::iterator it = _map.find(key);
             if (it == _map.end()) {
-                _map.insert(std::pair<Key, shared_ptr<VectorOfChunkPos> >(key, make_shared<VectorOfChunkPos>()));
+                _map.insert(std::pair<Key, std::shared_ptr<VectorOfChunkPos> >(key, make_shared<VectorOfChunkPos>()));
                 it = _map.find(key);
                 assert(it!=_map.end());
             }
@@ -197,9 +201,9 @@ public:
          *
          * @return whether the vector exists
          */
-        bool getVector(Coordinates const& chunkPos, shared_ptr<VectorOfChunkPos>& pVectorOfChunkPos)
+        bool getVector(Coordinates const& chunkPos, std::shared_ptr<VectorOfChunkPos>& pVectorOfChunkPos)
         {
-            MyMap::iterator it = _map.find( _coordsToKey.toKey(chunkPos) );
+            KeyToVectorOfChunkPos::iterator it = _map.find( _coordsToKey.toKey(chunkPos) );
             if (it == _map.end()) {
                 return false;
             }
@@ -218,11 +222,11 @@ public:
         size_t _aggrDim;                     /// the dimension to aggregate on
         vector<AggregatePtr> _aggregates;    /// the aggregates, one per output attribute
         vector<AttributeID> _inputAttrIDs;   /// the attributes in the input array, to compute aggregates on
-        shared_ptr<Array> _localEdges;       /// the local edges, i.e. the aggregation state built using data in each local chunk
-        shared_ptr<Array> _allEdges;         /// local edges from all instances put together
-        shared_ptr<MapOfVectorsOfChunkPos> _mapOfVectorsInRemoteEdges;  /// MapOfVectorsOfChunkPos in the remote edges, i.e. in _allEdges but not in _localEdges
-        shared_ptr<MapOfVectorsOfChunkPos> _mapOfVectorsInInputArray;   /// MapOfVectorsOfChunkPos in the input array
-        shared_ptr<CoordinatesToKey> _cellPosToKey;                     /// a tool to turn a cell position to a key, by replacing the coordinate in the aggrDim with 0
+        std::shared_ptr<Array> _localEdges;       /// the local edges, i.e. the aggregation state built using data in each local chunk
+        std::shared_ptr<Array> _allEdges;         /// local edges from all instances put together
+        std::shared_ptr<MapOfVectorsOfChunkPos> _mapOfVectorsInRemoteEdges;  /// MapOfVectorsOfChunkPos in the remote edges, i.e. in _allEdges but not in _localEdges
+        std::shared_ptr<MapOfVectorsOfChunkPos> _mapOfVectorsInInputArray;   /// MapOfVectorsOfChunkPos in the input array
+        std::shared_ptr<CoordinatesToKey> _cellPosToKey;                     /// a tool to turn a cell position to a key, by replacing the coordinate in the aggrDim with 0
     };
 
     /**
@@ -234,7 +238,7 @@ public:
      * @pre The variables in MyVariablesInExecute, before the one to be generated in this routine, should already be assigned.
      * @note chunks at the end of the aggrDim do not need to have its local edge built, because such local edges won't be used.
      */
-    shared_ptr<MemArray> buildLocalEdges(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
+    std::shared_ptr<MemArray> buildLocalEdges(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
     {
         // Create an array.
         //
@@ -249,16 +253,16 @@ public:
                     );
         }
 
-        shared_ptr<MemArray> localEdges = make_shared<MemArray>(
-            ArrayDesc(commonVars._output._schema.getName(),addEmptyTagAttribute(attrsEdge),commonVars._output._dims),
+        std::shared_ptr<MemArray> localEdges = make_shared<MemArray>(
+            ArrayDesc(commonVars._output._schema.getName(),addEmptyTagAttribute(attrsEdge),commonVars._output._dims, defaultPartitioning()),
             commonVars._query
             );
 
         // Fill in data.
         //
         for (AttributeID outputAttr = 0; outputAttr < myVars._numAggrs; ++outputAttr) {
-            shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._input._array->getConstIterator(myVars._inputAttrIDs[outputAttr]);
-            shared_ptr<ArrayIterator> localEdgesArrayIter = localEdges->getIterator(outputAttr);
+            std::shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._input._array->getConstIterator(myVars._inputAttrIDs[outputAttr]);
+            std::shared_ptr<ArrayIterator> localEdgesArrayIter = localEdges->getIterator(outputAttr);
 
             while (!inputArrayIter->end()) {
                 Coordinates const& inputChunkPos = inputArrayIter->getPosition();
@@ -271,7 +275,7 @@ public:
                 }
 
                 ConstChunk const& inputChunk = inputArrayIter->getChunk();
-                shared_ptr<ConstChunkIterator> inputChunkIter = inputChunk.getConstIterator();
+                std::shared_ptr<ConstChunkIterator> inputChunkIter = inputChunk.getConstIterator();
 
                 // an object to convert a cell Coordinates to a key, i.e. by replacing the coordinate in aggrDim with that in chunkPos
                 //
@@ -298,10 +302,10 @@ public:
                 if (outputAttr != 0) {
                     iterMode |= ChunkIterator::NO_EMPTY_CHECK;
                 }
-                shared_ptr<ChunkIterator> localEdgesChunkIter = chunk.getIterator(commonVars._query, iterMode);
+                std::shared_ptr<ChunkIterator> localEdgesChunkIter = chunk.getIterator(commonVars._query, iterMode);
 
                 std::map<Coordinates, Value> tempMap;
-                for (unordered_map<Coordinates, Value>::iterator it = edgeVector.getHash().begin(); it != edgeVector.getHash().end(); ++it ) {
+                for (Coords2Value::iterator it = edgeVector.getHash().begin(); it != edgeVector.getHash().end(); ++it ) {
                     tempMap[it->first] = it->second;
                 }
 
@@ -331,12 +335,12 @@ public:
      *
      * @pre The variables in MyVariablesInExecute, before the one to be generated in this routine, should already be assigned.
      */
-    shared_ptr<MapOfVectorsOfChunkPos> buildMapOfVectorsInRemoteEdges(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
+    std::shared_ptr<MapOfVectorsOfChunkPos> buildMapOfVectorsInRemoteEdges(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
     {
-        shared_ptr<MapOfVectorsOfChunkPos> mapOfVectorsInRemoteEdges = make_shared<MapOfVectorsOfChunkPos>(myVars._aggrDim);
-        shared_ptr<ConstArrayIterator> localEdgesArrayIter = myVars._localEdges->getConstIterator(0);
+        std::shared_ptr<MapOfVectorsOfChunkPos> mapOfVectorsInRemoteEdges = make_shared<MapOfVectorsOfChunkPos>(myVars._aggrDim);
+        std::shared_ptr<ConstArrayIterator> localEdgesArrayIter = myVars._localEdges->getConstIterator(0);
 
-        shared_ptr<CoordinateSet> chunkPosAllEdges = myVars._allEdges->findChunkPositions();
+        std::shared_ptr<CoordinateSet> chunkPosAllEdges = myVars._allEdges->findChunkPositions();
 
         for (CoordinateSet::const_iterator itSet=chunkPosAllEdges->begin(); itSet!=chunkPosAllEdges->end(); ++itSet) {
             // only push if this is a remote chunk
@@ -357,10 +361,10 @@ public:
      *
      * @pre The variables in MyVariablesInExecute, before the one to be generated in this routine, should already be assigned.
      */
-    shared_ptr<MapOfVectorsOfChunkPos> buildMapOfVectorsInInputArray(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
+    std::shared_ptr<MapOfVectorsOfChunkPos> buildMapOfVectorsInInputArray(CommonVariablesInExecute const& commonVars, MyVariablesInExecute const& myVars)
     {
-        shared_ptr<MapOfVectorsOfChunkPos> mapOfVectorsInInputArray = make_shared<MapOfVectorsOfChunkPos>(myVars._aggrDim);
-        shared_ptr<CoordinateSet> chunkPosInputArray = commonVars._input._array->findChunkPositions();
+        std::shared_ptr<MapOfVectorsOfChunkPos> mapOfVectorsInInputArray = make_shared<MapOfVectorsOfChunkPos>(myVars._aggrDim);
+        std::shared_ptr<CoordinateSet> chunkPosInputArray = commonVars._input._array->findChunkPositions();
 
         for (CoordinateSet::const_iterator itSet=chunkPosInputArray->begin(); itSet!=chunkPosInputArray->end(); ++itSet) {
             mapOfVectorsInInputArray->append(*itSet);
@@ -383,16 +387,16 @@ public:
             // array iterators
             //
             AttributeID inputAttr = myVars._inputAttrIDs[outputAttr];
-            shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._input._array->getConstIterator(inputAttr);
-            shared_ptr<ConstArrayIterator> remoteEdgesArrayIter = myVars._allEdges->getConstIterator(outputAttr);
-            shared_ptr<ArrayIterator> outputArrayIter = commonVars._output._array->getIterator(outputAttr);
+            std::shared_ptr<ConstArrayIterator> inputArrayIter = commonVars._input._array->getConstIterator(inputAttr);
+            std::shared_ptr<ConstArrayIterator> remoteEdgesArrayIter = myVars._allEdges->getConstIterator(outputAttr);
+            std::shared_ptr<ArrayIterator> outputArrayIter = commonVars._output._array->getIterator(outputAttr);
 
             // for every vector of input chunks
             //
             // Reminder:
-            // typedef unordered_map<Key=Coordinates, shared_ptr<VectorOfChunkPos> > MapOfVectorsOfChunkPos::MyMap;
+            // typedef unordered_map<Key=Coordinates, std::shared_ptr<VectorOfChunkPos> > MapOfVectorsOfChunkPos::KeyToVectorOfChunkPos;
             //
-            for (MapOfVectorsOfChunkPos::MyMap::const_iterator itMapOfVectorsInInputArray = myVars._mapOfVectorsInInputArray->_map.begin();
+            for (MapOfVectorsOfChunkPos::KeyToVectorOfChunkPos::const_iterator itMapOfVectorsInInputArray = myVars._mapOfVectorsInInputArray->_map.begin();
                     itMapOfVectorsInInputArray != myVars._mapOfVectorsInInputArray->_map.end();
                     ++itMapOfVectorsInInputArray)
             {
@@ -402,7 +406,7 @@ public:
 
                 // Get an iterator into the matching vector in remote edges.
                 //
-                MapOfVectorsOfChunkPos::MyMap::const_iterator itMapOfVectorsInRemoteEdges =
+                MapOfVectorsOfChunkPos::KeyToVectorOfChunkPos::const_iterator itMapOfVectorsInRemoteEdges =
                         myVars._mapOfVectorsInRemoteEdges->_map.find(itMapOfVectorsInInputArray->first);
                 bool hasRemoteEdges = (itMapOfVectorsInRemoteEdges != myVars._mapOfVectorsInRemoteEdges->_map.end());
                 vector<Coordinates>::const_iterator itVectorInRemoteEdges;
@@ -440,7 +444,7 @@ public:
                         bool mustSucceed = remoteEdgesArrayIter->setPosition(coordsInRemoteEdges);
                         SCIDB_ASSERT(mustSucceed);
                         ConstChunk const& chunk = remoteEdgesArrayIter->getChunk();
-                        shared_ptr<ConstChunkIterator> remoteEdgesChunkIter = chunk.getConstIterator();
+                        std::shared_ptr<ConstChunkIterator> remoteEdgesChunkIter = chunk.getConstIterator();
 
                         while (!remoteEdgesChunkIter->end()) {
                             Coordinates const& cellPos = remoteEdgesChunkIter->getPosition();
@@ -458,13 +462,13 @@ public:
                     bool mustSucceed = inputArrayIter->setPosition(chunkPosInput);
                     SCIDB_ASSERT(mustSucceed);
                     ConstChunk const& chunkInput = inputArrayIter->getChunk();
-                    shared_ptr<ConstChunkIterator> inputChunkIter = chunkInput.getConstIterator();
+                    std::shared_ptr<ConstChunkIterator> inputChunkIter = chunkInput.getConstIterator();
                     Chunk& outputChunk = outputArrayIter->newChunk(chunkPosInput);
                     int iterMode = ChunkIterator::SEQUENTIAL_WRITE;
                     if (outputAttr!=0) {
                         iterMode |= ChunkIterator::NO_EMPTY_CHECK;
                     }
-                    shared_ptr<ChunkIterator> outputChunkIter = outputChunk.getIterator(commonVars._query, iterMode);
+                    std::shared_ptr<ChunkIterator> outputChunkIter = outputChunk.getIterator(commonVars._query, iterMode);
 
                     while (!inputChunkIter->end()) {
                         Coordinates const& cellPos =inputChunkIter->getPosition();
@@ -480,16 +484,16 @@ public:
                     // flush the output chunk
                     outputChunkIter->flush();
                 } // for (vector<Coordinates>::const_iterator itVectorInInputArray = vectorInInputArray.begin();
-            } // for (MapOfVectorsOfChunkPos::MyMap::const_iterator itMapOfVectorsInInputArray = myVars._mapOfVectorsInInputArray->_map.begin();
+            } // for (MapOfVectorsOfChunkPos::KeyToVectorOfChunkPos::const_iterator itMapOfVectorsInInputArray = myVars._mapOfVectorsInInputArray->_map.begin();
         } // for (AttributeID outputAttr = 0; outputAttr < commonVars._numAggrs; outputAttr++)
     }
 
     /**
      * @see PhysicalOperator::execute()
      */
-    boost::shared_ptr<Array> execute (
-            vector< boost::shared_ptr<Array> >& inputArrays,
-            boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute (
+            vector< std::shared_ptr<Array> >& inputArrays,
+            std::shared_ptr<Query> query)
     {
         SCIDB_ASSERT( _parameters.size() > 0 ); // at least one aggregate call
         SCIDB_ASSERT(inputArrays.size() == 1);
@@ -497,11 +501,11 @@ public:
         // CommonVariablesInExecute
         // TO-DO: for now, we make sure the input array is materialized
         //
-        shared_ptr<Array> inputArray = inputArrays[0];
+        std::shared_ptr<Array> inputArray = inputArrays[0];
         if (!inputArray->isMaterialized()) {
-            inputArray = shared_ptr<MemArray>(new MemArray(inputArray, query));
+            inputArray = std::shared_ptr<MemArray>(new MemArray(inputArray, query));
         }
-        shared_ptr<Array> outputArray = make_shared<MemArray>(_schema, query);
+        std::shared_ptr<Array> outputArray = make_shared<MemArray>(_schema, query);
         CommonVariablesInExecute commonVars(inputArray, outputArray, query);
 
         // get the aggregate dimension
@@ -510,7 +514,7 @@ public:
         myVars._numAggrs = commonVars._output._attrsWithoutET.size();
         myVars._aggrDim = 0;
 
-        shared_ptr<OperatorParam>& lastParam = _parameters[_parameters.size()-1];
+        std::shared_ptr<OperatorParam>& lastParam = _parameters[_parameters.size()-1];
         if ( lastParam->getParamType() == PARAM_DIMENSION_REF ) {
             assert(_parameters.size() == myVars._numAggrs+1);
 
@@ -537,7 +541,7 @@ public:
             assert( _parameters[i]->getParamType() == PARAM_AGGREGATE_CALL );
 
             myVars._aggregates[i] = resolveAggregate(
-                    (shared_ptr <OperatorParamAggregateCall> const&) _parameters[i],
+                    (std::shared_ptr <OperatorParamAggregateCall> const&) _parameters[i],
                     commonVars._input._attrsWithoutET,
                     &myVars._inputAttrIDs[i],
                     0);
@@ -558,9 +562,9 @@ public:
         //
         myVars._allEdges = redistributeToRandomAccess(myVars._localEdges, query, psReplication,
                                                       ALL_INSTANCE_MASK,
-                                                      shared_ptr<DistributionMapper>(),
+                                                      std::shared_ptr<CoordinateTranslator>(),
                                                       0,
-                                                      shared_ptr<PartitioningSchemaData>());
+                                                      std::shared_ptr<PartitioningSchemaData>());
 
         // Generate a map of vector<chunkPos> for chunks in _allEdges, but not in _localEdges.
         // The key of the map is chunkPos, with the coordinate in aggrDim replaced with 0.

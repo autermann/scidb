@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -26,7 +26,7 @@ def usage():
   print "\t Usage: python pythonsample4.py <fullstatementfilepath> <fullfilepath> <fullpythonlibdiri>"
   print ""
   print "Use this script to read and execute scidb statements contained"
-  print "in a file" 
+  print "in a file"
   print ""
   print "fullfilepath:"
   print "   FULL PATH to a containing a file of SciDB statements."
@@ -45,15 +45,15 @@ def q_execute(query, myzz):
         else:
 		queryType = 1
         print "%s" % query[2]
-        try: 
+        try:
 		myzz.executeQuery(query[2], queryType, qr, myhandle)
         except Exception, inst:
                 print "Exception occured during statement execution attempt:"
                 print "     Exception Type: %s" % type(inst)     # the exception instance
                 print "     %s" % inst
                 print "Program will proceed to next statement in file."
-                return False 
-        return True 
+                return False
+        return True
 
 def print_result(qr):
 	mydesc = qr.array.getArrayDesc()
@@ -79,10 +79,10 @@ def print_result(qr):
 		out_file.write( "\n           Type: %s" % myattributes[i].getType() )
 	out_file.write( "\n _____________________________________________________________________________________" )
 	out_file.write( "\n Getting array iterators."  )
-	arrayiterators = libscidbpython.constarrayiterator(numberofattributes) 
+	arrayiterators = libscidbpython.constarrayiterator(numberofattributes)
 	out_file.write( "\n      Number of arrayiterators: %d" % numberofattributes )
-	for i in range (0, numberofattributes): 
-		attributeid = myattributes[i].getId() 
+	for i in range (0, numberofattributes):
+		attributeid = myattributes[i].getId()
 		out_file.write( "\n      Attributeid = %d" % attributeid )
 		arrayiterators[i] = qr.array.getConstIterator( attributeid )
 		out_file.write( "\n      Iterator %d loaded" % i )
@@ -103,9 +103,9 @@ def print_result(qr):
 			for i in range (0, numberofattributes):
                         	if not chunkiterators[i].isEmpty(): #Determine if the attribute contains data.
                                                                     #This test is not necessary if currentchunk.getConstIterator is called
-                                                                    #with the paramater libscidbpython.ConstChunkIterator.IGNORE_OVERLAPS 
+                                                                    #with the paramater libscidbpython.ConstChunkIterator.IGNORE_OVERLAPS
                                                                     # is or'ed(|) with
-                                                                    #libscidbpython.ConstChunkIterator.IGNORE_EMPTY_CELLS 
+                                                                    #libscidbpython.ConstChunkIterator.IGNORE_EMPTY_CELLS
 					dataitem = chunkiterators[i].getItem()
 					#out_file.write( "\n           Data: %s" % libscidbpython.ValueToString(myattributes[i].getType(),dataitem) )
  					if myattributes[i].getType() == "string":
@@ -128,11 +128,11 @@ def print_result(qr):
                                          	out_file.write( "\n           Data: %s" % dataitem.getFloat() )
                                  	elif myattributes[i].getType() == "indicator":
                                          	out_file.write( "\n           Indicator: Returned attributes matched predicate criteria(e.g. where...)")
-                                        #note: Scidb will return an extra synthesized attribute for every cell containing data that matches predicate criteria. 
+                                        #note: Scidb will return an extra synthesized attribute for every cell containing data that matches predicate criteria.
                                         #      iquery shows the value of this synthized attribute as "true".  So if a cell has 5 attributes and a select statement
-                                        #      returned all the attributes because the predicate criteria where matched then a total of 6 attributes will be 
-                                        #      returned. The last attribute will be the indicator. When the array shape is maintained in the result set the 
-                                        #      indicator can be used to identify cells with data. 
+                                        #      returned all the attributes because the predicate criteria where matched then a total of 6 attributes will be
+                                        #      returned. The last attribute will be the indicator. When the array shape is maintained in the result set the
+                                        #      indicator can be used to identify cells with data.
                                  	elif myattributes[i].getType() == "int16":
                                          	out_file.write( "\n           Data: %s" % dataitem.getInt16() )
                                  	elif myattributes[i].getType() == "uint16":
@@ -151,7 +151,7 @@ def print_result(qr):
                        		out_file.write( "\n           ______________________________________" )
 
 		for j in range (0, numberofattributes):
-			arrayiterators[j].increment_to_next();                
+			arrayiterators[j].increment_to_next();
 		numberofchunks += 1;
 	out_file.write( "\n           End of data" )
 	out_file.write( "\n _____________________________________________________________________________________" )
@@ -163,7 +163,7 @@ if __name__ == "__main__":
            usage()
         #Set the path to the data file used to load our new array.
         fullfilepath = sys.argv[1]
-        #Set the path to the Python API runtime library.  This path contains the file libscidbpython.py. 
+        #Set the path to the Python API runtime library.  This path contains the file libscidbpython.py.
         #libscidbpython.py loads the actual runtime library _libscidbpython.so
         #libscidbpython.py contains the python interface code to _libscidbpython.so. It must be imported
         #into your python application.

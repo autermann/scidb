@@ -1,8 +1,8 @@
 ########################################
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -31,3 +31,4 @@ add_subdirectory("operators")
 add_subdirectory("fits")
 add_subdirectory("example_udos")
 add_subdirectory("tile_integration")
+add_subdirectory("load_tools")

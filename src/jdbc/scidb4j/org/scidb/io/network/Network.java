@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -26,6 +26,7 @@ import java.net.Socket;
 import java.net.SocketException;
 
 import org.scidb.util.InputStreamWithReadall;
+import org.scidb.client.SciDBException;
 
 /**
  * Class for handling reading and writing arbitrary network messages syncronously
@@ -36,7 +37,7 @@ public class Network
 
     /**
      * Connect to server
-     * 
+     *
      * @param host Host name or IP
      * @param port Port number
      * @throws IOException
@@ -48,7 +49,7 @@ public class Network
 
     /**
      * Close connection
-     * 
+     *
      * @throws IOException
      */
     public void disconnect() throws IOException
@@ -59,7 +60,7 @@ public class Network
 
     /**
      * Set timeout to socket
-     * 
+     *
      * @param timeout Timeout im milliseconds
      * @throws SocketException
      */
@@ -80,7 +81,7 @@ public class Network
 
     /**
      * Write arbitrary SciDB network message to socket
-     * 
+     *
      * @param msg Message object
      * @throws IOException
      */
@@ -91,12 +92,12 @@ public class Network
 
     /**
      * Read arbitrary network message from socket
-     * 
+     *
      * @return SciDB network message
-     * @throws org.scidb.client.Error
+     * @throws SciDBException
      * @throws IOException
      */
-    public Message read() throws org.scidb.client.Error, IOException
+    public Message read() throws SciDBException, IOException
     {
         return Message.parseFromStream(new InputStreamWithReadall(sock.getInputStream()));
     }

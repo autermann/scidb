@@ -6,8 +6,9 @@
 create array zipcodes <city:string,state_code:string,zip:int64>[i=0:*,10,0]
 
 --test
---shell --command "cat ${TEST_DATA_DIR}/zipcodes.csv | loadcsv.py -a zipcodes -d ${IQUERY_HOST} -p ${IQUERY_PORT}"
-scan(zipcodes)
+--shell --command "cp ${TEST_DATA_DIR}/zipcodes.csv /tmp"
+load(zipcodes, '/tmp/zipcodes.csv', -2, 'csv')
 
 --cleanup
 remove(zipcodes)
+--shell --command "rm -f /tmp/zipcodes.csv"

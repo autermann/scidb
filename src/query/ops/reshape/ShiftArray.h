@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -31,12 +31,11 @@
 #ifndef SHIFT_ARRAY_H
 #define SHIFT_ARRAY_H
 
-#include "array/DelegateArray.h"
-#include "array/MemArray.h"
+#include <array/DelegateArray.h>
+#include <array/MemArray.h>
 
 namespace scidb {
 
-using namespace boost;
 using namespace std;
 
 class ShiftArray;
@@ -45,7 +44,7 @@ class ShiftChunk;
 class ShiftChunkIterator;
 
 class ShiftChunkIterator : public DelegateChunkIterator
-{  
+{
     ShiftArray const& array;
     Coordinates outPos;
     Coordinates inPos;
@@ -79,7 +78,7 @@ class ShiftArrayIterator : public DelegateArrayIterator
     virtual Coordinates const& getPosition();
     virtual bool setPosition(Coordinates const& pos);
 
-	ShiftArrayIterator(ShiftArray const& array, AttributeID attrID, boost::shared_ptr<ConstArrayIterator> inputIterator);
+	ShiftArrayIterator(ShiftArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator);
 };
 
 class ShiftArray : public DelegateArray
@@ -92,7 +91,7 @@ class ShiftArray : public DelegateArray
     Dimensions outDims;
 
     void in2out(Coordinates const& inPos, Coordinates& outPos) const;
-    void out2in(Coordinates const& outPos, Coordinates& inPos) const; 
+    void out2in(Coordinates const& outPos, Coordinates& inPos) const;
 
   public:
 
@@ -100,7 +99,7 @@ class ShiftArray : public DelegateArray
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    ShiftArray(ArrayDesc const& desc, boost::shared_ptr<Array> const& array);
+    ShiftArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array);
 };
 
 }

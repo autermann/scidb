@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -77,8 +77,8 @@ class JoinArrayIterator : public DelegateArrayIterator
         hasCurrent = false;
     }
 
-    JoinArrayIterator(DelegateArray const& array, AttributeID attrID, shared_ptr<ConstArrayIterator> inputIterator,
-                      shared_ptr<ConstArrayIterator> pairIterator)
+    JoinArrayIterator(DelegateArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator,
+                      std::shared_ptr<ConstArrayIterator> pairIterator)
     : DelegateArrayIterator(array, attrID, inputIterator),
       joinIterator(pairIterator)
     {
@@ -86,7 +86,7 @@ class JoinArrayIterator : public DelegateArrayIterator
     }
 
   private:
-    shared_ptr<ConstArrayIterator> joinIterator;
+    std::shared_ptr<ConstArrayIterator> joinIterator;
     bool hasCurrent;
 };
 
@@ -104,7 +104,7 @@ public:
                                          : leftArray->getConstIterator(0));
     }
 
-    JoinArray(ArrayDesc const& desc, boost::shared_ptr<Array> left, boost::shared_ptr<Array> right)
+    JoinArray(ArrayDesc const& desc, std::shared_ptr<Array> left, std::shared_ptr<Array> right)
     : DelegateArray(desc, left),
       leftArray(left),
       rightArray(right),
@@ -113,8 +113,8 @@ public:
     }
 
   private:
-    boost::shared_ptr<Array> leftArray;
-    boost::shared_ptr<Array> rightArray;
+    std::shared_ptr<Array> leftArray;
+    std::shared_ptr<Array> rightArray;
     size_t nLeftAttributes;
 };
 
@@ -146,25 +146,26 @@ public:
     /**
      * Ensure input array chunk sizes and overlaps match.
      */
-    virtual void requiresRepart(vector<ArrayDesc> const& inputSchemas,
-                                vector<ArrayDesc const*>& repartPtrs) const
+    virtual void requiresRedimensionOrRepartition(
+        vector<ArrayDesc> const& inputSchemas,
+        vector<ArrayDesc const*>& modifiedPtrs) const
     {
-        repartByLeftmost(inputSchemas, repartPtrs);
+        repartByLeftmost(inputSchemas, modifiedPtrs);
     }
 
     /***
      * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
-        boost::shared_ptr<Array> left = inputArrays[0];
-        boost::shared_ptr<Array> right = inputArrays[1];
+        std::shared_ptr<Array> left = inputArrays[0];
+        std::shared_ptr<Array> right = inputArrays[1];
         left = ensureRandomAccess(left, query);
         right = ensureRandomAccess(right, query);
 
-        return boost::shared_ptr<Array>(_schema.getEmptyBitmapAttribute() == NULL
+        return std::shared_ptr<Array>(_schema.getEmptyBitmapAttribute() == NULL
                                         ? (Array*)new JoinArray(_schema, left, right)
                                         : (Array*)new JoinEmptyableArray(_schema, left, right));
     }

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -52,44 +52,6 @@ out transform(I i,I e,J j,K k,L l,out o,function f)
     }
 
     return o;
-}
-
-/**
- * Return true if at least one of the elements in the sequence [i,e) satisfies
- * the given predicate. The function should be part of the standard library in
- * C++ 11.
- */
-template<class iterator,class predicate>
-bool any_of(iterator i,iterator e,predicate pred)
-{
-    for ( ; i!=e; ++i)
-    {
-        if (pred(*i))
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/**
- * Return  true if every one of  the elements in  the sequence [i,e) satisfies
- * the given predicate. The function should be part of the standard library in
- * C++ 11.
- */
-template<class iterator,class predicate>
-bool all_of(iterator i,iterator e,predicate pred)
-{
-    for ( ; i!=e; ++i)
-    {
-        if (!pred(*i))
-        {
-            return false;
-        }
-    }
-
-    return  true;
 }
 
 /****************************************************************************/

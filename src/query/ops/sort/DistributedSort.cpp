@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2014 SciDB, Inc.
+* Copyright (C) 2014-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,19 +32,19 @@
 #include "DistributedSort.h"
 #include "ArrayBreaker.h"
 
-using namespace std;
-using namespace boost;
-
 namespace scidb
 {
+using namespace std;
+using namespace boost;
+using namespace arena;
 
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.sort"));
 
 DistributedSort::DistributedSort(
-        shared_ptr<Query> query,
-        shared_ptr<MemArray> const& sortedLocalData,
+        std::shared_ptr<Query> query,
+        std::shared_ptr<MemArray> const& sortedLocalData,
         ArrayDesc const& expandedSchema,
-        arena::ArenaPtr parentArena,
+        ArenaPtr parentArena,
         SortingAttributeInfos const& sortingAttributeInfos,
         ElapsedMilliSeconds& timing)
 : _query(query),
@@ -54,9 +54,9 @@ DistributedSort::DistributedSort(
   _myInstanceID(_query->getInstanceID()),
   _sortedLocalDataArrayIterators(_schemaUtils._nAttrsWithoutET),
   _sortedLocalDataChunkIterators(_schemaUtils._nAttrsWithoutET),
-  _arena(arena::newArena(arena::Options("DistributedSort").parent(parentArena).resetting(true).recycling(false).pagesize(64*MiB))),
+  _arena(newArena(Options("DistributedSort").scoped(parentArena,64*MiB).threading(0))),
   _sortingAttributeInfos(sortingAttributeInfos),
-  _tupleComparator(new TupleComparator(sortingAttributeInfos, _schemaUtils._schema)),
+  _tupleComparator(make_shared<TupleComparator>(sortingAttributeInfos, _schemaUtils._schema)),
   _tupleLessThan(&*_tupleComparator),
   _setOfSplitterAndCounts(_arena),
   _desiredCounts(_numInstances+1),
@@ -101,8 +101,8 @@ void DistributedSort::fillSplitterFromChunkIterators(size_t localIndex, Splitter
 
     // Prepare the chunk iterators, if needed to.
     const AttributeID oneAttr = oneSortingAttribute();
-    shared_ptr<ConstChunkIterator>& oneChunkIter = _sortedLocalDataChunkIterators[oneAttr];
-    shared_ptr<ConstArrayIterator>& oneArrayIter = _sortedLocalDataArrayIterators[oneAttr];
+    std::shared_ptr<ConstChunkIterator>& oneChunkIter = _sortedLocalDataChunkIterators[oneAttr];
+    std::shared_ptr<ConstArrayIterator>& oneArrayIter = _sortedLocalDataArrayIterators[oneAttr];
     SCIDB_ASSERT(oneArrayIter && !oneArrayIter->end());
 
     // If the chunk iterators are not at the right cell...
@@ -245,7 +245,7 @@ void DistributedSort::determineGlobalMinMaxSplitterAndCounts(SplitterAndCounts& 
         }
 
         // Receive; update counts.
-        shared_ptr<SharedBuffer> buffer = BufReceive(i, _query);
+        std::shared_ptr<SharedBuffer> buffer = BufReceive(i, _query);
         archive::binary_iarchive* iArchive = iArchiveWrapper.reset(buffer);
         size_t localCount = 0;
         (*iArchive) & localCount;
@@ -442,7 +442,7 @@ size_t DistributedSort::lookupLocalCount(Splitter const& splitter)
 size_t breakerOnOneDimCoordinatesAndDividers(
         Coordinates const& cellPos,
         size_t previousResult,
-        shared_ptr<Query>& query,
+        std::shared_ptr<Query>& query,
         Dimensions const& dims,
         void* additionalInfo)
 {
@@ -490,10 +490,10 @@ size_t breakerOnOneDimCoordinatesAndDividers(
 }
 
 
-shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
+std::shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
 {
     // Break the array into _numInstances outbound arrays.
-    vector<shared_ptr<Array> > outboundArrays(_numInstances);
+    vector<std::shared_ptr<Array> > outboundArrays(_numInstances);
     for (size_t i=0; i<_numInstances; ++i) {
         outboundArrays[i] = make_shared<MemArray>(_schemaUtils._schema, _query);
     }
@@ -515,8 +515,8 @@ shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
 
     // Prepare inbound arrays, to receive pieces from other instances.
     // Also, move outboundArrays[_myInstanceID] to inboundArrays[_myInstanceID].
-    shared_ptr<RemoteArrayContext> remoteArrayContext = make_shared<RemoteArrayContext>(_numInstances);
-    vector<shared_ptr<Array> > inboundArrays(_numInstances);
+    std::shared_ptr<RemoteArrayContext> remoteArrayContext = make_shared<RemoteArrayContext>(_numInstances);
+    vector<std::shared_ptr<Array> > inboundArrays(_numInstances);
     for (InstanceID i = 0; i < _numInstances; i++)
     {
         if (i != _myInstanceID) {
@@ -534,7 +534,7 @@ shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
         }
         if (Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE) > 1
                 && outboundArrays[i]->getSupportedAccess() == Array::RANDOM) {
-            boost::shared_ptr<ParallelAccumulatorArray> paa = boost::make_shared<ParallelAccumulatorArray>(outboundArrays[i]);
+            std::shared_ptr<ParallelAccumulatorArray> paa = std::make_shared<ParallelAccumulatorArray>(outboundArrays[i]);
             outboundArrays[i] = paa;
             paa->start(_query);
         } else {
@@ -549,14 +549,14 @@ shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
     _query->setOperatorContext(remoteArrayContext);
 
     // Set up a MemArray of MergeSortArray over the inboundArrays, to pull from the other instances and merge.
-    shared_ptr<vector<size_t> > streamSizes = shared_ptr<vector<size_t> >(new vector<size_t>(_numInstances));
+    std::shared_ptr<vector<size_t> > streamSizes(make_shared< vector<size_t> >(_numInstances));
     for (size_t i=0; i<_numInstances; ++i) {
         // Here is how to decide how many records will be sent from instance i to me (_myInstanceID).
         // _anchors[_myInstanceID+1]->_localCounts[i] includes the number of records instance i will send to me or instances with a smaller ID.
         // All I need to do is to subtract from it _anchors[_myInstanceID]->_localCount[i].
         (*streamSizes)[i] = _anchors[_myInstanceID+1]->_localCounts[i] - _anchors[_myInstanceID]->_localCounts[i];
     }
-    shared_ptr<Array> mergeSortResult = make_shared<MergeSortArray>(
+    std::shared_ptr<Array> mergeSortResult = make_shared<MergeSortArray>(
             _query, _schemaUtils._schema, inboundArrays, _tupleComparator,
             // The parameter below is the offset to be added to the coordinate of every cell.
             // Let's use an example to illustrate why what's chosen is correct:
@@ -567,7 +567,7 @@ shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
             streamSizes
             );
     const bool isVertical = false; // the MemArray cannot scan data vertically, because the MergeSortArray is streaming.
-    shared_ptr<MemArray> resultArray = shared_ptr<MemArray>(new MemArray(mergeSortResult, _query, isVertical));
+    std::shared_ptr<MemArray> resultArray(make_shared<MemArray>(mergeSortResult, _query, isVertical));
     syncSG(_query);
 
     // Unset the operator context.
@@ -578,7 +578,7 @@ shared_ptr<MemArray> DistributedSort::distributeBasedOnAnchors()
     return resultArray;
 }
 
-shared_ptr<MemArray> DistributedSort::sort()
+std::shared_ptr<MemArray> DistributedSort::sort()
 {
     // Some common variables.
     assert(_myInstanceID < _numInstances);
@@ -856,7 +856,7 @@ shared_ptr<MemArray> DistributedSort::sort()
     _timing.logTiming(logger, "[sort] Picking anchors");
 
     // Distribute the data based on the anchors.
-    shared_ptr<MemArray> distributedArray = distributeBasedOnAnchors();
+    std::shared_ptr<MemArray> distributedArray = distributeBasedOnAnchors();
     _timing.logTiming(logger, "[sort] Distributing data based on anchors");
 
     if (totalError == 0) {
@@ -864,7 +864,7 @@ shared_ptr<MemArray> DistributedSort::sort()
     }
 
     // Adjust boundaries and coordinates.
-    shared_ptr<MemArray> afterAdjustingBoundaries = redistributeToAdjustBoundaries(distributedArray);
+    std::shared_ptr<MemArray> afterAdjustingBoundaries = redistributeToAdjustBoundaries(distributedArray);
     _timing.logTiming(logger, "[sort] Adjusting boundaries");
     return afterAdjustingBoundaries;
 }

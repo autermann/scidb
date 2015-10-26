@@ -3,8 +3,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -24,21 +24,17 @@
 */
 
 #include <dlfcn.h>
-#include <iostream>
-#include <fstream>
-
-#include "log4cxx/logger.h"
+#include <boost/foreach.hpp>
+#include <log4cxx/logger.h>
 
 #include "util/PluginManager.h"
 #include "system/Exceptions.h"
 #ifndef SCIDB_CLIENT
 #include "system/Config.h"
 #endif
-#include "system/SciDBConfigOptions.h"
-#include "query/Operator.h"
-#include "query/OperatorLibrary.h"
 #include "system/SystemCatalog.h"
-#include "query/ops/list/ListArrayBuilder.h"
+#include "system/SciDBConfigOptions.h"
+#include "query/OperatorLibrary.h"
 
 namespace scidb
 {
@@ -82,15 +78,15 @@ void PluginManager::preLoadLibraries()
 
 PluginManager::~PluginManager()
 {
-    for (map<string, PluginDesc>::iterator i = _plugins.begin(); i != _plugins.end(); ++i)
+    BOOST_FOREACH(Plugins::value_type const& i, _plugins)
     {
-        dlclose(i->second.handle);
+        dlclose(i.second._handle);
     }
 }
 
 typedef void (*GetPluginVersion)(uint32_t&, uint32_t&, uint32_t&, uint32_t&);
 
-PluginDesc& PluginManager::findModule(const std::string& moduleName, bool* was)
+PluginManager::Plugin& PluginManager::findModule(const std::string& moduleName, bool* was)
 {
     ScopedMutexLock cs (_mutex);
 
@@ -116,32 +112,26 @@ PluginDesc& PluginManager::findModule(const std::string& moduleName, bool* was)
     else {
         fullName = moduleName;
     }
-    PluginDesc pluginDesc;
-    pluginDesc.handle = plugin;
+    Plugin pluginDesc(fullName,plugin);
 
     GetPluginVersion getPluginVersion = reinterpret_cast<GetPluginVersion>(reinterpret_cast<size_t>(openSymbol(plugin, "GetPluginVersion")));
     if (getPluginVersion) {
-        getPluginVersion(pluginDesc.major, pluginDesc.minor, pluginDesc.patch, pluginDesc.build);
-        if (pluginDesc.major != SCIDB_VERSION_MAJOR() || pluginDesc.minor != SCIDB_VERSION_MINOR()) {
+        getPluginVersion(pluginDesc._major, pluginDesc._minor, pluginDesc._patch, pluginDesc._build);
+        if (pluginDesc._major != SCIDB_VERSION_MAJOR() || pluginDesc._minor != SCIDB_VERSION_MINOR()) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_PLUGIN_MGR, SCIDB_LE_WRONG_MODULE_VERSION) << moduleName
-                << pluginDesc.major << pluginDesc.minor << pluginDesc.patch << pluginDesc.build
+                << pluginDesc._major << pluginDesc._minor << pluginDesc._patch << pluginDesc._build
                 << SCIDB_VERSION();
         }
-        LOG4CXX_INFO(logger, "Version of " << moduleName << " is " << pluginDesc.major <<
-                     "." << pluginDesc.minor << "." << pluginDesc.patch << "." << pluginDesc.build)
+        LOG4CXX_INFO(logger, "Version of " << moduleName << " is " << pluginDesc._major <<
+                     "." << pluginDesc._minor << "." << pluginDesc._patch << "." << pluginDesc._build)
     } else {
-        pluginDesc.major = 0;
-        pluginDesc.minor = 0;
-        pluginDesc.patch = 0;
-        pluginDesc.build = 0;
         LOG4CXX_INFO(logger, "Unknown version of library " << moduleName)
     }
-    PluginDesc& res = _plugins[fullName];
+    Plugin& res = _plugins[fullName];
     res = pluginDesc;
 
     return res;
 }
-
 
 void* PluginManager::openSymbol(void* plugin, const std::string& symbolName, bool throwException)
 {
@@ -152,12 +142,11 @@ void* PluginManager::openSymbol(void* plugin, const std::string& symbolName, boo
     return symbol;
 }
 
-typedef const vector<BaseLogicalOperatorFactory*>& (*GetLogicalOperatorFactories)();
+typedef const vector<BaseLogicalOperatorFactory*>&  (*GetLogicalOperatorFactories)();
 typedef const vector<BasePhysicalOperatorFactory*>& (*GetPhysicalOperatorFactories)();
-typedef const vector<Type>& (*GetTypes)();
-typedef const vector<FunctionDescription>& (*GetFunctions)();
-typedef const vector<AggregatePtr>& (*GetAggregates)();
-
+typedef const vector<Type>&                         (*GetTypes)();
+typedef const vector<FunctionDescription>&          (*GetFunctions)();
+typedef const vector<AggregatePtr>&                 (*GetAggregates)();
 
 template<typename T>
 class Eraser
@@ -192,58 +181,57 @@ void PluginManager::loadLibrary(const string& libraryName, bool registerInCatalo
     Eraser<std::string> eraser(_loadingLibrary);
     _loadingLibrary = libraryName;
     bool was;
-    PluginDesc& pluginDesc = findModule(libraryName, &was);
-    void* library = pluginDesc.handle;
-    if (was)
-        return;
+    Plugin& pluginDesc = findModule(libraryName, &was);
+    void* library = pluginDesc._handle;
+    if (!was) {
 
-    GetTypes getTypes = reinterpret_cast<GetTypes>(reinterpret_cast<size_t>(openSymbol(library, "GetTypes")));
-    if (getTypes) {
-        const vector<Type>& types = getTypes();
-        for (size_t i = 0; i < types.size(); i++) {
-            TypeLibrary::registerType(types[i]);
+        GetTypes getTypes = reinterpret_cast<GetTypes>(reinterpret_cast<size_t>(openSymbol(library, "GetTypes")));
+        if (getTypes) {
+            const vector<Type>& types = getTypes();
+            for (size_t i = 0; i < types.size(); i++) {
+                TypeLibrary::registerType(types[i]);
+            }
         }
-    }
 
 #ifndef SCIDB_CLIENT
-    GetLogicalOperatorFactories getLogicalOperatorFactories = reinterpret_cast<GetLogicalOperatorFactories>(reinterpret_cast<size_t>(openSymbol(library, "GetLogicalOperatorFactories")));
-    if (getLogicalOperatorFactories) {
-        const vector<BaseLogicalOperatorFactory*>& logicalOperatorFactories = getLogicalOperatorFactories();
-        for (size_t i = 0; i < logicalOperatorFactories.size(); i++) {
-            OperatorLibrary::getInstance()->addLogicalOperatorFactory(logicalOperatorFactories[i]);
+        GetLogicalOperatorFactories getLogicalOperatorFactories = reinterpret_cast<GetLogicalOperatorFactories>(reinterpret_cast<size_t>(openSymbol(library, "GetLogicalOperatorFactories")));
+        if (getLogicalOperatorFactories) {
+            const vector<BaseLogicalOperatorFactory*>& logicalOperatorFactories = getLogicalOperatorFactories();
+            for (size_t i = 0; i < logicalOperatorFactories.size(); i++) {
+                OperatorLibrary::getInstance()->addLogicalOperatorFactory(logicalOperatorFactories[i]);
+            }
         }
-    }
 
-    GetPhysicalOperatorFactories getPhysicalOperatorFactories = reinterpret_cast<GetPhysicalOperatorFactories>(reinterpret_cast<size_t>(openSymbol(library, "GetPhysicalOperatorFactories")));
-    if (getPhysicalOperatorFactories) {
-        const vector<BasePhysicalOperatorFactory*>& physicalOperatorFactories = getPhysicalOperatorFactories();
-        for (size_t i = 0; i < physicalOperatorFactories.size(); i++) {
-            OperatorLibrary::getInstance()->addPhysicalOperatorFactory(physicalOperatorFactories[i]);
+        GetPhysicalOperatorFactories getPhysicalOperatorFactories = reinterpret_cast<GetPhysicalOperatorFactories>(reinterpret_cast<size_t>(openSymbol(library, "GetPhysicalOperatorFactories")));
+        if (getPhysicalOperatorFactories) {
+            const vector<BasePhysicalOperatorFactory*>& physicalOperatorFactories = getPhysicalOperatorFactories();
+            for (size_t i = 0; i < physicalOperatorFactories.size(); i++) {
+                OperatorLibrary::getInstance()->addPhysicalOperatorFactory(physicalOperatorFactories[i]);
+            }
         }
-    }
 
-    GetAggregates getAggregates = reinterpret_cast<GetAggregates>(reinterpret_cast<size_t>(openSymbol(library, "GetAggregates")));
-    if (getAggregates)
-    {
-        const vector< AggregatePtr>& aggregates = getAggregates();
-        for (size_t i = 0; i < aggregates.size(); i++) {
-            AggregateLibrary::getInstance() -> addAggregate(aggregates[i]);
+        GetAggregates getAggregates = reinterpret_cast<GetAggregates>(reinterpret_cast<size_t>(openSymbol(library, "GetAggregates")));
+        if (getAggregates)
+        {
+            const vector< AggregatePtr>& aggregates = getAggregates();
+            for (size_t i = 0; i < aggregates.size(); i++) {
+                AggregateLibrary::getInstance() -> addAggregate(aggregates[i], libraryName);
+            }
         }
-    }
 
 #endif
-    GetFunctions getFunctions = reinterpret_cast<GetFunctions>(reinterpret_cast<size_t>(openSymbol(library, "GetFunctions")));
-    if (getFunctions) {
-        vector< FunctionDescription> functions = getFunctions();
-        for (size_t i = 0; i < functions.size(); i++) {
-            FunctionLibrary::getInstance()->addFunction(functions[i]);
+        GetFunctions getFunctions = reinterpret_cast<GetFunctions>(reinterpret_cast<size_t>(openSymbol(library, "GetFunctions")));
+        if (getFunctions) {
+            vector< FunctionDescription> functions = getFunctions();
+            for (size_t i = 0; i < functions.size(); i++) {
+                FunctionLibrary::getInstance()->addFunction(functions[i]);
+            }
         }
     }
-
-
 #ifndef SCIDB_CLIENT
-    if (registerInCatalog)
+    if (registerInCatalog) {
         SystemCatalog::getInstance()->addLibrary(libraryName);
+    }
 #endif
 }
 
@@ -267,24 +255,38 @@ void PluginManager::setPluginsDirectory(const std::string &pluginsDirectory)
     _pluginsDirectory = pluginsDirectory;
 }
 
-void PluginManager::listPlugins(ListLibrariesArrayBuilder& builder)
+void PluginManager::visitPlugins(const Visitor& visit) const
 {
-    ScopedMutexLock cs (_mutex);
-    LibraryInformation scidbEntry("SciDB",
-                                   SCIDB_VERSION_MAJOR(),
-                                   SCIDB_VERSION_MINOR(),
-                                   SCIDB_VERSION_PATCH(),
-                                   SCIDB_VERSION_BUILD(),
-                                   SCIDB_BUILD_TYPE());
-    builder.listElement(scidbEntry);
-    for (std::map<std::string, PluginDesc>::const_iterator i = _plugins.begin(); i != _plugins.end(); ++i)
+    ScopedMutexLock cs(_mutex);
+
+    visit(Plugin(
+            "SciDB",NULL,
+            SCIDB_VERSION_MAJOR(),
+            SCIDB_VERSION_MINOR(),
+            SCIDB_VERSION_PATCH(),
+            SCIDB_VERSION_BUILD(),
+            SCIDB_BUILD_TYPE()));
+
+    BOOST_FOREACH (Plugins::value_type const& i,_plugins)
     {
-        LibraryInformation pluginEntry(i->first, i->second.major, i->second.minor, i->second.patch, i->second.build);
-        builder.listElement(pluginEntry);
+        visit(i.second);
     }
 }
 
-
-
+PluginManager::Plugin::Plugin(std::string const& name,
+                              void*              handle,
+                              uint32_t           major,
+                              uint32_t           minor,
+                              uint32_t           patch,
+                              uint32_t           build,
+                              std::string const& buildType)
+ :  _name(name),
+    _handle(handle),
+    _major(major),
+    _minor(minor),
+    _patch(patch),
+    _build(build),
+    _buildType(buildType)
+{}
 
 } // namespace

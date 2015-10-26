@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -68,7 +68,7 @@ def main():
 
     if REMOVE:
         print 'Cleaning repo dir %s/%s' % (ROOT, REPO)
-        execute(['test', '-d', ROOT+'/'+REPO, '&&', 'rm', '-rf', ROOT+'/'+REPO], None, ssh)        
+        execute(['test', '-d', ROOT+'/'+REPO, '&&', 'rm', '-rf', ROOT+'/'+REPO], None, ssh)
     print 'Preparing repo dir %s in %s' % (REPO, ROOT)
     execute(['test', '!', '-d', ROOT, '&&', 'mkdir', '-p', ROOT], None, ssh)
     execute(['test', '!', '-d', REPO, '&&', 'mkdir', '-p', REPO], ROOT, ssh)
@@ -111,8 +111,8 @@ def execute(args, cwd=None, remote=None):
         cmd = "cd %s && %s" % (argprepare(cwd), cmd)
     if remote:
         chan = remote.get_transport().open_session()
-        stdout = chan.makefile('rb', -1) 
-        stderr = chan.makefile_stderr('rb', -1) 
+        stdout = chan.makefile('rb', -1)
+        stderr = chan.makefile_stderr('rb', -1)
         chan.exec_command(cmd)
         res = chan.recv_exit_status()
         if res:

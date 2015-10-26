@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -32,8 +32,9 @@
 
 #include <set>
 #include <map>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/asio.hpp>
+
 #include <util/Singleton.h>
 #include <util/Thread.h>
 #include <util/Network.h>
@@ -45,8 +46,6 @@
 #include <mpi/MPILauncher.h>
 #include <mpi/MPIUtils.h>
 #include <system/Config.h>
-
-using namespace std;
 
 namespace scidb
 {
@@ -79,7 +78,7 @@ namespace scidb
     public:
 
         /// Constructor
-        MpiOperatorContext(const boost::weak_ptr<scidb::Query>& query)
+        MpiOperatorContext(const std::weak_ptr<scidb::Query>& query)
         : _query(query),
         _launchId(0),
         _lastLaunchIdInUse(0)
@@ -89,19 +88,19 @@ namespace scidb
         virtual ~MpiOperatorContext() {}
 
         /// Get a launcher for a given launch ID
-        boost::shared_ptr<MpiLauncher> getLauncher(uint64_t launchId);
+        std::shared_ptr<MpiLauncher> getLauncher(uint64_t launchId);
 
         /// Set a launcher for a given launch ID
-        void setLauncher(const boost::shared_ptr<MpiLauncher>& launcher)
+        void setLauncher(const std::shared_ptr<MpiLauncher>& launcher)
         {
             setLauncherInternal(launcher->getLaunchId(), launcher);
         }
 
         /// for internal use
-        void setLauncherInternal(uint64_t launchId, const boost::shared_ptr<MpiLauncher>& launcher);
+        void setLauncherInternal(uint64_t launchId, const std::shared_ptr<MpiLauncher>& launcher);
 
         /// Get a slave for a given launch ID
-        boost::shared_ptr<MpiSlaveProxy> getSlave(uint64_t launchId);
+        std::shared_ptr<MpiSlaveProxy> getSlave(uint64_t launchId);
 
         /// Get the launch ID of the last slave (in which this instance participated)
         uint64_t getLastLaunchIdInUse() const
@@ -111,16 +110,16 @@ namespace scidb
         }
 
         /// Set a slave proxy for a given launch ID
-        void setSlave(const boost::shared_ptr<MpiSlaveProxy>& slave);
+        void setSlave(const std::shared_ptr<MpiSlaveProxy>& slave);
 
         /// for internal use
-        void setSlaveInternal(uint64_t launchId, const boost::shared_ptr<MpiSlaveProxy>& slave);
+        void setSlaveInternal(uint64_t launchId, const std::shared_ptr<MpiSlaveProxy>& slave);
 
         /// Get a shared memory IPC object for a given launch ID
-        boost::shared_ptr<SharedMemoryIpc> getSharedMemoryIpc(uint64_t launchId, const std::string& name);
+        std::shared_ptr<SharedMemoryIpc> getSharedMemoryIpc(uint64_t launchId, const std::string& name);
 
         /// Set a shared memory IPC object for a given launch ID
-        bool addSharedMemoryIpc(uint64_t launchId, const boost::shared_ptr<SharedMemoryIpc>& ipc);
+        bool addSharedMemoryIpc(uint64_t launchId, const std::shared_ptr<SharedMemoryIpc>& ipc);
 
         typedef boost::function<bool (uint64_t, MpiOperatorContext*)> LaunchErrorChecker;
         /**
@@ -128,14 +127,14 @@ namespace scidb
          * @param launchId the launch ID corresponding to the slave
          * @return the next message; the client context referenced by the message does not change for the same launch ID
          */
-        boost::shared_ptr<scidb::ClientMessageDescription> popMsg(uint64_t launchId,
+        std::shared_ptr<scidb::ClientMessageDescription> popMsg(uint64_t launchId,
                                                                   LaunchErrorChecker& errChecker);
         /**
          * Add the next message from the slave
          * @param launchId the launch ID corresponding to the slave
          * @param the next message
          */
-        void pushMsg(uint64_t launchId, const boost::shared_ptr<scidb::ClientMessageDescription>& msg);
+        void pushMsg(uint64_t launchId, const std::shared_ptr<scidb::ClientMessageDescription>& msg);
 
         /**
          * Must be called when the launch related state is no longer in use
@@ -160,22 +159,22 @@ namespace scidb
         {
             struct lessShmIpc
             {
-                bool operator() (const boost::shared_ptr<SharedMemoryIpc>& l,
-                                 const boost::shared_ptr<SharedMemoryIpc>& r) const
+                bool operator() (const std::shared_ptr<SharedMemoryIpc>& l,
+                                 const std::shared_ptr<SharedMemoryIpc>& r) const
                 {
                     return (l->getName() < r->getName());
                 }
             };
-            typedef std::set< boost::shared_ptr<SharedMemoryIpc>, lessShmIpc >  ShmIpcSet;
+            typedef std::set< std::shared_ptr<SharedMemoryIpc>, lessShmIpc >  ShmIpcSet;
 
-            boost::shared_ptr<scidb::ClientMessageDescription> _msg;
-            boost::shared_ptr<MpiLauncher>     _launcher;
+            std::shared_ptr<scidb::ClientMessageDescription> _msg;
+            std::shared_ptr<MpiLauncher>     _launcher;
             ShmIpcSet                          _shmIpcs;
-            boost::shared_ptr<MpiSlaveProxy>   _slave;
+            std::shared_ptr<MpiSlaveProxy>   _slave;
         } LaunchInfo;
 
         typedef boost::function<void (uint64_t, LaunchInfo*)> LaunchCleaner;
-        typedef std::map<uint64_t, boost::shared_ptr<LaunchInfo> > LaunchMap;
+        typedef std::map<uint64_t, std::shared_ptr<LaunchInfo> > LaunchMap;
 
         void clear(LaunchCleaner& cleaner);
 
@@ -186,7 +185,7 @@ namespace scidb
         LaunchMap::iterator getIter(uint64_t launchId, bool updateLastLaunchId=true);
 
     private:
-        boost::weak_ptr<scidb::Query> _query;
+        std::weak_ptr<scidb::Query> _query;
         LaunchMap _launches;
         scidb::Event _event;
         scidb::Mutex _mutex;
@@ -209,7 +208,7 @@ namespace scidb
          * Handler for the handshake message coming from a slave
          * @param messageDescription HB message pointer
          */
-        void handleMpiSlaveHandshake(const boost::shared_ptr<scidb::MessageDescription>& messageDesc);
+        void handleMpiSlaveHandshake(const std::shared_ptr<scidb::MessageDescription>& messageDesc);
 
         inline scidb::MessagePtr createMpiSlaveResult(scidb::MessageID id);
 
@@ -217,37 +216,37 @@ namespace scidb
          * Handler for the command result message coming from a slave
          * @param messageDescription HB message pointer
          */
-        void handleMpiSlaveResult(const boost::shared_ptr<scidb::MessageDescription>& messageDesc);
+        void handleMpiSlaveResult(const std::shared_ptr<scidb::MessageDescription>& messageDesc);
 
         /**
          * Handler invoked on client disconnect
          * @param launchId launch ID
          * @param query associated with this slave connection
          */
-        static void handleMpiSlaveDisconnect(uint64_t launchId, const boost::shared_ptr<scidb::Query>& query);
+        static void handleMpiSlaveDisconnect(uint64_t launchId, const std::shared_ptr<scidb::Query>& query);
 
     private:
 
         template <class MessageType_tt, int MessageTypeId_tv>
-        void handleMpiSlaveMessage(const boost::shared_ptr<scidb::MessageDescription>& messageDesc);
+        void handleMpiSlaveMessage(const std::shared_ptr<scidb::MessageDescription>& messageDesc);
 
         /// @throws scidb::Exception if message cannot be processed
         static void processMessage(uint64_t launchId,
-                                   const boost::shared_ptr<scidb::ClientMessageDescription>& cliMsg,
-                                   const boost::shared_ptr<scidb::Query>& query);
+                                   const std::shared_ptr<scidb::ClientMessageDescription>& cliMsg,
+                                   const std::shared_ptr<scidb::Query>& query);
 
         MpiMessageHandler(const MpiMessageHandler&);
         MpiMessageHandler& operator=(const MpiMessageHandler&);
     };
 
     template <class MessageType_tt, int MessageTypeId_tv>
-    void MpiMessageHandler::handleMpiSlaveMessage(const boost::shared_ptr<scidb::MessageDescription>& messageDesc)
+    void MpiMessageHandler::handleMpiSlaveMessage(const std::shared_ptr<scidb::MessageDescription>& messageDesc)
     {
         bool isExpectedMsg = (messageDesc->getMessageType() == MessageTypeId_tv);
         bool isClientMsg   = (messageDesc->getSourceInstanceID() == scidb::CLIENT_INSTANCE);
 
-        boost::shared_ptr<scidb::ClientMessageDescription> cliMsg =
-            boost::dynamic_pointer_cast<scidb::ClientMessageDescription>(messageDesc);
+        std::shared_ptr<scidb::ClientMessageDescription> cliMsg =
+            std::dynamic_pointer_cast<scidb::ClientMessageDescription>(messageDesc);
         if (!cliMsg) {
             assert(false);
             if (!isExpectedMsg) {
@@ -274,7 +273,7 @@ namespace scidb
         }
         if (!isClientMsg) {
             assert(false);
-            stringstream ss;
+            std::stringstream ss;
             ss << "Invalid source of message in MPI slave handler: "
                << messageDesc->getSourceInstanceID();
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
@@ -287,8 +286,8 @@ namespace scidb
 
         scidb::QueryID queryId = cliMsg->getQueryId();
 
-        boost::shared_ptr<MessageType_tt> result =
-            boost::dynamic_pointer_cast<MessageType_tt>(cliMsg->getRecord());
+        std::shared_ptr<MessageType_tt> result =
+            std::dynamic_pointer_cast<MessageType_tt>(cliMsg->getRecord());
 
         if (!result) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_MESSAGE_FORMAT)
@@ -296,7 +295,7 @@ namespace scidb
         }
         const uint64_t launchId = result->launch_id();
 
-        boost::shared_ptr<scidb::Query> query = Query::getQueryByID(queryId, true);
+        std::shared_ptr<scidb::Query> query = Query::getQueryByID(queryId, true);
         assert(query);
         try {
             processMessage(launchId, cliMsg, query);
@@ -313,7 +312,7 @@ namespace scidb
     {
     private:
 
-        typedef std::map<scidb::QueryID, boost::shared_ptr<MpiOperatorContext> >  ContextMap;
+        typedef std::map<scidb::QueryID, std::shared_ptr<MpiOperatorContext> >  ContextMap;
         ContextMap   _ctxMap;
         scidb::Mutex _mutex;
         scidb::Event _event;
@@ -321,7 +320,7 @@ namespace scidb
         // currently MPI queries are serialized
         // after _mpiResourceTimeout seconds waiting a blocked query will error out
         uint32_t _mpiResourceTimeout;
-        boost::shared_ptr<scidb::Scheduler> _cleanupScheduler;
+        std::shared_ptr<scidb::Scheduler> _cleanupScheduler;
 	size_t _mpiType;
 	std::string _mpiInstallDir;
 	std::string _mpiDaemonBin;
@@ -400,17 +399,17 @@ namespace scidb
         void cleanup();
 
         static const std::string& getInstallPath(
-            const boost::shared_ptr<const scidb::InstanceMembership>& membership);
+            const std::shared_ptr<const scidb::InstanceMembership>& membership);
 
         /// @note Enforces only a single context at a time (i.e. serializes queries which call this method).
-        boost::shared_ptr<MpiOperatorContext> checkAndSetCtx(const boost::shared_ptr<scidb::Query>& query,
-                                                             const boost::shared_ptr<MpiOperatorContext>& ctx);
-        boost::shared_ptr<MpiOperatorContext> checkAndSetCtxAsync(const boost::shared_ptr<scidb::Query>& query,
-                                                                  const boost::shared_ptr<MpiOperatorContext>& ctx);
+        std::shared_ptr<MpiOperatorContext> checkAndSetCtx(const std::shared_ptr<scidb::Query>& query,
+                                                             const std::shared_ptr<MpiOperatorContext>& ctx);
+        std::shared_ptr<MpiOperatorContext> checkAndSetCtxAsync(const std::shared_ptr<scidb::Query>& query,
+                                                                  const std::shared_ptr<MpiOperatorContext>& ctx);
         bool removeCtx(scidb::QueryID queryId);
 
-	MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q);
-	MpiLauncher* newMPILauncher(uint64_t launchId, const boost::shared_ptr<scidb::Query>& q, uint32_t timeout);
+	MpiLauncher* newMPILauncher(uint64_t launchId, const std::shared_ptr<scidb::Query>& q);
+	MpiLauncher* newMPILauncher(uint64_t launchId, const std::shared_ptr<scidb::Query>& q, uint32_t timeout);
 
         /// for internal use
         void forceInitMpi();
@@ -431,7 +430,7 @@ namespace scidb
          * @param ctx MPI-based operator context to use
          * @param max number of launches performed on using the ctx
          */
-        MpiErrorHandler(const boost::shared_ptr<MpiOperatorContext>& ctx)
+        MpiErrorHandler(const std::shared_ptr<MpiOperatorContext>& ctx)
         : _ctx(ctx)
         {
             assert(ctx);
@@ -447,7 +446,7 @@ namespace scidb
          * ignoring the errors.
          * @param query current query context
          */
-        virtual void handleError(const boost::shared_ptr<Query>& query);
+        virtual void handleError(const std::shared_ptr<Query>& query);
 
         /**
          * Clean up the MpiSlaveProxy (MpiSlaveProxy::destroy)
@@ -455,7 +454,7 @@ namespace scidb
          * ignoring the errors.
          * @param query current query context
          */
-        void finalize(const boost::shared_ptr<Query>& query);
+        void finalize(const std::shared_ptr<Query>& query);
 
         /**
          * Perform the cleanup of all resources left behind
@@ -510,9 +509,8 @@ namespace scidb
 
         static void clean(scidb::QueryID queryId, uint64_t launchId,
                           MpiOperatorContext::LaunchInfo* info);
-        boost::shared_ptr<MpiOperatorContext> _ctx;
+        std::shared_ptr<MpiOperatorContext> _ctx;
     };
 
 } //namespace
-
 #endif /* MPIMANAGER_H_ */

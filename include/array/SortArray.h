@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -61,11 +61,7 @@ public:
      * @param[in] preservePositions  whether the cell positions of all records need to be preserved.
      * @param[in] chunkSize optional chunk size for ouput
      */
-    SortArray(const ArrayDesc& inputSchema, arena::ArenaPtr const& arena, bool preservePositions, size_t chunkSize = 0)
-        : _inputSchema(inputSchema), _arena(arena), _preservePositions(preservePositions)
-    {
-        calcOutputSchema(inputSchema, chunkSize);
-    }
+    SortArray(const ArrayDesc& inputSchema, arena::ArenaPtr const& arena, bool preservePositions, size_t chunkSize = 0);
 
     /**
      * Sort the array
@@ -76,9 +72,9 @@ public:
      * @param[in] tcomp class which provides comparison operator
      * @return sorted one-dimensional array.
      */
-    boost::shared_ptr<MemArray> getSortedArray(boost::shared_ptr<Array> inputArray,
-                                               boost::shared_ptr<Query> query,
-                                               boost::shared_ptr<TupleComparator> tcomp);
+    std::shared_ptr<MemArray> getSortedArray(std::shared_ptr<Array> inputArray,
+                                               std::shared_ptr<Query> query,
+                                               std::shared_ptr<TupleComparator> tcomp);
 
     /**
      * @return the array descriptor from the input array.
@@ -118,22 +114,22 @@ private:
     class SortIterators
     {
     public:
-        SortIterators(boost::shared_ptr<Array>& input,
+        SortIterators(std::shared_ptr<Array>const& input,
                       size_t shift,
                       size_t step);
 
         void advanceIterators();
-        bool end() 
+        bool end()
             { return _arrayIters[0]->end(); }
-        std::vector< boost::shared_ptr<ConstArrayIterator> > const& getIterators()
+        PointerRange<std::shared_ptr<ConstArrayIterator> const> getIterators()
             { return _arrayIters; }
 
     private:
         // iterators under the control of this instance
-        std::vector< boost::shared_ptr<ConstArrayIterator> > _arrayIters;
+        std::vector< std::shared_ptr<ConstArrayIterator> > _arrayIters;
 
-        size_t _shift;    // initial chunk offset
-        size_t _step;     // number of chunks to skip on advance
+        size_t const _shift;    // initial chunk offset
+        size_t const _step;     // number of chunks to skip on advance
     };
 
 
@@ -147,10 +143,10 @@ private:
     class SortJob : public Job, protected SelfStatistics
     {
     public:
-        SortJob(SortArray& sorter,
-                boost::shared_ptr<Query> query,
+        SortJob(SortArray* sorter,
+                std::shared_ptr<Query>const& query,
                 size_t id,
-                SortIterators& iters);
+                SortIterators* iters);
 
         virtual void run();
         bool complete() { return _complete; };
@@ -159,7 +155,7 @@ private:
         SortArray& _sorter;               // enclosing sort context
         SortIterators& _sortIters;        // iterators into array to partition/sort
         bool _complete;                   // true if at and of input
-        size_t _id;                       // job id, determines which chunks to partition
+        size_t const _id;                 // job id, determines which chunks to partition
     };
 
 
@@ -170,15 +166,15 @@ private:
     class MergeJob : public Job, protected SelfStatistics
     {
     public:
-        MergeJob(SortArray& sorter,
-                 boost::shared_ptr<Query> query,
+        MergeJob(SortArray* sorter,
+                 std::shared_ptr<Query>const& query,
                  size_t id);
 
         virtual void run();
 
     private:
         SortArray& _sorter;     // enclosing sort context
-        size_t _id;             // job id, used to communicate with main thread
+        size_t const _id;       // job id, used to communicate with main thread
     };
 
 
@@ -188,10 +184,10 @@ private:
     void calcOutputSchema(const ArrayDesc& inputSchema, size_t chunkSize);
 
     ArrayDesc const _inputSchema;
-    arena::ArenaPtr const _arena;                    // parent memory arena
-    boost::shared_ptr<Array> _input;           // array to sort
-    boost::shared_ptr<ArrayDesc> _outputSchema;      // shape of output
-    boost::shared_ptr<TupleComparator> _tupleComp;   // comparison to use between cells
+    arena::ArenaPtr const _arena;                          // parent memory arena
+    std::shared_ptr<Array> _input;                       // array to sort
+    std::shared_ptr<ArrayDesc> _outputSchema;            // shape of output
+    std::shared_ptr<TupleComparator> _tupleComp;         // comparison to use between cells
 
     size_t _memLimit;           // how big are the sorted runs
     size_t _nStreams;           // how many runs to merge at once
@@ -199,24 +195,24 @@ private:
     size_t _tupleSize;          // how big is each cell
 
     // list which accumulates sorted runs
-    std::list< boost::shared_ptr<Array> > _results;
+    std::list< std::shared_ptr<Array> > _results;
 
     // state to track sort/merge progress and jobs
     Mutex  _sortLock;
     Event  _sortEvent;
-    size_t _nRunningJobs;       
+    size_t _nRunningJobs;
     size_t _runsProduced;
-    std::vector<bool> _partitionComplete;
-    std::vector< boost::shared_ptr<SortIterators> > _sortIterators;
-    std::vector< boost::shared_ptr<Job> > _runningJobs;
-    std::vector< boost::shared_ptr<Job> > _waitingJobs;
-    std::vector< boost::shared_ptr<Job> > _stoppedJobs;
-    boost::shared_ptr<Job> _failedJob;
+    mgd::vector<bool> _partitionComplete;
+    mgd::vector< std::shared_ptr<SortIterators> > _sortIterators;
+    mgd::vector< std::shared_ptr<Job> > _runningJobs;
+    mgd::vector< std::shared_ptr<Job> > _waitingJobs;
+    mgd::vector< std::shared_ptr<Job> > _stoppedJobs;
+    std::shared_ptr<Job> _failedJob;
 
     /**
      * Whether the cell positions of all records need to be preserved.
      */
-    bool _preservePositions;
+    bool const _preservePositions;
 };
 
 } //namespace scidb

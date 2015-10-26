@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -44,14 +44,15 @@
 # include <boost/iostreams/detail/current_directory.hpp>
 # include <boost/version.hpp>
 
-# include "global.h"
-# include "helper.h"
-# include "harness.h"
-# include "suite.h"
-# include "manager.h"
-# include "Exceptions.h"
-# include "system/Constants.h"
-# include "util/PluginManager.h"
+# include <global.h>
+# include <helper.h>
+# include <harness.h>
+# include <suite.h>
+# include <manager.h>
+# include <Exceptions.h>
+# include <system/Constants.h>
+# include <util/PluginManager.h>
+# include <util/ConfigUser.h>
 
 # define LOGGER_TAG_HARNESS  "[HARNESS]"
 
@@ -79,6 +80,17 @@ namespace bid = boost :: iostreams :: detail;
 
 namespace scidbtestharness
 {
+inline std::string getEnvironmentVariable(const char *var)
+{
+    const char * val = ::getenv( var );
+    if( val == NULL )
+    {
+        return "";
+    }
+
+    return val;
+}
+
 
 int SciDBTestHarness :: runSuites (const vector<string> &skip_tclist)
 {
@@ -187,7 +199,7 @@ int SciDBTestHarness :: execute (int mode)
             }
 
 			/* collect skipped testcases */
-			rv_skip = collectSkippedTestCases (_c.rootDir, under_dir, skiptestfname, skip_tclist); 
+			rv_skip = collectSkippedTestCases (_c.rootDir, under_dir, skiptestfname, skip_tclist);
 			if ( (rv_skip != -2) && (rv_skip <= -1) )
 //			if (collectSkippedTestCases (_c.rootDir, under_dir, skiptestfname, skip_tclist) <= -1)
 			{
@@ -280,6 +292,9 @@ void SciDBTestHarness :: printConf (void)
 
     LOG4CXX_INFO (_logger, "KeepPreviousRun =                             " << _c.keepPreviousRun);
     LOG4CXX_INFO (_logger, "TerminateOnFailure =                          " << _c.terminateOnFailure);
+
+    LOG4CXX_INFO (_logger, "UserName =                                    " << _c.userName);
+    LOG4CXX_INFO (_logger, "UserPassword =                                " << "********");
 }
 
 int SciDBTestHarness :: createLogger (void)
@@ -428,10 +443,10 @@ int SciDBTestHarness :: validateParameters (void)
 
 	_c.rootDir = getAbsolutePath (_c.rootDir, false);
 	_c.scratchDir = getAbsolutePath (_c.scratchDir, false);
-	
+
 	if (_c.rootDir.empty ())
 		throw ConfigError (FILE_LINE_FUNCTION, ERR_CONFIG_SCIDBROOTDIR_EMPTY);
-		
+
 	if (_c.scratchDir.empty ())
 	{
 	  _c.scratchDir = _c.rootDir;
@@ -581,6 +596,8 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 		("save-failures",                             "Save output file, log file and diff file with timestamp")
 		("terminate-on-failure",                      "Stop running the harness when a test case fails. By default it will continue to run.")
 		("cleanup",                                   "Does a cleanup and exit. Removes Report.xml and also everything under r/ and log/ directories generated in previous run.")
+		("user-name",            po::value<string>(), "Name of the user to connect as.")
+		("user-password",        po::value<string>(), "The user's password.")
 		("help,h", "View this text.")
                 ("plugins,p",            po::value<string>(), "Plugins folder.")
                 ("version", "version");
@@ -628,6 +645,12 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			exit (0);
 		}
 
+		if (vm.count ("user-name"))
+			_c.userName = vm["user-name"].as<string>();
+
+		if (vm.count ("user-password"))
+			_c.userPassword = vm["user-password"].as<string>();
+
 		if (vm.count ("connect"))
 			_c.scidbServer = vm["connect"].as<string>();
 
@@ -636,7 +659,7 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 
 		if (vm.count ("root-dir"))
 			_c.rootDir = vm["root-dir"].as<string>();
-			
+
 		if (vm.count ("scratch-dir"))
 		{
 		  _c.scratchDir = vm["scratch-dir"].as<string>();
@@ -657,10 +680,10 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			_c.suiteId.clear ();
             vector<string> lists;
 			tokenize (vm["test-list"].as<string>(), lists, DELIMITERS);
-            for (size_t i = 0; i < lists.size(); i++) { 
+            for (size_t i = 0; i < lists.size(); i++) {
             	ifstream list(lists[i].c_str());
                 string testId;
-                while (!list.eof()) { 
+                while (!list.eof()) {
                     getline(list, testId);
                     _c.testId.push_back(testId);
                 }
@@ -770,6 +793,67 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
     }
 	}
 
+
+	if(_c.userName.empty() && _c.userPassword.empty())
+	{
+		try
+		{
+			std::string scidbConfigUserFilename =
+				getEnvironmentVariable("SCIDB_CONFIG_USER");
+			if(scidbConfigUserFilename.length() != 0)
+			{
+				// The environment variable "SCIDB_CONFIG_USER" points to
+				// a file that allows setting the username and password if
+				// they are not specified on the command line.  This
+				// segement of code handles that functionality.
+
+				scidb::ConfigUser *cfgUser = scidb::ConfigUser::getInstance();
+
+				cfgUser->addOption
+					(
+						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_NAME,    // int32_t option
+						'u',                    // char shortCmdLineArg
+						"user-name",            // const std::string &longCmdLineArg
+						"user-name",            // const std::string &configOption
+						"",                     // const std::string &envVariable
+						scidb::ConfigUser::STRING,  // ConfigOptionType type
+						"UserName.",            // const std::string &description = ""
+						std::string("root"),    // const boost::any &value = boost::any()
+						false)                  // bool required = true
+
+					(
+						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_PASSWORD,  // int32_t option
+						'p',                    // char shortCmdLineArg
+						"user-password",        // const std::string &longCmdLineArg
+						"user-password",        // const std::string &configOption
+						"",                     // const std::string &envVariable
+						scidb::ConfigUser::STRING,  // ConfigOptionType type
+						"UserPassword.",        // const std::string &description = ""
+						std::string(""),        // const boost::any &value = boost::any()
+						false)                  // bool required = true
+					;
+
+				cfgUser->verifySafeFile(scidbConfigUserFilename);
+				cfgUser->parse(0, NULL, scidbConfigUserFilename.c_str());
+
+				_c.userName =
+					cfgUser->getOption<std::string>(
+						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_NAME);
+
+				_c.userPassword =
+					cfgUser->getOption<std::string>(
+						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_PASSWORD);
+			}
+		} catch (const scidb::Exception& e) {
+			// Assume we are in 'trust' mode but log the exception
+			cerr << "Exception:  - " << e.what() << endl;
+
+			// If we cannot read the information from the user config
+			// file it is not the end of the world.  So, we do not
+			// rethrow the exception here.
+		}
+	}
+
 	validateParameters ();
 
 	if (_c.cleanupLog)
@@ -813,6 +897,8 @@ void SciDBTestHarness :: initConfDefault (void)
 	_c.selfTesting        = false;
 	_c.log_queries        = false;
 	_c.save_failures      = false;
+    _c.userName           = "";
+    _c.userPassword       = "";
 }
 
 } //END namespace scidbtestharness

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -42,20 +42,20 @@
 #define SUB_ARRAY_H_
 
 #include <string>
-#include "array/DelegateArray.h"
-#include "array/Metadata.h"
+
+#include <array/DelegateArray.h>
+#include <array/Metadata.h>
 
 namespace scidb
 {
 
 using namespace std;
-using namespace boost;
 
 class SubArray;
 class SubArrayIterator;
 
-void subarrayMappingArray(string const& dimName, string const& mappingArrayName, string const& tmpMappingArrayName,
-                          Coordinate from, Coordinate till, boost::shared_ptr<Query> const& query);
+void subarrayMappingArray(string const& dimName, std::string const& mappingArrayName, std::string const& tmpMappingArrayName,
+                          Coordinate from, Coordinate till, std::shared_ptr<Query> const& query);
 
 /***
  * NOTE: This looks like a candidate for an intermediate abstract class: PositionConstArrayIterator.
@@ -75,7 +75,7 @@ protected:
     MemChunk sparseBitmapChunk;
     MemChunk sparseChunk;
     // outIterator must be defined AFTER sparseXChunk because it needs to be destroyed BEFORE
-    boost::shared_ptr<ChunkIterator> outIterator;
+    std::shared_ptr<ChunkIterator> outIterator;
 
   public:
 	/***
@@ -122,7 +122,7 @@ protected:
 class MappedSubArrayIterator : public SubArrayIterator
 {
 protected:
-    set<Coordinates,CoordinatesLess>::const_iterator _mIter;
+    std::set<Coordinates,CoordinatesLess>::const_iterator _mIter;
 
 public:
     MappedSubArrayIterator(SubArray const& subarray, AttributeID attrID);
@@ -150,7 +150,7 @@ class SubArray : public DelegateArray
     bool aligned;
 
     bool _useChunkSet;
-    set<Coordinates, CoordinatesLess> _chunkSet;
+    std::set<Coordinates, CoordinatesLess> _chunkSet;
 
     void buildChunkSet();
     void addChunksToSet(Coordinates outChunkCoords, size_t dim = 0);
@@ -181,8 +181,8 @@ class SubArray : public DelegateArray
 
   public:
     SubArray(ArrayDesc& d, Coordinates lowPos, Coordinates highPos,
-             boost::shared_ptr<Array>& input,
-             boost::shared_ptr<Query> const& query);
+             std::shared_ptr<Array>& input,
+             std::shared_ptr<Query> const& query);
 
     DelegateArrayIterator* createArrayIterator(AttributeID attrID) const;
 

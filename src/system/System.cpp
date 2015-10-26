@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -22,12 +22,26 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <system/Utils.h>
 #include <system/Exceptions.h>
 
 /****************************************************************************/
 namespace scidb {
 /****************************************************************************/
+
+namespace arena {extern void onForkOfChild();}
+
+pid_t fork()
+{
+    if (int e = pthread_atfork(NULL,NULL,&arena::onForkOfChild))
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL,SCIDB_LE_SYSCALL_ERROR)
+            << "pthread_atfork" << e << errno << ::strerror(errno) << "";
+    }
+
+    return ::fork();
+}
 
 void exit(int status)
 {

@@ -2,8 +2,8 @@
 #
 # BEGIN_COPYRIGHT
 #
-# This file is part of SciDB.
-# Copyright (C) 2008-2014 SciDB, Inc.
+# Copyright (C) 2008-2015 SciDB, Inc.
+# All Rights Reserved.
 #
 # SciDB is free software: you can redistribute it and/or modify
 # it under the terms of the AFFERO GNU General Public License as published by
@@ -23,10 +23,10 @@
 MYDIR=`dirname $0`
 NUM_INSTANCES=4 #including coordinator
 DB_NAME="mydb"
-	
+
 check_exit_status()
 {
-	if [ $1 -ne 0 ]; then 
+	if [ $1 -ne 0 ]; then
 		echo "Error above. Exiting. Peace."
 		exit 1;
 	fi

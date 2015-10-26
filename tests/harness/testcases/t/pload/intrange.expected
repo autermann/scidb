@@ -1,9 +1,7 @@
-SCIDB QUERY : <csv2scidb -s 1 -p NNNNNNNNS < ${TEST_DATA_DIR}/integer_range.csv > /tmp/intrange.scidb>
-
 SCIDB QUERY : <CREATE ARRAY a_flat <i8:int8,i16:int16 null,i32:int32,i64:int64,u8:uint8,u16:uint16,u32:uint32,u64:uint64,s:string>[i=0:*,1000,0]>
 Query was executed successfully
 
-SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD a_flat FROM '/tmp/intrange.scidb' AS 'text' ERRORS 99 SHADOW ARRAY a_shadow">
+SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD a_flat FROM '/tmp/intrange.csv' AS 'csv' ERRORS 99 SHADOW ARRAY a_shadow">
 {i} i8,i16,i32,i64,u8,u16,u32,u64,s
 {0} 0,0,0,0,0,0,0,0,'int8 overflow'
 {1} 66,0,0,0,0,0,0,0,'int8 hex input'
@@ -51,8 +49,8 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD a_flat FROM '/tmp
 {43} 0,null,0,0,0,0,0,0,'int16 nullable using whitespace'
 {44} 45,0,0,0,0,0,0,0,'int8 leading spaces'
 {45} 0,0,0,0,254,0,0,0,'uint8 hex leading and trailing spaces'
-{46} 0,null,0,0,0,0,0,0,'int16 nullable using Linear-TSV N null'
-{47} 0,null,0,0,0,0,0,0,'int16 nullable using Linear-TSV N null and spaces'
+{46} 0,null,0,0,0,0,0,0,'int16 nullable using Linear-TSV \\N null'
+{47} 0,null,0,0,0,0,0,0,'int16 nullable using Linear-TSV \\N null and spaces'
 {48} 0,?5,0,0,0,0,0,0,'int16 nullable using SciDB missing reason 5'
 {49} 0,null,0,0,0,0,0,0,'int16 nullable using SciDB notation and spaces'
 {50} 0,null,0,0,0,0,0,0,'int16 nullable using SciDB null'
@@ -64,29 +62,29 @@ SCIDB QUERY : <show(a_shadow)>
 
 SCIDB QUERY : <scan(a_shadow)>
 {i} i8,i16,i32,i64,u8,u16,u32,u64,s,row_offset
-{0} 'Failed to parse string \'128\' as int8 (signed overflow)',null,null,null,null,null,null,null,null,9
-{2} 'Failed to parse string \'42hike\' as int8 (non-digits)',null,null,null,null,null,null,null,null,88
-{4} 'Failed to parse string \'-129\' as int8 (signed underflow)',null,null,null,null,null,null,null,null,189
-{5} null,'Failed to parse string \'32768\' as int16 (signed overflow)',null,null,null,null,null,null,null,231
-{7} null,'Failed to parse string \'42hike\' as int16 (non-digits)',null,null,null,null,null,null,null,314
-{9} null,'Failed to parse string \'-32769\' as int16 (signed underflow)',null,null,null,null,null,null,null,419
-{10} null,null,'Failed to parse string \'2147483648\' as int32 (signed overflow)',null,null,null,null,null,null,467
-{12} null,null,'Failed to parse string \'10000Maniacs\' as int32 (non-digits)',null,null,null,null,null,null,560
-{14} null,null,'Failed to parse string \'-2147483649\' as int32 (signed underflow)',null,null,null,null,null,null,672
-{15} null,null,null,'Failed to parse string \'9223372036854775808\' as int64 (Numerical result out of range)',null,null,null,null,null,729
-{17} null,null,null,'Failed to parse string \'12345foobar6789\' as int64 (non-digits)',null,null,null,null,null,830
-{19} null,null,null,'Failed to parse string \'-9223372036854775809\' as int64 (Numerical result out of range)',null,null,null,null,null,966
-{20} null,null,null,null,'Failed to parse string \'256\' as uint8 (unsigned overflow)',null,null,null,null,1007
-{23} null,null,null,null,'Failed to parse string \'0377\' as uint8 (unsigned overflow)',null,null,null,null,1138
-{24} null,null,null,null,null,'Failed to parse string \'65536\' as uint16 (unsigned overflow)',null,null,null,1213
-{26} null,null,null,null,null,'Failed to parse string \'0Xbeef_is_whats_4_dinner\' as uint16 (non-digits)',null,null,null,1316
-{28} null,null,null,null,null,null,'Failed to parse string \'4294967296\' as uint32 (unsigned overflow)',null,null,1434
-{30} null,null,null,null,null,null,'Failed to parse string \'4billion\' as uint32 (non-digits)',null,null,1525
-{32} null,null,null,null,null,null,null,'Failed to parse string \'18446744073709551616\' as uint64 (Numerical result out of range)',null,1655
-{34} null,null,null,null,null,null,null,'Failed to parse string \'184467440737095516foo\' as uint64 (non-digits)',null,1767
-{36} 'Assigning NULL to non-nullable attribute',null,null,null,null,null,null,null,null,1868
-{46} null,'Failed to parse string \'N\' as int16 (non-digits)',null,null,null,null,null,null,null,2379
-{47} null,'Failed to parse string \'N\' as int16 (non-digits)',null,null,null,null,null,null,null,2443
+{0} 'Failed to parse string \'128\' as int8 (signed overflow)',null,null,null,null,null,null,null,null,0
+{2} 'Failed to parse string \'42hike\' as int8 (non-digits)',null,null,null,null,null,null,null,null,66
+{4} 'Failed to parse string \'-129\' as int8 (signed underflow)',null,null,null,null,null,null,null,null,159
+{5} null,'Failed to parse string \'32768\' as int16 (signed overflow)',null,null,null,null,null,null,null,195
+{7} null,'Failed to parse string \'42hike\' as int16 (non-digits)',null,null,null,null,null,null,null,267
+{9} null,'Failed to parse string \'-32769\' as int16 (signed underflow)',null,null,null,null,null,null,null,362
+{10} null,null,'Failed to parse string \'2147483648\' as int32 (signed overflow)',null,null,null,null,null,null,401
+{12} null,null,'Failed to parse string \'10000Maniacs\' as int32 (non-digits)',null,null,null,null,null,null,482
+{14} null,null,'Failed to parse string \'-2147483649\' as int32 (signed underflow)',null,null,null,null,null,null,585
+{15} null,null,null,'Failed to parse string \'9223372036854775808\' as int64 (Numerical result out of range)',null,null,null,null,null,629
+{17} null,null,null,'Failed to parse string \'12345foobar6789\' as int64 (non-digits)',null,null,null,null,null,724
+{19} null,null,null,'Failed to parse string \'-9223372036854775809\' as int64 (Numerical result out of range)',null,null,null,null,null,845
+{20} null,null,null,null,'Failed to parse string \'256\' as uint8 (unsigned overflow)',null,null,null,null,898
+{23} null,null,null,null,'Failed to parse string \'0377\' as uint8 (unsigned overflow)',null,null,null,null,1013
+{24} null,null,null,null,null,'Failed to parse string \'65536\' as uint16 (unsigned overflow)',null,null,null,1082
+{26} null,null,null,null,null,'Failed to parse string \'0Xbeef_is_whats_4_dinner\' as uint16 (non-digits)',null,null,null,1156
+{28} null,null,null,null,null,null,'Failed to parse string \'4294967296\' as uint32 (unsigned overflow)',null,null,1278
+{30} null,null,null,null,null,null,'Failed to parse string \'4billion\' as uint32 (non-digits)',null,null,1361
+{32} null,null,null,null,null,null,null,'Failed to parse string \'18446744073709551616\' as uint64 (Numerical result out of range)',null,1469
+{34} null,null,null,null,null,null,null,'Failed to parse string \'184467440737095516foo\' as uint64 (non-digits)',null,1570
+{47} null,'Failed to parse string \'\\N  \' as int16 (non-digits)',null,null,null,null,null,null,null,2190
+{49} null,'Failed to parse string \'?0  \' as int16 (non-digits)',null,null,null,null,null,null,null,2323
+{51} null,'Failed to parse string \'null  \' as int16 (non-digits)',null,null,null,null,null,null,null,2442
 
 SCIDB QUERY : <remove(a_flat)>
 Query was executed successfully

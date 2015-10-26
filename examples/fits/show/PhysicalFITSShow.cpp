@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -47,23 +47,23 @@ public:
     {
     }
 
-    virtual ArrayDistribution getOutputDistribution(const std::vector<ArrayDistribution> & inputDistributions,
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-       return ArrayDistribution(psLocalInstance);
+       return RedistributeContext(psLocalInstance);
     }
 
-    boost::shared_ptr<Array> execute(vector<boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector<std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         uint32_t hdu = 0;
 
         if (! query->isCoordinator() )
         {
-            return shared_ptr<Array> (new MemArray(_schema,query));
+            return make_shared<MemArray>(_schema,query);
         }
 
-        shared_ptr<TupleArray> tuples(make_shared<TupleArray>(_schema, _arena));
-        const string filePath = ((boost::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
+        std::shared_ptr<TupleArray> tuples(make_shared<TupleArray>(_schema, _arena));
+        const string filePath = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 
         FITSParser parser(filePath);
 

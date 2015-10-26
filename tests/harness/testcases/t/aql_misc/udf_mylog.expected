@@ -13,9 +13,9 @@ Query was executed successfully
 {2} inf
 
 {x} expr
-{0} 0
-{1} 0
-{2} 0
+{0} -0
+{1} -0
+{2} -0
 
 {x} expr
 {0} nan

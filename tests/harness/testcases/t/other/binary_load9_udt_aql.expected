@@ -44,9 +44,6 @@ SCIDB QUERY : <select * from show(YY)>
 
 SCIDB QUERY : <save ZZ into current instance 'zzz.txt' as 'text'>
 {x} a,b,c
-{0} 1,'(1,1)','(3,2)'
-{1} 2,'(1,1)','(3,2)'
-{2} 3,'(1,1)','(3,2)'
 
 SCIDB QUERY : <load Z from current instance 'zzz.txt' as 'text'>
 {x} a,b,c
@@ -56,9 +53,6 @@ SCIDB QUERY : <load Z from current instance 'zzz.txt' as 'text'>
 
 SCIDB QUERY : <save YY into current instance 'yyy.txt' as 'text'>
 {x} a,b,c
-{0} 1,'(1,1)','(3/2)'
-{1} 2,'(1,1)','(2/1)'
-{2} 3,'(1,1)','(5/2)'
 
 SCIDB QUERY : <load Y from current instance 'yyy.txt' as 'text'>
 {x} a,b,c
@@ -68,9 +62,6 @@ SCIDB QUERY : <load Y from current instance 'yyy.txt' as 'text'>
 
 SCIDB QUERY : <save ZZ into current instance 'mathio.bin' as '(int32,point,point)'>
 {x} a,b,c
-{0} 1,'(1,1)','(3,2)'
-{1} 2,'(1,1)','(3,2)'
-{2} 3,'(1,1)','(3,2)'
 
 SCIDB QUERY : <load Z from  current instance 'mathio.bin' as '(int32,point,point)'>
 {x} a,b,c
@@ -80,9 +71,6 @@ SCIDB QUERY : <load Z from  current instance 'mathio.bin' as '(int32,point,point
 
 SCIDB QUERY : <save YY into current instance 'trigno.bin' as '(int32,point,rational)'>
 {x} a,b,c
-{0} 1,'(1,1)','(3/2)'
-{1} 2,'(1,1)','(2/1)'
-{2} 3,'(1,1)','(5/2)'
 
 SCIDB QUERY : <load Y from current instance 'trigno.bin' as '(int32,point,rational)'>
 {x} a,b,c
@@ -92,15 +80,9 @@ SCIDB QUERY : <load Y from current instance 'trigno.bin' as '(int32,point,ration
 
 SCIDB QUERY : <save ZZ into current instance 'mat.dmp' as '(int32,string,string)'>
 {x} a,b,c
-{0} 1,'(1,1)','(3,2)'
-{1} 2,'(1,1)','(3,2)'
-{2} 3,'(1,1)','(3,2)'
 
 SCIDB QUERY : <save YY into current instance 'tri.dmp' as '(int32,string,string)'>
 {x} a,b,c
-{0} 1,'(1,1)','(3/2)'
-{1} 2,'(1,1)','(2/1)'
-{2} 3,'(1,1)','(5/2)'
 
 SCIDB QUERY : <load Z from  current instance 'mathio.bin' as '(int32,point,point)'>
 {x} a,b,c
@@ -129,49 +111,49 @@ SCIDB QUERY : <load Y from current instance 'tri.dmp' as '(int32,string,string)'
 {1} 2,'(1,1)','(2/1)'
 {2} 3,'(1,1)','(5/2)'
 
-SCIDB QUERY : <load B from  current instance 'mat.dmp' as '(dummy(4),string,dummy(10))'>
+SCIDB QUERY : <load B from  current instance 'mat.dmp' as '(skip(4),string,skip(10))'>
 {x} b
 {0} '(1,1)'
 {1} '(1,1)'
 {2} '(1,1)'
 
-SCIDB QUERY : <load B from  current instance 'mat.dmp' as '(dummy(4),dummy(10),string)'>
+SCIDB QUERY : <load B from  current instance 'mat.dmp' as '(skip(4),skip(10),string)'>
 {x} b
 {0} '(3,2)'
 {1} '(3,2)'
 {2} '(3,2)'
 
-SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),string,dummy(10))'>
-[An error expected at this place for the query "load C from  current instance 'tri.dmp' as '(dummy(4),string,dummy(10))'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),string,skip(10))'>
+[An error expected at this place for the query "load C from  current instance 'tri.dmp' as '(skip(4),string,skip(10))'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),string,dummy(10))' errors 100 shadow array C_shad>
+SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),string,skip(10))' errors 100 shadow array C_shad>
 {x} c
 {0} '(0/1)'
 {1} '(0/1)'
 {2} '(0/1)'
 
-SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),dummy(10),string)'>
+SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),skip(10),string)'>
 {x} c
 {0} '(3/2)'
 {1} '(2/1)'
 {2} '(5/2)'
 
-SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(dummy(4),dummy(10),rational)'>
-[An error expected at this place for the query "load C from  current instance 'tri.dmp' as '(dummy(4),dummy(10),rational)'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),skip(10),rational)'>
+[An error expected at this place for the query "load C from  current instance 'tri.dmp' as '(skip(4),skip(10),rational)'". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-SCIDB QUERY : <load B from  current instance 'mathio.bin' as '(dummy(4),dummy(16),point)'>
+SCIDB QUERY : <load B from  current instance 'mathio.bin' as '(skip(4),skip(16),point)'>
 {x} b
 {0} '(3,2)'
 {1} '(3,2)'
 {2} '(3,2)'
 
-SCIDB QUERY : <load C from current instance 'trigno.bin' as '(dummy(4),dummy(16),rational)'>
+SCIDB QUERY : <load C from current instance 'trigno.bin' as '(skip(4),skip(16),rational)'>
 {x} c
 {0} '(3/2)'
 {1} '(2/1)'
 {2} '(5/2)'
 
-SCIDB QUERY : <load B from current instance 'trigno.bin' as '(dummy(4),point,dummy(16))'>
+SCIDB QUERY : <load B from current instance 'trigno.bin' as '(skip(4),point,skip(16))'>
 {x} b
 {0} '(1,1)'
 {1} '(1,1)'

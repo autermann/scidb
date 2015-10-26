@@ -84,7 +84,7 @@ store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei,Kemboi,Kipruto,Thugw
 store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya,Kenya,Kenya,USA,Ethiopia,Italy,Kenya]',true),country)
 store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12),(503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time)
 store(join(event,join(person,join(year,join(country,time)))),winnersFlat)
-store(redimension(winnersFlat,winners),winners)
+store(redimension(winnersFlat,winners,false),winners)
 --stop-igdata
 show(winners)
 --start-igdata

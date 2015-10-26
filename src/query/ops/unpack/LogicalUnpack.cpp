@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -43,7 +43,7 @@ inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName, siz
 {
     Attributes const& oldAttributes = desc.getAttributes();
     Dimensions const& dims = desc.getDimensions();
-    Attributes newAttributes(oldAttributes.size() + dims.size()); 
+    Attributes newAttributes(oldAttributes.size() + dims.size());
     size_t i = 0;
     uint64_t arrayLength = 1;
     for (size_t j = 0; j < dims.size(); j++, i++)
@@ -63,11 +63,15 @@ inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName, siz
     newAttributes = addEmptyTagAttribute(newAttributes);
 
     Dimensions newDimensions(1);
-    newDimensions[0] = DimensionDesc(dimName, 0, 0, MAX_COORDINATE, MAX_COORDINATE, chunkSize, 0);
+    newDimensions[0] = DimensionDesc(
+        dimName, 0, 0,
+        CoordinateBounds::getMax(),
+        CoordinateBounds::getMax(),
+        chunkSize, 0);
 
-    return ArrayDesc(desc.getName(), newAttributes, newDimensions);
+    return ArrayDesc(desc.getName(), newAttributes, newDimensions, defaultPartitioning());
 }
-    
+
 /**
  * @brief The operator: unpack().
  *
@@ -111,24 +115,24 @@ public:
         ADD_PARAM_VARIES()
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(PARAM_CONSTANT("int64"));
         res.push_back(END_OF_VARIES_PARAMS());
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
-        assert(((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getParamType() == PARAM_DIMENSION_REF);
-        const string &dimName = ((boost::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        assert(((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getParamType() == PARAM_DIMENSION_REF);
+        const string &dimName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         size_t chunkSize = 0;
         if(_parameters.size() == 2)
         {
-            chunkSize = evaluate(((boost::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(), query, TID_INT64).getInt64();
+            chunkSize = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(), query, TID_INT64).getInt64();
             if(chunkSize <= 0)
             {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE);

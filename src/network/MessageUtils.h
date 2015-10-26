@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,7 +29,7 @@
 #ifndef MESSAGEUTILS_H_
 #define MESSAGEUTILS_H_
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <network/proto/scidb_msg.pb.h>
 #include <network/BaseConnection.h>
@@ -42,25 +42,25 @@ namespace scidb
 
 #ifndef SCIDB_CLIENT
 
-boost::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID = 0);
-boost::shared_ptr<MessageDesc> makeErrorMessage(int code, const std::string& errorMessage, QueryID queryID);
-boost::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID = 0);
-boost::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID);
-boost::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID);
-boost::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID);
-boost::shared_ptr<MessageDesc> makeNotifyMessage(QueryID queryID);
+std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID = 0);
+std::shared_ptr<MessageDesc> makeErrorMessage(int code, const std::string& errorMessage, QueryID queryID);
+std::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID = 0);
+std::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID);
+std::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID);
+std::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID);
+std::shared_ptr<MessageDesc> makeNotifyMessage(QueryID queryID);
 
-bool parseQueryLiveness(boost::shared_ptr<InstanceLiveness>& queryLiveness,
-                        boost::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);
+bool parseQueryLiveness(std::shared_ptr<InstanceLiveness>& queryLiveness,
+                        std::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);
 
-bool serializeQueryLiveness(boost::shared_ptr<const InstanceLiveness>& queryLiveness,
-                            boost::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);
+bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLiveness,
+                            std::shared_ptr<scidb_msg::PhysicalPlan>& ppMsg);
 
 #endif //SCIDB_CLIENT
 
-boost::shared_ptr<Exception> makeExceptionFromErrorMessage(const boost::shared_ptr<MessageDesc> &msg);
+std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<MessageDesc> &msg);
 
-void makeExceptionFromErrorMessageAndThrow(const boost::shared_ptr<MessageDesc> &msg);
+void makeExceptionFromErrorMessageAndThrow(const std::shared_ptr<MessageDesc> &msg);
 } // namespace
 
 #endif /* MESSAGEUTILS_H_ */

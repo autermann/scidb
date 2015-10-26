@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -40,7 +40,7 @@ using namespace boost;
 
 namespace scidb
 {
-    
+
 class PhysicalDiskInfo: public PhysicalOperator
 {
   public:
@@ -49,9 +49,9 @@ class PhysicalDiskInfo: public PhysicalOperator
     {
     }
 
-    boost::shared_ptr<Array> execute(vector< boost::shared_ptr<Array> >& inputArrays, boost::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        boost::shared_ptr<TupleArray> tuples(boost::make_shared<TupleArray>(_schema, _arena));
+        std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
         Value tuple[5];
         Storage::DiskInfo info;
         StorageManager::getInstance().getDiskInfo(info);
@@ -65,6 +65,6 @@ class PhysicalDiskInfo: public PhysicalOperator
     }
 };
 
-DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalDiskInfo, "diskinfo", "physicalDiskInfo")
+DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalDiskInfo, "_diskinfo", "physicalDiskInfo")
 
 } //namespace

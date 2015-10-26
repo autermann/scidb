@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -104,7 +104,7 @@ bool parseSharedMemoryIpcName(const std::string& fileName,
 
         string format("SciDB-");
         format += clusterUuid;
-        format += "-%"PRIu64"-%"PRIu64"-%"PRIu64"%n";
+        format += "-%" PRIu64 "-%" PRIu64 "-%" PRIu64 "%n";
         int n=0;
         int rc = ::sscanf(fileName.c_str(), format.c_str(), &queryId, &instanceId, &launchId, &n);
         if (rc == EOF || rc < 3) {
@@ -118,7 +118,7 @@ bool parseSharedMemoryIpcName(const std::string& fileName,
         throw std::logic_error("Unknown IPC mode");
     }
     int n=0;
-    int rc = ::sscanf(fileName.c_str(), "%"PRIu64".%"PRIu64"%n", &queryId, &launchId, &n);
+    int rc = ::sscanf(fileName.c_str(), "%" PRIu64 ".%" PRIu64 "%n", &queryId, &launchId, &n);
     if (rc == EOF || rc < 2) {
         // ignore file with unknown name
         return false;
@@ -319,7 +319,7 @@ parseScidbMPIEnvVar(const string& envVarValue,
                     string& clusterUuid)
 {
   std::vector<char> buf(envVarValue.size()+1);
-  string format("%"PRIu32".%"PRIu64".%"PRIu64".%s""%n");
+  string format("%" PRIu32 ".%" PRIu64 ".%" PRIu64 ".%s""%n");
   int n=0;
   int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &shmType, &queryId, &launchId, &buf[0], &n);
   if (rc == EOF || rc < 3) {

@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -29,6 +29,8 @@
 
 #include <query/Operator.h>
 
+using namespace std;
+
 namespace scidb
 {
 
@@ -46,7 +48,7 @@ namespace scidb
    *   array into a 2-d matrix whose columns correspond to the input array
    *   attributes. The output matrix row dimension will have a chunk size
    *   equal to the input array, and column chunk size equal to the number
-   *   of columns. 
+   *   of columns.
    *
    * @par Input:
    *   - array: the array to consume
@@ -101,7 +103,7 @@ namespace scidb
     }
 
     ArrayDesc inferSchema(vector<ArrayDesc> schemas,
-			  shared_ptr<Query> query) {
+			  std::shared_ptr<Query> query) {
       // Look at the first schema for the input schema; since the operator
       // takes only one input array, there should only be one schema.
       assert(schemas.size() == 1);
@@ -123,7 +125,7 @@ namespace scidb
       outputAttributes = addEmptyTagAttribute(outputAttributes);
 
       // Effort to create a new dimension name that doesn't conflict
-      // with existing dimensions: use the operator name and 
+      // with existing dimensions: use the operator name and
       // the number of dimensions on the input as the output
       // dimension name.
       Dimensions outputDimensions = inputSchema.getDimensions();
@@ -131,13 +133,14 @@ namespace scidb
       dim_name << "unfold_"
 	       << outputDimensions.size();
       outputDimensions.push_back(DimensionDesc(dim_name.str(),
-					       0, 
-					       nAttrs-1, 
-					       nAttrs, 
+					       0,
+					       nAttrs-1,
+					       nAttrs,
 					       0));
-      return ArrayDesc(inputSchema.getName(), 
-		       outputAttributes, 
-		       outputDimensions);
+      return ArrayDesc(inputSchema.getName(),
+		       outputAttributes,
+		       outputDimensions,
+                       defaultPartitioning());
 
     }
   };

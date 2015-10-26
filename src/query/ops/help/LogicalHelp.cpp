@@ -2,8 +2,8 @@
 **
 * BEGIN_COPYRIGHT
 *
-* This file is part of SciDB.
-* Copyright (C) 2008-2014 SciDB, Inc.
+* Copyright (C) 2008-2015 SciDB, Inc.
+* All Rights Reserved.
 *
 * SciDB is free software: you can redistribute it and/or modify
 * it under the terms of the AFFERO GNU General Public License as published by
@@ -75,16 +75,16 @@ public:
         _usage = "scan([<operator name>])";
     }
 
-    std::vector<boost::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
     {
-        std::vector<boost::shared_ptr<OperatorParamPlaceholder> > res;
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         if (_parameters.size() == 0)
             res.push_back(PARAM_CONSTANT("string"));
         res.push_back(END_OF_VARIES_PARAMS());
         return res;
     }
 
-    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, boost::shared_ptr< Query> query)
+    ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 0 || _parameters.size() == 1);
@@ -93,7 +93,7 @@ public:
         {
             const string &opName =
                 evaluate(
-                    ((boost::shared_ptr<OperatorParamLogicalExpression>&) _parameters[0])->getExpression(),
+                    ((std::shared_ptr<OperatorParamLogicalExpression>&) _parameters[0])->getExpression(),
                     query, TID_STRING).getString();
 
             try
@@ -112,7 +112,7 @@ public:
         Dimensions dims(1);
         dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
 
-        return ArrayDesc("Help",atts,dims);
+        return ArrayDesc("Help",atts,dims, defaultPartitioning());
     }
 
 };
