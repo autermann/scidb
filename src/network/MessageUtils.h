@@ -42,9 +42,11 @@ namespace scidb
 
 #ifndef SCIDB_CLIENT
 
-std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID = 0);
+/// @param forClient set to true if the message is to be sent to the client, false by default
+std::shared_ptr<MessageDesc> makeErrorMessageFromExceptionForClient(const Exception& e, QueryID queryID);
+std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID, bool forClient=false);
 std::shared_ptr<MessageDesc> makeErrorMessage(int code, const std::string& errorMessage, QueryID queryID);
-std::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID = 0);
+std::shared_ptr<MessageDesc> makeOkMessage(QueryID queryID);
 std::shared_ptr<MessageDesc> makeAbortMessage(QueryID queryID);
 std::shared_ptr<MessageDesc> makeCommitMessage(QueryID queryID);
 std::shared_ptr<MessageDesc> makeWaitMessage(QueryID queryID);
@@ -58,9 +60,12 @@ bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLivene
 
 #endif //SCIDB_CLIENT
 
-std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<MessageDesc> &msg);
+/// @param forClient set to true if the message is parsed on the client, false by default
+std::shared_ptr<Exception> makeExceptionFromErrorMessageOnClient(const std::shared_ptr<MessageDesc> &msg);
+std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<MessageDesc> &msg, bool forClient=false);
 
-void makeExceptionFromErrorMessageAndThrow(const std::shared_ptr<MessageDesc> &msg);
+/// @param forClient set to true if the message is parsed on the client, true by default
+void makeExceptionFromErrorMessageAndThrowOnClient(const std::shared_ptr<MessageDesc> &msg);
 } // namespace
 
 #endif /* MESSAGEUTILS_H_ */

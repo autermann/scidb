@@ -53,7 +53,7 @@ public:
         CPU_CACHE_L3 = 4
     };
 
-    static int getNumberOfCPUs();
+    static long getNumberOfCPUs();
 
     /**
      * Get hardware cache sizes from the operating system.
@@ -65,7 +65,7 @@ public:
      * only the initial calls to this method will actually perform
      * system calls.
      */
-    static int getCPUCacheSize(int level);
+    static long getCPUCacheSize(int level);
 };
 
 } //namespace

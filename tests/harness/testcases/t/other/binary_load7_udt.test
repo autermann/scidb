@@ -6,10 +6,10 @@
 
 load_library('rational')
 
-create array RAT <val: rational > [ x=0:2,3,0]
-create array RAT1 <val1: rational,val2:rational >[ x=0:2,3,0]
-create array RAT2 <val1: rational,val2:rational >[ x=0:2,3,0]
-create array RAT3 <fraction: rational > [ x=0:2,3,0]
+create array RAT <val: rational NOT NULL > [ x=0:2,3,0]
+create array RAT1 <val1: rational NOT NULL,val2:rational NOT NULL >[ x=0:2,3,0]
+create array RAT2 <val1: rational NOT NULL,val2:rational NOT NULL >[ x=0:2,3,0]
+create array RAT3 <fraction: rational NOT NULL > [ x=0:2,3,0]
 
 --test
 --shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(RAT,'${TEST_DATA_DIR}/rat.txt')""

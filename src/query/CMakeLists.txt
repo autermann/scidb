@@ -96,6 +96,14 @@ set(scalar_proc_src
     Aggregate.cpp
 )
 
+# Template Functions (in TileFunctions.h) and Macro defined Fuctions
+# (in BuiltInFunctions.h) have many warnings when dealing with integral
+# types smaller than int. The conversion back to sizes smaller than int
+# after arithmetic operations cause the "warning: conversion" to occur.
+# ... so assuming that the conversions are "okay"
+# ... also assuming the all integral types to double conversion are also "okay"
+set_source_files_properties(FunctionLibrary.cpp BuiltinAggregates.cpp PROPERTIES COMPILE_FLAGS "-Wno-conversion")
+
 add_library(scalar_proc_lib STATIC ${scalar_proc_src} ${qproc_include})
 target_link_libraries(scalar_proc_lib ${Boost_LIBRARIES})
 target_link_libraries(scalar_proc_lib network_lib util_lib)
@@ -117,9 +125,11 @@ set(qproc_src
     PullSGContext.cpp
     PullSGArrayUtil.cpp
     PullSGArray.cpp
+    AutochunkFixer.cpp
 )
 
-set_source_files_properties(${query_parser_src} ${lexer_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses")
+set_source_files_properties(${query_parser_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses -Wno-conversion")
+set_source_files_properties(${lexer_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses -Wno-conversion")
 add_library(qproc_lib STATIC ${qproc_src} ${query_parser_src} ${lexer_fixed_src}  ${qproc_include})
 target_link_libraries(qproc_lib ${Boost_LIBRARIES})
 target_link_libraries(qproc_lib usr_namespace_lib scalar_proc_lib compression_lib array_lib ops_lib system_lib)

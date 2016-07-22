@@ -39,8 +39,7 @@ scan(simp2_reloaded)
 --echo Save and reload simple2 via csv:E
 remove(simp2_reloaded)
 create array simp2_reloaded <s1:string null,s2:string null>[i=0:*,100,0]
-save(simple2, '/tmp/simple2.hdr.csv', -2, 'csv:E')
---shell --command "sed 1d /tmp/simple2.hdr.csv > /tmp/simple2.csv"
+save(simple2, '/tmp/simple2.csv', -2, 'csv:E')
 load(simp2_reloaded, '/tmp/simple2.csv', -2, 'csv')
 
 --echo Save reloaded simple2 array in .scidb format, should be identical.

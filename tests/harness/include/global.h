@@ -241,7 +241,8 @@ struct HarnessCommandLineOptions
     bool                    log_queries;
     bool                    save_failures;
     std::string             userName;
-    std::string             userPassword;
+    std::string             userPassword;  // non-plaintext format
+    std::string             authFile;
 };
 
 } //END namespace scidbtestharness

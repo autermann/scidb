@@ -27,51 +27,73 @@
  *      Author: Knizhnik
  */
 
+#include <array/DBArray.h>
+#include <array/Metadata.h>
+#include <array/TransientCache.h>
 #include <boost/foreach.hpp>
 #include <deque>
+#include <query/Operator.h>
+#include <query/QueryProcessor.h>
+#include <smgr/io/Storage.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
-#include "query/Operator.h"
-#include "query/QueryProcessor.h"
-#include "array/DBArray.h"
-#include "array/TransientCache.h"
-#include "smgr/io/Storage.h"
-#include "system/SystemCatalog.h"
 
 using namespace std;
 using namespace boost;
 
-namespace scidb {
+namespace scidb
+{
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.physical_remove"));
 
 class PhysicalRemove: public PhysicalOperator
 {
 public:
-   PhysicalRemove(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-   PhysicalOperator(logicalName, physicalName, parameters, schema)
-   {
-   }
+    PhysicalRemove(
+        const string& logicalName, const string& physicalName,
+        const Parameters& parameters, const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
+    {
+    }
 
-   void preSingleExecute(std::shared_ptr<Query> query)
-   {
-       std::shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-       assert(membership);
-       if (((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-            (membership->getInstances().size() != query->getInstancesCount()))) {
-           throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-       }
-       const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-       _lock = std::shared_ptr<SystemCatalog::LockDesc>(new SystemCatalog::LockDesc(arrayName,
-                                                                                      query->getQueryID(),
-                                                                                      Cluster::getInstance()->getLocalInstanceId(),
-                                                                                      SystemCatalog::LockDesc::COORD,
-                                                                                      SystemCatalog::LockDesc::RM));
+    void preSingleExecute(std::shared_ptr<Query> query)
+    {
+        const std::string & arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+       _lock = std::shared_ptr<SystemCatalog::LockDesc>(
+            new SystemCatalog::LockDesc(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::RM));
        std::shared_ptr<Query::ErrorHandler> ptr(new RemoveErrorHandler(_lock));
        query->pushErrorHandler(ptr);
 
-       bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(arrayName,
-                                                                     query->getCatalogVersion(arrayName),
-                                                                     _schema, true);
+       SystemCatalog* catalog = SystemCatalog::getInstance();
+
+       // From this point on _schema is used to describe the array to be removed rather than the output array
+       // somewhat hacky ... but getOutputDistribution() and other optimizer manipulations should be done by now
+       ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+       bool arrayExists = scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, arrayId, _schema, true);
        SCIDB_ASSERT(arrayExists);
-       assert(_schema.getName() == arrayName);
+       SCIDB_ASSERT(_schema.getName() == arrayName);
+       SCIDB_ASSERT(_schema.getUAId()>0);
+
+       query->checkDistributionForRemove(_schema);
+
+       // Until the lock is updated with UAID, the query can be rolled back.
+       _lock->setArrayId(_schema.getUAId());
+       query->setAutoCommit();
+       bool rc = catalog->updateArrayLock(_lock);
+       SCIDB_ASSERT(rc);
    }
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
@@ -87,7 +109,7 @@ public:
     void postSingleExecute(std::shared_ptr<Query> query)
     {
         bool rc = RemoveErrorHandler::handleRemoveLock(_lock, true);
-        if (!rc) assert(false);
+        SCIDB_ASSERT(rc);
     }
 
 private:

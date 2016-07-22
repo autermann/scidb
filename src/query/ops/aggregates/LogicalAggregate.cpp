@@ -27,17 +27,20 @@
  *      Author: poliocough@gmail.com
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "query/LogicalExpression.h"
-#include "query/TypeSystem.h"
-#include "query/Aggregate.h"
-#include "util/arena/Set.h"
+#include <query/Operator.h>
+#include <query/AutochunkFixer.h>
+#include <system/Exceptions.h>
+#include <query/LogicalExpression.h>
+#include <query/TypeSystem.h>
+#include <query/Aggregate.h>
+#include <util/arena/Set.h>
 
 namespace scidb {
 
 using namespace std;
 using namespace boost;
+
+int64_t constexpr UNDEF_CHUNKSIZE = -1L; // (Same as AUTOCHUNKED but usage does not collide, so OK.)
 
 /**
  * @brief The operator: aggregate().
@@ -96,6 +99,8 @@ using namespace boost;
  */
 class LogicalAggregate: public  LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
     LogicalAggregate(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
@@ -103,6 +108,11 @@ public:
         _properties.tile = true;
         ADD_PARAM_INPUT()
         ADD_PARAM_VARIES()
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     std::vector<std::shared_ptr<OperatorParamPlaceholder> >
@@ -151,12 +161,12 @@ public:
      * @param inputDims  the input dimensions.
      * @param outDims    the output dimensions.
      * @param param      the OperatorParam object.
-     * @param chunkSize  the chunkSize for the dimension; -1 means to use the input dimension size.
+     * @param chunkSize  the chunkSize for the dimension; UNDEF_CHUNKSIZE means to use the input dimension size.
      */
     void addDimension(Dimensions const& inputDims,
                       Dimensions& outDims,
                       std::shared_ptr<OperatorParam> const& param,
-                      size_t chunkSize)
+                      int64_t chunkSize)
     {
         std::shared_ptr<OperatorParamReference> const& reference =
             (std::shared_ptr<OperatorParamReference> const&) param;
@@ -175,8 +185,13 @@ public:
                                                  inputDims[j].getCurrStart(),
                                                  inputDims[j].getCurrEnd(),
                                                  inputDims[j].getEndMax(),
-                                                 chunkSize==static_cast<size_t>(-1) ? inputDims[j].getChunkInterval() : chunkSize,
+                                                 chunkSize == UNDEF_CHUNKSIZE
+                                                     ? inputDims[j].getRawChunkInterval()
+                                                     : chunkSize,
                                                  0));
+                if (chunkSize == UNDEF_CHUNKSIZE) {
+                    _fixer.takeDimension(outDims.size()-1).fromArray(0).fromDimension(j);
+                }
                 return;
             }
         }
@@ -228,7 +243,7 @@ public:
         {
             if (_parameters[i]->getParamType() == PARAM_DIMENSION_REF)
             {
-                int64_t chunkSize = -1;
+                int64_t chunkSize = UNDEF_CHUNKSIZE;
                 if (numChunkSizes) {
                     // E.g. here are the parameters:
                     //       0           1      2        3            4
@@ -243,7 +258,7 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CHUNK_SIZE_MUST_BE_POSITIVE);
                     }
                 }
-                addDimension(inputDims, outDims, _parameters[i], static_cast<size_t>(chunkSize));
+                addDimension(inputDims, outDims, _parameters[i], chunkSize);
             }
         }
 
@@ -258,7 +273,10 @@ public:
             grand = false;
         }
 
-        ArrayDesc outSchema(input.getName(), Attributes(), outDims, defaultPartitioning());
+        ArrayDesc outSchema(input.getName(), Attributes(), outDims,
+                            defaultPartitioning(),
+                            query->getDefaultArrayResidency());
+
         for (size_t i =0, n = _parameters.size(); i<n; i++)
         {
             if (_parameters[i]->getParamType() == PARAM_AGGREGATE_CALL)

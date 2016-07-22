@@ -94,7 +94,14 @@ class LogicalSaveBmp: public LogicalOperator
         Dimensions outputDims;
         outputDims.push_back(DimensionDesc("i", 0, 0, 0, 0, 1, 0));
 
-        return ArrayDesc("savbmp_output", outputAttrs, outputDims, defaultPartitioning());
+        stringstream ss;
+        ss << 0;
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        return ArrayDesc("savbmp_output", outputAttrs, outputDims,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 };
 

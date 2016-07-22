@@ -63,6 +63,10 @@
 //#include "system/ExceptionUnitTests.h"
 #include "PointerRangeUnitTests.h"
 #include "ArenaUnitTests.h"
+#include "NewUsageOfArena.h"
+
+// The variable_window() unit test should be enabled after fixing #5018.
+// #include <query/ops/variable_window/VariableWindowUnitTests.h>
 
 using namespace std;
 

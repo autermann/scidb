@@ -10,10 +10,10 @@ Query was executed successfully
 SCIDB QUERY : <create array ABC2_null <a: int32 null ,b:string null,c: double null> [x=0:3,4,0,y=0:3,4,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array AB1 <a:int32,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]>
+SCIDB QUERY : <create array AB1 <a:int32 NOT NULL, b:string NOT NULL, c:double NOT NULL> [x=0:3,4,0,y=0:3,4,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array AB2 <a:int32,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]>
+SCIDB QUERY : <create array AB2 <a:int32 NOT NULL, b:string NOT NULL, c:double NOT NULL> [x=0:3,4,0,y=0:3,4,0]>
 Query was executed successfully
 
 SCIDB QUERY : <create array PQR <a:int64,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]>
@@ -22,7 +22,7 @@ Query was executed successfully
 SCIDB QUERY : <create array PQR1 <a:int64,b:string> [x=0:3,4,0,y=0:3,4,0]>
 Query was executed successfully
 
-SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+ -aq "load(AB, '${TEST_DATA_DIR}/abc.txt')">
+SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+:l -aq "load(AB, '${TEST_DATA_DIR}/abc.txt')">
 x,y,a,b,c
 0,0,100,'0',0.25
 0,1,100,'0',1.25
@@ -82,7 +82,7 @@ x,y,a,b,c
 3,2,106,'300',5.25
 3,3,109,'300',6.25
 
-SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+ -aq "load(ABC_null, '${TEST_DATA_DIR}/abc_null.txt')">
+SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+:l -aq "load(ABC_null, '${TEST_DATA_DIR}/abc_null.txt')">
 x,y,a,b,c
 0,0,null,'0',0.25
 0,1,100,'0',null

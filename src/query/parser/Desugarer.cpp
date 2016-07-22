@@ -22,10 +22,11 @@
 
 /****************************************************************************/
 
+#include <query/Query.h>                                 // For Query
 #include <system/SystemCatalog.h>                        // For SystemCatalog
+#include <usr_namespace/NamespacesCommunicator.h>
 #include <util/arena/ScopedArena.h>                      // For ScopedArena
 #include <util/arena/Vector.h>                           // For mgd::vector
-#include <query/Query.h>                                 // For Query
 #include "AST.h"                                         // For Node etc.
 
 /****************************************************************************/
@@ -168,8 +169,11 @@ void Desugarer::onCreateArrayUsing(Node*& pn)
     in order to distinguish  whether each target  dimension 'd' is a dimension
     or attribute of the load array 'L'...*/
     assert(_qry);
-    chars arrName = L->get(referenceArgName,variableArgName)->getString();
-    _cat.getArrayDesc(arrName,_qry->getCatalogVersion(arrName), lArrDesc);
+    std::string arrayName = L->get(referenceArgName,variableArgName)->getString();
+
+    std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+    ArrayID arrayId = _qry->getCatalogVersion(namespaceName, arrayName);
+    scidb::namespaces::Communicator::getArrayDesc(namespaceName, arrayName, arrayId, lArrDesc);
 
  /* For each dimension 'd' of the proposed target schema, construct (abstract
     syntax for) the initial (synthesized) arguments to the 'create_array_as()'
@@ -190,10 +194,10 @@ void Desugarer::onCreateArrayUsing(Node*& pn)
 
     pn = _fac.newApp(w,"Create_Array_Using",
             caMerge(v),                                  // Merge the rows
-			_fac.newApp(w,"sys_create_array_aux",
-			    _fac.newCopy(L),                         // The load array
-			    caGetX(D),                               // The distinct string
-                C),                                      // The desired cells
+            _fac.newApp(w,"sys_create_array_aux",
+                        _fac.newCopy(L),                 // The load array
+                        caGetX(D),                       // The distinct string
+                        C),                              // The desired cells
             a->get(listArg0),                            // The target name
             a->get(listArg1),                            // The target schema
             a->get(listArg2));                           // The temporary flag
@@ -239,8 +243,14 @@ Node* Desugarer::caGetEi(Node* pn,size_t Ni) const
     os << Ni                                      << ',';// The row number
     os << (pn->get(dimensionArgLoBound)      !=0) << ',';// Was lo specified?
     os << (pn->get(dimensionArgHiBound)      !=0) << ',';// Was hi specified?
-    os << (pn->get(dimensionArgChunkInterval)!=0) << ',';// Was ci specified?
-    os << (pn->get(dimensionArgChunkOverlap) !=0);       // Was co specified?
+
+    const Node* n = pn->get(dimensionArgChunkInterval);
+    bool hasInterval = n && !n->is(questionMark) && !n->is(asterisk);
+    n = pn->get(dimensionArgChunkInterval);
+    bool hasOverlap = n && !n->is(questionMark);
+
+    os << hasInterval << ',';                            // Was ci specified?
+    os << hasOverlap;                                    // Was co specified?
     os << ")]";
 
     return _fac.newString(pn->getWhere(),

@@ -84,8 +84,8 @@ SCIDB QUERY : <load AB from current instance 'spook2.bin' as '(string,rational)'
 
 SCIDB QUERY : <load AB from current instance 'spook2.bin' as '(string,rational)' errors 100 shadow array Shad_AB>
 {x} a,b
-{0} 0,'(216172782113783808/144115188075855872)'
-{1} 0,'(0/1)'
+{0} null,'(216172782113783808/144115188075855872)'
+{1} null,null
 
 SCIDB QUERY : <remove(A)>
 Query was executed successfully

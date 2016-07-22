@@ -133,10 +133,6 @@ private:
                     << indexAttribute.getName()
                     << indexAttribute.getType();
         }
-        if (indexAttribute.isNullable())
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ATTRIBUTE_CANNOT_BE_NULLABLE) <<indexAttribute.getName();
-        }
     }
 
 public:

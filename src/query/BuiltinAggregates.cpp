@@ -26,9 +26,9 @@
  * @author poliocough@gmail.com
  */
 
-
 #include <math.h>
 #include <log4cxx/logger.h>
+#include <MurmurHash/MurmurHash3.h>
 
 #include <query/Aggregate.h>
 #include <query/FunctionLibrary.h>
@@ -334,7 +334,7 @@ protected:
 
         size_t  mask  = ((size_t) (m-1) << k_comp);
         size_t  j     = h[0] >> k_comp;
-        uint8_t r     = getTrailingZeros(h[0] | mask) + 1;
+        uint8_t r     = static_cast<uint8_t>(getTrailingZeros(h[0] | mask) + 1);
 
         uint8_t *M = dstState.getData<uint8_t>();
         M[j] = max(M[j], r);
@@ -419,7 +419,7 @@ public:
         }
         double E = alpha_m * m * m / c;
 
-        const double pow_2_64_minus_1 = SIZE_MAX;
+        const double pow_2_64_minus_1 = static_cast<double>(SIZE_MAX);
 
 
         //corrections
@@ -440,7 +440,96 @@ public:
         {
             E = -pow_2_64_minus_1 * log(1 - E / pow_2_64_minus_1);
         }
-        dstValue.setUint64(E);
+        dstValue.setUint64(static_cast<uint64_t>(E));
+    }
+};
+
+/**
+ * This class implements MaxRepeatCount.
+ */
+class MaxRepeatCountAggregate : public Aggregate
+{
+    // Our goal is to come up with an approximate collision count using constant space.  Don't
+    // really care if there are some false collisions.
+    uint32_t const N_BUCKETS = 4096;
+    uint32_t const HASH_SEED = 42; // Well known to be the most random integer.
+    typedef uint8_t bucket_type;
+
+protected:
+    virtual void accumulate(Value& dstState, Value const& srcValue)
+    {
+        assert(isStateInitialized(dstState));
+        assert(isAccumulatable(srcValue));
+
+        // MurmurHash is probably overkill, oh well.  Also, not sure how
+        // uniformly distributed the indeces will be once we mod by
+        // N_BUCKETS, but since we want to compute a worst-case synthetic
+        // interval, it's OK to err on the high side.
+
+        uint32_t index;
+        SCIDB_ASSERT(N_BUCKETS < std::numeric_limits<uint32_t>::max());
+        MurmurHash3_x86_32(srcValue.data(), srcValue.size(), HASH_SEED, &index);
+        index %= N_BUCKETS;
+        SCIDB_ASSERT(index < N_BUCKETS);
+        bucket_type* bucket = static_cast<bucket_type*>(dstState.data());
+        if (bucket[index] < std::numeric_limits<bucket_type>::max()) {
+            ++bucket[index];
+        }
+    }
+
+    virtual void merge(Value& dstState, Value const& srcState)
+    {
+        assert(isStateInitialized(dstState));
+        assert(isMergeable(srcState));
+
+        bucket_type const* src = static_cast<bucket_type const*>(srcState.data());
+        bucket_type* dest = static_cast<bucket_type*>(dstState.data());
+        for (size_t i = 0; i < N_BUCKETS; ++i, ++src, ++dest) {
+            *dest = max(*dest, *src);
+        }
+    }
+
+public:
+    MaxRepeatCountAggregate()
+    : Aggregate("_maxrepcnt", TypeLibrary::getType(TID_VOID), TypeLibrary::getType(TID_UINT64))
+    {}
+
+    virtual bool ignoreNulls() const
+    {
+        return true;
+    }
+
+    virtual Type getStateType() const
+    {
+        return TypeLibrary::getType(TID_BINARY);
+    }
+
+    virtual AggregatePtr clone() const
+    {
+        return AggregatePtr(new MaxRepeatCountAggregate());
+    }
+
+    virtual AggregatePtr clone(Type const& aggregateType) const
+    {
+        return clone();
+    }
+
+    virtual void initializeState(Value& state)
+    {
+        size_t stateBytes = N_BUCKETS * sizeof(bucket_type);
+        ::memset(state.setSize(stateBytes), 0, stateBytes);
+    }
+
+    virtual void finalResult(Value& dstValue, Value const& srcState)
+    {
+        bucket_type theMax = 0;
+        bucket_type* bucket = static_cast<bucket_type*>(srcState.data());
+        for (size_t i = 0; i < N_BUCKETS; ++i, ++bucket) {
+            if (*bucket > theMax) {
+                theMax = *bucket;
+            }
+        }
+        dstValue.setUint64(safe_static_cast<uint64_t>(theMax));
     }
 };
 
@@ -543,6 +632,9 @@ AggregateLibrary::AggregateLibrary()
 
     /** ApproxDC **/
     addAggregate(make_shared<ApproxDCAggregate>());
+
+    /** MaxRepeatCount **/
+    addAggregate(make_shared<MaxRepeatCountAggregate>());
 }
 
 } // namespace scidb

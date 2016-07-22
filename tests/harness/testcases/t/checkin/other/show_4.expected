@@ -34,7 +34,7 @@ SCIDB QUERY : <show(Ts)>
 
 SCIDB QUERY : <show(Tsn)>
 {i} schema
-{0} 'Tsn<a:string DEFAULT \'test\'> [x=-2:3,2,1]'
+{0} 'Tsn<a:string> [x=-2:3,2,1]'
 
 SCIDB QUERY : <show(Ts_rle)>
 {i} schema

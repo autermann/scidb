@@ -70,6 +70,7 @@ public:
     LogicalInput(const std::string& logicalName, const std::string& alias);
     std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas);
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query);
+    std::string inferPermissions(std::shared_ptr<Query>& query);
     void inferArrayAccess(std::shared_ptr<Query>& query);
     static const char* OP_INPUT_NAME;
 };

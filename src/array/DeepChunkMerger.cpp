@@ -313,7 +313,8 @@ void DeepChunkMerger::fillMergedPayloadUsingIntermediateResult(RLEPayload& merge
         outputSegment.setSame(inputSegment.same());
         outputSegment.setValueIndex(inputSegment.null() ? inputSegment.valueIndex() : numRealVals);
 
-        int realLength = inputSegment.length(); // how many real values to insert to the payload
+        // how many real values to insert to the payload
+        int realLength = safe_static_cast<int>(inputSegment.length());
         if (inputSegment.null()) {
             realLength = 0;
         } else if (inputSegment.same()) {

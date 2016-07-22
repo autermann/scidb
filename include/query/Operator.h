@@ -45,6 +45,7 @@
 #include <memory>
 #include <boost/format.hpp>
 #include <boost/serialization/serialization.hpp>
+#include <boost/serialization/string.hpp> // needed for serialization of string parameter
 #include <unordered_map>
 
 #include <array/Array.h>
@@ -971,6 +972,16 @@ public:
      */
     virtual void inferArrayAccess(std::shared_ptr<Query>& query);
 
+    /**
+     * This is where the logical operator can specify which permissions are
+     * needed in order for the query to succeed.
+     * @param query the current query context
+     */
+    virtual std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        return std::string();
+    }
+
     void addParamPlaceholder(const std::shared_ptr<OperatorParamPlaceholder> paramPlaceholder)
     {
         if (_paramPlaceholders.size() > 0 &&
@@ -1000,6 +1011,17 @@ public:
     }
 
     /**
+     *  Get generic inspectable string.
+     *
+     *  @description PhysicalOperator::inspectLogicalOp() is allowed to examine the LogicalOperator,
+     *  but the current physical code layout often prevents a particular PhysicalFoo from knowing
+     *  the definition of LogicalFoo.  This virtual method allows such physical operators to gleen
+     *  some information from their logical counterpart without requiring the particular physical
+     *  operator class definition.
+     */
+    virtual std::string getInspectable() const { return std::string(); }
+
+    /**
       * Retrieve a human-readable description.
       * Append a human-readable description of this onto str. Description takes up
       * one or more lines. Append indent spacer characters to the beginning of
@@ -1019,170 +1041,6 @@ private:
     ArrayDesc _schema;
     std::string _aliasName;
     OperatorParamPlaceholders _paramPlaceholders;
-};
-
-/**
- * CoordinateTranslator stores a DimensionVector, and helps shifting a Coordinates by adding the offset.
- * @example
- * Let the offset vector be <4,6>. We have: translate(<1,1>) = <5,7>.
- *
- */
-class CoordinateTranslator
-{
-private:
-    // The offset vector.
-    DimensionVector _distOffsetVector;
-
-    // Private constructor.
-    CoordinateTranslator(DimensionVector const& offset)
-    {
-        _distOffsetVector = offset;
-    }
-
-public:
-
-    virtual ~CoordinateTranslator()
-    {}
-
-    const DimensionVector& getOffsetVector() {
-        return _distOffsetVector;
-    }
-
-    Coordinates translate (Coordinates const& input) const
-    {
-        assert(input.size() == _distOffsetVector.numDimensions());
-        Coordinates result;
-
-        for (size_t i = 0 ; i < input.size(); i++ )
-        {
-            result.push_back(input[i] + _distOffsetVector[i]);
-        }
-
-        return result;
-    }
-
-    static std::shared_ptr<CoordinateTranslator> createOffsetMapper(DimensionVector const& offset)
-    {
-        return std::shared_ptr<CoordinateTranslator> (new CoordinateTranslator(offset));
-    }
-
-    //careful: this is not commutative
-    std::shared_ptr<CoordinateTranslator> combine(std::shared_ptr<CoordinateTranslator> previous)
-    {
-        if (previous.get() == NULL)
-        {
-            return createOffsetMapper(_distOffsetVector);
-        }
-
-        DimensionVector newOffset = _distOffsetVector + previous->_distOffsetVector;
-        return createOffsetMapper(newOffset);
-    }
-
-    friend bool operator== (const CoordinateTranslator& lhs, const CoordinateTranslator& rhs)
-    {
-        return lhs._distOffsetVector == rhs._distOffsetVector;
-    }
-
-    friend bool operator!= (const CoordinateTranslator& lhs, const CoordinateTranslator& rhs)
-    {
-        return ! (lhs == rhs);
-    }
-
-    friend std::ostream& operator<<(std::ostream& stream, const CoordinateTranslator& dm)
-    {
-        stream << "offset [" ;
-        for (size_t i = 0; i < dm._distOffsetVector.numDimensions(); i++)
-        {
-            stream<<dm._distOffsetVector[i]<<" ";
-        }
-        stream << "]";
-
-        return stream;
-    }
-};
-
-
-class RedistributeContext
-{
-private:
-    PartitioningSchema _partitioningSchema;
-    std::shared_ptr <CoordinateTranslator> _distMapper;
-    int64_t _instanceId;
-
-public:
-    RedistributeContext(PartitioningSchema ps = psHashPartitioned,
-                      std::shared_ptr <CoordinateTranslator> distMapper = std::shared_ptr<CoordinateTranslator>(),
-                      int64_t instanceId = 0):
-        _partitioningSchema(ps), _distMapper(distMapper), _instanceId(instanceId)
-    {
-        if(!isValidPartitioningSchema(ps, true)) {
-             ASSERT_EXCEPTION_FALSE("RedistributeContext: invalid PartitioningSchema")
-        }
-
-        if(_distMapper.get() != NULL && _partitioningSchema == psUndefined)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER);
-    }
-
-    RedistributeContext(const RedistributeContext& other):
-        _partitioningSchema(other._partitioningSchema),
-        _distMapper(other._distMapper),
-        _instanceId(other._instanceId)
-    {
-        if (_distMapper.get() != NULL && _partitioningSchema == psUndefined)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNDEFINED_DISTRIBUTION_CANT_HAVE_MAPPER);
-    }
-
-    virtual ~RedistributeContext()
-    {}
-
-    RedistributeContext& operator= (const RedistributeContext& rhs)
-    {
-        if (this != &rhs)
-        {
-            _partitioningSchema = rhs._partitioningSchema;
-            _distMapper = rhs._distMapper;
-            _instanceId = rhs._instanceId;
-        }
-        return *this;
-    }
-
-    bool hasMapper() const
-    {
-        return _distMapper.get() != NULL;
-    }
-
-    bool isUndefined() const
-    {
-        return _partitioningSchema == psUndefined;
-    }
-
-    bool isViolated() const
-    {
-        return isUndefined() || hasMapper();
-    }
-
-    PartitioningSchema getPartitioningSchema() const
-    {
-        return _partitioningSchema;
-    }
-
-    std::shared_ptr <CoordinateTranslator> getMapper() const
-    {
-        return _distMapper;
-    }
-
-    int64_t getInstanceId() const
-    {
-        return _instanceId;
-    }
-
-    friend bool operator== (RedistributeContext const& lhs, RedistributeContext const& rhs);
-    friend bool operator!= (RedistributeContext const& lhs, RedistributeContext const& rhs)
-    {
-        return !(lhs == rhs);
-    }
-
-    friend std::ostream& operator<<(std::ostream& stream, const RedistributeContext& dist);
 };
 
 /**
@@ -1222,13 +1080,6 @@ public:
      * @return boundaries with numDimensions nonintersecting coordinates.
      */
     static PhysicalBoundaries createEmpty(size_t numDimensions);
-
-    /**
-     * Given a set of dimensions, return the maximum number of cells in each chunk, no overlap.
-     * @param dims a list of array dimensions
-     * @return the product of the chunk sizes.
-     */
-    static uint64_t getCellsPerChunk (Dimensions const& dims);
 
     /**
      * Given a set of array attributes, compute the estimated size of a single cell of this array. Uses
@@ -1341,8 +1192,29 @@ public:
      * box.
      * @param dims the dimensions used for array start, end and chunk interval
      * @return the number of chunks inside this
+     * @throws UnknownChunkIntervalException if any dimension is autochunked
      */
     uint64_t getNumChunks(Dimensions const& dims) const;
+
+    struct UnknownChunkIntervalException : public scidb::SystemException {
+        UnknownChunkIntervalException(const char* file, int line)
+            : SystemException(file, "getNumChunks", line, "scidb",
+                              SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR,
+                              "SCIDB_SE_INTERNAL", "UnknownChunkIntervalException",
+                              INVALID_QUERY_ID)
+        {
+            *this << __FUNCTION__;
+        }
+        virtual ~UnknownChunkIntervalException() throw () {}
+        virtual void raise() const { throw *this; }
+        virtual Exception::Pointer copy() const
+        {
+           std::shared_ptr<UnknownChunkIntervalException> ep =
+               std::make_shared<UnknownChunkIntervalException>(getFile().c_str(), getLine());
+            ep->_formatter = _formatter;
+            return ep;
+        }
+    };
 
     /**
      * Given a schema, estimate the total size, in bytes that an array would occupy in this bounding box.
@@ -1457,10 +1329,12 @@ public:
                     nAttrs), _srcArrayIterators(nAttrs), bounds(
                     PhysicalBoundaries::createEmpty(nDims))
     {
+        ASSERT_EXCEPTION(nAttrs <= std::numeric_limits<AttributeID>::max(),
+            "Attribute count exceeds max addressable iterator");
         for (size_t i = 0; i < nAttrs; i++)
         {
-            _dstArrayIterators[i] = _dstArray->getIterator(i);
-            _srcArrayIterators[i] = _srcArray->getConstIterator(i);
+            _dstArrayIterators[i] = _dstArray->getIterator(static_cast<AttributeID>(i));
+            _srcArrayIterators[i] = _srcArray->getConstIterator(static_cast<AttributeID>(i));
         }
     }
 
@@ -1486,7 +1360,10 @@ public:
         SpecificAnyOrder
     };
 
-    DistributionRequirement (reqType rt = Any, std::vector<RedistributeContext> specificRequirements = std::vector<RedistributeContext>(0)):
+    DistributionRequirement (reqType rt = Any,
+                             std::vector<RedistributeContext> specificRequirements =
+                             std::vector<RedistributeContext>(0)):
+
         _requiredType(rt), _specificRequirements(specificRequirements)
     {
         if ((_requiredType == SpecificAnyOrder || _specificRequirements.size() != 0)
@@ -1513,6 +1390,7 @@ private:
     reqType                     const _requiredType;
     std::vector<RedistributeContext> const _specificRequirements;
 };
+
 
 class DimensionGrouping
 {
@@ -1635,7 +1513,8 @@ public:
     {
         if (numCoords==0 || axis >= numCoords)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Invalid parameters passed to ChunkInstanceMap ctor";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+               << "Invalid parameters passed to ChunkInstanceMap ctor";
         }
     }
 
@@ -1651,7 +1530,8 @@ public:
     {
         if (coords.size() != _numCoords)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Invalid coords passed to ChunkInstanceMap::addChunkInfo";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+               << "Invalid coords passed to ChunkInstanceMap::addChunkInfo";
         }
 
         Coordinates copy = coords;
@@ -1670,7 +1550,8 @@ public:
 
         if (_outerIter->second->find(inner) != _outerIter->second->end())
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Duplicate chunk information passed to ChunkInstanceMap::addChunkInfo";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+               << "Duplicate chunk information passed to ChunkInstanceMap::addChunkInfo";
         }
 
         _outerIter->second->insert(std::pair<Coordinate, InstanceID>(inner, instanceId));
@@ -2078,9 +1959,17 @@ public:
      */
     virtual std::shared_ptr< Array> executeWrapper(std::vector<std::shared_ptr<Array> >&, std::shared_ptr<Query>);
 
+    /**
+     * Build this operator's piece of the Array plumbing for the executor's data flow machinery.
+     *
+     * @note The result Array MUST NOT have any autochunked dimensions.  For simple operators, an
+     * early call to checkOrUpdateIntervals() may be enough to fulfill this requirement; see
+     * PhysicalApply for an example.  Physical operators with more complicated needs often implement
+     * a private fixChunkIntervals() method to fix up the schema intervals to match actual inputs.
+     */
     virtual std::shared_ptr< Array> execute(
-            std::vector< std::shared_ptr< Array> >&,
-            std::shared_ptr<Query>) = 0;
+            std::vector< std::shared_ptr< Array> >& inputArrays,
+            std::shared_ptr<Query> query) = 0;
 
     /**
      * This routine allows operators to communicate with profiling code
@@ -2110,6 +1999,8 @@ public:
 
     /**
       * [Optimizer API] Determine if operator changes result chunk distribution.
+      * If a derived implementation returns true, getOutputDistribution()
+      * must be overriden as well to convey the new distribution/residency
       * @param sourceSchemas shapes of all arrays that will given as inputs.
       * @return true if will changes output chunk distribution, false if otherwise
       */
@@ -2133,30 +2024,14 @@ public:
 
     /**
      *  [Optimizer API] Determine the distribution of operator output.
-     *  @param sourceDistributions distributions of inputs that will be provided in order same as inputSchemas
-     *  @param sourceSchemas shapes of all arrays that will given as inputs
+     *  If changesDistribution() is overriden this MUST be overriden too.
+     *  @param inputDistributions distributions of inputs that will be provided in order same as inputSchemas
+     *  @param inputSchemas shapes of all arrays that will given as inputs
      *  @return distribution of the output
      */
     virtual RedistributeContext getOutputDistribution(
-            std::vector<RedistributeContext> const& sourceDistributions,
-            std::vector<ArrayDesc> const& sourceSchemas) const
-    {
-        if (changesDistribution(sourceSchemas)) {
-            /*
-              if you override changesDistribution
-              you MUST override getOutputDistribution
-            */
-            throw USER_EXCEPTION(SCIDB_SE_INTERNAL,
-                                 SCIDB_LE_NOT_IMPLEMENTED)
-                    << "getOutputDistribution";
-        }
-
-        if(sourceDistributions.empty()) {
-            return RedistributeContext(defaultPartitioning());
-        } else {
-            return sourceDistributions[0];
-        }
-    }
+            std::vector<RedistributeContext> const& inputDistributions,
+            std::vector<ArrayDesc> const& inputSchemas) const ;
 
     /**
      *  [Optimizer API] Determine the boundaries of operator output.
@@ -2226,6 +2101,38 @@ public:
         modifiedPtrs.clear();
     }
 
+    /**
+     *  [Optimizer API] Give physical operator a chance to inspect its "parent" logical operator.
+     *
+     *  @param[in] lop logical operator object that this physical operator implements
+     *
+     *  @description Sometimes a physical operator needs access to results computed in the logical
+     *  operator.  For example, PhysicalXgrid needs to know which input dimensions were autochunked
+     *  (and therefore not scaled), so that at execute time it can scale those dimensions as if they
+     *  had been fully specified all along.  This virtual method lets a physical operator optionally
+     *  call the const methods of its "parent".  It is called just after physical operator creation
+     *  on the coordinator.
+     */
+    virtual void inspectLogicalOp(LogicalOperator const& lop) { }
+
+    /**
+     * Set/get a control cookie.
+     *
+     * @description Sometimes a PhysicalOperator on the coordinator wants to insure that all its
+     * peers receive some arbitrary control information.  Since plan nodes (and not physical
+     * operators themselves) are serialized during plan distribution, these methods are used to copy
+     * any control cookie @i into the plan node on the coordinator, and later retrieve it on all
+     * workers.
+     *
+     * @note So far we don't have any operators that need to overload the control cookie with
+     * multiple uses.  If we ever do, perhaps a JSON dict-of-strings is the way to do it.
+     *
+     * @{
+     */
+    void setControlCookie(const std::string& cookie) { _cookie = cookie; }
+    const std::string& getControlCookie() const { return _cookie; }
+    /** @} */
+
     bool getTileMode() const
     {
         return _tileMode;
@@ -2262,7 +2169,8 @@ public:
 
 protected:
     Parameters _parameters;
-    ArrayDesc _schema;
+    // _schema can be changed by getOutputDistribution()
+    mutable ArrayDesc _schema;
     Statistics _statistics;
     arena::ArenaPtr _arena;
     bool _tileMode;
@@ -2270,23 +2178,48 @@ protected:
     mutable std::vector<std::shared_ptr<ArrayDesc> > _redimRepartSchemas;
 
     /**
+     * Check that @c checkMe schema's intervals match the resolved array.
+     *
+     * @description If an interval is AUTOCHUNKED in @c checkMe, take its value from @c resolved.
+     * Otherwise corresponding intervals must match.
+     *
+     * @param[in,out] checkMe schema to check, or update if any dimensions were autochunked
+     * @param[in] resolved Array whose schema has all intervals specified
+     * @throws SCIDB_LE_DIMENSIONS_DONT_MATCH if non-autochunked intervals don't match.
+     *
+     * @note Physical operators that may have acquired an autochunked _schema during logical
+     * inferSchema() need to fix those autochunked intervals according to their actual input arrays,
+     * which they first get to inspect in physical execute().  This method takes care of the easy
+     * case: a unary operator that makes no major modifications to input dimensions.
+     *
+     *@{
+     */
+    static void checkOrUpdateIntervals(ArrayDesc& checkMe, std::shared_ptr<Array>& resolved);
+    static void checkOrUpdateIntervals(ArrayDesc& checkMe, Dimensions const& resolvedDims);
+    /**@}*/
+
+    /**
      * Canned impl of requiresRedimensionOrRepartition() for use by most n-ary
      * auto-repartitioning operators.
      *
      * @description Operators whose only requirement is that all inputs have like chunk sizes
      * and overlaps may call this canned implementation.  All input arrays will be repartitioned
-     * to match the chunk sizes of inputSchemas[0] (if they do not already match).  Minimum
-     * overlap values will be chosen (the 'join' operator insists on this... for now).
+     * to match the chunk sizes of the left-most non-autochunked input schema (if they do not
+     * already match).  Minimum overlap values will be chosen (the 'join' operator insists on
+     * this... for now).
      *
      * @param[in] inputSchemas shapes of arrays that will be given as input
      * @param[in,out] modifiedPtrs pointers to repartitioning schemas for corresponding inputs
-     * @throws SCIDB_LE_BAD_EXPLICIT_REPART if an explicit repart prevents correctly partitioned inputs
+     * @throws scidb::UserException SCIDB_LE_BAD_EXPLICIT_REPART
+     *         if an explicit repart prevents correctly partitioned inputs
+     * @throws scidb::UserException SCIDB_LE_ALL_INPUTS_AUTOCHUNKED
+     *         if all input schemas are autochunked
      */
     void repartByLeftmost(std::vector<ArrayDesc> const& inputSchemas,
                           std::vector<ArrayDesc const*>& modifiedPtrs) const;
 
     /**
-     * Help that executes in Debug build only
+     * Helper that executes in Debug build only
      * Asserts that a given array descriptor corresponds to the last committed array version.
      * If arrayExists == false, asserts if the last version is found in the catalog.
      * @param arrayName
@@ -2294,14 +2227,25 @@ protected:
      * @param desc array descriptor to be validated (if arrayExists == true)
      *
      */
-    void assertLastVersion(std::string const& arrayName,
-                           bool arrayExists,
-                           ArrayDesc const& desc);
+    static void assertLastVersion(std::string const& arrayName,
+                                  bool arrayExists,
+                                  ArrayDesc const& desc);
+    /**
+     * Helper that executes in Debug build only
+     * Asserts that a given array descriptor's distribution and residency is consistent with those of the redistribute context
+     * @param schema array descriptor
+     * @param distro redistribute context
+     */
+    static void assertConsistency(ArrayDesc const& schema,
+                                  RedistributeContext const& distro);
 
+    /// @return identical distribution BUT with  DEFAULT_REDUNDANCY, possibly the same
+    static ArrayDistPtr convertToDefaultRedundancy(ArrayDistPtr const& inputDist) ;
 
 private:
     std::string _logicalName;
     std::string _physicalName;
+    std::string _cookie;
     static InjectedErrorListener<OperatorInjectedError> _injectedErrorListener;
 
 public:
@@ -2329,6 +2273,9 @@ private:
  */
 class PhysicalUpdate: public PhysicalOperator
 {
+    bool _preambleDone;         // Sanity check: did subclass run the preamble?
+    bool _deferLockUpdate;      // Indicates preamble should update the lock.
+
 protected:
     std::string _unversionedArrayName;
     ArrayUAID _arrayUAID;
@@ -2350,6 +2297,7 @@ public:
      * @see scidb::PhysicalOperator::preSingleExecute
      */
     virtual void preSingleExecute(std::shared_ptr<Query> query);
+
     /**
      * Performs the necessary steps to update the catalog *if* the query commits
      * @see scidb::PhysicalOperator::postSingleExecute
@@ -2395,6 +2343,15 @@ protected:
      */
     void recordPersistent(const std::shared_ptr<Query>& query);
 
+    /**
+     * Runs deferred work from preSingleExecute().
+     *
+     * @description Some work done by preSingleExecute() must be deferred if the input array is
+     * autochunked, since chunk intervals are not yet known.  This method runs the deferred work.
+     *
+     * @note ALL SUBCLASS execute() METHODS *MUST* CALL THIS as the first action of their execute() method!
+     */
+    void executionPreamble(std::shared_ptr<Array>&, std::shared_ptr<Query>& query);
 };
 
 /**
@@ -2540,28 +2497,6 @@ public:
 #define REGISTER_PHYSICAL_OPERATOR_FACTORY(name, ulname, upname) \
     static UserDefinedPhysicalOperatorFactory<name> _physicalFactory##name(ulname, upname)
 
-/**
- * Computes an instance where a chunk should be sent according to a specific distribution
- * @param chunkPosition chunk coordinates
- * @param desc array descriptor for the chunk
- * @param ps partitioning schema
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param destInstanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param psData a pointer to the data that is specific to the particular partitioning schema, NULL by default
- */
-InstanceID getInstanceForChunk(std::shared_ptr<Query> const& query,
-                               Coordinates const& chunkPosition,
-                               ArrayDesc const& desc,
-                               PartitioningSchema ps,
-                               std::shared_ptr<CoordinateTranslator> const& distMapper,
-                               size_t instanceIdShift,
-                               InstanceID destInstanceId,
-                               PartitioningSchemaData* psData = NULL);
-
-const InstanceID ALL_INSTANCE_MASK = -1;
-const InstanceID COORDINATOR_INSTANCE_MASK = -2;
 
 #ifndef SCIDB_CLIENT
 
@@ -2580,25 +2515,18 @@ static const bool DEFAULT_INTEGRITY_ENFORCEMENT = true;
  * 3. After all selected attributes are completely consumed,
  * the SynchableArray::sync() method must be called on the returned array.
  * @param inputArray to redistribute, must support at least MULTI_PASS access or have only a single attribute
+ * @param outputArrayDist output array distribution
+ * @param outputArrayRes output array residency; if NULL, the query deafault residency is assumed
  * @param query context
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely).
  * @return a new SynchableArray if inputArray needs redistribution; otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
 std::shared_ptr<Array>
 pullRedistribute(std::shared_ptr<Array>& inputArray,
+                 const ArrayDistPtr& outputArrayDist,
+                 const ArrayResPtr& outputArrayRes,
                  const std::shared_ptr<Query>& query,
-                 PartitioningSchema ps,
-                 InstanceID instanceId,
-                 const std::shared_ptr<CoordinateTranslator>& distMapper,
-                 size_t instanceIdShift,
-                 const std::shared_ptr<PartitioningSchemaData>& psData,
                  bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT); //XXX TODO: remove default
 
 /**
@@ -2628,16 +2556,21 @@ typedef boost::function <
  * 3. After all selected attributes are completely consumed,
  * the SynchableArray::sync() method must be called on the returned array.
  * @param inputArray to redistribute, must support at least MULTI_PASS access or have only a single attribute
+ * @param outputArrayDist output array distribution
+ * @param outputArrayRes output array residency; if NULL, the query deafault residency is assumed
  * @param query context
  * @param instanceLocator a functor to map chunks to their destination instances
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely).
  * @return a new SynchableArray if inputArray needs redistribution; otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
-std::shared_ptr<Array> pullRedistribute(std::shared_ptr<Array>& inputArray,
-                                   const std::shared_ptr<Query>& query,
-                                   SGInstanceLocator& instanceLocator,
-                                   bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
+std::shared_ptr<Array>
+pullRedistribute(std::shared_ptr<Array>& inputArray,
+                 const ArrayDistPtr& outputArrayDist,
+                 const ArrayResPtr& outputArrayRes,
+                 const std::shared_ptr<Query>& query,
+                 SGInstanceLocator& instanceLocator,
+                 bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
 
 /**
  * A vector of partial chunk merger pointers
@@ -2651,45 +2584,32 @@ typedef std::vector<std::shared_ptr<MultiStreamArray::PartialChunkMerger> > Part
  * It is not necessary to specify all the input array attributes; the ommitted ones will not be delivered.
  * @note IMPORTANT:
  * The returned array has several limitations:
- * 1. The chunks need to be pulled 'horizontally' in the order specified by attributesOrdered.
+ * 1. The chunks need to be pulled 'horizontally' in the order specified by attributes.
  * 2. All specified attributes must be pulled *completely* before pullRedistribute()/redistributeXXX()
  * can be called again. All attributes must either be pulled completely or not at all.
  * 3. After all selected attributes are completely consumed,
  * the SynchableArray::sync() method must be called on the returned array.
  * @param inputArray to redistribute, must support at least MULTI_PASS access or have only a single attribute
- *
- * @param attributesOrdered
+ * @param attributes
+ * @param outputArrayDist output array distribution
+ * @param outputArrayRes output array residency; if NULL, the query deafault residency is assumed
  * @param query context
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely).
  * @return a new SynchableArray if inputArray needs redistribution; otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
 std::shared_ptr<Array> pullRedistributeInAttributeOrder(std::shared_ptr<Array>& inputArray,
-                                                          std::set<AttributeID>& attributeOrdering,
-                                                          const std::shared_ptr<Query>& query,
-                                                          PartitioningSchema ps,
-                                                          InstanceID destInstanceId,
-                                                          const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                                          size_t instanceIdShift,
-                                                          const std::shared_ptr<PartitioningSchemaData>& psData,
-                                                          bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
-
+                                                        std::set<AttributeID>& attributes,
+                                                        const ArrayDistPtr& outputArrayDist,
+                                                        const ArrayResPtr& outputArrayRes,
+                                                        const std::shared_ptr<Query>& query,
+                                                        bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
 /**
  * Redistribute (i.e S/G) a given array into an array with the RANDOM access support
  * @param inputArray to redistribute
+ * @param outputArrayDist output array distribution
+ * @param outputArrayRes output array residency; if NULL, the query deafault residency is assumed
  * @param query context
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely).
  * @return a new Array with RANDOM access if inputArray needs redistribution;
@@ -2697,12 +2617,9 @@ std::shared_ptr<Array> pullRedistributeInAttributeOrder(std::shared_ptr<Array>& 
  */
 std::shared_ptr<Array>
 redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
+                           const ArrayDistPtr& outputArrayDist,
+                           const ArrayResPtr& outputArrayRes,
                            const std::shared_ptr<Query>& query,
-                           PartitioningSchema ps,
-                           InstanceID destInstanceId,
-                           const std::shared_ptr<CoordinateTranslator > & distMapper,
-                           size_t shift,
-                           const std::shared_ptr<PartitioningSchemaData>& psData,
                            bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);  //XXX TODO: remove default
 
 /**
@@ -2710,68 +2627,48 @@ redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
  * An aggregate array is an array of intermediate aggregate states.
  * @see Aggregate.h
  * @param inputArray an aggregate array to redistribute
+ * @param outputArrayDist output array distribution
+ * @param outputArrayRes output array residency; if NULL, the query deafault residency is assumed
  * @param query context
  * @param aggreagtes a list aggregate function pointers for each attribute, the aggregate function pointers can be NULL
  *        The aggregate function will be used to merge partial chunks from different instances (in an undefined order).
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely).
  * @return a new Array with RANDOM access if inputArray needs redistribution;
  *         otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
 std::shared_ptr<Array> redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
-                                             const std::shared_ptr<Query>& query,
-                                             const std::vector<AggregatePtr>& aggregates,
-                                             PartitioningSchema ps,
-                                             InstanceID destInstanceId,
-                                             const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                             size_t shift,
-                                             const std::shared_ptr<PartitioningSchemaData>& psData,
-                                             bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
+                                                  const ArrayDistPtr& outputArrayDist,
+                                                  const ArrayResPtr& outputArrayRes,
+                                                  const std::shared_ptr<Query>& query,
+                                                  const std::vector<AggregatePtr>& aggregates,
+                                                  bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);
 /**
  * Redistribute (i.e S/G) a given array into an array with the RANDOM access support.
  * The caller can specify a custom partial chunk merger for each attribute.
  * @param inputArray to redistribute
+ * @param outputArrayDist output array distribution
+ * @param outputArrayRes output array residency; if NULL, the query deafault residency is assumed
  * @param query context
  * @param mergers [in/out] a list of mergers for each attribute, a merger can be NULL if the default merger is desired.
  *        Upon return the list will contain ALL NULLs.
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely).
  * @return a new Array with RANDOM access if inputArray needs redistribution;
  *         otherwise inputArray is returned and enforceDataIntegrity has no effect
  */
 std::shared_ptr<Array> redistributeToRandomAccess(std::shared_ptr<Array>& inputArray,
-                                                    const std::shared_ptr<Query>& query,
-                                                    PartialChunkMergerList& mergers,
-                                                    PartitioningSchema ps,
-                                                    InstanceID destInstanceId,
-                                                    const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                                    size_t shift,
-                                                    const std::shared_ptr<PartitioningSchemaData>& psData,
-                                                    bool enforceDataIntegrity);
+                                                  const ArrayDistPtr& outputArrayDist,
+                                                  const ArrayResPtr& outputArrayRes,
+                                                  const std::shared_ptr<Query>& query,
+                                                  PartialChunkMergerList& mergers,
+                                                  bool enforceDataIntegrity);
 /**
  * Redistribute (i.e S/G) from a given input array into a given output array
  * @param inputArray to redistribute from
- * @param outputArray to redistribute into
+ * @param outputArray to redistribute into, the output array distribution & residency is obtained from the ArrayDesc
  * @param newChunkCoordinates [in/out] if not NUll on entry, a set of all chunk positions added to outputArray
  * @param query context
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely). If inputArray does not require redistribution,
  *        enforceDataIntegrity has no effect and the method is equivalent to Array::append()
@@ -2780,27 +2677,16 @@ void redistributeToArray(std::shared_ptr<Array>& inputArray,
                          std::shared_ptr<Array>& outputArray,
                          std::set<Coordinates, CoordinatesLess>* newChunkCoordinates,
                          const std::shared_ptr<Query>& query,
-                         PartitioningSchema ps,
-                         InstanceID destInstanceId,
-                         const std::shared_ptr<CoordinateTranslator > & distMapper,
-                         size_t shift,
-                         const std::shared_ptr<PartitioningSchemaData>& psData,
                          bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);  //XXX TODO: remove default
 
 /**
  * Redistribute (i.e S/G) from a given input array into a given output array
  * @param inputArray to redistribute from
- * @param outputArray to redistribute into
+ * @param outputArray to redistribute into, the output array distribution & residency is obtained from the ArrayDesc
  * @param mergers [in/out] a list of mergers for each attribute, a merger can be NULL if the default merger is desired.
  *        Upon return the list will contain ALL NULLs.
  * @param newChunkCoordinates [in/out] if not NUll on entry, a set of all chunk positions added to outputArray
  * @param query context
- * @param ps new partitioning schema
- * @param instanceId only used in conjunction with the psLocalInstance partitioning scheme;
- *        COORDINATOR_INSTANCE_MASK is equivalent to the query coordinator instance. In all other cases it must be ALL_INSTANCE_MASK.
- * @param distMapper NULL, or the object that maps each chunk position to some other position before applying the partitioning scheme
- * @param instanceIdShift to apply to each chunk's destination instance, which is determined by the partitioning scheme
- * @param psData a pointer to the data that is specific to the particular partitioning schema
  * @param enforceDataIntegrity if true  data collision/unordered data would cause a UserException
  *        while pulling on the output array (either locally or remotely). If inputArray does not require redistribution,
  *        enforceDataIntegrity has no effect and the method is equivalent to Array::append()
@@ -2810,11 +2696,6 @@ void redistributeToArray(std::shared_ptr<Array>& inputArray,
                          PartialChunkMergerList& mergers,
                          std::set<Coordinates, CoordinatesLess>* newChunkCoordinates,
                          const std::shared_ptr<Query>& query,
-                         PartitioningSchema ps,
-                         InstanceID destInstanceId,
-                         const std::shared_ptr<CoordinateTranslator > & distMapper,
-                         size_t shift,
-                         const std::shared_ptr<PartitioningSchemaData>& psData,
                          bool enforceDataIntegrity=DEFAULT_INTEGRITY_ENFORCEMENT);  //XXX TODO: remove default
 
 void syncBarrier(uint64_t barrierId, const std::shared_ptr<scidb::Query>& query);

@@ -26,14 +26,18 @@
  *  Created on: Mar 9, 2010
  *      Author: Emad
  */
+#include <log4cxx/logger.h>
 #include <query/Operator.h>
 #include <system/SystemCatalog.h>
 #include <system/Exceptions.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 
 namespace scidb
 {
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.logical_scan"));
 
 /**
  * @brief The operator: scan().
@@ -94,6 +98,15 @@ public:
         return res;
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        LOG4CXX_DEBUG(logger, "LogicalScan::inferPermissions() = ReadArray");
+        // Ensure we have permissions to read the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ReadArray);
+        return permissions;
+    }
+
     void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
@@ -101,19 +114,27 @@ public:
         assert(!_parameters.empty());
         assert(_parameters.front()->getParamType() == PARAM_ARRAY_REF);
 
-        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters.front())->getObjectName();
+        const string& arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters.front())->getObjectName();
+        assert(arrayNameOrg.find('@') == std::string::npos);
 
-        assert(arrayName.find('@') == std::string::npos);
+        std::string namespaceName;
+        std::string arrayName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         ArrayDesc srcDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION, srcDesc);
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, SystemCatalog::ANY_VERSION, srcDesc);
         if (srcDesc.isTransient())
         {
-            std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(arrayName,
-                                                                                          query->getQueryID(),
-                                                                                          Cluster::getInstance()->getLocalInstanceId(),
-                                                                                          SystemCatalog::LockDesc::COORD,
-                                                                                          SystemCatalog::LockDesc::XCL));
+            std::shared_ptr<SystemCatalog::LockDesc> lock(
+                make_shared<SystemCatalog::LockDesc>(
+                    namespaceName,
+                    arrayName,
+                    query->getQueryID(),
+                    Cluster::getInstance()->getLocalInstanceId(),
+                    SystemCatalog::LockDesc::COORD,
+                    SystemCatalog::LockDesc::XCL));
             std::shared_ptr<SystemCatalog::LockDesc> resLock(query->requestLock(lock));
 
             SCIDB_ASSERT(resLock);
@@ -126,6 +147,7 @@ public:
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 1 || _parameters.size() == 2);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
+
         std::shared_ptr<OperatorParamArrayReference>& arrayRef = (std::shared_ptr<OperatorParamArrayReference>&)_parameters[0];
         assert(arrayRef->getArrayName().find('@') == string::npos);
         assert(ArrayDesc::isNameUnversioned(arrayRef->getObjectName()));
@@ -134,14 +156,21 @@ public:
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ASTERISK_USAGE2, _parameters[0]->getParsingContext());
         }
         ArrayDesc schema;
-        SystemCatalog* systemCatalog = SystemCatalog::getInstance();
+        const std::string &arrayNameOrg = arrayRef->getObjectName();
+        std::string namespaceName;
+        std::string arrayName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
-        systemCatalog->getArrayDesc(arrayRef->getObjectName(),
-                                    query->getCatalogVersion(arrayRef->getObjectName()),
-                                    arrayRef->getVersion(),
-                                    schema);
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName,
+            arrayName,
+            arrayId,
+            arrayRef->getVersion(),
+            schema);
 
-        schema.addAlias(arrayRef->getObjectName());
+        schema.addAlias(arrayNameOrg);
+        schema.setNamespaceName(namespaceName);
 
         // Trim if the user wishes to.
         if (_parameters.size() == 2 // the user provided a true/false clause
@@ -163,8 +192,9 @@ public:
             schema.setName("");
         }
 
-        SCIDB_ASSERT(schema.getPartitioningSchema() != psUninitialized);
-        SCIDB_ASSERT(schema.getPartitioningSchema() != psUndefined);
+        SCIDB_ASSERT(schema.getDistribution()->getPartitioningSchema() != psUninitialized);
+        SCIDB_ASSERT(schema.getDistribution()->getPartitioningSchema() != psUndefined);
+
         return schema;
     }
 };

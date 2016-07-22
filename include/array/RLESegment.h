@@ -100,7 +100,7 @@ public:
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_TOO_POPULATED)
                 << dataIndex << MAX_DATA_INDEX;
         }
-        _bits._dataIndex = dataIndex;
+        _bits._dataIndex = dataIndex & MAX_DATA_INDEX;
         _bits._isRun = isRun;
         _bits._isNull = isNull;
     }
@@ -136,8 +136,9 @@ public:
     }
     void setMissingCode(int32_t code)
     {
-        // the missing code is not stored in payload _data
-        // but rather directly in _bits._dataIndex
+        // The missing code is not stored in payload _data but rather
+        // directly in _bits._dataIndex.  Valid values must actually fit
+        // in an int8_t... which is what this check is about.
         if (code < 0 || !Value::isValidMissingReason(code)) {
             // This should have been caught by now.
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_BAD_MISSING_REASON) << code;
@@ -152,7 +153,7 @@ public:
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_TOO_POPULATED)
                 << i << MAX_DATA_INDEX;
         }
-        _bits._dataIndex = i;
+        _bits._dataIndex = i & MAX_DATA_INDEX;
     }
     void setRun(bool b)  { _bits._isRun = b; }
     void setNull(bool b) { _bits._isNull = b; }
@@ -172,14 +173,14 @@ public:
     void    setPPosition(position_t pPos) { setStartPosition(pPos); }
     void    addToPPosition(position_t incr) { _startPosition += incr; }
     void    setSame(bool b) { setRun(b); }
-    void    setValueIndex(size_t vi) { setDataIndex(vi); }
+    void    setValueIndex(size_t vi) { setDataIndex(safe_static_cast<uint32_t>(vi)); }
     void    addToValueIndex(size_t incr)
     {
         if (getDataIndex() + incr > MAX_DATA_INDEX) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_TOO_POPULATED)
                 << (getDataIndex() + incr) << MAX_DATA_INDEX;
         }
-        _bits._dataIndex += incr;
+        _bits._dataIndex = MAX_DATA_INDEX & static_cast<uint32_t>(getDataIndex() + incr);
     }
     /**@}*/
 
@@ -208,9 +209,9 @@ public:
         ar & same__;
         ar & null__;
         _startPosition = startPos__;
-        _bits._dataIndex = dataIndex__;
-        _bits._isRun = same__;
-        _bits._isNull = null__;
+        _bits._dataIndex = dataIndex__ & MAX_DATA_INDEX;
+        _bits._isRun = static_cast<bool>(same__);
+        _bits._isNull = static_cast<bool>(null__);
     }
 
     BOOST_SERIALIZATION_SPLIT_MEMBER()

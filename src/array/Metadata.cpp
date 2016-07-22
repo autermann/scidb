@@ -28,7 +28,6 @@
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  */
 #include <sstream>
-#include <boost/foreach.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 #include <log4cxx/logger.h>
@@ -46,6 +45,7 @@
 #include <system/Utils.h>
 #include <smgr/io/Storage.h>
 #include <array/Compressor.h>
+#include <util/BitManip.h>
 
 using namespace std;
 
@@ -103,7 +103,7 @@ void ObjectNames::addAlias(const std::string &alias)
         boost::algorithm::trim(trimmedAlias);
         assert(trimmedAlias != "");
 
-        BOOST_FOREACH(const NamesPairType &nameAlias, _names)
+        for (const NamesPairType &nameAlias : _names)
         {
             _names[nameAlias.first].insert(alias);
         }
@@ -118,8 +118,17 @@ bool ObjectNames::hasNameAndAlias(const std::string &name, const std::string &al
     {
         if (alias.empty())
             return true;
-        else
-            return ( (*nameIt).second.find(alias) != (*nameIt).second.end() );
+        else {
+            std::string qualifiedAlias;
+            if(!ArrayDesc::isQualifiedArrayName(alias))
+            {
+                qualifiedAlias = ArrayDesc::makeQualifiedArrayName("public", alias);
+            }
+
+            return
+                ((*nameIt).second.find(alias) != (*nameIt).second.end()) ||
+                ((*nameIt).second.find(qualifiedAlias) != (*nameIt).second.end());
+        }
     }
 
     return false;
@@ -164,71 +173,6 @@ void printNames (std::ostream& stream, const ObjectNames::NamesType &ob)
 }
 
 /*
- * Class DimensionVector
- */
-
-DimensionVector& DimensionVector::operator+=(const DimensionVector& rhs)
-{
-    if (isEmpty())
-    {
-        _data = rhs._data;
-    }
-    else
-    if (!rhs.isEmpty())
-    {
-        assert(numDimensions() == rhs.numDimensions());
-
-        for (size_t i=0, n=numDimensions(); i!=n; ++i)
-        {
-            _data[i] += rhs._data[i];
-        }
-    }
-
-    return *this;
-}
-
-DimensionVector& DimensionVector::operator-=(const DimensionVector& rhs)
-{
-    if (!isEmpty() && !rhs.isEmpty())
-    {
-        assert(numDimensions() == rhs.numDimensions());
-
-        for (size_t i=0, n=numDimensions(); i!=n; ++i)
-        {
-            _data[i] -= rhs._data[i];
-        }
-    }
-
-    return *this;
-}
-/**
- * Retrieve a human-readable description.
- * Append a human-readable description of this onto str. Description takes up
- * one or more lines. Append indent spacer characters to the beginning of
- * each line.
- * @param[out] str buffer to write to
- * @param[in] indent number of spacer characters to start every line with.
- */
-void DimensionVector::toString (std::ostringstream &str, int indent) const
-{
-    if (indent > 0)
-    {
-        str << std::string(indent,' ');
-    }
-
-    if (isEmpty())
-    {
-        str << "[empty]";
-    }
-    else
-    {
-        str << '[';
-        insertRange(str,_data,' ');
-        str << ']';
-    }
-}
-
-/*
  * Class ArrayDesc
  */
 
@@ -237,49 +181,128 @@ ArrayDesc::ArrayDesc() :
     _uAId(0),
     _versionId(0),
     _bitmapAttr(NULL),
-    _flags(0),
-    _ps(psUninitialized)
+    _flags(0)
 {}
 
 
-ArrayDesc::ArrayDesc(const std::string &name,
+ArrayDesc::ArrayDesc(const std::string &namespaceName,
+                     const std::string &arrayName,
                      const Attributes& attributes,
                      const Dimensions &dimensions,
-                     PartitioningSchema ps,
+                     const ArrayDistPtr& arrDist,
+                     const ArrayResPtr& arrRes,
                      int32_t flags) :
     _arrId(0),
     _uAId(0),
     _versionId(0),
-    _name(name),
+    _namespaceName(namespaceName),
+    _arrayName(arrayName),
     _attributes(attributes),
     _dimensions(dimensions),
     _flags(flags),
-    _ps(ps)
+    _distribution(arrDist),
+    _residency(arrRes)
 {
-    assert(isPermitted(ps)); // temporary restriction while scaffolding erected for #4546
+    splitQualifiedArrayName(arrayName, _namespaceName, _arrayName);
 
+#ifndef SCIDB_CLIENT
+    SCIDB_ASSERT(arrDist);
+    SCIDB_ASSERT(arrRes);
+    SCIDB_ASSERT(isValidPartitioningSchema(arrDist->getPartitioningSchema())); // temporary restriction while scaffolding erected for #4546
+#endif
+    locateBitmapAttribute();
+    initializeDimensions();
+}
+
+ArrayDesc::ArrayDesc(const std::string &arrayName,
+                     const Attributes& attributes,
+                     const Dimensions &dimensions,
+                     const ArrayDistPtr& arrDist,
+                     const ArrayResPtr& arrRes,
+                     int32_t flags) :
+    _arrId(0),
+    _uAId(0),
+    _versionId(0),
+    _namespaceName("public"),
+    _arrayName(arrayName),
+    _attributes(attributes),
+    _dimensions(dimensions),
+    _flags(flags),
+    _distribution(arrDist),
+    _residency(arrRes)
+{
+    splitQualifiedArrayName(arrayName, _namespaceName, _arrayName);
+
+#ifndef SCIDB_CLIENT
+    SCIDB_ASSERT(arrDist);
+    SCIDB_ASSERT(arrRes);
+    SCIDB_ASSERT(isValidPartitioningSchema(arrDist->getPartitioningSchema())); // temporary restriction while scaffolding erected for #4546
+#endif
     locateBitmapAttribute();
     initializeDimensions();
 }
 
 ArrayDesc::ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
-                     const std::string &name,
+                     const std::string &namespaceName,
+                     const std::string &arrayName,
                      const Attributes& attributes,
                      const Dimensions &dimensions,
-                     PartitioningSchema ps,
+                     const ArrayDistPtr& arrDist,
+                     const ArrayResPtr& arrRes,
                      int32_t flags)
 :
     _arrId(arrId),
     _uAId(uAId),
     _versionId(vId),
-    _name(name),
+    _namespaceName(namespaceName),
+    _arrayName(arrayName),
     _attributes(attributes),
     _dimensions(dimensions),
     _flags(flags),
-    _ps(ps)
+    _distribution(arrDist),
+    _residency(arrRes)
 {
-    assert(isPermitted(ps)); // temporary restriction while scaffolding erected for #4546
+    splitQualifiedArrayName(arrayName, _namespaceName, _arrayName);
 
+#ifndef SCIDB_CLIENT
+    SCIDB_ASSERT(arrDist);
+    SCIDB_ASSERT(arrRes);
+    SCIDB_ASSERT(isValidPartitioningSchema(arrDist->getPartitioningSchema())); // temporary restriction while scaffolding erected for #4546
+#endif
+    // either both 0 or not...
+    assert(arrId == 0 || uAId != 0);
+
+    locateBitmapAttribute();
+    initializeDimensions();
+}
+
+
+ArrayDesc::ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
+                     const std::string &arrayName,
+                     const Attributes& attributes,
+                     const Dimensions &dimensions,
+                     const ArrayDistPtr& arrDist,
+                     const ArrayResPtr& arrRes,
+                     int32_t flags)
+:
+    _arrId(arrId),
+    _uAId(uAId),
+    _versionId(vId),
+    _namespaceName("public"),
+    _arrayName(arrayName),
+    _attributes(attributes),
+    _dimensions(dimensions),
+    _flags(flags),
+    _distribution(arrDist),
+    _residency(arrRes)
+{
+    splitQualifiedArrayName(arrayName, _namespaceName, _arrayName);
+
+#ifndef SCIDB_CLIENT
+    SCIDB_ASSERT(arrDist);
+    SCIDB_ASSERT(arrRes);
+    SCIDB_ASSERT(isValidPartitioningSchema(arrDist->getPartitioningSchema())); // temporary restriction while scaffolding erected for #4546
+#endif
     // either both 0 or not...
     assert(arrId == 0 || uAId != 0);
 
@@ -291,25 +314,113 @@ ArrayDesc::ArrayDesc(ArrayDesc const& other) :
     _arrId(other._arrId),
     _uAId(other._uAId),
     _versionId(other._versionId),
-    _name(other._name),
+    _namespaceName(other._namespaceName),
+    _arrayName(other._arrayName),
     _attributes(other._attributes),
     _attributesWithoutBitmap(other._attributesWithoutBitmap),
     _dimensions(other._dimensions),
     _bitmapAttr(other._bitmapAttr != NULL ? &_attributes[other._bitmapAttr->getId()] : NULL),
     _flags(other._flags),
-    _ps(other._ps) // TODO: this my be invoked with other._ps = psUninitialized
+    _distribution(other._distribution),
+    _residency(other._residency)
 {
+    splitQualifiedArrayName(other._arrayName, _namespaceName, _arrayName);
     initializeDimensions();
+}
+
+void ArrayDesc::splitQualifiedArrayName(
+    const std::string &     qualifiedArrayName,
+    std::string &           namespaceName,
+    std::string &           arrayName)
+{
+    std::string::size_type pos = qualifiedArrayName.find(".");
+    if(pos != std::string::npos) {
+        namespaceName = qualifiedArrayName.substr(0, pos);
+        arrayName = qualifiedArrayName.substr(pos+1, qualifiedArrayName.length());
+    } else {
+        // The namespaceName is not set if the qualifiedArrayName is not qualified.
+        arrayName = qualifiedArrayName;
+    }
+}
+
+std::string ArrayDesc::getUnqualifiedArrayName(
+    const std::string & arrayName)
+{
+    std::string::size_type pos = arrayName.find(".");
+    if(pos != std::string::npos) {
+        return arrayName.substr(pos+1, arrayName.length());
+    }
+
+    return arrayName;
+}
+
+std::string ArrayDesc::makeQualifiedArrayName(
+    const std::string &           namespaceNameIn,
+    const std::string &           arrayNameIn)
+{
+	if(arrayNameIn == "") return arrayNameIn;
+    std::string arrayName = arrayNameIn;
+
+    if(isQualifiedArrayName(arrayName))
+    {
+        std::string namespaceName = namespaceNameIn;
+        splitQualifiedArrayName(arrayNameIn, namespaceName, arrayName);
+        if(namespaceName != namespaceNameIn)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ARRAY_NAME_ALREADY_QUALIFIED)
+                  << namespaceName << arrayName;
+        }
+
+        return arrayNameIn;
+    }
+
+    std::stringstream ss;
+    ss << namespaceNameIn << std::string(".") << arrayName;
+    return ss.str();
+}
+
+bool ArrayDesc::isQualifiedArrayName(
+    const std::string &           arrayName)
+{
+    return (arrayName.find('.') != std::string::npos);
+}
+
+std::string ArrayDesc::getQualifiedArrayName() const
+{
+    if(isQualifiedArrayName(_arrayName) || (_namespaceName==""))
+    {
+        return _arrayName;
+    }
+
+    return makeQualifiedArrayName(_namespaceName, _arrayName);
 }
 
 bool ArrayDesc::operator==(ArrayDesc const& other) const
 {
-    return
-        _name == other._name &&
-        _ps == other._ps &&
-        _attributes == other._attributes &&
-        _dimensions == other._dimensions &&
-        _flags == other._flags;
+    bool same =
+       _namespaceName == other._namespaceName &&
+       _arrayName == other._arrayName &&
+       _attributes == other._attributes &&
+       _dimensions == other._dimensions &&
+       _flags == other._flags;
+
+    if (!same) {
+        return false;
+    }
+    if (_distribution && other._distribution) {
+        same = _distribution->checkCompatibility(other._distribution);
+    } else if (_distribution || other._distribution) {
+        return false;
+    }
+    if (!same) {
+        return false;
+    }
+    if (_residency && other._residency) {
+        same = _residency->isEqual(other._residency);
+    } else if (_residency || other._residency) {
+        return false;
+    }
+    return same;
 }
 
 ArrayDesc& ArrayDesc::operator=(ArrayDesc const& other)
@@ -317,14 +428,16 @@ ArrayDesc& ArrayDesc::operator=(ArrayDesc const& other)
     _arrId = other._arrId;
     _uAId = other._uAId;
     _versionId = other._versionId;
-    _name = other._name;
+    _namespaceName = other._namespaceName;
+    _arrayName = other._arrayName;
     _attributes = other._attributes;
     _attributesWithoutBitmap = other._attributesWithoutBitmap;
     _dimensions = other._dimensions;
     _bitmapAttr = (other._bitmapAttr != NULL) ? &_attributes[other._bitmapAttr->getId()] : NULL;
     _flags = other._flags;
     initializeDimensions();
-    _ps = other._ps; // TODO: this does get invoked with other._ps = psUninitialized
+    _distribution = other._distribution;
+    _residency = other._residency;
     return *this;
 }
 
@@ -332,7 +445,8 @@ bool ArrayDesc::isNameVersioned(std::string const& name)
 {
     if (name.empty())
     {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "calling isNameVersioned on an empty string";
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+              << "calling isNameVersioned on an empty string";
     }
 
     size_t const locationOfAt = name.find('@');
@@ -344,7 +458,8 @@ bool ArrayDesc::isNameUnversioned(std::string const& name)
 {
     if (name.empty())
     {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "calling isNameUnversioned on an empty string";
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+              << "calling isNameUnversioned on an empty string";
     }
 
     size_t const locationOfAt = name.find('@');
@@ -357,7 +472,8 @@ void ArrayDesc::initializeDimensions()
     Coordinate logicalChunkSize = 1;
     for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
         _dimensions[i]._array = this;
-        Coordinate chunkLength = _dimensions[i].getChunkInterval();
+        // If unknown (autochunked) interval, use 1 so the calculation is as close as it can be.
+        Coordinate chunkLength = _dimensions[i].getChunkIntervalIfAutoUse(1);
         Coordinate t = chunkLength + _dimensions[i].getChunkOverlap();
         if ( t < chunkLength ) //overflow check
         {
@@ -383,6 +499,7 @@ void ArrayDesc::trim()
 {
     for (size_t i = 0, n = _dimensions.size(); i < n; i++) {
         DimensionDesc& dim = _dimensions[i];
+        SCIDB_ASSERT(dim._chunkInterval > 0);
         if (dim._startMin == CoordinateBounds::getMin() && dim._currStart != CoordinateBounds::getMax()) {
             dim._startMin = dim._currStart;
         }
@@ -414,38 +531,11 @@ Coordinates ArrayDesc::getHighBoundary() const
     return high;
 }
 
-
-InstanceID ArrayDesc::getPrimaryInstanceId(Coordinates const& chunkPosition,
-                                           size_t nInstances) const      // const critical
+InstanceID ArrayDesc::getPrimaryInstanceId(Coordinates const& pos,
+                                           size_t instanceCount) const
 {
-    // redirect to the master definition of the chunk mapping function for persistent arrays
-
-    assert(isPermitted(_ps));
-
-    // TODO: psLocalInstance is set by e.g. LogicalInput.
-    //       but we don't want it in ArrayDesc() because the
-    //       ability to evaluate this method then depends on Query.
-    //       Storage manager does not have Query in all cases where it calls
-    //       this method, ergo, psLocalInstance better not be persisted.
-    //       At the moment, ArrayDesc::getPrimaryInstanceId() isn't called
-    //       on ArrayDescs with psLocalInstance, so we have some time to sort
-    //       this out:
-    //          a) should all callers have query? [problem for storage manager?]
-    //          b) should current instance be stored in ArrayDesc with _ps ?
-    //             [problem for sending ArrayDesc to other instances]
-    //          c) avoid putting psLocalInstance into ArrayDesc? [problem for LogicalInput.cpp]
-    //          d) another solution.
-    assert(_ps != psLocalInstance);
-
-    assert(_ps != psUndefined);
-
-    //
-    // NOTE: the current method is const.  that is essential so that the
-    // third argument to getPrimaryInstancesForChunk() will call
-    // getDimensions() const, not getDimensions() [which has unacceptable malloc overhead]
-    // next line it is getDimensions() const" that is called, otherwise this call would
-    //
-    return getPrimaryInstanceForChunk(_ps, chunkPosition, getDimensions(), nInstances);
+    SCIDB_ASSERT(_distribution);
+    return _distribution->getPrimaryChunkLocation(pos, _dimensions, instanceCount);
 }
 
 ssize_t ArrayDesc::findDimension(const std::string& name, const std::string& alias) const
@@ -472,9 +562,13 @@ bool ArrayDesc::contains(Coordinates const& pos) const
 
 void ArrayDesc::getChunkPositionFor(Coordinates& pos) const
 {
-    Dimensions const& dims = _dimensions;
+    getChunkPositionFor(_dimensions, pos);
+}
+
+void ArrayDesc::getChunkPositionFor(Dimensions const& dims, Coordinates& pos)
+{
     for (size_t i = 0, n = pos.size(); i < n; i++) {
-        if ( dims[i].getChunkInterval() != 0) {
+        if ( dims[i].getRawChunkInterval() > 0) {
             Coordinate diff = (pos[i] - dims[i].getStartMin()) % dims[i].getChunkInterval();
 
             // The code below ensures the correctness of this code, in case pos[i] < dims[i].getStartMin().
@@ -591,6 +685,16 @@ bool ArrayDesc::hasOverlap() const
     return false;
 }
 
+bool ArrayDesc::isAutochunked() const
+{
+    for (DimensionDesc const& dim : _dimensions) {
+        if (dim.getRawChunkInterval() == DimensionDesc::AUTOCHUNKED) {
+            return true;
+        }
+    }
+    return false;
+}
+
 Dimensions ArrayDesc::grabDimensions(VersionID version) const
 {
     Dimensions dims(_dimensions.size());
@@ -601,19 +705,19 @@ Dimensions ArrayDesc::grabDimensions(VersionID version) const
     return dims;
 }
 
-void ArrayDesc::addAlias(const std::string &alias)
+void ArrayDesc::addAlias(const std::string& alias)
 {
-    BOOST_FOREACH(AttributeDesc &attr, _attributes)
+    for (AttributeDesc& attr : _attributes)
     {
         attr.addAlias(alias);
     }
 
-    BOOST_FOREACH(AttributeDesc &attr, _attributesWithoutBitmap)
+    for (AttributeDesc& attr : _attributesWithoutBitmap)
     {
         attr.addAlias(alias);
     }
 
-    BOOST_FOREACH(DimensionDesc &dim, _dimensions)
+    for (DimensionDesc& dim : _dimensions)
     {
         dim.addAlias(alias);
     }
@@ -626,12 +730,28 @@ bool ArrayDesc::coordsAreAtChunkStart(Coordinates const& coords) const
 
     for (size_t i = 0; i < coords.size(); i++ )
     {
-       if ( coords[i] < _dimensions[i].getStartMin() ||
-            coords[i] > _dimensions[i].getEndMax() ||
-            (coords[i] - _dimensions[i].getStartMin()) % _dimensions[i].getChunkInterval() != 0 )
-       {
-           return false;
-       }
+        if ( coords[i] < _dimensions[i].getStartMin() ||
+             coords[i] > _dimensions[i].getEndMax() )
+        {
+            return false;
+        }
+
+        if (_dimensions[i].isAutochunked())
+        {
+            if (coords[i] != _dimensions[i].getStartMin())
+            {
+                // We have no way of knowing, unless the coordinate is
+                // at the very beginning of the dimension range.
+                return false;
+            }
+        }
+        else
+        {
+            if ( (coords[i] - _dimensions[i].getStartMin()) % _dimensions[i].getChunkInterval() != 0 )
+            {
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -692,23 +812,9 @@ double ArrayDesc::getNumChunksAlongDimension(size_t dimension, Coordinate start,
         start = _dimensions[dimension].getStartMin();
         end = _dimensions[dimension].getEndMax();
     }
-    return ceil((end * 1.0 - start + 1.0) / _dimensions[dimension].getChunkInterval());
-}
-
-bool ArrayDesc::isPermitted(PartitioningSchema ps) const
-{
-
-    return (ps == psHashPartitioned ||
-            ps == psByRow ||
-            ps == psByCol ||
-            ps == psReplication ||
-            ps == psUndefined ||
-            ps == psLocalInstance);
-    // TODO: Deal with psLocalInstance differently.
-    //       It is currently set on ArrayDesc
-    //       by e.g. LogicalInput(), but is incompatible with
-    //       ArrayDesc::getPrimaryInstanceId() [see that for more details]
-    //       Note special assert in that method to disallow it
+    return ceil(
+        (static_cast<double>(end) - static_cast<double>(start) + 1.0)
+        / static_cast<double>(_dimensions[dimension].getChunkInterval()));
 }
 
 size_t getChunkNumberOfElements(Coordinates const& low, Coordinates const& high)
@@ -731,10 +837,11 @@ size_t getChunkNumberOfElements(Coordinates const& low, Coordinates const& high)
 void ArrayDesc::checkConformity(ArrayDesc const& srcDesc, ArrayDesc const& dstDesc, unsigned options)
 {
     if (!(options & IGNORE_PSCHEME) &&
-        srcDesc.getPartitioningSchema() != dstDesc.getPartitioningSchema())
+        !(srcDesc.getDistribution()->checkCompatibility(dstDesc.getDistribution()) &&
+          srcDesc.getResidency()->isEqual(dstDesc.getResidency())))
     {
         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT)
-            << "Target of INSERT/STORE must have same distribution as the source";
+           << "Target of INSERT/STORE must have same distribution as the source";
     }
 
     Dimensions const& srcDims = srcDesc.getDimensions();
@@ -837,24 +944,43 @@ void ArrayDesc::checkConformity(ArrayDesc const& srcDesc, ArrayDesc const& dstDe
     }
 }
 
+bool ArrayDesc::areNamesUnique() const
+{
+    set<string> names;
+    for (auto const& attr : _attributes) {
+        auto iter_and_inserted = names.insert(attr.getName());
+        if (!iter_and_inserted.second) {
+            return false;
+        }
+    }
+    for (auto const& dim : _dimensions) {
+        auto iter_and_inserted = names.insert(dim.getBaseName());
+        if (!iter_and_inserted.second) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Determine if 'this' and the 'other' schema match based on the
-// selection critera.
+// selection critera.  So far, only dimension-based criteria are implemented.
 bool ArrayDesc::sameSchema(ArrayDesc const& other, SchemaFieldSelector const &sel) const
 {
     Dimensions::const_iterator itOther, itThis;
     Dimensions const& dimsOther = other.getDimensions();
 
     // Same dimension count, or else some inferSchema() method failed to forbid this!
-    SCIDB_ASSERT(dimsOther.size() == _dimensions.size());
+    ASSERT_EXCEPTION(dimsOther.size() == _dimensions.size(), "Dimension count mismatch");
 
     for(itOther = dimsOther.begin(),      itThis = _dimensions.begin();
-        (itOther != dimsOther.end())  &&  (itThis != _dimensions.end());
-        itOther++,                        itThis++)
+        (itOther != dimsOther.end());
+        ++itOther,                        ++itThis)
     {
-        if(sel.chunkOverlap()  && ((*itOther).getChunkInterval() != (*itThis).getChunkInterval())) return false;
-        if(sel.chunkInterval() && ((*itOther).getChunkOverlap()  != (*itThis).getChunkOverlap()))  return false;
-        if(sel.startMin()      && ((*itOther).getStartMin()      != (*itThis).getStartMin()))      return false;
-        if(sel.endMax()        && ((*itOther).getEndMax()        != (*itThis).getEndMax()))        return false;
+        assert(itThis != _dimensions.end());
+        if(sel.chunkOverlap()  && ((*itOther).getChunkOverlap()     != (*itThis).getChunkOverlap()))     return false;
+        if(sel.chunkInterval() && ((*itOther).getRawChunkInterval() != (*itThis).getRawChunkInterval())) return false;
+        if(sel.startMin()      && ((*itOther).getStartMin()         != (*itThis).getStartMin()))         return false;
+        if(sel.endMax()        && ((*itOther).getEndMax()           != (*itThis).getEndMax()))           return false;
     }
 
     return true;
@@ -868,11 +994,11 @@ void ArrayDesc::replaceDimensionValues(ArrayDesc const& other)
     Dimensions const& dimsOther = other.getDimensions();
 
     // Same dimension count, or else some inferSchema() method failed to forbid this!
-    SCIDB_ASSERT(dimsOther.size() == _dimensions.size());
+    ASSERT_EXCEPTION(dimsOther.size() == _dimensions.size(), "Dimension count mismatch");
 
     for(itOther = dimsOther.begin(),      itThis = _dimensions.begin();
         (itOther != dimsOther.end())  &&  (itThis != _dimensions.end());
-        itOther++,                        itThis++)
+        ++itOther,                        ++itThis)
     {
         (*itThis).replaceValues((*itOther));
     }
@@ -912,7 +1038,7 @@ std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob)
     }
 #endif
 
-    stream << ob.getName()
+    stream << ob.getQualifiedArrayName()
            << '<' << ob.getAttributes(true)
            << "> [" << ob.getDimensions() << ']';
 
@@ -921,7 +1047,8 @@ std::ostream& operator<<(std::ostream& stream,const ArrayDesc& ob)
     stream << " UnversionedArrayId: " << ob.getUAId();
     stream << " Version: " << ob.getVersionId();
     stream << " Flags: " << ob.getFlags();
-    stream << " PartitioningSchema: " << ob.getPartitioningSchema();
+    stream << " Distro: " << RedistributeContext(ob.getDistribution(),
+                                                 ob.getResidency());
     stream << " <" << ob.getAttributes(false) << ">" ;
 #endif
 
@@ -945,7 +1072,7 @@ AttributeDesc::AttributeDesc() :
     _defaultCompressionMethod(0),
     _reserve(
 #ifndef SCIDB_CLIENT
-        Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE)
+        static_cast<int16_t>(Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE))
 #else
         0
 #endif
@@ -967,7 +1094,7 @@ AttributeDesc::AttributeDesc(AttributeID id,
     _name(name),
     _aliases(aliases),
     _type(type),
-    _flags(flags | (type ==  TID_INDICATOR ? IS_EMPTY_INDICATOR : 0)),
+    _flags(static_cast<int16_t>(flags | (type ==  TID_INDICATOR ? IS_EMPTY_INDICATOR : 0))),
     _defaultCompressionMethod(defaultCompressionMethod),
     _reserve(reserve),
     _varSize(varSize),
@@ -1002,11 +1129,11 @@ AttributeDesc::AttributeDesc(AttributeID id, const std::string &name,  TypeId ty
     _name(name),
     _aliases(aliases),
     _type(type),
-    _flags(flags | (type ==  TID_INDICATOR ? IS_EMPTY_INDICATOR : 0)),
+    _flags(static_cast<int16_t>(flags | (type ==  TID_INDICATOR ? IS_EMPTY_INDICATOR : 0))),
     _defaultCompressionMethod(defaultCompressionMethod),
     _reserve(
 #ifndef SCIDB_CLIENT
-        Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE)
+        safe_static_cast<int16_t>(Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE))
 #else
         0
 #endif
@@ -1075,8 +1202,17 @@ bool AttributeDesc::hasAlias(const std::string& alias) const
 {
     if (alias.empty())
         return true;
-    else
-        return (_aliases.find(alias) != _aliases.end());
+    else {
+        std::string qualifiedAlias;
+        if(!ArrayDesc::isQualifiedArrayName(alias))
+        {
+            qualifiedAlias = ArrayDesc::makeQualifiedArrayName("public", alias);
+        }
+
+        return
+            (_aliases.find(alias)          != _aliases.end()) ||
+            (_aliases.find(qualifiedAlias) != _aliases.end());
+    }
 }
 
 TypeId AttributeDesc::getType() const
@@ -1084,7 +1220,7 @@ TypeId AttributeDesc::getType() const
     return _type;
 }
 
-int AttributeDesc::getFlags() const
+int16_t AttributeDesc::getFlags() const
 {
     return _flags;
 }
@@ -1135,26 +1271,26 @@ const std::string& AttributeDesc::getDefaultValueExpr() const
  * Append a human-readable description of this onto str. Description takes up
  * one or more lines. Append indent spacer characters to the beginning of
  * each line. Call toString on interesting children. Terminate with newline.
- * @param[out] str buffer to write to
+ * @param[out] output stream to write to
  * @param[in] indent number of spacer characters to start every line with.
  */
-void AttributeDesc::toString(std::ostringstream &str, int indent) const
+void AttributeDesc::toString(std::ostream &os, int indent) const
 {
     if (indent > 0)
     {
-        str<<std::string(indent,' ');
+        os << std::string(indent,' ');
     }
 
-    str<< "[attDesc] id " << _id
+    os << "[attDesc] id " << _id
        << " name " << _name
        << " aliases {";
 
-    BOOST_FOREACH(const std::string& alias,_aliases)
+    for (const std::string& alias : _aliases)
     {
-        str << _name << "." << alias << ", ";
+        os << _name << "." << alias << ", ";
     }
 
-    str<< "} type " << _type
+    os << "} type " << _type
        << " flags " << _flags
        << " compression " << _defaultCompressionMethod
        << " reserve " << _reserve
@@ -1168,12 +1304,13 @@ std::ostream& operator<<(std::ostream& stream,const Attributes& atts)
 
 std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
 {
-    //don't print NOT NULL because it default behaviour
+    //Don't print NULL because nullable is the default behavior.
     stream << att.getName() << ':' << att.getType()
-           << (att.getFlags() & AttributeDesc::IS_NULLABLE ? " NULL" : "");
+           << (isAnyOn<int>(att.getFlags(), AttributeDesc::IS_NULLABLE) ? "" : " NOT NULL");
     try
     {
-        if (!isDefaultFor(att.getDefaultValue(),att.getType()))
+        if (!isAnyOn<int>(att.getFlags(), AttributeDesc::IS_NULLABLE) &&  // not nullable, and
+            !isDefaultFor(att.getDefaultValue(),att.getType()))           // not equal to the type's default value
         {
             stream << " DEFAULT " << att.getDefaultValue().toString(att.getType());
         }
@@ -1189,7 +1326,9 @@ std::ostream& operator<<(std::ostream& stream, const AttributeDesc& att)
     }
     if (att.getDefaultCompressionMethod() != CompressorFactory::NO_COMPRESSION)
     {
-        stream << " COMPRESSION '" << CompressorFactory::getInstance().getCompressors()[att.getDefaultCompressionMethod()]->getName() << "'";
+        stream << " COMPRESSION '"
+               << CompressorFactory::getInstance().getCompressors()[att.getDefaultCompressionMethod()]->getName()
+               << "'";
     }
     return stream;
 }
@@ -1306,8 +1445,9 @@ uint64_t DimensionDesc::getCurrLength() const
     }
 #endif
     /*
-     * check for empty array - according to informal agreement,
-     * high boundary for empty array is CoordinateBounds::getMax()
+     * Check for empty array.  According to informal agreement, high
+     * boundary for empty array is CoordinateBounds::getMin() and low
+     * is ...::getMax().
      */
     if (low == CoordinateBounds::getMax() || high == CoordinateBounds::getMin()) {
         return 0;
@@ -1321,24 +1461,24 @@ uint64_t DimensionDesc::getCurrLength() const
  * Append a human-readable description of this onto str. Description takes up
  * one or more lines. Append indent spacer characters to the beginning of
  * each line. Call toString on interesting children. Terminate with newline.
- * @param[out] str buffer to write to
+ * @param[out] os output stream to write to
  * @param[in] indent number of spacer characters to start every line with.
  */
-void DimensionDesc::toString (std::ostringstream &str,int indent) const
+void DimensionDesc::toString (std::ostream& os, int indent) const
 {
     if (indent > 0)
     {
-        str<<std::string(indent,' ');
+        os << std::string(indent, ' ');
     }
 
-    str<<"[dimDesc] names "<<_names
-       <<" startMin "<<_startMin
-       <<" currStart "<<_currStart
-       <<" currEnd "<<_currEnd
-       <<" endMax "<<_endMax
-       <<" chnkInterval "<<_chunkInterval
-       <<" chnkOverlap "<<_chunkOverlap
-       << "\n";
+    os << "[dimDesc] names " << _names
+       << " startMin " << _startMin
+       << " currStart " << _currStart
+       << " currEnd " << _currEnd
+       << " endMax " << _endMax
+       << " chnkInterval " << _chunkInterval
+       << " chnkOverlap " << _chunkOverlap
+       << '\n';
 }
 
 void DimensionDesc::validate() const
@@ -1377,57 +1517,58 @@ void printSchema(std::ostream& stream,const Dimensions& dims)
 
 std::ostream& operator<<(std::ostream& stream,const Dimensions& dims)
 {
+    // XXX Use ';' to separate?
     return insertRange(stream,dims,',');
 }
 
-std::ostream& operator<<(std::ostream& stream,const DimensionDesc& dim)
+std::ostream& operator<<(std::ostream& os, const DimensionDesc& dim)
 {
-    Coordinate start = dim.getStartMin();
-    stringstream ssstart;
-    ssstart << start;
-
-    Coordinate end = dim.getEndMax();
-    stringstream ssend;
-    ssend << end;
-
-    Coordinate currStart = dim.getCurrStart();
-    stringstream scstart;
-    scstart << currStart;
-
-    Coordinate currEnd = dim.getCurrEnd();
-    stringstream scend;
-    scend << currEnd;
-
-   // Note:  The negative side does not know about '*' per design
-   stream << dim.getNamesAndAliases() << '='
-           << ssstart.str() << ':'
-           << (end ==  CoordinateBounds::getMax()  ? "*" : ssend.str()) << " "
-           << "("
-           << scstart.str() << ':'
-           << (currEnd ==  CoordinateBounds::getMax()  ? "*" : scend.str())
-           << ")"
-           << ","
-           << dim.getChunkInterval() << "," << dim.getChunkOverlap();
-    return stream;
+    printSchema(os, dim, /*verbose:*/true);
+    return os;
 }
 
-void printSchema(std::ostream& stream,const DimensionDesc& dim)
+void printSchema(std::ostream& os, const DimensionDesc& dim, bool verbose)
 {
-    Coordinate start = dim.getStartMin();
-    stringstream ssstart;
-    ssstart << start;
+    // Stringify numbers that may need special representation like '*'.
+    // (Low bounds do not use any such notation, by design.)
 
-    Coordinate end = dim.getEndMax();
-    stringstream ssend;
-    ssend << end;
+    stringstream end;
+    if (dim.getEndMax() == CoordinateBounds::getMax()) {
+        end << '*';
+    } else {
+        end << dim.getEndMax();
+    }
 
-    printNames(stream, dim.getNamesAndAliases());
+    stringstream currEnd;
+    if (verbose) {
+        if (dim.getCurrEnd() == CoordinateBounds::getMax()) {
+            currEnd << '*';
+        } else {
+            currEnd << dim.getCurrEnd();
+        }
+    }
 
-   // Note:  The negative side does not know about '*' per design
-    stream << '='
-           << ssstart.str() << ':'
-           << (end == CoordinateBounds::getMax() ? "*" : ssend.str()) << ","
-           << dim.getChunkInterval() << "," << dim.getChunkOverlap();
+    // Emit the dimension name.  In verbose mode we want the aliases too.
+    if (verbose) {
+        os << dim.getNamesAndAliases();
+    } else {
+        printNames(os, dim.getNamesAndAliases());
+    }
+
+    os << '=' << dim.getStartMin() << ':' << end.str();
+    if (verbose) {
+        os << " (" << dim.getCurrStart() << ':' << currEnd.str() << ')';
+    }
+    os << ',';
+
+    int64_t interval = dim.getRawChunkInterval();
+    if (interval == DimensionDesc::AUTOCHUNKED) {
+        os << "*,";
+    } else {
+        os << interval << ',';
+    }
+
+    os << dim.getChunkOverlap();
 }
 
 void printDimNames(std::ostream& os, Dimensions const& dims)
@@ -1440,45 +1581,6 @@ void printDimNames(std::ostream& os, Dimensions const& dims)
         }
         printNames(os, dims[i].getNamesAndAliases());
     }
-}
-
-/*
- * Class InstanceDesc
- */
-InstanceDesc::InstanceDesc() :
-    _instance_id(0),
-    _port(0),
-    _online(~0)
-{}
-
-InstanceDesc::InstanceDesc(const std::string &host, uint16_t port, const std::string &path) :
-        _host(host),
-        _port(port),
-        _online(~0)
-{
-     boost::filesystem::path p(path);
-     _path = p.normalize().string();
-}
-
-InstanceDesc::InstanceDesc(uint64_t instance_id, const std::string &host,
-                           uint16_t port, uint64_t online, const std::string &path) :
-        _instance_id(instance_id),
-        _host(host),
-        _port(port),
-        _online(online)
-{
-    boost::filesystem::path p(path);
-    _path = p.normalize().string();
-}
-
-std::ostream& operator<<(std::ostream& stream,const InstanceDesc& instance)
-{
-    stream << "instance { id = " << instance.getInstanceId()
-           << ", host = " << instance.getHost()
-           << ", port = " << instance.getPort()
-           << ", has been on-line since " << instance.getOnlineSince()
-           << ", path = " << instance.getPath();
-    return stream;
 }
 
 } // namespace

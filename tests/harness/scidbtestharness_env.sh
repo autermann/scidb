@@ -36,12 +36,24 @@ export SCIDB_CLUSTER_NAME=$DB_NAME
 export PYTHONPATH="${SCIDB_SOURCE_PATH}/tests/harness/pyLib/"
 
 if [ "${SCIDB_BUILD_PATH}" != "" -a "${SCIDB_DATA_PATH}" != "" ] ; then
-   rm -f ${SCIDB_DATA_PATH}/000/tests
-   ln -s ${SCIDB_SOURCE_PATH}/tests ${SCIDB_DATA_PATH}/000/tests
+   rm -f ${SCIDB_DATA_PATH}/0/tests
+   ln -s ${SCIDB_SOURCE_PATH}/tests ${SCIDB_DATA_PATH}/0/tests
 
    export DOC_DATA="${SCIDB_SOURCE_PATH}/tests/harness/testcases/data/doc"
    export TESTCASES_DIR="${SCIDB_BUILD_PATH}/tests/harness/testcases/"
-   export TEST_DATA_DIR="${SCIDB_DATA_PATH}/000/tests/harness/testcases/data"
+   export TEST_DATA_DIR="${SCIDB_DATA_PATH}/0/tests/harness/testcases/data"
    export TEST_UTILS_DIR="${SCIDB_SOURCE_PATH}/tests/utils"
    export TEST_BIN_DIR="${SCIDB_BUILD_PATH}/bin"
 fi
+
+function create_login_file() {
+    local login_file=$1/${USER}_root_login
+    echo "[security_password]" > $login_file
+    echo "user-name      = root" >> $login_file
+    echo "user-password  = Paradigm4" >> $login_file
+    chmod 600 $login_file
+    echo "$login_file"   # return $login_file
+}
+
+export SCIDB_CONFIG_USER=$(create_login_file ${SCIDB_BUILD_PATH})
+# echo "SCIDB_CONFIG_USER=$SCIDB_CONFIG_USER"

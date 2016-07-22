@@ -21,6 +21,7 @@ set(scidbtest_src
 	src/scidbtest.cpp
 )
 add_executable(scidbtest ${scidbtest_src})
+set_source_files_properties(src/defaultexecutor.cpp PROPERTIES COMPILE_FLAGS "-Wno-conversion")
 set_target_properties(scidbtest PROPERTIES COMPILE_FLAGS "--pedantic -Wall -std=c++14 -Wno-long-long -g -DSCIDB_CLIENT")
 target_link_libraries(scidbtest ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES} scidbclient ${LIBRT_LIBRARIES} )
 if(${Boost_MAJOR_VERSION} LESS 2 AND ${Boost_MINOR_VERSION} LESS 46)
@@ -52,6 +53,9 @@ set(scidbtestharness_src
 )
 
 add_executable(scidbtestharness ${scidbtestharness_src})
+set_source_files_properties(src/harness.cpp src/helper.cpp src/reporter.cpp src/suite.cpp src/manager.cpp PROPERTIES COMPILE_FLAGS "-Wno-conversion")
+set_target_properties(scidbtestharness PROPERTIES COMPILE_FLAGS "-Wno-conversion")
+
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "scidbtestharness" scidbtestharness)
 target_link_libraries(scidbtestharness scidbclient ${LIBRT_LIBRARIES} )
 
@@ -94,7 +98,7 @@ set(preparecdashreport_sources
 )
 
 add_executable(preparecdashreport ${preparecdashreport_sources})
-set_target_properties(preparecdashreport PROPERTIES COMPILE_FLAGS "--pedantic -std=c++14 -Wall -Wno-long-long -g -DSCIDB_CLIENT")
+set_target_properties(preparecdashreport PROPERTIES COMPILE_FLAGS "--pedantic -std=c++14 -Wall -Wno-long-long -g -DSCIDB_CLIENT -Wno-conversion")
 target_link_libraries(preparecdashreport ${Boost_LIBRARIES} ${LOG4CXX_LIBRARIES} ${LIBRT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} )
 if(${Boost_MAJOR_VERSION} LESS 2 AND ${Boost_MINOR_VERSION} LESS 46)
         set_target_properties(preparecdashreport PROPERTIES COMPILE_DEFINITIONS "BOOST_FS_VER=2")

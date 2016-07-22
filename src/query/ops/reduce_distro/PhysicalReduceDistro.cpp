@@ -26,11 +26,11 @@
  *  Created on: Apr 20, 2010
  *      Author: Knizhnik
  */
-
-#include "query/Operator.h"
-#include "array/Metadata.h"
-#include "array/DelegateArray.h"
-#include "system/Cluster.h"
+#include <log4cxx/logger.h>
+#include <query/Operator.h>
+#include <array/Metadata.h>
+#include <array/DelegateArray.h>
+#include <system/Cluster.h>
 
 namespace scidb
 {
@@ -38,7 +38,7 @@ namespace scidb
 using namespace boost;
 using namespace std;
 
-
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.reduce_distro"));
 
 class ReduceDistroArrayIterator : public DelegateArrayIterator
 {
@@ -48,7 +48,8 @@ public:
                              AttributeID attrID,
                              std::shared_ptr<ConstArrayIterator> inputIterator,
                              PartitioningSchema ps):
-   DelegateArrayIterator(delegate, attrID, inputIterator), _ps(ps), _myInstance(query->getInstanceID()), _nextChunk(0), _query(query)
+   DelegateArrayIterator(delegate, attrID, inputIterator),
+   _ps(ps), _myInstance(query->getInstanceID()), _nextChunk(0), _query(query)
     {
         findNext();
     }
@@ -62,10 +63,12 @@ public:
         while (!inputIterator->end())
         {
             Coordinates const& pos = inputIterator->getPosition();
-            std::shared_ptr<CoordinateTranslator> distMapper;
-            if (getInstanceForChunk(Query::getValidQueryPtr(_query), pos,
-                                    array.getArrayDesc(), _ps,
-                                    distMapper, 0, 0) == _myInstance)
+            std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+            if (getInstanceForChunk(pos,
+                                    array.getArrayDesc().getDimensions(),
+                                    array.getArrayDesc().getDistribution(),
+                                    array.getArrayDesc().getResidency(),
+                                    query) == _myInstance)
             {
                 _nextChunk = &inputIterator->getChunk();
                 _hasNext = true;
@@ -99,9 +102,12 @@ public:
     bool setPosition(Coordinates const& pos)
     {
         chunkInitialized = false;
-        std::shared_ptr<CoordinateTranslator> distMapper;
-        if (getInstanceForChunk(Query::getValidQueryPtr(_query), pos, array.getArrayDesc(),
-                                _ps, distMapper, 0, 0) == _myInstance &&
+        std::shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+        if (getInstanceForChunk(pos,
+                                array.getArrayDesc().getDimensions(),
+                                array.getArrayDesc().getDistribution(),
+                                array.getArrayDesc().getResidency(),
+                                query) == _myInstance &&
             inputIterator->setPosition(pos))
         {
             _nextChunk = &inputIterator->getChunk();
@@ -134,7 +140,10 @@ private:
 class ReduceDistroArray: public DelegateArray
 {
 public:
-    ReduceDistroArray(const std::shared_ptr<Query>& query, ArrayDesc const& desc, std::shared_ptr<Array> const& array, PartitioningSchema ps):
+    ReduceDistroArray(const std::shared_ptr<Query>& query,
+                      ArrayDesc const& desc,
+                      std::shared_ptr<Array> const& array,
+                      PartitioningSchema ps):
     DelegateArray(desc, array, true), _ps(ps)
     {
         assert(query);
@@ -154,7 +163,10 @@ private:
 class PhysicalReduceDistro: public  PhysicalOperator
 {
 public:
-    PhysicalReduceDistro(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+    PhysicalReduceDistro(const string& logicalName,
+                         const string& physicalName,
+                         const Parameters& parameters,
+                         const ArrayDesc& schema)
         :  PhysicalOperator(logicalName, physicalName, parameters, schema)
 	{
 	}
@@ -170,24 +182,38 @@ public:
         return true;
     }
 
-    virtual RedistributeContext getOutputDistribution(
-            std::vector<RedistributeContext> const&,
-            std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext
+    getOutputDistribution(std::vector<RedistributeContext> const& inputDistributions,
+                          std::vector<ArrayDesc> const& inputSchemas) const
     {
         PartitioningSchema ps = (PartitioningSchema)((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
-        return RedistributeContext(ps);
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        LOG4CXX_TRACE(logger, "reduce_distro::getOutputDist: ps=" << ps);
+        LOG4CXX_TRACE(logger, "reduce_distro::getOutputDist: schema ps="
+                      << _schema.getDistribution()->getPartitioningSchema());
+
+        SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema() == ps);
+        ASSERT_EXCEPTION(_schema.getResidency()->isEqual(inputDistributions[0].getArrayResidency()),
+                         "reduce_distro must not change residency");
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
-	/***
-	 * Project is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-	 * that overrides the chunkiterator method.
-	 */
-	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
+    /**
+     * Project is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+     * that overrides the chunkiterator method.
+     */
+    virtual std::shared_ptr<Array>
+    execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 1);
+        assert(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
         PartitioningSchema ps = (PartitioningSchema)((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt32();
         return std::shared_ptr<Array>(new ReduceDistroArray(query, _schema, inputArrays[0], ps));
-	 }
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalReduceDistro, "_reduce_distro", "physicalReduceDistro")

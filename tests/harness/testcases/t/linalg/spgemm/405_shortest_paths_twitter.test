@@ -23,17 +23,17 @@ create array GRAPH_PAIRS <v0:int64, v1:int64>[dummy=0:*,10000*10000,0]
 
 # create statements:
 # FID MAXVERT
-# 409 ????K create array  GRAPH_WEIGHTS <w:float>[v0=0:568770231, 568770231/4+1,0, v1=0:568770231, 568770231/4+1,0]
-# 408 1280K create array  GRAPH_WEIGHTS <w:float>[v0=0:xxxxxxxx,   xxxxxxxx/4+1,0,  v1=0:xxxxxxxx,  xxxxxxxx/4+1,0]
-# 407  640K create array  GRAPH_WEIGHTS <w:float>[v0=0:22309220,   22309220/4+1,0,  v1=0:22309220,  22309220/4+1,0]
-# 406  320K create array  GRAPH_WEIGHTS <w:float>[v0=0:15484730,   15484730/4+1,0,  v1=0:15484730,  15484730/4+1,0]
-# 405  160K create array  GRAPH_WEIGHTS <w:float>[v0=0:10959642,   10959642/4+1,0,  v1=0:10959642,  10959642/4+1,0]
-create array  GRAPH_WEIGHTS <w:float>[v0=0:10959642,   10959642/4+1,0,  v1=0:10959642,  10959642/4+1,0]
-# 404   80K create array  GRAPH_WEIGHTS <w:float>[v0=0: 4143281,    4143281/4+1,0,  v1=0: 4143281,   4143281/4+1,0]
-# 403   40K create array  GRAPH_WEIGHTS <w:float>[v0=0:  818340,     818340/4+1,0,    v1=0:818340,    818340/4+1,0]
-# 402   20K create array  GRAPH_WEIGHTS <w:float>[v0=0:  428333,     428333/4+1,0,    v1=0:428333,    428333/4+1,0]
-# 401   10K create array  GRAPH_WEIGHTS <w:float>[v0=0:   12830,      12830/4+1,0,    v1=0: 12830,     12830/4+1,0]
-# 400    1K create array  GRAPH_WEIGHTS <w:float>[v0=0:1000,        250,0,        v1=0:1000,      250,0]
+# 409 ????K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:568770231, 568770231/4+1,0, v1=0:568770231, 568770231/4+1,0]
+# 408 1280K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:xxxxxxxx,   xxxxxxxx/4+1,0,  v1=0:xxxxxxxx,  xxxxxxxx/4+1,0]
+# 407  640K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:22309220,   22309220/4+1,0,  v1=0:22309220,  22309220/4+1,0]
+# 406  320K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:15484730,   15484730/4+1,0,  v1=0:15484730,  15484730/4+1,0]
+# 405  160K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:10959642,   10959642/4+1,0,  v1=0:10959642,  10959642/4+1,0]
+create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:10959642,   10959642/4+1,0,  v1=0:10959642,  10959642/4+1,0]
+# 404   80K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0: 4143281,    4143281/4+1,0,  v1=0: 4143281,   4143281/4+1,0]
+# 403   40K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:  818340,     818340/4+1,0,    v1=0:818340,    818340/4+1,0]
+# 402   20K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:  428333,     428333/4+1,0,    v1=0:428333,    428333/4+1,0]
+# 401   10K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:   12830,      12830/4+1,0,    v1=0: 12830,     12830/4+1,0]
+# 400    1K create array  GRAPH_WEIGHTS <w:float NOT NULL>[v0=0:1000,        250,0,        v1=0:1000,      250,0]
 
 
 --start-query-logging

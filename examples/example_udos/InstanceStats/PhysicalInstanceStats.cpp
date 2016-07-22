@@ -208,7 +208,7 @@ public:
                                                                                        ChunkIterator::SEQUENTIAL_WRITE);
         outputChunkIter->setPosition(position);
         Value value;
-        value.setUint32(stats.chunkCount);
+        value.setUint64(stats.chunkCount);
         outputChunkIter->writeItem(value);
         outputChunkIter->flush();
 
@@ -260,7 +260,7 @@ public:
         outputChunkIter->setPosition(position);
         if (stats.cellCount > 0)
         {
-            value.setDouble(stats.cellCount * 1.0 / stats.chunkCount);
+            value.setDouble(static_cast<double>(stats.cellCount) / static_cast<double>(stats.chunkCount));
         }
         else
         {

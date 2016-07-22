@@ -112,7 +112,9 @@ public:
         Dimensions outputDimensions(1, outputDimension);
 
         /* The first argument is the name of the returned array. */
-        return ArrayDesc("hello_instances", outputAttributes, outputDimensions, defaultPartitioning());
+        return ArrayDesc("hello_instances", outputAttributes, outputDimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

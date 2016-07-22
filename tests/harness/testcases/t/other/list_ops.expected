@@ -6,6 +6,7 @@ name,library,internal
 '_materialize','scidb',true
 '_reduce_distro','scidb',true
 '_save_old','scidb',true
+'_setopt','scidb',true
 '_sg','scidb',true
 '_splitarraytest','scidb',true
 
@@ -49,7 +50,6 @@ name,library
 'reshape','scidb'
 'save','scidb'
 'scan','scidb'
-'setopt','scidb'
 'show','scidb'
 'slice','scidb'
 'sort','scidb'
@@ -106,7 +106,6 @@ name,library
 'reshape','scidb'
 'save','scidb'
 'scan','scidb'
-'setopt','scidb'
 'show','scidb'
 'slice','scidb'
 'sort','scidb'

@@ -21,12 +21,12 @@
 */
 
 /*
- * PhysicalApply.cpp
+ * PhysicalJoin.cpp
  *
  *  Created on: Apr 20, 2010
  *      Author: Knizhnik
  */
-
+#include <log4cxx/logger.h>
 #include "query/Operator.h"
 #include "array/Metadata.h"
 #include "JoinArray.h"
@@ -35,6 +35,8 @@ using namespace std;
 using namespace boost;
 
 namespace scidb {
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.join"));
 
 class JoinArrayIterator : public DelegateArrayIterator
 {
@@ -108,14 +110,15 @@ public:
     : DelegateArray(desc, left),
       leftArray(left),
       rightArray(right),
-      nLeftAttributes(left->getArrayDesc().getAttributes().size())
+      nLeftAttributes(
+          safe_static_cast<AttributeID>(left->getArrayDesc().getAttributes().size()))
     {
     }
 
   private:
     std::shared_ptr<Array> leftArray;
     std::shared_ptr<Array> rightArray;
-    size_t nLeftAttributes;
+    AttributeID nLeftAttributes;
 };
 
 class PhysicalJoin: public PhysicalOperator
@@ -131,6 +134,19 @@ public:
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
         return DistributionRequirement(DistributionRequirement::Collocated);
+    }
+
+
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const& inputDistributions,
+                                                      std::vector<ArrayDesc> const& inputSchemas) const
+    {
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+        assertConsistency(inputSchemas[1], inputDistributions[1]);
+
+        RedistributeContext distro = PhysicalOperator::getOutputDistribution(inputDistributions,
+                                                                             inputSchemas);
+        LOG4CXX_TRACE(logger, "join() output distro: "<< distro);
+        return distro;
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
@@ -153,7 +169,7 @@ public:
         repartByLeftmost(inputSchemas, modifiedPtrs);
     }
 
-    /***
+    /**
      * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
@@ -162,9 +178,24 @@ public:
         assert(inputArrays.size() == 2);
         std::shared_ptr<Array> left = inputArrays[0];
         std::shared_ptr<Array> right = inputArrays[1];
+
+        checkOrUpdateIntervals(_schema, left);
+
         left = ensureRandomAccess(left, query);
         right = ensureRandomAccess(right, query);
 
+        if (isDebug()) {
+            ArrayDistPtr leftDist = left->getArrayDesc().getDistribution();
+            ArrayDistPtr rightDist = right->getArrayDesc().getDistribution();
+            ArrayResPtr leftRes = left->getArrayDesc().getResidency();
+            ArrayResPtr rightRes = right->getArrayDesc().getResidency();
+
+            SCIDB_ASSERT(leftRes->isEqual(rightRes));
+            SCIDB_ASSERT(leftDist->checkCompatibility(rightDist));
+
+            SCIDB_ASSERT(leftRes->isEqual(_schema.getResidency()));
+            SCIDB_ASSERT(leftDist->checkCompatibility(_schema.getDistribution()));
+        }
         return std::shared_ptr<Array>(_schema.getEmptyBitmapAttribute() == NULL
                                         ? (Array*)new JoinArray(_schema, left, right)
                                         : (Array*)new JoinEmptyableArray(_schema, left, right));

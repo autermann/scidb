@@ -64,6 +64,11 @@ def main():
         iquery_host,
         iquery_port
         ]
+
+    env_scidb_config_user = os.environ["SCIDB_CONFIG_USER"]
+    if len(env_scidb_config_user) > 0:
+        cmd.extend([env_scidb_config_user])
+
     proc = runSubProcess(cmd,useShell=True)
     exitCode = proc.poll()
     while (exitCode is None):

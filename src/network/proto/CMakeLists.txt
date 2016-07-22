@@ -25,5 +25,9 @@ set (scidb_msg_src
 	${PROTO_SRC}
 )
 
+# The -Wconversion option hates the generated code, so...
+set_source_files_properties(scidb_msg.pb.cc
+                            PROPERTIES COMPILE_FLAGS -Wno-conversion)
+
 add_library(scidb_msg_lib STATIC ${scidb_msg_src})
 target_link_libraries(scidb_msg_lib ${PROTOBUF_LIBRARY})

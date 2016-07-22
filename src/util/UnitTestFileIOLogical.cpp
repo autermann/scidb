@@ -77,7 +77,9 @@ public:
         attributes[0] = AttributeDesc((AttributeID)0, "dummy_attribute",  TID_STRING, 0, 0);
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), Coordinate(0), Coordinate(0), uint32_t(0), uint32_t(0));
-        return ArrayDesc("dummy_array", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("dummy_array", attributes, dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 
 };

@@ -89,7 +89,7 @@ private:
          * Setters
          * @{
          */
-        void    setValueIndex(size_t vi) { _self.setValueIndex(vi); }
+        void    setValueIndex(uint32_t vi) { _self.setValueIndex(vi); }
         void    setSame(bool b) { _self.setSame(b); }
         void    setNull(bool b) { _self.setNull(b); }
         void    setCurrSeg(size_t seg) { _currSeg = seg; }

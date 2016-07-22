@@ -29,15 +29,15 @@
  * which is located on coordinator
  */
 
-#include <string.h>
-#include <log4cxx/logger.h>
+#include "InputArray.h"
 
+#include <log4cxx/logger.h>
 #include <query/Operator.h>
 #include <query/QueryProcessor.h>
 #include <query/QueryPlan.h>
 #include <network/NetworkManager.h>
+#include <string.h>
 #include <system/Cluster.h>
-#include "InputArray.h"
 
 using namespace std;
 using namespace boost;
@@ -85,13 +85,20 @@ public:
         InstanceID sourceInstanceID = getSourceInstanceID();
         if (sourceInstanceID == ALL_INSTANCE_MASK) {
             //The file is loaded from multiple instances - the distribution could be possibly violated - assume the worst
-            return RedistributeContext(psUndefined);
+
+            ArrayDistPtr undefDist = createDistribution(psUndefined);
+
+            if (!_preferredInputDist) {
+                _preferredInputDist = _schema.getDistribution();
+                SCIDB_ASSERT(_preferredInputDist);
+            }
+            ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+            mySchema->setDistribution(undefDist);
+        } else {
+            SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema() == psLocalInstance);
         }
-        else {
-            return RedistributeContext(psLocalInstance,
-                                     std::shared_ptr<CoordinateTranslator>(),
-                                     sourceInstanceID);
-        }
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)
@@ -109,9 +116,9 @@ public:
 
         //Let's store shadow arrays in defaultPartitioning()
         //TODO: revisit this when we allow users to store arrays with specified distributions
-        ArrayDesc shadowArrayDesc = InputArray::generateShadowArraySchema(_schema, shadowArrayName);
-        shadowArrayDesc.setPartitioningSchema(defaultPartitioning());
-        SCIDB_ASSERT(shadowArrayName == shadowArrayDesc.getName());
+        ArrayDesc shadowArrayDesc = InputArray::generateShadowArraySchema(_schema, shadowArrayName, query);
+
+        SCIDB_ASSERT(shadowArrayName == shadowArrayDesc.getQualifiedArrayName());
 
         LOG4CXX_DEBUG(oplogger, "Preparing catalog for shadow array " << shadowArrayName);
 
@@ -122,8 +129,15 @@ public:
                                                            shadowArrayName);
         _shadowArrayUpdateOp->preSingleExecute(query);
 
-        SCIDB_ASSERT(shadowArrayName ==
-                     ArrayDesc::makeUnversionedName(_shadowArrayUpdateOp->getSchema().getName()));
+        std::string unvArrayName = ArrayDesc::makeUnversionedName(
+            _shadowArrayUpdateOp->getSchema().getName());
+        if(ArrayDesc::isQualifiedArrayName(shadowArrayName) &&
+           !ArrayDesc::isQualifiedArrayName(unvArrayName))
+        {
+            unvArrayName = ArrayDesc::makeQualifiedArrayName(
+                query->getNamespaceName(), unvArrayName);
+        }
+        SCIDB_ASSERT(shadowArrayName == unvArrayName);
 
         shadowArrayDesc = _shadowArrayUpdateOp->getSchema();
 
@@ -163,14 +177,13 @@ public:
         const string fileName = paramExpr->getExpression()->evaluate().getString();
 
         InstanceID sourceInstanceID = getSourceInstanceID();
-
-        if (sourceInstanceID != COORDINATOR_INSTANCE_MASK &&
-            sourceInstanceID != ALL_INSTANCE_MASK &&
-            (size_t)sourceInstanceID >= query->getInstancesCount())
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_INVALID_INSTANCE_ID) << sourceInstanceID;
-
         if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) {
             sourceInstanceID = (query->isCoordinator() ? query->getInstanceID() : query->getCoordinatorID());
+
+        } else if (sourceInstanceID != ALL_INSTANCE_MASK) {
+            SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema() == psLocalInstance);
+            SCIDB_ASSERT(isValidPhysicalInstance(sourceInstanceID));
+            sourceInstanceID = safe_dynamic_cast<const LocalArrayDistribution*>(_schema.getDistribution().get())->getLogicalInstanceId();
         }
 
         int64_t maxErrors = 0;
@@ -215,6 +228,9 @@ public:
         std::shared_ptr<Array> result;
         bool emptyArray = (sourceInstanceID != ALL_INSTANCE_MASK &&
                            sourceInstanceID != myInstanceID);
+        if (_preferredInputDist) {
+            _schema.setDistribution(_preferredInputDist);
+        }
         InputArray* ary = new InputArray(_schema, format, query,
                                          emptyArray,
                                          enforceDataIntegrity,
@@ -259,11 +275,15 @@ public:
             }
         }
 
+        SCIDB_ASSERT(!_preferredInputDist ||
+                     result->getArrayDesc().getDistribution()->getPartitioningSchema() == psUndefined);
+
         return result;
     }
 
     private:
     std::shared_ptr<PhysicalUpdate> _shadowArrayUpdateOp;
+    mutable ArrayDistPtr _preferredInputDist;
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalInput, "input", "impl_input")

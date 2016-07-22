@@ -52,13 +52,16 @@ public:
      * @param parameters the operator parameters - the output schema and optional aggregates
      * @param schema the result of LogicalRedimension::inferSchema
      */
-    PhysicalRedimension(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-    RedimensionCommon(logicalName, physicalName, parameters, schema)
+    PhysicalRedimension(const string& logicalName,
+                        const string& physicalName,
+                        const Parameters& parameters,
+                        const ArrayDesc& schema)
+        : RedimensionCommon(logicalName, physicalName, parameters, schema)
     {}
 
     /**
      * Check if we are dealing with aggregates or a synthetic dimension.
-     * @return true if this redimension has at least one aggregate or if it uses a synthetic dimension; false otherwise
+     * @return true iff this redimension either uses a synthetic dimension or has at least one aggregate
      */
     bool haveAggregatesOrSynthetic(ArrayDesc const& srcDesc) const
     {
@@ -106,13 +109,27 @@ public:
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
-    virtual RedistributeContext getOutputDistribution(vector<RedistributeContext>const&  sourceDistribution,
+    virtual RedistributeContext getOutputDistribution(vector<RedistributeContext>const& inputDistributions,
                                                       vector<ArrayDesc>const& inputSchemas) const
     {
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+
         if (haveAggregatesOrSynthetic(inputSchemas[0])) {
-            return RedistributeContext(defaultPartitioning());
+            // With aggreagations or synthetic dimension,
+            // redistribution happens within the execute() method.
+            // The distribution & residency become the defaults.
+            mySchema->setDistribution(defaultPartitioning());
+            SCIDB_ASSERT(_schema.getResidency()->isEqual(Query::getValidQueryPtr(_query)->getDefaultArrayResidency()));
+        } else {
+            // the optimizer needs to deal with the fallout,
+            // i.e. redistributing (from psUndefined) and merging partial chunks
+            SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema()==psUndefined);
+            mySchema->setResidency(inputDistributions[0].getArrayResidency());
         }
-        return RedistributeContext(psUndefined);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /**
@@ -148,13 +165,16 @@ public:
         } else if ( isStrict()) {
             redistributeMode = VALIDATED;
         }
-        return redimensionArray(srcArray,
-                                attrMapping,
-                                dimMapping,
-                                aggregates,
-                                query,
-                                timing,
-                                redistributeMode);
+        std::shared_ptr<Array> resultArray =
+           redimensionArray(srcArray,
+                            attrMapping,
+                            dimMapping,
+                            aggregates,
+                            query,
+                            timing,
+                            redistributeMode);
+        SCIDB_ASSERT(!inputArrays[0]); // should be dropped by now
+        return resultArray;
     }
 };
 

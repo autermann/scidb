@@ -65,8 +65,8 @@
 %destructor { delete $$; } IDENTIFIER STRING_LITERAL
 
 %token SET LANG AFL AQL NO FETCH VERBOSE TIMER HELP QUIT FORMAT
-       AUTO OPAQUE CSV CSV_PLUS LCSV_PLUS DENSE LSPARSE SPARSE TEXT DCSV
-       TSV TSV_PLUS LTSV_PLUS
+       AUTO OPAQUE CSV CSV_PLUS DENSE LSPARSE SPARSE TEXT DCSV
+       TSV TSV_PLUS
 
 %token  EOQ             0 "end of query"
 %token  EOL             "end of line"
@@ -206,10 +206,6 @@ format:
     {
         $$ = "csv+";
     }
-    | LCSV_PLUS
-    {
-        $$ = "lcsv+";
-    }
     | DENSE
     {
         $$ = "dense";
@@ -237,10 +233,6 @@ format:
     | TSV_PLUS
     {
         $$ = "tsv+";
-    }
-    | LTSV_PLUS
-    {
-        $$ = "ltsv+";
     }
     ;
 

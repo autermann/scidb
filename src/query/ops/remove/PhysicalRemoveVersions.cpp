@@ -27,14 +27,14 @@
  *      Author: sfridella
  */
 
+#include <array/DBArray.h>
 #include <boost/foreach.hpp>
 #include <deque>
-
-#include "query/Operator.h"
-#include "query/QueryProcessor.h"
-#include "array/DBArray.h"
-#include "smgr/io/Storage.h"
-#include "system/SystemCatalog.h"
+#include <query/Operator.h>
+#include <query/QueryProcessor.h>
+#include <smgr/io/Storage.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 using namespace boost;
@@ -44,51 +44,60 @@ namespace scidb {
 class PhysicalRemoveVersions: public PhysicalOperator
 {
 public:
-   PhysicalRemoveVersions(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-   PhysicalOperator(logicalName, physicalName, parameters, schema)
-   {
-   }
+    PhysicalRemoveVersions(
+        const string& logicalName, const string& physicalName,
+        const Parameters& parameters, const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
+    {
+    }
 
-   void preSingleExecute(std::shared_ptr<Query> query)
-   {
-       std::shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-       assert(membership);
-       if (((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-            (membership->getInstances().size() != query->getInstancesCount()))) {
-           throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-       }
-
-
-       const string &arrayName =
+    void preSingleExecute(std::shared_ptr<Query> query)
+    {
+       const string &arrayNameOrg =
            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
        VersionID targetVersion =
            ((std::shared_ptr<OperatorParamPhysicalExpression>&)
             _parameters[1])->getExpression()->evaluate().getInt64();
 
-       bool arrayExists = SystemCatalog::getInstance()->getArrayDesc(arrayName,
-                                                                     query->getCatalogVersion(arrayName),
-                                                                     targetVersion,
-                                                                     _schema, true);
-       SCIDB_ASSERT(arrayExists);
-       assert(_schema.getVersionId() == targetVersion);
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
        _lock = std::shared_ptr<SystemCatalog::LockDesc>(
-           new SystemCatalog::LockDesc(arrayName,
-                                       query->getQueryID(),
-                                       Cluster::getInstance()->getLocalInstanceId(),
-                                       SystemCatalog::LockDesc::COORD,
-                                       SystemCatalog::LockDesc::RM)
+            new SystemCatalog::LockDesc(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::RM)
            );
-       _lock->setArrayId(_schema.getUAId());
-       _lock->setArrayVersion(targetVersion);
-
-       SystemCatalog::getInstance()->updateArrayLock(_lock);
        std::shared_ptr<Query::ErrorHandler> ptr(new RemoveErrorHandler(_lock));
        query->pushErrorHandler(ptr);
+
+       // From this point on _schema is used to describe the array to be removed rather than the output array
+       // somewhat hacky ... but getOutputDistribution() and other optimizer manipulations should be done by now
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        bool arrayExists = scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, arrayId, targetVersion,_schema, true);
+       SCIDB_ASSERT(arrayExists);
+       SCIDB_ASSERT(_schema.getVersionId() == targetVersion);
+       SCIDB_ASSERT(_schema.getUAId()>0);
+
+       //XXX TODO: for now just check that all the instances in the residency are alive
+       //XXX TODO: once we allow writes in a degraded mode, this call might have more semantics
+       query->isDistributionDegradedForWrite(_schema);
+
+       // Until the lock is updated with UAID, the query can be rolled back.
+       _lock->setArrayId(_schema.getUAId());
+       _lock->setArrayVersion(targetVersion);
+       query->setAutoCommit();
+       bool rc = SystemCatalog::getInstance()->updateArrayLock(_lock);
+       SCIDB_ASSERT(rc);
    }
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
-                                     std::shared_ptr<Query> query)
+                                   std::shared_ptr<Query> query)
     {
         getInjectedErrorListener().check();
 

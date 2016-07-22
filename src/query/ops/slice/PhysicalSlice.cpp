@@ -28,6 +28,7 @@
  */
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <array/Metadata.h>
 #include <array/Array.h>
 #include "SliceArray.h"
@@ -53,10 +54,17 @@ public:
     }
 
     virtual RedistributeContext getOutputDistribution(
-            std::vector<RedistributeContext> const& sourceDistributions,
-            std::vector<ArrayDesc> const& sourceSchemas) const
+            std::vector<RedistributeContext> const& inputDistributions,
+            std::vector<ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema()==psUndefined);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(
@@ -82,10 +90,11 @@ public:
 
         for (size_t i = 0; i < nDims; i++) {
             const std::string dimName = dims[i].getBaseName();
-            int k = sliceDimName.size();
+            int k = safe_static_cast<int>(sliceDimName.size());
             while (--k >= 0
                    && sliceDimName[k] != dimName
-                   && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1));
+                   && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1))
+                ;
 
             if (k < 0) {
                 //dimension i is present in output
@@ -102,16 +111,26 @@ public:
             }
         }
 
-        double resultCells = PhysicalBoundaries::getNumCells(newStart, newEnd);
-        double origCells = inputBoundaries[0].getNumCells();
-        double newDensity = 1.0;
-        if (resultCells > 0.0)
-        {
-            newDensity = inputBoundaries[0].getDensity() * origCells / resultCells;
-            newDensity = newDensity > 1.0 ? 1.0 : newDensity;
-        }
+        // This does nothing but calculate a few local values
+        // and then discard them.
+        // 
+        // double resultCells = PhysicalBoundaries::getNumCells(newStart, newEnd);
+        // double origCells = inputBoundaries[0].getNumCells();
+        // double newDensity = 1.0;
+        // if (resultCells > 0.0)
+        // {
+        //     newDensity = inputBoundaries[0].getDensity() * origCells / resultCells;
+        //     newDensity = newDensity > 1.0 ? 1.0 : newDensity;
+        // }
 
         return PhysicalBoundaries(newStart, newEnd);
+    }
+
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see LogicalSlice::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
     }
 
     /**
@@ -124,6 +143,10 @@ public:
             std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
+
+        AutochunkFixer af(getControlCookie());
+        af.fix(_schema, inputArrays);
+
         std::shared_ptr<Array> inputArray = inputArrays[0];
         ArrayDesc const& desc = inputArray->getArrayDesc();
         inputArray = ensureRandomAccess(inputArray, query);
@@ -142,7 +165,7 @@ public:
         }
         for (size_t i = 0; i < nDims; i++) {
             string dimName = dims[i].getBaseName();
-            int k = sliceDimName.size();
+            int k = safe_static_cast<int>(sliceDimName.size());
             while (--k >= 0
                    && sliceDimName[k] != dimName
                    && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1));

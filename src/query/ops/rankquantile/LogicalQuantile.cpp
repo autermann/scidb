@@ -30,6 +30,7 @@
 #include <boost/foreach.hpp>
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <system/Exceptions.h>
 #include <query/LogicalExpression.h>
 
@@ -89,6 +90,8 @@ namespace scidb
  */
 class LogicalQuantile: public LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
     LogicalQuantile(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
@@ -97,6 +100,8 @@ public:
         ADD_PARAM_CONSTANT("uint32");
         ADD_PARAM_VARIES();
     }
+
+    std::string getInspectable() const override { return _fixer.str(); }
 
     std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
     {
@@ -113,6 +118,7 @@ public:
 
         return res;
     }
+
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         ArrayDesc const& input = schemas[0];
@@ -147,6 +153,7 @@ public:
         outputAttrs.push_back(AttributeDesc(0, "percentage", TID_DOUBLE, 0,0));
         outputAttrs.push_back(AttributeDesc(1, attName + "_quantile", inputAttribute.getType(), AttributeDesc::IS_NULLABLE, 0));
 
+        _fixer.clear();
         Dimensions outputDims;
         if (_parameters.size()>2)
         {
@@ -165,13 +172,14 @@ public:
                         }
 
                         //no overlap
+                        _fixer.takeDimension(outputDims.size()).fromArray(0).fromDimension(j);
                         outputDims.push_back(DimensionDesc( dim.getBaseName(),
                                                             dim.getNamesAndAliases(),
                                                             dim.getStartMin(),
                                                             dim.getCurrStart(),
                                                             dim.getCurrEnd(),
                                                             dim.getEndMax(),
-                                                            dim.getChunkInterval(),
+                                                            dim.getRawChunkInterval(),
                                                             0));
                         break;
                     }
@@ -192,7 +200,9 @@ public:
                 0);                    // chunkOverlap
         outputDims.push_back(quantileDim);
 
-        return ArrayDesc(input.getName()+"_quantile", outputAttrs, outputDims, defaultPartitioning());
+        return ArrayDesc(input.getName()+"_quantile", outputAttrs, outputDims,
+                         createDistribution(psUndefined),
+                         query->getDefaultArrayResidency());
     }
 };
 

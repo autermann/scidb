@@ -34,7 +34,6 @@
 #include <log4cxx/logger.h>
 
 #include <array/Metadata.h>
-#include <query/QueryProcessor.h>
 #include <network/ThrottledScheduler.h>
 #include <system/Cluster.h>
 #include <util/Singleton.h>
@@ -45,6 +44,8 @@
 namespace scidb
 {
  class Connection;
+
+class MessageDesc;
 
 /***
  * The network manager implementation depends on system catalog API
@@ -89,6 +90,7 @@ class NetworkManager: public Singleton<NetworkManager>
     static const uint64_t MAX_QUEUE_SIZE = ~0;
 
  private:
+
     friend class Cluster;
     friend class Connection;
 
@@ -117,9 +119,33 @@ class NetworkManager: public Singleton<NetworkManager>
     // Job queue for processing received messages
     std::shared_ptr< JobQueue> _jobQueue;
 
-    std::shared_ptr<Instances> _instances;
+    // Current cluster instance membership
+    InstMembershipPtr _instanceMembership;
 
-    std::shared_ptr<const InstanceLiveness> _instanceLiveness;
+    // Current cluster instance liveness,
+    // which may not be in sync with the membership
+    // (i.e. may have a different membership ID) at any given time.
+    // Instance addition/removal can cause the two to deviate temporarily.
+    InstLivenessPtr _instanceLiveness;
+
+    /// A functor class that sends a given message to a given instance
+    class MessageSender
+    {
+    public:
+        MessageSender(NetworkManager& nm,
+                      std::shared_ptr<MessageDesc>& messageDesc,
+                      InstanceID selfInstanceID)
+        :  _nm(nm), _messageDesc(messageDesc), _selfInstanceID(selfInstanceID)
+        {}
+        void operator() (const InstanceDesc& i);
+
+    private:
+        NetworkManager& _nm;
+        std::shared_ptr<MessageDesc>& _messageDesc;
+        InstanceID _selfInstanceID;
+    };
+
+    friend class MessageSender;
 
     Mutex _mutex;
 
@@ -133,12 +159,11 @@ class NetworkManager: public Singleton<NetworkManager>
     static const time_t CONTROL_MSG_TIMEOUT_MICRO = 100*1000; // 100 msec
     static const time_t CONTROL_MSG_TIME_STEP_MICRO = 10*1000; // 10 msec
 
-
     uint64_t _repMessageCount;
     uint64_t _maxRepSendQSize;
     uint64_t _maxRepReceiveQSize;
 
-    uint64_t _randInstanceId;
+    uint64_t _randInstanceIndx;
     uint64_t _aliveRequestCount;
 
     uint64_t _memUsage;
@@ -263,7 +288,11 @@ class NetworkManager: public Singleton<NetworkManager>
     }
     void _handleLiveness();
 
-    bool isDead(InstanceID remoteInstanceId) const ;
+   /**
+    * @return true if the remote instance is either dead or not in the membership at all
+    * @note may update the current cluster membership
+    */
+    bool isDead(InstanceID remoteInstanceId);
 
     static void publishMessage(const std::shared_ptr<MessageDescription>& msgDesc);
 
@@ -295,12 +324,14 @@ class NetworkManager: public Singleton<NetworkManager>
                                 NetworkMessageFactory::MessageHandler& handler);
 
     /**
-     * Request information about instances from system catalog.
-     * @param force a flag to force usage system catalog. If false and _instances.size() > 0
-     * function just return existing version.
-     * @return a number of instances registered in the system catalog.
+     * Request the latest information about the member  instances from system catalog.
      */
-    void getInstances(bool force);
+    void fetchLatestInstances();
+
+    /**
+     * Make sure the information about the member instances is cached.
+     */
+    void fetchInstances();
 
     /**
      * Get currently known instance liveness
@@ -310,13 +341,12 @@ class NetworkManager: public Singleton<NetworkManager>
     std::shared_ptr<const InstanceLiveness> getInstanceLiveness()
     {
        ScopedMutexLock mutexLock(_mutex);
-       getInstances(false);
+       fetchInstances();
        return _instanceLiveness;
     }
 
-    size_t getPhysicalInstances(std::vector<InstanceID>& instances);
-
-    InstanceID getPhysicalInstanceID() {
+    InstanceID getPhysicalInstanceID()
+    {
        ScopedMutexLock mutexLock(_mutex);
        return _selfInstanceID;
     }
@@ -328,25 +358,20 @@ class NetworkManager: public Singleton<NetworkManager>
     uint64_t _getAvailable(MessageQueueType mqt, InstanceID forInstanceID);
     void _broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc);
 
-public:
+protected:
+    /// Constructor
     NetworkManager();
+
+    /// Destructor
     ~NetworkManager();
+    friend class Singleton<NetworkManager>;
+
+public:
 
     uint64_t getUsedMemSize() const
     {
         // not synchronized, relying on 8byte atomic load
         return _memUsage;
-    }
-
-    /**
-     * Request information about instances from system catalog.
-     * @return an immutable array of currently registered instance descriptors
-     */
-    std::shared_ptr<const Instances> getInstances()
-    {
-        ScopedMutexLock mutexLock(_mutex);
-        getInstances(false);
-        return _instances;
     }
 
     /**
@@ -452,31 +477,8 @@ public:
     uint64_t getAvailable(MessageQueueType mqt, InstanceID forInstanceID);
 
     /// internal
-    uint64_t getSendQueueLimit(MessageQueueType mqt)
-    {
-        // mqtRplication is the only supported type for now
-        if (mqt == mqtReplication) {
-            ScopedMutexLock mutexLock(_mutex);
-            getInstances(false);
-            SCIDB_ASSERT(_instances->size()>0);
-            return (_maxRepSendQSize / _instances->size());
-        }
-        SCIDB_ASSERT(mqt==mqtNone);
-        return MAX_QUEUE_SIZE;
-    }
-
-    uint64_t getReceiveQueueHint(MessageQueueType mqt)
-    {
-        // mqtRplication is the only supported type for now
-        if (mqt == mqtReplication) {
-            ScopedMutexLock mutexLock(_mutex);
-            getInstances(false);
-            SCIDB_ASSERT(_instances->size()>0);
-            return (_maxRepReceiveQSize / _instances->size());
-        }
-        SCIDB_ASSERT(mqt==mqtNone);
-        return MAX_QUEUE_SIZE;
-    }
+    uint64_t getSendQueueLimit(MessageQueueType mqt);
+    uint64_t getReceiveQueueHint(MessageQueueType mqt);
 
     boost::asio::io_service& getIOService()
     {
@@ -506,7 +508,7 @@ public:
               std::shared_ptr<Query> & query);
 
     std::shared_ptr<SharedBuffer> receive(InstanceID logicalSourceID,
-                                            std::shared_ptr<Query> & query);
+                                          std::shared_ptr<Query>& query);
 
     static void shutdown()
     {
@@ -532,8 +534,10 @@ public:
     {
     public:
     OverflowException(MessageQueueType mqt, const char* file, const char* function, int32_t line)
-    : SystemException(file, function, line, "scidb", SCIDB_SE_NO_MEMORY, SCIDB_LE_NETWORK_QUEUE_FULL,
-                      "SCIDB_E_NO_MEMORY", "SCIDB_E_NETWORK_QUEUE_FULL", uint64_t(0)), _mqt(mqt)
+    : SystemException(file, function, line, "scidb",
+                      SCIDB_SE_NO_MEMORY, SCIDB_LE_NETWORK_QUEUE_FULL,
+                      "SCIDB_E_NO_MEMORY", "SCIDB_E_NETWORK_QUEUE_FULL",
+                      INVALID_QUERY_ID), _mqt(mqt)
         {
         }
         ~OverflowException() throw () {}

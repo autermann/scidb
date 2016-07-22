@@ -34,6 +34,9 @@
 #include <util/session/Session.h>
 #include "AST.h"
 
+#include <query/Operator.h>
+#include <query/OperatorLibrary.h>
+#include <query/QueryPlan.h>
 /****************************************************************************/
 
 #define PLACEHOLDER_OUTPUT_FLAG (PLACEHOLDER_END_OF_VARIES << 1)
@@ -135,6 +138,7 @@ class Translator
             /**
              * Get array metadata for the array name as of a given catalog version.
              * The metadata provided by this method corresponds to an array with id <= catalogVersion
+             * @param[in] namespaceName The namespace the array belongs to
              * @param[in] array_name Array name
              * @param[in] catalogVersion as previously returned by getCurrentVersion().
              *            If catalogVersion == SystemCatalog::ANY_VERSION,
@@ -143,23 +147,26 @@ class Translator
              * @exception scidb::SystemException
              * @see SystemCatalog::getCurrentVersion()
              */
-            void              getArrayDesc                    (const std::string& array_name,
+            void              getArrayDesc                    (const std::string &namespaceName,
+                                                              const std::string& array_name,
                                                               const ArrayID catalogVersion,
                                                               ArrayDesc& array_desc);
 
             /**
              * Get array metadata for the array name as of a given catalog version.
              * The metadata provided by this method corresponds to an array with id <= catalogVersion
-             * @param[in] array_name Array name
+             * @param[in] namespaceName The namespace the array belongs to
+             * @param[in] arrayName Array name
              * @param[in] catalogVersion as previously returned by getCurrentVersion().
              *            If catalogVersion == SystemCatalog::ANY_VERSION,
              *            the result metadata array ID is not bounded by catalogVersion
-             * @param[out] array_desc Array descriptor
+             * @param[out] arrayDesc Array descriptor
              * @param[in] throwException throw exception if array with specified name is not found
              * @return true if array is found, false if array is not found and throwException is false
              * @exception scidb::SystemException
              */
-            bool                getArrayDesc                  (const std::string &arrayName,
+            bool                getArrayDesc                  (const std::string &namespaceName,
+                                                              const std::string &arrayName,
                                                               const ArrayID catalogVersion,
                                                               ArrayDesc &arrayDesc,
                                                               const bool throwException);
@@ -167,23 +174,35 @@ class Translator
             /**
              * Get array metadata for the array name as of a given catalog version.
              * The metadata provided by this method corresponds to an array with id <= catalogVersion
-             * @param[in] array_name Array name
+             * @param[in] namespaceName The namespace the array belongs to
+             * @param[in] arrayName Array name
              * @param[in] catalogVersion as previously returned by getCurrentVersion().
              *            If catalogVersion == SystemCatalog::ANY_VERSION,
              *            the result metadata array ID is not bounded by catalogVersion
              * @param[in] array_version version identifier or LAST_VERSION
-             * @param[out] array_desc Array descriptor
+             * @param[out] arrayDesc Array descriptor
              * @param[in] throwException throw exception if array with specified name is not found
              * @return true if array is found, false if array is not found and throwException is false
              * @exception scidb::SystemException
              */
-            bool              getArrayDesc                    (const std::string &arrayName,
+            bool                getArrayDesc                  (const std::string &namespaceName,
+                                                              const std::string &arrayName,
                                                               const ArrayID catalogVersion,
                                                               VersionID version,
                                                               ArrayDesc &arrayDesc,
                                                               const bool throwException = true);
 
-            bool              checkArrayAccess                (ArrayID arrayId) const;
+
+
+            /**
+             * Deterine if the environment is such that the specified array can be accessed.
+             *
+             * @param namespaceName - The name of the array to check in
+             * @param arrayName - The name of the array to check for
+             */
+            bool              checkArrayAccess                (const std::string &namespaceName,
+                                                               const std::string &arrayName) const;
+
 
  private:                  // Expressions
             LEPtr             onNull              (const Node*);
@@ -191,6 +210,7 @@ class Translator
             LEPtr             onInteger           (const Node*);
             LEPtr             onBoolean           (const Node*);
             LEPtr             onString            (const Node*);
+            LEPtr             onQuestionMark      (const Node*);
 
             // @see AstToLogicalExpression().
             LEPtr             onScalarFunction    (const Node*, size_t depthExpression);
@@ -207,18 +227,32 @@ class Translator
  private:
             void              checkDepthExpression(size_t depthExpression);
             void              checkDepthOperator(size_t depthOperator);
+      const Node*             currentOperator() const                                   {return _opStack.empty() ? 0 : _opStack.back();}
+
+            /// Used to maintain _opStack, a stack of operator AST nodes.
+            class OpTracker
+            {
+                Translator& _trans;
+            public:
+                OpTracker(Translator& t, const Node* ast)
+                    : _trans(t)
+                {
+                    _trans._opStack.push_back(ast);
+                }
+
+                ~OpTracker()
+                {
+                    assert(!_trans._opStack.empty());
+                    _trans._opStack.resize(_trans._opStack.size() - 1);
+                }
+            };
 
  private:                  // Representation
             Factory&          _fac;                      // Abstract factory
             Log&              _log;                      // Abstract error log
       const StringPtr&        _txt;                      // The source text: yuk!
             QueryPtr    const _qry;                      // The query
-
-      // If this constant is changed, also change the error string SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS.
-      static const size_t MAX_DEPTH_EXPRESSION = 446;
-
-      // If this constant is changed, also change the error string SCIDB_LE_TOO_MANY_OPERANDS_IN_EXPRESSION.
-      static const size_t MAX_DEPTH_OPERATOR = 95;
+          vector<const Node*> _opStack;                  // Operator stack
 };
 
 /****************************************************************************/
@@ -327,7 +361,8 @@ int64_t Translator::estimateChunkInterval(cnodes nodes)
     {
         assert(d->is(dimension));
 
-        if (const Node* n = d->get(dimensionArgChunkInterval))
+        Node const *n = d->get(dimensionArgChunkInterval);
+        if (n && !n->is(questionMark))
         {
             knownChunksSize *= passIntegralExpression(n);
         }
@@ -345,7 +380,9 @@ int64_t Translator::estimateChunkInterval(cnodes nodes)
         return knownChunksSize;
     }
 
-    int64_t r = floor(pow(max(1L,targetChunkSize/knownChunksSize),1.0/unknownChunksCount));
+    int64_t r = static_cast<int64_t>(
+        floor(pow(max(1L,targetChunkSize/knownChunksSize),
+                  1.0/static_cast<double>(unknownChunksCount))));
     assert(r > 0);
     return r;
 }
@@ -354,12 +391,14 @@ int64_t Translator::estimateChunkInterval(cnodes nodes)
  *  Verify that this array belongs to the current namespace or to the
  *  public namespace.
  */
-bool Translator::checkArrayAccess(ArrayID arrayId) const
+bool Translator::checkArrayAccess(
+    const std::string &namespaceName,
+    const std::string &arrayName) const
 {
     if(_qry->isFake())
     {
         /*
-         * A fake query is created when code similiar to that shown 
+         * A fake query is created when code similiar to that shown
          * below is executed.  The fake query creation occurs in
          * Query::createFakeQuery(...) which creates a query that has
          * an id of Query::FAKE_QUERY_ID.
@@ -371,28 +410,53 @@ bool Translator::checkArrayAccess(ArrayID arrayId) const
     }
 
     std::shared_ptr<Session> session = _qry->getSession();
-LOG4CXX_DEBUG(logger, "checkArrayAccess("
-    << "_qry=" << _qry << ","
-    << "id=" << _qry->getQueryID() << ","
-    << "arrayId=" << arrayId << ","
-    << "session=" << session.get() << ")" );
+    LOG4CXX_TRACE(logger, "Translator::checkArrayAccess("
+        << "arrayName=" << namespaceName << ","
+        << "arrayName=" << arrayName << ")" );
 
-    Session *pSession = session.get();
-    ASSERT_EXCEPTION(pSession!=nullptr, "NULL session");
+    try
+    {
+        scidb::namespaces::Communicator::checkArrayAccess(namespaceName, arrayName);
+    }
+    catch (SystemException& e)
+    {
+        if (e.getLongErrorCode() == SCIDB_LE_ARRAY_DOESNT_EXIST)
+        {
+            return false;
+        }
 
-    return scidb::namespaces::Communicator::checkArrayAccess(
-        session, arrayId );
+        throw;
+    }
+
+    return true;
+}
+
+bool Translator::getArrayDesc(
+    const std::string &namespaceName,
+    const std::string &arrayName,
+    const ArrayID catalogVersion,
+    ArrayDesc &arrayDesc,
+    const bool throwException)
+{
+    bool ret;
+
+    ret = scidb::namespaces::Communicator::getArrayDesc(
+        namespaceName, arrayName, catalogVersion, arrayDesc, throwException);
+    if(!ret) return ret;
+
+    return checkArrayAccess(namespaceName, arrayName);
 }
 
 void Translator::getArrayDesc(
+    const std::string &namespaceName,
     const std::string& arrayName,
     const ArrayID catalogVersion,
     ArrayDesc& arrayDesc)
 {
-    SystemCatalog::getInstance()->getArrayDesc(
-        arrayName, catalogVersion, arrayDesc);
+    scidb::namespaces::Communicator::getArrayDesc(
+        namespaceName, arrayName, catalogVersion, arrayDesc);
 
-    if(false == checkArrayAccess(arrayDesc.getId()))
+    if(false == checkArrayAccess(namespaceName, arrayName))
     {
         throw SYSTEM_EXCEPTION(
             SCIDB_SE_SYSCAT,
@@ -401,24 +465,8 @@ void Translator::getArrayDesc(
     }
 }
 
-
 bool Translator::getArrayDesc(
-    const std::string &arrayName,
-    const ArrayID catalogVersion,
-    ArrayDesc &arrayDesc,
-    const bool throwException)
-{
-    bool ret;
-
-    ret = SystemCatalog::getInstance()->getArrayDesc(
-        arrayName, catalogVersion, arrayDesc, throwException);
-    if(!ret) return ret;
-
-    ret = checkArrayAccess(arrayDesc.getId());
-    return ret;
-}
-
-bool Translator::getArrayDesc(
+    const std::string &namespaceName,
     const std::string &arrayName,
     const ArrayID catalogVersion,
     VersionID version,
@@ -427,18 +475,12 @@ bool Translator::getArrayDesc(
 {
     bool ret;
 
-    ret = SystemCatalog::getInstance()->getArrayDesc(
-        arrayName, catalogVersion, version, arrayDesc, throwException);
-    if(!ret)
-    {
-        return ret;
-    }
+    ret = scidb::namespaces::Communicator::getArrayDesc(
+        namespaceName, arrayName, catalogVersion, version, arrayDesc, throwException);
+    if(!ret) return ret;
 
-    ret = checkArrayAccess(arrayDesc.getId());
-    return ret;
+    return checkArrayAccess(namespaceName, arrayName);
 }
-
-
 
 Value Translator::passConstantExpression(const Node* ast,const TypeId& targetType)
 {
@@ -474,13 +516,13 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
 {
     dimensions.reserve(ast->getSize());                  // Reserve memory
 
-    BOOST_FOREACH (const Node* d,ast->getList())         // For each dimension
+    for (const Node* d : ast->getList())                 // For each dimension
     {
         assert(d->is(dimension));                        // ...is a dimension
 
         string  const nm = d->get(dimensionArgName)->getString();
         int64_t       lo = 0;                            // ...lower bound
-        int64_t       hi = CoordinateBounds::getMax();               // ...upper bound
+        int64_t       hi = CoordinateBounds::getMax();   // ...upper bound
         int64_t       ci = 0;                            // ...chunk interval
         int64_t       co = 0;                            // ...chunk overlap
 
@@ -489,30 +531,74 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
             fail(SYNTAX(SCIDB_LE_DUPLICATE_DIMENSION_NAME,d->get(dimensionArgName)) << nm);
         }
 
-        if (const Node* n = d->get(dimensionArgLoBound))
+        bool autochunkAllowed = false;
+        const Node* nOp = currentOperator();
+        chars opName = "(no operator context)";
+        if (nOp)
         {
-            lo = passIntegralExpression(n);
+            opName = getStringApplicationArgName(nOp);
+            if (!::strcmp(opName, "redimension") || !::strcmp(opName, "repart"))
+            {
+                autochunkAllowed = true;
+            }
         }
 
-        if (const Node* n = d->get(dimensionArgHiBound))
-        if (!n->is(asterisk))
+        const Node* nLo = d->get(dimensionArgLoBound);
+        if (nLo && !nLo->is(questionMark))
         {
-            hi = passIntegralExpression(n);
+            assert(!nLo->is(asterisk));                  // BNF forbids it
+            lo = passIntegralExpression(nLo);
         }
 
-        if (const Node* n = d->get(dimensionArgChunkInterval))
+        const Node* nHi = d->get(dimensionArgHiBound);
+        if (nHi)
         {
-            ci = passIntegralExpression(n);
-        }
-        else
-        {
-            ci = estimateChunkInterval(ast->getList());
+            if (!nHi->is(asterisk) && !nHi->is(questionMark))
+            {
+                hi = passIntegralExpression(nHi);
+            }
         }
 
-        if (const Node* n = d->get(dimensionArgChunkOverlap))
+        const Node* nCi = d->get(dimensionArgChunkInterval);
+        if (nCi)
         {
-            co = passIntegralExpression(n);
+            if (nCi->is(questionMark))
+            {
+                ci = estimateChunkInterval(ast->getList());
+            }
+            else if (nCi->is(asterisk))
+            {
+                if (autochunkAllowed)
+                {
+                    ci = DimensionDesc::AUTOCHUNKED;
+                }
+                else
+                {
+                    fail(SYNTAX(SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED, nCi) << opName);
+                }
+            }
+            else
+            {
+                ci = passIntegralExpression(nCi);
+            }
         }
+
+        const Node* nCo = d->get(dimensionArgChunkOverlap);
+        if (nCo)
+        {
+            co = passIntegralExpression(nCo);
+        }
+
+        if ( !(nLo || nHi || nCi || nCo) )
+        {
+            ci = autochunkAllowed
+                ? static_cast<int64_t>(DimensionDesc::AUTOCHUNKED)
+                : estimateChunkInterval(ast->getList());
+        }
+
+        /*
+         *  Validate the dimension specification.
+         */
 
         if (lo == CoordinateBounds::getMax() && hi != CoordinateBounds::getMax())
         {
@@ -521,12 +607,14 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
 
         if (lo<CoordinateBounds::getMin() || CoordinateBounds::getMax()<lo)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgLoBound)) << CoordinateBounds::getMin() << CoordinateBounds::getMax());
+            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgLoBound))
+                 << CoordinateBounds::getMin() << CoordinateBounds::getMax());
         }
 
         if (hi<CoordinateBounds::getMin() || CoordinateBounds::getMax()<hi)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgHiBound))<< CoordinateBounds::getMin() << CoordinateBounds::getMax());
+            fail(SYNTAX(SCIDB_LE_INCORRECT_DIMENSION_BOUNDARY,getChildSafely(d,dimensionArgHiBound))
+                 << CoordinateBounds::getMin() << CoordinateBounds::getMax());
         }
 
         if (hi<lo && hi+1!=lo)
@@ -534,22 +622,25 @@ void Translator::passDimensions(const Node* ast,Dimensions& dimensions,const str
             fail(SYNTAX(SCIDB_LE_HIGH_SHOULDNT_BE_LESS_LOW,getChildSafely(d,dimensionArgHiBound)));
         }
 
-        if (ci <= 0)
+        if (ci <= 0 && ci != DimensionDesc::AUTOCHUNKED)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_CHUNK_SIZE,getChildSafely(d,dimensionArgChunkInterval)) << numeric_limits<int64_t>::max());
+            fail(SYNTAX(SCIDB_LE_INCORRECT_CHUNK_SIZE,getChildSafely(d,dimensionArgChunkInterval))
+                 << numeric_limits<int64_t>::max());
         }
 
         if (co < 0)
         {
-            fail(SYNTAX(SCIDB_LE_INCORRECT_OVERLAP_SIZE,getChildSafely(d,dimensionArgChunkOverlap)) << numeric_limits<int64_t>::max());
+            fail(SYNTAX(SCIDB_LE_INCORRECT_OVERLAP_SIZE,getChildSafely(d,dimensionArgChunkOverlap))
+                 << numeric_limits<int64_t>::max());
         }
 
-        if (co > ci)
+        if (co > ci && ci != DimensionDesc::AUTOCHUNKED)
         {
             fail(SYNTAX(SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK,getChildSafely(d,dimensionArgChunkOverlap)));
         }
 
         dimensions.push_back(DimensionDesc(nm,lo,hi,ci,co));
+        LOG4CXX_DEBUG(logger, "passDimensions: " << dimensions);
     }
 }
 
@@ -637,16 +728,19 @@ void Translator::passSchema(const Node* ast,ArrayDesc& schema,const string& arra
                 fail(SYNTAX(SCIDB_LE_COMPRESSOR_DOESNT_EXIST,attNode->get(attributeArgCompressorName)) << attCompressorName);
             }
 
-            attributes.push_back(AttributeDesc(
-                attributes.size(),
-                attName,
-                attType.typeId(),
-                attFlags,
-                attCompressor->getType(),
-                set<string>(),
-                getInteger(attNode,attributeArgReserve,Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE)),
-                &defaultValue,
-                serializedDefaultValueExpr));
+            attributes.push_back(
+                AttributeDesc(
+                    safe_static_cast<AttributeID>(attributes.size()),
+                    attName,
+                    attType.typeId(),
+                    attFlags,
+                    attCompressor->getType(),
+                    set<string>(),
+                    safe_static_cast<int16_t>(
+                        getInteger(attNode,attributeArgReserve,
+                                   Config::getInstance()->getOption<int>(CONFIG_CHUNK_RESERVE))),
+                    &defaultValue,
+                    serializedDefaultValueExpr));
         }
         catch (SystemException& e)
         {
@@ -661,18 +755,25 @@ void Translator::passSchema(const Node* ast,ArrayDesc& schema,const string& arra
 
     // In 14.3, all arrays became emptyable
     //FIXME: Which compressor for empty indicator attribute?
-    attributes.push_back(AttributeDesc(attributes.size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+    attributes.push_back(
+        AttributeDesc(
+            safe_static_cast<AttributeID>(attributes.size()), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+            TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
     Dimensions dimensions;
 
     passDimensions(ast->get(schemaArgDimensions),dimensions,arrayName,usedNames);
 
-    schema = ArrayDesc(0,0,0,arrayName,attributes,dimensions, defaultPartitioning());
+    std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+    schema = ArrayDesc(0,0,0,namespaceName, arrayName,attributes,dimensions,
+                       defaultPartitioning(),
+                       _qry->getDefaultArrayResidency());
 }
 
 LQPNPtr Translator::passAFLOperator(const Node *ast, size_t depthOperator)
 {
     checkDepthOperator(depthOperator);
+    OpTracker ot(*this, ast);
 
     const chars opName   = getStringApplicationArgName(ast);
     cnodes astParameters = ast->getList(applicationArgOperands);
@@ -838,46 +939,73 @@ LQPNPtr Translator::passAFLOperator(const Node *ast, size_t depthOperator)
 std::shared_ptr<OperatorParamArrayReference> Translator::createArrayReferenceParam(const Node *arrayReferenceAST,bool inputSchema)
 {
     ArrayDesc schema;
-    string arrayName = getStringReferenceArgName(arrayReferenceAST);
     string dimName;
+    string arrayName = getStringReferenceArgName(arrayReferenceAST);
     assert(arrayName != "");
     assert(arrayName.find('@') == string::npos);
 
-    if (const Node* n = getReferenceArgArrayName(arrayReferenceAST))
+    assert(_qry);
+
+    string namespaceName = "";
+    chars argArrayName = getStringReferenceArgArrayName(arrayReferenceAST);
+    if(argArrayName && (0 != std::string(argArrayName).compare("")))
     {
-        fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,n));
+        namespaceName = argArrayName;
+
+        NamespaceDesc       namespaceDesc(namespaceName);
+        NamespaceDesc::ID   namespaceID;
+        if(false == scidb::namespaces::Communicator::findNamespace(
+            namespaceDesc, namespaceID, false))
+        {
+            // This exception is only valid if the argArrayName is not a namespace_name
+            if(const Node* n = getReferenceArgArrayName(arrayReferenceAST))
+            {
+                fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,n));
+            }
+        }
+    } else {
+        // This exception is only valid if the argArrayName is not a namespace_name
+        if(const Node* n = getReferenceArgArrayName(arrayReferenceAST))
+        {
+            fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,n));
+        }
     }
+
+    if(namespaceName == "")
+    {
+        namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+    }
+
+    std::string qualifiedArrayName = ArrayDesc::makeQualifiedArrayName(namespaceName, arrayName);
 
     if (!inputSchema)
     {
         assert(!arrayReferenceAST->get(referenceArgVersion));
-        return make_shared<OperatorParamArrayReference>(newParsingContext(arrayReferenceAST),"",arrayName,inputSchema,0);
+        return make_shared<OperatorParamArrayReference>(
+            newParsingContext(arrayReferenceAST),"",qualifiedArrayName,inputSchema,0);
     }
 
     SystemCatalog *systemCatalog = SystemCatalog::getInstance();
     VersionID version = 0;
-    assert(_qry);
 
-
-
-    if (!getArrayDesc(  arrayName,
-                        _qry->getCatalogVersion(arrayName),
-                        schema, false))
+    ArrayID arrayId = _qry->getCatalogVersion(namespaceName, arrayName);
+    bool fArrayDesc = getArrayDesc(namespaceName, arrayName, arrayId, schema, false);
+    if (!fArrayDesc)
     {
         fail(QPROC(
             SCIDB_LE_ARRAY_DOESNT_EXIST,
             getReferenceArgName(arrayReferenceAST))
-                << arrayName);
+                << qualifiedArrayName);
     }
-
-
     version = LAST_VERSION;
 
     if (arrayReferenceAST->get(referenceArgVersion))
     {
         if (arrayReferenceAST->get(referenceArgVersion)->is(asterisk))
         {
-            return make_shared<OperatorParamArrayReference>(newParsingContext(arrayReferenceAST), "",arrayName, inputSchema, ALL_VERSIONS);
+            return make_shared<OperatorParamArrayReference>(
+                newParsingContext(arrayReferenceAST), "",
+                qualifiedArrayName, inputSchema, ALL_VERSIONS);
         }
         else
         {
@@ -900,18 +1028,24 @@ std::shared_ptr<OperatorParamArrayReference> Translator::createArrayReferencePar
             }
             else
             {
-                fail(SYNTAX(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,arrayReferenceAST->get(referenceArgVersion)) << arrayName);
+                fail(SYNTAX(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,arrayReferenceAST->get(referenceArgVersion))
+                    << qualifiedArrayName);
             }
         }
     }
-    if (version == 0 ||
-        (!getArrayDesc(arrayName, _qry->getCatalogVersion(arrayName), version, schema, false) &&
-         version != LAST_VERSION) ) {
-        fail(QPROC(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,arrayReferenceAST->get(referenceArgVersion)) << arrayName);
+
+    arrayId = _qry->getCatalogVersion(namespaceName, arrayName);
+    fArrayDesc = getArrayDesc(namespaceName, arrayName, arrayId, version, schema, false);
+    if (version == 0 || (!fArrayDesc && version != LAST_VERSION) )
+    {
+        fail(QPROC(SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST,arrayReferenceAST->get(referenceArgVersion))
+            <<  qualifiedArrayName);
     }
 
     assert(arrayName.find('@') == string::npos);
-    return make_shared<OperatorParamArrayReference>(newParsingContext(arrayReferenceAST), "",arrayName, inputSchema, version);
+
+    return  make_shared<OperatorParamArrayReference>(
+        newParsingContext(arrayReferenceAST), "",qualifiedArrayName, inputSchema, version);
 }
 
 bool Translator::matchOperatorParam(const Node* ast,
@@ -941,6 +1075,7 @@ bool Translator::matchOperatorParam(const Node* ast,
                         fail(SYNTAX(SCIDB_LE_SORTING_QUIRK_WRONG_USAGE,ast->get(referenceArgOrder)));
                     }
 
+                    // string arrayName = getStringReferenceArgName(ast);
                     input = passImplicitScan(ast, depthOperator+1);
                 }
                 //This input is result of other operator, so go deeper in tree and translate this operator.
@@ -1005,8 +1140,12 @@ bool Translator::matchOperatorParam(const Node* ast,
                     //Trying resolve attribute in input schema
                     if (placeholder->isInputSchema())
                     {
-                        if (!resolveParamAttributeReference(inputSchemas, (std::shared_ptr<OperatorParamReference>&)opParam, false))
+                        if (!resolveParamAttributeReference(
+                            inputSchemas,
+                            (std::shared_ptr<OperatorParamReference>&)opParam, false))
+                        {
                             break;
+                        }
                     }
 
                     //Check if something already matched in overloaded parameter
@@ -1201,19 +1340,46 @@ bool Translator::matchOperatorParam(const Node* ast,
                         fail(INTERNAL( SCIDB_LE_AMBIGUOUS_OPERATOR_PARAMETER,ast));
                     }
 
-                    if (getReferenceArgArrayName(ast) != 0)
+                    assert(_qry);
+                    std::string namespaceName;
+                    std::string arrayName = getStringReferenceArgName(ast);
+                    chars argArrayName = getStringReferenceArgArrayName(ast);
+                    if(argArrayName && (0 != std::string(argArrayName).compare("")))
                     {
-                        fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,ast));
+                        namespaceName = argArrayName;
+
+                        NamespaceDesc       namespaceDesc(namespaceName);
+                        NamespaceDesc::ID   namespaceID;
+                        if(false == scidb::namespaces::Communicator::findNamespace(
+                            namespaceDesc, namespaceID, false))
+                        {
+                            // This test is only valid if the arrayName is not in
+                            // the format namespace_name.array_name
+                            if (getReferenceArgArrayName(ast) != 0)
+                            {
+                                fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,ast));
+                            }
+                        }
+                    } else {
+                        if (getReferenceArgArrayName(ast) != 0)
+                        {
+                            fail(SYNTAX(SCIDB_LE_NESTED_ARRAYS_NOT_SUPPORTED,ast));
+                        }
                     }
 
-                    const chars arrayName = getStringReferenceArgName(ast);
-                    ArrayDesc schema;
-                    assert(_qry);
-                    if (!getArrayDesc(  arrayName,
-                                        _qry->getCatalogVersion(arrayName),
-                                        schema, false))
+                    if(namespaceName == "")
                     {
-                        fail(SYNTAX(SCIDB_LE_ARRAY_DOESNT_EXIST, ast) << arrayName);
+                        namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+                    }
+
+
+                    ArrayDesc schema;
+                    ArrayID arrayId = _qry->getCatalogVersion(namespaceName, arrayName);
+                    bool fArrayDesc = getArrayDesc(namespaceName, arrayName, arrayId, schema, false);
+                    if (!fArrayDesc)
+                    {
+                        fail(SYNTAX(SCIDB_LE_ARRAY_DOESNT_EXIST, ast)
+                            << ArrayDesc::makeQualifiedArrayName(namespaceName, arrayName));
                     }
 
                     param = make_shared<OperatorParamSchema>(newParsingContext(ast), schema);
@@ -1332,23 +1498,45 @@ bool Translator::resolveParamAttributeReference(const vector<ArrayDesc> &inputSc
     bool found = false;
 
     size_t inputNo = 0;
+    const std::string &arrayName = attRef->getArrayName();
     BOOST_FOREACH(const ArrayDesc &schema, inputSchemas)
     {
         size_t attributeNo = 0;
         BOOST_FOREACH(const AttributeDesc& attribute, schema.getAttributes())
         {
+            const std::string &namespaceName = schema.getNamespaceName();
+            std::string qualifiedArrayName =
+                ArrayDesc::makeQualifiedArrayName(
+                    namespaceName, arrayName);
+
             if (attribute.getName() == attRef->getObjectName()
-             && attribute.hasAlias(attRef->getArrayName()))
+             && (   attribute.hasAlias(qualifiedArrayName) ||   // NS1.A1 or A1.attribute format
+                    attribute.hasAlias(arrayName)))             // ALIAS1.attribute format
             {
                 if (found)
                 {
-                    const string fullName = str(boost::format("%s%s") % (attRef->getArrayName() != "" ? attRef->getArrayName() + "." : "") % attRef->getObjectName() );
+                    string fullName;
+                    if(attribute.hasAlias(arrayName)) {
+                        fullName = str(
+                            boost::format("%s%s")
+                                % (arrayName != ""
+                                    ? arrayName + "."
+                                    : "")
+                                % attRef->getObjectName() );
+                    } else {
+                        fullName = str(
+                            boost::format("%s%s")
+                                % (arrayName != ""
+                                    ? qualifiedArrayName + "."
+                                    : "")
+                                % attRef->getObjectName() );
+                    }
                     fail(SYNTAX(SCIDB_LE_AMBIGUOUS_ATTRIBUTE,attRef) << fullName);
                 }
                 found = true;
 
-                attRef->setInputNo(inputNo);
-                attRef->setObjectNo(attributeNo);
+                attRef->setInputNo(safe_static_cast<int32_t>(inputNo));
+                attRef->setObjectNo(safe_static_cast<int32_t>(attributeNo));
             }
             ++attributeNo;
         }
@@ -1357,7 +1545,11 @@ bool Translator::resolveParamAttributeReference(const vector<ArrayDesc> &inputSc
 
     if (!found && throwException)
     {
-        const string fullName = str(boost::format("%s%s") % (attRef->getArrayName() != "" ? attRef->getArrayName() + "." : "") % attRef->getObjectName() );
+        const string fullName = str(
+			boost::format("%s%s")
+				% (arrayName != ""
+					? arrayName + "." : "")
+				% attRef->getObjectName() );
         fail(SYNTAX(SCIDB_LE_ATTRIBUTE_NOT_EXIST, attRef) << fullName);
     }
 
@@ -1405,8 +1597,8 @@ bool Translator::resolveParamDimensionReference(const vector<ArrayDesc> &inputSc
 
     if (resolveDimension(inputSchemas, dimRef->getObjectName(), dimRef->getArrayName(), inputNo, dimensionNo, newParsingContext(dimRef), throwException))
     {
-        dimRef->setInputNo(inputNo);
-        dimRef->setObjectNo(dimensionNo);
+        dimRef->setInputNo(safe_static_cast<int32_t>(inputNo));
+        dimRef->setObjectNo(safe_static_cast<int32_t>(dimensionNo));
         return true;
     }
 
@@ -1948,11 +2140,14 @@ LQPNPtr Translator::passIntoClause(const Node* ast, LQPNPtr &input, size_t depth
     assert(ArrayDesc::isNameUnversioned(targetName));
 
     ArrayDesc destinationSchema;
-    if (!getArrayDesc(  targetName,
-                        _qry->getCatalogVersion(targetName),
-                        destinationSchema, false))
+
+    std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+    ArrayID arrayId = _qry->getCatalogVersion(namespaceName, targetName);
+    bool fArrayDesc = getArrayDesc(namespaceName, targetName, arrayId, destinationSchema, false);
+    if (!fArrayDesc)
     {
-        LOG4CXX_TRACE(logger, str(boost::format("Target array '%s' not existing so inserting STORE") % targetName));
+        LOG4CXX_TRACE(logger, str(boost::format("Target array '%s' not existing so inserting STORE") %
+            ArrayDesc::makeQualifiedArrayName(namespaceName, targetName)));
         storeOp = OperatorLibrary::getInstance()->createLogicalOperator("store");
         storeOp->setParameters(targetParams);
         result = make_shared<LogicalQueryPlanNode>(parsingContext, storeOp);
@@ -2046,9 +2241,11 @@ LQPNPtr Translator::passUpdateStatement(const Node *ast, size_t depthOperator)
 
     ArrayDesc arrayDesc;
     assert(_qry);
-    getArrayDesc(   arrayName,
-                    _qry->getCatalogVersion(arrayName),
-                    arrayDesc);
+
+    std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+    ArrayID arrayId = _qry->getCatalogVersion(namespaceName, arrayName);
+    getArrayDesc(namespaceName, arrayName, arrayId, arrayDesc);
+
     const Node *updateList = ast->get(updateArrayArgUpdateList);
 
     map<string,string> substMap;
@@ -2181,10 +2378,13 @@ LQPNPtr Translator::passInsertIntoStatement(const Node *ast, size_t depthOperato
 
     ArrayDesc dstSchema;
     assert(_qry);
-    if (!getArrayDesc(  dstName,
-                        _qry->getCatalogVersion(dstName),
-                        dstSchema, false)) {
-        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST, dstAst) << dstName);
+
+    std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(_qry);
+    ArrayID arrayId = _qry->getCatalogVersion(namespaceName, dstName);
+    bool fArrayDesc = getArrayDesc(namespaceName, dstName, arrayId, dstSchema, false);
+    if (!fArrayDesc) {
+        fail(QPROC(SCIDB_LE_ARRAY_DOESNT_EXIST, dstAst)
+            << ArrayDesc::makeQualifiedArrayName(namespaceName, dstName));
     }
 
     LQPNPtr srcNode;
@@ -2266,21 +2466,13 @@ void Translator::checkLogicalExpression(const vector<ArrayDesc> &inputSchemas, c
             // If we can't find reference even in output schema, finally throw error
             else if (!(foundAttrOut || foundDimOut))
             {
-                ArrayDesc schema;
-                assert(_qry);
-                if (ref->getArrayName() != "" ||
-                    !getArrayDesc(  ref->getAttributeName(),
-                                    _qry->getCatalogVersion(ref->getAttributeName()),
-                                    schema, false) ||
-                    schema.getAttributes(true).size() != 1 ||
-                    schema.getDimensions().size() != 1 ||
-                    schema.getDimensions()[0].getLength() != 1)
-                {
-                    const string fullName = str(boost::format("%s%s") % (ref->getArrayName() != "" ?
-                                                                  ref->getArrayName() + "." :
-                                                                  "") % ref->getAttributeName() );
-                    fail(SYNTAX(SCIDB_LE_UNKNOWN_ATTRIBUTE_OR_DIMENSION,ref) << fullName);
-                }
+                // we used to try to resolve the name as if it was a reference to a single cell array
+                // that does not work with our locking/transaction strategy and had been broken for some time
+                // so, we just throw
+                const string fullName = str(boost::format("%s%s") % (ref->getArrayName() != "" ?
+                                                                     ref->getArrayName() + "." :
+                                                                     "") % ref->getAttributeName() );
+                fail(SYNTAX(SCIDB_LE_UNKNOWN_ATTRIBUTE_OR_DIMENSION,ref) << fullName);
             }
         }
                 // If no ambiguity, and found some reference, we ignoring all from output schema.
@@ -2328,9 +2520,18 @@ bool Translator::checkDimension(const vector<ArrayDesc> &inputSchemas, const str
     bool found = false;
     BOOST_FOREACH(const ArrayDesc &schema, inputSchemas)
     {
+        LOG4CXX_TRACE(logger, "Translator::checkDimension("
+            << "namespaceName=" << schema.getNamespaceName()
+            << ", arrayName=" << schema.getName()
+            << ")");
+
         BOOST_FOREACH(const DimensionDesc& dim, schema.getDimensions())
         {
-            if (dim.hasNameAndAlias(dimensionName, aliasName))
+            std::string qualifiedAliasName = ArrayDesc::makeQualifiedArrayName(
+                schema.getNamespaceName(), aliasName);
+
+            if (dim.hasNameAndAlias(dimensionName, qualifiedAliasName) ||
+                dim.hasNameAndAlias(dimensionName, aliasName))
             {
                 if (found)
                 {
@@ -3136,23 +3337,29 @@ LQPNPtr Translator::passSelectList(
                             SCIDB_UNREACHABLE();
                         }
 
-                        redimensionAttrs.push_back(AttributeDesc(redimensionAttrs.size(),
-                                                                 aggAlias,
-                                                                 AggregateLibrary::getInstance()->createAggregate(aggName, aggParamType)->getResultType().typeId(),
-                                                                 AttributeDesc::IS_NULLABLE,
-                                                                 0));
+                        redimensionAttrs.push_back(
+                            AttributeDesc(safe_static_cast<AttributeID>(redimensionAttrs.size()),
+                                          aggAlias,
+                                          AggregateLibrary::getInstance()->createAggregate(
+                                              aggName, aggParamType)->getResultType().typeId(),
+                                          AttributeDesc::IS_NULLABLE,
+                                          0));
                         usedNames.insert(aggAlias);
                     }
-                    redimensionAttrs.push_back(AttributeDesc(
-                            redimensionAttrs.size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
-                            TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+                    redimensionAttrs.push_back(
+                        AttributeDesc(safe_static_cast<AttributeID>(redimensionAttrs.size()),
+                                      DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR,
+                                      AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
                     //Now prepare dimensions
                     Dimensions redimensionDims;
                     passDimensions(grwAsClause->get(listArg0), redimensionDims, "", usedNames);
 
                     //Ok. Adding schema parameter
-                    ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims, defaultPartitioning(), 0);
+                    ArrayDesc redimensionSchema = ArrayDesc("", redimensionAttrs, redimensionDims,
+                                                            defaultPartitioning(),
+                                                            _qry->getDefaultArrayResidency(),
+                                                            0);
                     LOG4CXX_TRACE(logger, "Schema for redimension " <<  redimensionSchema);
                     aggregateParams[""] = make_pair("redimension",
                         LogicalOperator::Parameters(1,
@@ -3650,7 +3857,8 @@ LQPNPtr Translator::canonicalizeTypes(const LQPNPtr &input)
             inputSchema.getName(),
             attrs,
             inputSchema.getDimensions(),
-            defaultPartitioning(),
+            inputSchema.getDistribution(),
+            inputSchema.getResidency(),
             inputSchema.getFlags());
 
     castParams[0] = make_shared<OperatorParamSchema>(pc, castSchema);
@@ -3674,6 +3882,7 @@ LEPtr Translator::AstToLogicalExpression(const Node* ast, size_t depthExpression
         case cinteger:          return onInteger(ast);
         case application:       return onScalarFunction(ast, depthExpression);
         case reference:         return onAttributeReference(ast);
+        case questionMark:      return onQuestionMark(ast);
         case olapAggregate:     fail(SYNTAX(SCIDB_LE_WRONG_OVER_USAGE,ast));
         case asterisk:          fail(SYNTAX(SCIDB_LE_WRONG_ASTERISK_USAGE,ast));
         case selectArray:       fail(SYNTAX(SCIDB_LE_SUBQUERIES_NOT_SUPPORTED,ast));
@@ -3775,17 +3984,34 @@ LEPtr Translator::onAttributeReference(const Node* ast)
             getStringReferenceArgName(ast));
 }
 
+LEPtr Translator::onQuestionMark(const Node* ast)
+{
+    assert(ast->is(questionMark));
+
+    Value c; c.setNull();
+
+    return make_shared<Constant>(newParsingContext(ast),c,TID_VOID);
+}
+
 void Translator::checkDepthExpression(size_t depthExpression)
 {
+    static const size_t MAX_DEPTH_EXPRESSION = 400; // ~444 - margin
+
     if (depthExpression >= MAX_DEPTH_EXPRESSION) {
-        throw USER_EXCEPTION(SCIDB_SE_PARSER, SCIDB_LE_EXPRESSION_HAS_TOO_MANY_OPERANDS);
+        throw USER_EXCEPTION(SCIDB_SE_PARSER,
+                             SCIDB_LE_EXPRESSION_HAS_TOO_MANY_OPERANDS)
+        << MAX_DEPTH_EXPRESSION;
     }
 }
 
 void Translator::checkDepthOperator(size_t depthOperator)
 {
+    static const size_t MAX_DEPTH_OPERATOR = 90; // ~95 - margin
+
     if (depthOperator >= MAX_DEPTH_OPERATOR) {
-        throw USER_EXCEPTION(SCIDB_SE_PARSER, SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS);
+        throw USER_EXCEPTION(SCIDB_SE_PARSER,
+                             SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS)
+        << MAX_DEPTH_OPERATOR;
     }
 }
 
@@ -3798,7 +4024,8 @@ LEPtr translateExp(Factory& f,Log& l,const StringPtr& s,Node* n,const QueryPtr& 
 LQPNPtr translatePlan(Factory& f,Log& l,const StringPtr& s,Node* n,const QueryPtr& q)
 {
     const size_t depthOperator = 0;
-    return Translator(f,l,s,q).AstToLogicalPlan(n, depthOperator, true);
+    LQPNPtr p = Translator(f,l,s,q).AstToLogicalPlan(n, depthOperator, true);
+    return p;
 }
 
 /****************************************************************************/

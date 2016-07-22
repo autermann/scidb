@@ -62,7 +62,7 @@ namespace scidb {
         _step(step)
     {
         // Create the iterators
-        for (size_t i = 0; i < _arrayIters.size(); i++)
+        for (AttributeID i = 0; i < _arrayIters.size(); i++)
         {
             _arrayIters[i] = input->getConstIterator(i);
         }
@@ -138,20 +138,21 @@ namespace scidb {
         //
         size_t tupleArraySizeHint = _sorter._memLimit / _sorter._tupleSize;
         std::shared_ptr<TupleArray> buffer =
-            make_shared<TupleArray>(*(_sorter._outputSchema),
+            make_shared<TupleArray>(_sorter._outputSchemaExpanded,
                                     _sortIters.getIterators(),
                                     _sorter.getInputArrayDesc(),
                                     0,
                                     tupleArraySizeHint,
                                     16*MiB,
                                     _sorter._arena,
-                                    _sorter.preservePositions());
+                                    _sorter.preservePositions(),
+                                    _sorter._skipper);
 
         // Append chunks to buffer until we run out of input or reach limit
         bool limitReached = false;
         while (!_sortIters.end() && !limitReached)
         {
-            buffer->append(_sorter.getInputArrayDesc(), _sortIters.getIterators(), 1);
+            buffer->append(_sorter.getInputArrayDesc(), _sortIters.getIterators(), 1, _sorter._skipper);
             size_t currentSize = buffer->getNumberOfTuples() * _sorter._tupleSize;
             if (currentSize > _sorter._memLimit)
             {
@@ -173,14 +174,15 @@ namespace scidb {
                 if (limitReached) {
                     buffer.reset();
                 } else {
-                    buffer = std::make_shared<TupleArray>(*(_sorter._outputSchema),
+                    buffer = std::make_shared<TupleArray>(_sorter._outputSchemaExpanded,
                                                 _sortIters.getIterators(),
                                                 _sorter._inputSchema,
                                                 0,
                                                 tupleArraySizeHint,
                                                 16*MiB,
                                                 _sorter._arena,
-                                                _sorter.preservePositions());
+                                                _sorter.preservePositions(),
+                                                _sorter._skipper);
                 }
             }
             _sortIters.advanceIterators();
@@ -275,7 +277,7 @@ namespace scidb {
             (*streamSizes)[i] = -1;
         }
         merged = make_shared<MergeSortArray>(getQuery(),
-                                        *(_sorter._outputSchema),
+                                        _sorter._outputSchemaExpanded,
                                         mergeStreams,
                                         _sorter._tupleComp,
                                         0,  // Do not add an offset to the cell's coordinates.
@@ -298,7 +300,8 @@ namespace scidb {
            _runningJobs(arena),
            _waitingJobs(arena),
            _stoppedJobs(arena),
-           _preservePositions(preservePositions)
+           _preservePositions(preservePositions),
+           _skipper(NULL)
      {
          calcOutputSchema(inputSchema, chunkSize);
      }
@@ -337,11 +340,21 @@ namespace scidb {
             }
         }
 
-        Dimensions newDims(1,DimensionDesc("n", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), chunkSize, 0));
+        Dimensions newDims(1,DimensionDesc("n", 0, 0,
+                                           CoordinateBounds::getMax(),
+                                           CoordinateBounds::getMax(),
+                                           chunkSize, 0));
 
         const bool excludeEmptyBitmap = true;
         Attributes attributes = inputSchema.getAttributes(excludeEmptyBitmap);
-        size_t nAttrsIn = attributes.size();
+        AttributeID nAttrsIn = safe_static_cast<AttributeID>(attributes.size());
+        _outputSchemaNonExpanded = ArrayDesc(inputSchema.getName(),
+                                          addEmptyTagAttribute(attributes),
+                                          newDims,
+                                          createDistribution(psUndefined),
+                                          inputSchema.getResidency());
+
+        // the expanded version.
         if (_preservePositions) {
             attributes.push_back(AttributeDesc(
                             nAttrsIn,
@@ -358,10 +371,11 @@ namespace scidb {
                             0  // defaultCompressionMethod
                             ));
         }
-        _outputSchema = make_shared<ArrayDesc>(inputSchema.getName(),
-                                          addEmptyTagAttribute(attributes),
-                                          newDims,
-                                          defaultPartitioning());
+        _outputSchemaExpanded = ArrayDesc(inputSchema.getName(),
+                                               addEmptyTagAttribute(attributes),
+                                               newDims,
+                                               createDistribution(psUndefined),
+                                               inputSchema.getResidency());
     }
 
 
@@ -373,10 +387,12 @@ namespace scidb {
      */
     std::shared_ptr<MemArray> SortArray::getSortedArray(std::shared_ptr<Array> inputArray,
                                                    std::shared_ptr<Query> query,
-                                                   std::shared_ptr<TupleComparator> tcomp)
+                                                   std::shared_ptr<TupleComparator> tcomp,
+                                                   TupleSkipper* skipper
+                                                   )
     {
         // Timing for Sort
-        LOG4CXX_DEBUG(logger, "[SortArray] Sort for array " << _outputSchema->getName() << " begins");
+        LOG4CXX_DEBUG(logger, "[SortArray] Sort for array " << _outputSchemaExpanded.getName() << " begins");
         ElapsedMilliSeconds timing;
 
         // Init config parameters
@@ -404,7 +420,7 @@ namespace scidb {
         std::shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
         _input = inputArray;
         _tupleComp = tcomp;
-        _tupleSize = TupleArray::getTupleFootprint(_outputSchema->getAttributes());
+        _tupleSize = TupleArray::getTupleFootprint(_outputSchemaExpanded.getAttributes());
         _nRunningJobs = 0;
 	    _runsProduced = 0;
         _partitionComplete.resize(numJobs);
@@ -412,6 +428,7 @@ namespace scidb {
         _runningJobs.resize(numJobs);
         _stoppedJobs.resize(numJobs);
         _sortIterators.resize(numJobs);
+        _skipper = skipper;
 
         // Create the iterator groups and sort jobs
         for (size_t i = 0; i < numJobs; i++)
@@ -541,7 +558,7 @@ namespace scidb {
         // Return the result
         if (_results.empty())
         {
-            _results.push_back(make_shared<MemArray>(*_outputSchema, query));
+            _results.push_back(make_shared<MemArray>(_outputSchemaExpanded, query));
         }
 
         std::shared_ptr<MemArray> ret = dynamic_pointer_cast<MemArray, Array> (_results.front());

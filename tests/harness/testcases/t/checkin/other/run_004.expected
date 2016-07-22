@@ -19,8 +19,8 @@ Query was executed successfully
 {3,3} 4,4
 
 {No} name,type_id,nullable
-{0} 'a','int32',false
-{1} 'b','int32',false
+{0} 'a','int32',true
+{1} 'b','int32',true
 
 Query was executed successfully
 

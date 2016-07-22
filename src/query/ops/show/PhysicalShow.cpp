@@ -28,11 +28,12 @@
  * @brief Shows object. E.g. schema of array.
  */
 
-#include "query/Operator.h"
-#include "query/OperatorLibrary.h"
-#include "array/MemArray.h"
-#include "system/SystemCatalog.h"
-#include "query/QueryProcessor.h"
+#include <array/MemArray.h>
+#include <query/Operator.h>
+#include <query/OperatorLibrary.h>
+#include <query/QueryProcessor.h>
+#include <log4cxx/logger.h>
+#include <system/SystemCatalog.h>
 #include <util/Thread.h>
 
 using namespace std;
@@ -40,6 +41,7 @@ using namespace boost;
 
 namespace scidb
 {
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.physical_show"));
 
 class PhysicalShow: public PhysicalOperator
 {
@@ -50,9 +52,10 @@ public:
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext>& inputDistributions,
-                                                 const std::vector< ArrayDesc>& inputSchemas) const
+                                                      const std::vector< ArrayDesc>& inputSchemas) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)
@@ -84,6 +87,8 @@ public:
                              query->getPhysicalCoordinatorID(),
                              query->mapLogicalToPhysical(query->getInstanceID()),
                              query->getCoordinatorLiveness());
+            innerQuery->attachSession(query->getSession());
+
             boost::function<void()> func = boost::bind(&Query::destroyFakeQuery, innerQuery.get());
             Destructor<boost::function<void()> > fqd(func);
 

@@ -27,6 +27,7 @@
  *              Donghui Zhang
  */
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <memory>
 #include <boost/foreach.hpp>
 
@@ -88,6 +89,8 @@ namespace scidb
  */
 class LogicalCumulate: public LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
 
     LogicalCumulate(const std::string& logicalName, const std::string& alias):
@@ -103,6 +106,11 @@ public:
         ADD_PARAM_INPUT()
         ADD_PARAM_AGGREGATE_CALL()
         ADD_PARAM_VARIES()
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     /**
@@ -151,7 +159,14 @@ public:
         ArrayDesc const& inputSchema = inputArraySchemas[0];
         Dimensions const& inputDims  = inputSchema.getDimensions();
 
-        ArrayDesc outputSchema( inputSchema.getName(), Attributes(), inputDims, defaultPartitioning());
+        // Because physical execute() is shared among many ops in this
+        // directory, we have to use an AutochunkFixer even though,
+        // for cumulate(), checkOrUpdateIntervals() would do the job.
+        _fixer.takeAllDimensions(inputSchema);
+
+        ArrayDesc outputSchema( inputSchema.getName(), Attributes(), inputDims,
+                                inputSchema.getDistribution(),
+                                inputSchema.getResidency());
 
         // TO-DO: deal with dimensions with overlaps later
         //

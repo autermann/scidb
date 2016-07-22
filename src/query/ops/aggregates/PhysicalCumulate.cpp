@@ -243,7 +243,8 @@ public:
         // Create an array.
         //
         Attributes attrsEdge(myVars._numAggrs);
-        for (size_t i=0; i<myVars._numAggrs; ++i) {
+        AttributeID aggrsCount = safe_static_cast<AttributeID>(myVars._numAggrs);
+        for (AttributeID i=0; i < aggrsCount; ++i) {
             attrsEdge[i] = AttributeDesc(
                     i,
                     commonVars._output._attrsWithoutET[i].getName(),
@@ -254,7 +255,11 @@ public:
         }
 
         std::shared_ptr<MemArray> localEdges = make_shared<MemArray>(
-            ArrayDesc(commonVars._output._schema.getName(),addEmptyTagAttribute(attrsEdge),commonVars._output._dims, defaultPartitioning()),
+            ArrayDesc(commonVars._output._schema.getName(),
+                      addEmptyTagAttribute(attrsEdge),
+                      commonVars._output._dims,
+                      commonVars._output._schema.getDistribution(),
+                      commonVars._output._schema.getResidency() ),
             commonVars._query
             );
 
@@ -498,6 +503,8 @@ public:
         SCIDB_ASSERT( _parameters.size() > 0 ); // at least one aggregate call
         SCIDB_ASSERT(inputArrays.size() == 1);
 
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
         // CommonVariablesInExecute
         // TO-DO: for now, we make sure the input array is materialized
         //
@@ -549,7 +556,7 @@ public:
             // If an aggregate has a star, such as count(*), inputAttrIDs[i] will be -1.
             // We should replace with 0, so that we know which attribute in the input array to scan.
             //
-            if (myVars._inputAttrIDs[i] == (AttributeID)-1) {
+            if (myVars._inputAttrIDs[i] == INVALID_ATTRIBUTE_ID) {
                 myVars._inputAttrIDs[i] = 0;
             }
         }
@@ -560,11 +567,11 @@ public:
 
         // Generate allEdges, by putting together every instance's localEdges.
         //
-        myVars._allEdges = redistributeToRandomAccess(myVars._localEdges, query, psReplication,
-                                                      ALL_INSTANCE_MASK,
-                                                      std::shared_ptr<CoordinateTranslator>(),
-                                                      0,
-                                                      std::shared_ptr<PartitioningSchemaData>());
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(inputArray->getArrayDesc().getResidency()));
+        myVars._allEdges = redistributeToRandomAccess(myVars._localEdges,
+                                                      createDistribution(psReplication),
+                                                      _schema.getResidency(),
+                                                      query);
 
         // Generate a map of vector<chunkPos> for chunks in _allEdges, but not in _localEdges.
         // The key of the map is chunkPos, with the coordinate in aggrDim replaced with 0.

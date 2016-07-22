@@ -17,8 +17,8 @@ scan(Q_F)
 --set-format invalid1
 scan(Q_F)
 
---echo "output format lcsv+"
---set-format lcsv+
+--echo "output format csv+:l"
+--set-format csv+:l
 scan(Q_F)
 
 --echo "reset to default format: auto"

@@ -31,11 +31,18 @@
 #ifndef MUTEX_H_
 #define MUTEX_H_
 
-#include "assert.h"
+#include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
 
-#include "system/Exceptions.h"
+#include <sys/time.h>             // linux specific
+#include <sys/resource.h>         // linux specific
+
+#include <util/Platform.h>
+#include <util/PerfTime.h>
+
+#include <system/Exceptions.h>
 
 
 namespace scidb
@@ -64,6 +71,7 @@ private:
  };
 
     pthread_mutex_t _mutex;
+    static const int _mutexType = PTHREAD_MUTEX_RECURSIVE;
 
   public:
     void checkForDeadlock() {
@@ -72,16 +80,16 @@ private:
 
     Mutex()
     {
-        pthread_mutexattr_t __attr;
-        if (pthread_mutexattr_init(&__attr)) {
+        pthread_mutexattr_t mutexAttr;
+        if (pthread_mutexattr_init(&mutexAttr)) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_mutexattr_init";
         }
-        PAttrEraser onStack(&__attr);
+        PAttrEraser onStack(&mutexAttr);
 
-        if (pthread_mutexattr_settype(&__attr, PTHREAD_MUTEX_RECURSIVE)) {
+        if (pthread_mutexattr_settype(&mutexAttr, _mutexType)) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_mutexattr_settype";
         }
-        if (pthread_mutex_init(&_mutex, &__attr)) {
+        if (pthread_mutex_init(&_mutex, &mutexAttr)) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_mutex_init";
         }
     }
@@ -93,10 +101,13 @@ private:
         }
     }
 
-    void lock()
+    void lock(scidb::perfTimeCategory_t tc = PTCW_MUT_OTHER)
     {
-        if (pthread_mutex_lock(&_mutex)) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_mutex_lock";
+        {
+            ScopedWaitTimer timer(tc);     // destruction updates the timing of tc
+            if (pthread_mutex_lock(&_mutex)) {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_mutex_lock";
+            }
         }
     }
 
@@ -105,6 +116,25 @@ private:
         if (pthread_mutex_unlock(&_mutex)) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_mutex_unlock";
         }
+    }
+
+    /// @return true if the mutex is locked by this thread; otherwise, false
+    /// @note Works only in DEBUG mode
+    /// @note Specific to Linux implementation of pthreads
+    bool isLockedByThisThread()
+    {
+        bool result = false;
+        if (isDebug())  {
+            assert(_mutexType == PTHREAD_MUTEX_RECURSIVE);
+
+            int locked = pthread_mutex_trylock(&_mutex);
+            if (locked == 0) {
+                result = (_mutex.__data.__count > 1);
+                unlock();
+            }
+            result = result || (locked == EAGAIN) || (locked == EDEADLK);
+        }
+        return result;
     }
 };
 
@@ -118,9 +148,9 @@ private:
 	Mutex& _mutex;
 
 public:
-	ScopedMutexLock(Mutex& mutex): _mutex(mutex)
+	ScopedMutexLock(Mutex& mutex, perfTimeCategory_t tc = PTCW_SEM_OTHER): _mutex(mutex)
 	{
-		_mutex.lock();
+		_mutex.lock(tc);
 	}
 
 	~ScopedMutexLock()

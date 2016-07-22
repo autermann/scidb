@@ -28,8 +28,10 @@
  * @author roman.simakov@gmail.com
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 
 namespace scidb
@@ -43,6 +45,9 @@ namespace scidb
  *
  * @par Summary:
  *   Loads a SciDB plugin.
+ *   WARNING: this operation is best effort (i.e. NOT transactional).
+ *            The state of the system is known only after a successful execution.
+ *            In case of a failure unload_library() should be used, before re-trying.
  *
  * @par Input:
  *   - library: the name of the library to load.
@@ -69,6 +74,14 @@ public:
         ADD_PARAM_CONSTANT("string")
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have proper permissions
+        std::string permissions;
+        permissions.push_back(scidb::permissions::Root);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
@@ -77,7 +90,9 @@ public:
         attrs[0] = AttributeDesc((AttributeID)0, "library",  TID_STRING, 0, 0 );
         Dimensions dims(1);
         dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
-        return ArrayDesc("load_library", attrs, dims, defaultPartitioning());
+        return ArrayDesc("load_library", attrs, dims,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

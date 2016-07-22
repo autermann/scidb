@@ -39,6 +39,7 @@
 #include <system/Sysinfo.h>
 #include <system/Config.h>
 #include <util/Platform.h>
+#include <system/Warnings.h>
 
 // scidb or p4
 #include "../LAErrors.h"
@@ -53,12 +54,13 @@
 #include "spgemmSemiringTraits.h"
 #include "SpgemmTimes.h"
 
-using namespace boost;
-using namespace scidb;
 using namespace std;
 
 namespace scidb
 {
+
+// XXX AUTOCHUNK: Remove logging before release.
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.linear_algebra.ops.spgemm"));
 
 class PhysicalSpgemm : public  PhysicalOperator
 {
@@ -85,8 +87,15 @@ public:
             std::vector<RedistributeContext> const& inputDistributions,
             std::vector<ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psByRow);
+        assert(_schema.getDistribution()->getPartitioningSchema() == psByRow);
+        assert(_schema.getResidency()->isEqual(Query::getValidQueryPtr(_query)->getDefaultArrayResidency()));
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
+
     }
+
+    virtual void  requiresRedimensionOrRepartition(std::vector<ArrayDesc> const &  inputSchemas,
+                                                   std::vector<ArrayDesc const*> & modifiedPtrs) const;
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query);
 
@@ -155,6 +164,58 @@ private:
      */
     size_t  getArrayCellCountTotal(std::shared_ptr<Array> array, std::shared_ptr<Query>& query) const;
 };
+
+
+void PhysicalSpgemm::requiresRedimensionOrRepartition(vector<ArrayDesc> const &  inputSchemas,
+                                                      vector<ArrayDesc const*> & modifiedPtrs) const
+{
+    assert(inputSchemas.size() == 2);
+    assert(modifiedPtrs.size() == 2);
+
+    int64_t leftSize  = inputSchemas[0].getDimensions()[1].getRawChunkInterval();
+    int64_t rightSize = inputSchemas[1].getDimensions()[0].getRawChunkInterval();
+
+    if (leftSize == DimensionDesc::AUTOCHUNKED && rightSize == DimensionDesc::AUTOCHUNKED) {
+        throw USER_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_ALL_INPUTS_AUTOCHUNKED) << "spgemm()";
+    }
+
+    // Joint dimension sizes match?  All good!
+    if (leftSize == rightSize) {
+        modifiedPtrs.clear();
+        return;
+    }
+
+    // Requirement: schema[0].dim[1] interval must match schema[1].dim[0] interval.
+
+    // Request repartitioning based on smallest specified chunk size
+    // (hoping that there'll be less data movement).
+    size_t src, dst;
+    int64_t sz;
+    if (rightSize == DimensionDesc::AUTOCHUNKED || rightSize > leftSize) {
+        // Change schema[1] to use leftSize.
+        src = 0;
+        dst = 1;
+        sz = leftSize;
+    }
+    else {
+        // Change schema[0] to use rightSize.
+        src = 1;
+        dst = 0;
+        sz = rightSize;
+    }
+
+    // Request new schema for dst input.
+    modifiedPtrs[src] = nullptr;
+    _redimRepartSchemas.clear(); // paranoid
+    _redimRepartSchemas.push_back(make_shared<ArrayDesc>(ArrayDesc(inputSchemas[dst])));
+    size_t jointDim = 1 - dst;
+    _redimRepartSchemas.back()->getDimensions()[jointDim].setChunkInterval(sz);
+    modifiedPtrs[dst] = _redimRepartSchemas.back().get();
+
+    LOG4CXX_DEBUG(logger, "PhysicalSpgemm: Alter " << (dst ? "right" : "left")
+                  << " schema from " << inputSchemas[dst]
+                  << " to " << *modifiedPtrs[dst]);
+}
 
 
 std::shared_ptr< Array> PhysicalSpgemm::execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
@@ -254,6 +315,10 @@ std::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< std::shared_p
     std::shared_ptr<MemArray> resultArray = make_shared<MemArray>(_schema, query);
     std::shared_ptr<ArrayIterator> resultArrayIter = resultArray->getIterator(0);
 
+    assert(_schema.getDistribution()->getPartitioningSchema() == psByRow);
+    assert(_schema.getDistribution()->getRedundancy() == DEFAULT_REDUNDANCY);
+    assert(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+
     // We need to duplicate the right array to all instances, and multiply with the local chunks.
     // One option is to duplicate.
     // Another option is to rotate, which is what is used. In more detail:
@@ -264,14 +329,11 @@ std::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< std::shared_p
     // redistribute the left array, so that chunks in the same row are distributed to the same instance.
     times.totalSecsStart();
     times.redistLeftStart();
-    std::shared_ptr<Array> leftArray = redistributeToRandomAccess(inputArrays[0], query, psByRow,
-                                                             ALL_INSTANCE_MASK,
-                                                             std::shared_ptr<CoordinateTranslator>(),
-                                                             0,
-                                                             std::shared_ptr<PartitioningSchemaData>());
 
-
-
+    std::shared_ptr<Array> leftArray = redistributeToRandomAccess(inputArrays[0],
+                                                                  _schema.getDistribution(),
+                                                                  ArrayResPtr(), //default query residency
+                                                                  query);
     times.redistLeftStop();
 
     std::shared_ptr<Array> rightArray = inputArrays[1];
@@ -304,12 +366,9 @@ std::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< std::shared_p
         times.nextRound(); // call it a single "round"
         times.roundSubtotalStart();
         times.redistRightStart();
-        rightArray = redistributeToRandomAccess(rightArray, query, psReplication,
-                                                ALL_INSTANCE_MASK,
-                                                std::shared_ptr<CoordinateTranslator>(),
-                                                0,
-                                                std::shared_ptr<PartitioningSchemaData>());
-
+        rightArray = redistributeToRandomAccess(rightArray, createDistribution(psReplication),
+                                                ArrayResPtr(), //default query residency
+                                                query);
         times.redistRightStop();
 
         // do the calculation on all columns
@@ -331,11 +390,16 @@ std::shared_ptr<Array> PhysicalSpgemm::executeTraited(std::vector< std::shared_p
             times.nextRound();
             times.roundSubtotalStart();
             times.redistRightStart();
-            rightArray = redistributeToRandomAccess(rightArray, query, psByCol,
-                                                    ALL_INSTANCE_MASK,
-                                                    std::shared_ptr<CoordinateTranslator>(),
-                                                    i,
-                                                    std::shared_ptr<PartitioningSchemaData>());
+            ArrayDistPtr psByColShiftedDist =
+               ArrayDistributionFactory::getInstance()->construct(psByCol,
+                                                                  DEFAULT_REDUNDANCY,
+                                                                  std::string(),
+                                                                  std::shared_ptr<CoordinateTranslator>(),
+                                                                  i);
+            rightArray = redistributeToRandomAccess(rightArray,
+                                                    psByColShiftedDist,
+                                                    ArrayResPtr(),//default query residency
+                                                    query);
 
             times.redistRightStop();
 

@@ -104,89 +104,34 @@ public:
     {
         assert(schemas.size() >= 2);
         assert(_parameters.size() == 0);
+        // NOTE: Merge allows > 2 input schemas.
 
-        Attributes const&  leftAttributes   = schemas[0].getAttributes();
-        Dimensions const&  leftDimensions   = schemas[0].getDimensions();
-        Attributes const*  mergedAttributes = &leftAttributes;
-        Dimensions         mergedDimensions = leftDimensions;
-        size_t             nDimensions      = mergedDimensions.size();
-
-        for (size_t nSchema = 1; nSchema < schemas.size(); nSchema++)
-        {
+        // Check that the attributes in the right schema(s) match the left:
+        //   The number of attributes must be the same, and the attribute type
+        //   needs to be the same at each position in all schemas.
+        Attributes const& leftAttributes = schemas[0].getAttributes();
+        Attributes const* mergedAttributes = &leftAttributes;
+        for (size_t nSchema = 1; nSchema < schemas.size(); ++nSchema) {
             Attributes const& rightAttributes = schemas[nSchema].getAttributes();
-            Dimensions const& rightDimensions = schemas[nSchema].getDimensions();
-
-            if (nDimensions != rightDimensions.size())
-            {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_COUNT_MISMATCH)
-                    << "merge" << schemas[0] << schemas[nSchema];
-            }
-
-            // Report all startIndex problems at once.
-            ostringstream ss;
-            int mismatches = 0;
-            for (size_t i = 0; i < nDimensions; i++)
-            {
-                DimensionDesc const& leftDimension   = leftDimensions[i];
-                DimensionDesc const& rightDimension  = rightDimensions[i];
-
-                if(leftDimension.getStartMin() != rightDimension.getStartMin())
-                {
-                    if (mismatches++) {
-                        ss << ", ";
-                    }
-
-                    ss  << '[' << leftDimension << "] != ["  << rightDimension << ']';
-                }
-            }
-
-            if (mismatches)
-            {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_START_INDEX_MISMATCH) << ss.str();
-            }
-
-
-            for (size_t i = 0; i < nDimensions; i++)
-            {
-                DimensionDesc const& leftDimension   = leftDimensions[i];
-                DimensionDesc const& rightDimension  = rightDimensions[i];
-                DimensionDesc&       mergedDimension = mergedDimensions[i];
-
-                assert(leftDimension.getStartMin() == rightDimension.getStartMin());
-
-                mergedDimension = DimensionDesc(
-                    mergedDimension.getBaseName(),
-                    mergedDimension.getNamesAndAliases(),
-                    min(mergedDimension.getStartMin(),  rightDimension.getStartMin()),
-                    min(mergedDimension.getCurrStart(), rightDimension.getCurrStart()),
-                    max(mergedDimension.getCurrEnd(),   rightDimension.getCurrEnd()),
-                    max(mergedDimension.getEndMax(),    rightDimension.getEndMax()),
-                    mergedDimension.getChunkInterval(),
-                    mergedDimension.getChunkOverlap());
-            }
-
+            // Check attribute count.
             if (leftAttributes.size() != rightAttributes.size()
-                    && (leftAttributes.size() != rightAttributes.size()+1
-                        || !leftAttributes[leftAttributes.size()-1].isEmptyIndicator())
-
-                    && (leftAttributes.size()+1 != rightAttributes.size()
-                        || !rightAttributes[rightAttributes.size()-1].isEmptyIndicator()))
+                && (leftAttributes.size() != rightAttributes.size()+1
+                    || !leftAttributes[leftAttributes.size()-1].isEmptyIndicator())
+                && (leftAttributes.size()+1 != rightAttributes.size()
+                    || !rightAttributes[rightAttributes.size()-1].isEmptyIndicator()))
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ATTR_COUNT_MISMATCH)
                     << schemas[0] << schemas[nSchema];
             }
-
+            // Add empty bitmap attribute, if necessary, to mergedAttributes.
             size_t nAttributes = min(leftAttributes.size(), rightAttributes.size());
-            if (rightAttributes.size() > mergedAttributes->size())
-            {
+            if (rightAttributes.size() > mergedAttributes->size()) {
                 mergedAttributes = &rightAttributes;
             }
-
-            for (size_t nAttribute = 0; nAttribute < nAttributes; nAttribute++)
-            {
-                AttributeDesc const& leftAttribute   = leftAttributes[nAttribute];
-                AttributeDesc const& rightAttribute  = rightAttributes[nAttribute];
-
+            // Check the types of the Attributes.
+            for (size_t nAttribute = 0; nAttribute < nAttributes; nAttribute++) {
+                AttributeDesc const& leftAttribute = leftAttributes[nAttribute];
+                AttributeDesc const& rightAttribute = rightAttributes[nAttribute];
                 if (leftAttribute.getType() != rightAttribute.getType()
                     || leftAttribute.getFlags() != rightAttribute.getFlags())
                 {
@@ -195,13 +140,82 @@ public:
                         << schemas[0] << schemas[nSchema];
                 }
             }
+        }
+
+        // Find the left most non-autochunked schema as the exemplar for the
+        // chunkInterval and chunkOverlap of the dimensions.
+        size_t exemplarIndex = 0;
+        for (auto const &input : schemas) {
+            if (! input.isAutochunked()) {
+                break;
+            }
+            ++exemplarIndex;
+        }
+        if (exemplarIndex == schemas.size()) {
+            // All the schemas are autochunked. There is no way to determine the
+            // exemplar schema.
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ALL_INPUTS_AUTOCHUNKED)
+                << getLogicalName();
+        }
+
+        // Set the required chunkOverlap/chunkInterval based upon the exemplar schema.
+        // Set dimension names based upon the left dimension.
+        Dimensions const& exemplarDimensions = schemas[exemplarIndex].getDimensions();
+        Dimensions const& leftDimensions = schemas[0].getDimensions();
+        size_t nDimensions = exemplarDimensions.size();
+        Dimensions mergedDimensions(nDimensions);
+        for (size_t nSchema = 0; nSchema < schemas.size(); nSchema++) {
+            if (nSchema == exemplarIndex) {
+                // This schema is the exemplar, so the dimensions already match.
+                continue;
+            }
+           Dimensions const& targetDimensions = schemas[nSchema].getDimensions();
+
+            if (nDimensions != targetDimensions.size()) {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_COUNT_MISMATCH)
+                    << getLogicalName() << schemas[exemplarIndex] << schemas[nSchema];
+            }
+
+            // Report all startIndex problems at once.
+            ostringstream ss;
+            int mismatches = 0;
+            for (size_t i = 0; i < nDimensions; i++) {
+                DimensionDesc const& exemplarDim = exemplarDimensions[i];
+                DimensionDesc const& targetDim = targetDimensions[i];
+                if(exemplarDim.getStartMin() != targetDim.getStartMin()) {
+                    if (mismatches++) {
+                        ss << ", ";
+                    }
+                    ss << '[' << exemplarDim << "] != [" << targetDim << ']';
+                }
+            }
+            if (mismatches) {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_START_INDEX_MISMATCH) << ss.str();
+            }
+
+            for (size_t i = 0; i < nDimensions; i++) {
+                DimensionDesc const& exemplarDim = exemplarDimensions[i];
+                DimensionDesc const& leftDim     = leftDimensions[i];
+                DimensionDesc const& targetDim   = targetDimensions[i];
+
+                mergedDimensions[i] = DimensionDesc(
+                    leftDim.getBaseName(),
+                    leftDim.getNamesAndAliases(),
+                    exemplarDim.getStartMin(),
+                    min(exemplarDim.getCurrStart(), targetDim.getCurrStart()),
+                    max(exemplarDim.getCurrEnd(),   targetDim.getCurrEnd()),
+                    max(exemplarDim.getEndMax(),    targetDim.getEndMax()),
+                    exemplarDim.getChunkInterval(),
+                    exemplarDim.getChunkOverlap());
+            }
         }  // for (size_t nSchema = 1;  ... ) { ... }
 
         return ArrayDesc(
             schemas[0].getName(),
             *mergedAttributes,
             mergedDimensions,
-            defaultPartitioning());
+            createDistribution(psUndefined), // unknown until the physical stage
+            query->getDefaultArrayResidency() );
     }
 };
 

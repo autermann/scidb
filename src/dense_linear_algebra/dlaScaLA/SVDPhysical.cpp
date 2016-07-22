@@ -37,6 +37,7 @@
 #include <array/MemArray.h>
 #include <util/Network.h>
 #include <query/Query.h>
+#include <query/AutochunkFixer.h>
 #include <system/BlockCyclic.h>
 #include <system/Cluster.h>
 #include <system/Exceptions.h>
@@ -47,6 +48,7 @@
 #include <array/OpArray.h>
 #include <array/StreamArray.h>
 #include <scalapackUtil/reformat.hpp>
+#include <scalapackUtil/ScaLAPACKLogical.hpp> // for checkScaLAPACKPhysicalInputs()
 #include <scalapackUtil/ScaLAPACKPhysical.hpp>
 #include <scalapackUtil/scalapackFromCpp.hpp>
 #include <dlaScaLA/scalapackEmulation/scalapackEmulation.hpp>
@@ -110,6 +112,13 @@ public:
                                 std::shared_ptr<Query>& query,
                                 std::string& whichMatrix,
                                 ArrayDesc& outSchema);
+
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see SVDLogical::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
+    }
 
     virtual std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query);
 
@@ -191,11 +200,9 @@ std::shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     } else {
         LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI(): not participating in MPI");
 
-        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-           make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "SVDPhysical"), firstChunkSize);
-
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "SVDPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0],
+                                                                         outSchema.getDistribution(),
+                                                                         query, "SVDPhysical");
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
             SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
@@ -206,7 +213,7 @@ std::shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
         tmpRedistedInput.reset();
 
         unlaunchMPISlavesNonParticipating();
-        return std::shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(outSchema,query));
     }
 
     // REFACTOR: this is a pattern in DLAs
@@ -225,8 +232,8 @@ std::shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     if(DBG) std::cerr << tmp2.str() << std::endl;
 
     // find M,N from input array
-    slpp::int_t M = nRow(arrayA);
-    slpp::int_t N = nCol(arrayA);
+    slpp::int_t M = slpp::int_cast(nRow(arrayA));
+    slpp::int_t N = slpp::int_cast(nCol(arrayA));
     if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
 
     // find MB,NB from input array, which is the chunk size
@@ -388,11 +395,10 @@ std::shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     double* U = reinterpret_cast<double*>(shmIpc[BUF_MAT_U]->get()); shmSharedPtr_t Ux(shmIpc[BUF_MAT_U]);
     double* VT = reinterpret_cast<double*>(shmIpc[BUF_MAT_VT]->get());shmSharedPtr_t VTx(shmIpc[BUF_MAT_VT]);
 
-    procRowCol_t firstChunkSize = { chunkRow(arrayA), chunkCol(arrayA) };
-    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-       make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "SVDPhysical"), firstChunkSize);
-
-    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(arrayA, schemeData, query, "SVDPhysical");
+    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(arrayA,
+                                                                     outSchema.getDistribution(),
+                                                                     query,
+                                                                     "SVDPhysical");
 
     bool wasConverted = (tmpRedistedInput != arrayA) ;  // only when redistribute was actually done (sometimes optimized away)
 
@@ -436,7 +442,7 @@ std::shared_ptr<Array>  SVDPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     //
     LOG4CXX_DEBUG(logger, "SVDPhysical::invokeMPI: calling pdgesvdMaster M,N " << M << "," << N << "MB,NB:" << MB << "," << NB);
     std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
-    slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-to-1 between instanceID and MPI rank
+    slpp::int_t MYPE = slpp::int_cast(query->getInstanceID()) ;  // we map 1-to-1 between instanceID and MPI rank
     slpp::int_t INFO = DEFAULT_BAD_INFO ;
     pdgesvdMaster(query.get(), _ctx, slave, _ipcName, argsBuf,
                   NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
@@ -667,12 +673,27 @@ std::shared_ptr<Array> SVDPhysical::execute(std::vector< std::shared_ptr<Array> 
     const bool DBG = false ;
     if(DBG) std::cerr << "SVDPhysical::execute() begin ---------------------------------------" << std::endl;
 
+    AutochunkFixer af(getControlCookie());
+    af.fix(_schema, inputArrays);
+
+    // Need to re-check intervals due to autochunking.  Too bad preSingleExecute doesn't let us see schemas.
+    enum dummy { SINGLE_MATRIX = 1 };
+    checkScaLAPACKPhysicalInputs(inputArrays, query, SINGLE_MATRIX, SINGLE_MATRIX);
+
     // before redistributing the inputs, lets make sure the matrix sizes won't overwhelm the ScaLAPACK integer size:
     {
         const Dimensions& dims = inputArrays[0]->getArrayDesc().getDimensions();
         procRowCol_t procRowCol = getBlacsGridSize(inputArrays, query, "ScaLAPACKLogical"); // max number of rows and cols
-        size_t maxLocalRows = std::max(size_t(1), scidb_numroc_max( dims[ROW].getLength(), dims[ROW].getChunkInterval(), procRowCol.row ));
-        size_t maxLocalCols = std::max(size_t(1), scidb_numroc_max( dims[COL].getLength(), dims[COL].getChunkInterval(), procRowCol.col ));
+        size_t maxLocalRows = std::max(
+            size_t(1),
+            scidb_numroc_max(slpp::int_cast(dims[ROW].getLength()),
+                             slpp::int_cast(dims[ROW].getChunkInterval()),
+                             procRowCol.row));
+        size_t maxLocalCols = std::max(
+            size_t(1),
+            scidb_numroc_max(slpp::int_cast(dims[COL].getLength()),
+                             slpp::int_cast(dims[COL].getChunkInterval()),
+                             procRowCol.col));
 
         LOG4CXX_DEBUG(logger, "SVDPhysical::execute():"
                                << " maxLocalRows: " << maxLocalRows << " * maxLocalCols: " << maxLocalCols
@@ -693,10 +714,15 @@ std::shared_ptr<Array> SVDPhysical::execute(std::vector< std::shared_ptr<Array> 
     //
     string whichMatrix = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getString();
 
+    assert(query->getDefaultArrayResidency()->isEqual(_schema.getResidency()));
+    assert(_schema.getDistribution()->getPartitioningSchema() == psScaLAPACK);
+
     // invokeMPI does not manage an empty bitmap yet, but it is specified in _schema.
     // so to make it compatible, we first create a copy of _schema without the empty tag attribute
     Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
-    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions(), defaultPartitioning());
+    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions(),
+                               _schema.getDistribution(),
+                               _schema.getResidency());
 
     // and now invokeMPI produces an array without empty bitmap except when it is not participating
     std::shared_ptr<Array> arrayNoEmptyTag = invokeMPI(inputArrays, query, whichMatrix, schemaNoEmptyTag);
@@ -710,6 +736,9 @@ std::shared_ptr<Array> SVDPhysical::execute(std::vector< std::shared_ptr<Array> 
     } else {
         result = arrayNoEmptyTag;
     }
+
+    assert(query->getDefaultArrayResidency()->isEqual(result->getArrayDesc().getResidency()));
+    assert(result->getArrayDesc().getDistribution()->getPartitioningSchema() == psScaLAPACK);
 
     // return the scidb array
     Dimensions const& resultDims = result->getArrayDesc().getDimensions();

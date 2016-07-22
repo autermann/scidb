@@ -12,13 +12,13 @@ create array A_both     < X_A : int64, Y_A : int64 > [ I_A=0:9,3,2,  J_A=0:9,3,2
 --test
 
 --echo Explicitly force a different chunk interval.
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN "insert(repart(join(build(Numbers, (I*10) + J), build(Numbers, (13 + I + (J * 10)) % 10) ), B_chunks), A_chunks)"
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_BAD_EXPLICIT_REPART "insert(repart(join(build(Numbers, (I*10) + J), build(Numbers, (13 + I + (J * 10)) % 10) ), B_chunks), A_chunks)"
 
 --echo Explicitly force a different overlap.
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN "insert(repart(join(build(Numbers, (I*10) + J), build(Numbers, (13 + I + (J * 10)) % 10) ), A_overlaps), A_chunks)"
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_BAD_EXPLICIT_REPART "insert(repart(join(build(Numbers, (I*10) + J), build(Numbers, (13 + I + (J * 10)) % 10) ), A_overlaps), A_chunks)"
 
 --echo Explicitly force a different interval and overlap.
---error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN "insert(repart(join(build(Numbers, (I*10) + J), build(Numbers, (13 + I + (J * 10)) % 10) ), A_both), A_chunks)"
+--error --code=scidb::SCIDB_SE_OPERATOR::SCIDB_LE_BAD_EXPLICIT_REPART "insert(repart(join(build(Numbers, (I*10) + J), build(Numbers, (13 + I + (J * 10)) % 10) ), A_both), A_chunks)"
 
 --echo Explicitly force correct size and overlap.
 --start-igdata

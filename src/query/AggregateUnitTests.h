@@ -132,9 +132,9 @@ class AggregateTests: public CppUnit::TestFixture
         sum->initializeState(state);
         input = TypeLibrary::getDefaultValue(sum->getAggregateType().typeId());
         sum->accumulateIfNeeded(state, input);
-        input.setFloat(5.1);
+        input.setFloat(5.1f);
         sum->accumulateIfNeeded(state, input);
-        input.setFloat(3.1);
+        input.setFloat(3.1f);
         sum->accumulateIfNeeded(state, input);
 
         Value state2(sum->getStateType());

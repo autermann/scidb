@@ -51,7 +51,7 @@ void breakOneArrayIntoMultiple(
 
     // Get nAttrs input array iterators.
     vector<std::shared_ptr<ConstArrayIterator> > inputArrayIterators(schemaUtils._nAttrsWithET);
-    for (size_t attr=0; attr<schemaUtils._nAttrsWithET; ++attr) {
+    for (AttributeID attr=0; attr < safe_static_cast<AttributeID>(schemaUtils._nAttrsWithET); ++attr) {
         inputArrayIterators[attr] = inputArray->getConstIterator(attr);
     }
 
@@ -59,7 +59,10 @@ void breakOneArrayIntoMultiple(
     vector<ArrayIterators> outputArrayIterators(nOutputArrays);
     for (size_t i=0; i<nOutputArrays; ++i) {
         outputArrayIterators[i].resize(schemaUtils._nAttrsWithET);
-        for (size_t attr = 0; attr<schemaUtils._nAttrsWithET; ++attr) {
+        for (AttributeID attr = 0;
+             attr < safe_static_cast<AttributeID>(schemaUtils._nAttrsWithET);
+             ++attr)
+        {
             outputArrayIterators[i][attr] = outputArrays[i]->getIterator(attr);
         }
     }

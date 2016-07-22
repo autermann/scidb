@@ -12,7 +12,7 @@ SCIDB QUERY : <dimensions(imtest)>
 
 SCIDB QUERY : <attributes(imtest)>
 {No} name,type_id,nullable
-{0} 'a','int64',false
+{0} 'a','int64',true
 
 Query was executed successfully
 

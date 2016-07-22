@@ -30,12 +30,15 @@
 #include <log4cxx/logger.h>
 
 #include "InputArray.h"
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
-#include "system/Cluster.h"
-#include "system/Resources.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
+#include <system/Cluster.h>
+#include <system/Resources.h>
+#include <system/Warnings.h>
 #include "LogicalInput.h"
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 using namespace boost;
@@ -85,7 +88,17 @@ std::vector<std::shared_ptr<OperatorParamPlaceholder> > LogicalInput::nextVaryPa
     return res;
 }
 
-ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
+std::string LogicalInput::inferPermissions(std::shared_ptr<Query>& query)
+{
+    // Ensure we have proper permissions
+    std::string permissions;
+    permissions.push_back(scidb::permissions::namespaces::ReadArray);
+    return permissions;
+}
+
+ArrayDesc LogicalInput::inferSchema(
+    std::vector< ArrayDesc> inputSchemas,
+    std::shared_ptr< Query> query)
 {
     assert(inputSchemas.size() == 0);
 
@@ -94,9 +107,12 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, std::s
     {
         instanceID = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[2])->getExpression(),
                                   query, TID_INT64).getInt64();
-        if (instanceID != COORDINATOR_INSTANCE_MASK && instanceID != ALL_INSTANCE_MASK && (size_t)instanceID >= query->getInstancesCount())
+        if (instanceID != COORDINATOR_INSTANCE_MASK && instanceID != ALL_INSTANCE_MASK &&
+            !isValidPhysicalInstance(instanceID))
+        {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
                                        _parameters[2]->getParsingContext()) << instanceID;
+        }
     }
 
     const string &path = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
@@ -144,15 +160,18 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, std::s
 
     if (instanceID == ALL_INSTANCE_MASK)
     {
-        /* Let's support it: lets each instance assign unique coordiantes to its chunks based on distribution function.
-        * It is based on two assumptions:
+        /* Let's support it: lets each instance assign unique coordiantes to its chunks based on
+        * distribution function.  It is based on two assumptions:
         * - coordinates are not iportant (as in SQL)
         * - there can be holes in array
         *
-                    if (format[0] == '(') { // binary template loader
-                        throw  USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_INSTANCE_ID,
-                                               _parameters[2]->getParsingContext()) << "-1 can not be used for binary template loader";
-                    }
+        *           if (format[0] == '(') { // binary template loader
+        *               throw  USER_QUERY_EXCEPTION(
+        *                   SCIDB_SE_INFER_SCHEMA,
+        *                   SCIDB_LE_INVALID_INSTANCE_ID,
+        *                   _parameters[2]->getParsingContext())
+        *                       << "-1 can not be used for binary template loader";
+        *           }
         */
         //Distributed loading let's check file existence on all instances
         map<InstanceID, bool> instancesMap;
@@ -207,6 +226,9 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, std::s
     }
     else
     {
+        // convert from physical to logical
+        instanceID = query->mapPhysicalToLogical(instanceID);
+
         //This is loading from single instance. Throw error if file not found.
         if (!Resources::getInstance()->fileExists(path, instanceID, query))
         {
@@ -217,52 +239,76 @@ ArrayDesc LogicalInput::inferSchema(std::vector< ArrayDesc> inputSchemas, std::s
     }
 
     ArrayDesc arrayDesc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
-
+    if (arrayDesc.isAutochunked()) {
+        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED) << getLogicalName();
+    }
     Dimensions const& srcDims = arrayDesc.getDimensions();
 
     //Use array name from catalog if possible or generate temporary name
     string inputArrayName = arrayDesc.getName();
-    PartitioningSchema partitioningSchema = arrayDesc.getPartitioningSchema();
+    PartitioningSchema partitioningSchema = psUninitialized;
+    if (arrayDesc.getDistribution()) {
+        partitioningSchema = arrayDesc.getDistribution()->getPartitioningSchema();
+    }
 
+    ArrayDistPtr dist;
     if (instanceID != ALL_INSTANCE_MASK) {
         // loading from a single file/instance as in
         // load(ARRAY, 'file.x', -2) or input(<XXX>[YYY], 'file.x', 0)
         partitioningSchema = psLocalInstance;
+        dist = std::make_shared<LocalArrayDistribution>((instanceID == COORDINATOR_INSTANCE_MASK) ?
+                                                        query->getInstanceID() :
+                                                        instanceID);
     } else if (partitioningSchema == psUninitialized) {
         // in-line schema currently does not provide a distribution, i.e.
         // input(<XXX>[YYY], 'file.x')
-        partitioningSchema = psUndefined;
-    } // else the user-specified schema will be used for generating the implicit coordinates.
-      // Notice that the optimizer will still be told psUndefined for any parallel ingest
-      // (e.g.  load(ARRAY, 'file.x', -1, ...)
-      // by PhysicalInput::getOutputDistribution() because some input formats (e.g. opaque, text)
-      // may specify the data coordinates (in any distribution).
-
+        dist = createDistribution(psUndefined);
+    } else {
+        // the user-specified schema will be used for generating the implicit coordinates.
+        // NOTICE that the optimizer will still be told psUndefined for any parallel ingest
+        // (e.g.  load(ARRAY, 'file.x', -1, ...)
+        // by PhysicalInput::getOutputDistribution() because some input formats (e.g. opaque, text)
+        // may specify the data coordinates (in any distribution).
+        dist = arrayDesc.getDistribution();
+    }
     if (inputArrayName.empty())
     {
         inputArrayName = "tmp_input_array";
     }
 
+    SCIDB_ASSERT(dist);
+
     return ArrayDesc(inputArrayName,
-                     arrayDesc.getAttributes(), srcDims,
-                     partitioningSchema, arrayDesc.getFlags());
+                     arrayDesc.getAttributes(),
+                     srcDims,
+                     dist,
+                     query->getDefaultArrayResidency(),
+                     arrayDesc.getFlags());
 }
 
 void LogicalInput::inferArrayAccess(std::shared_ptr<Query>& query)
 {
     LogicalOperator::inferArrayAccess(query);
 
-    string shadowArrayName;
+    string shadowArrayNameOrg;
     if (_parameters.size() >= 6 && _parameters[5]->getParamType() == PARAM_ARRAY_REF) {
-        shadowArrayName = ((std::shared_ptr<OperatorParamArrayReference>&)_parameters[5])->getObjectName();
+        shadowArrayNameOrg = ((std::shared_ptr<OperatorParamArrayReference>&)_parameters[5])->getObjectName();
     }
-    if (!shadowArrayName.empty()) {
-        assert(shadowArrayName.find('@') == std::string::npos);
-        std::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(shadowArrayName,
-                                                                                     query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalInstanceId(),
-                                                                                     SystemCatalog::LockDesc::COORD,
-                                                                                     SystemCatalog::LockDesc::WR));
+    if (!shadowArrayNameOrg.empty()) {
+        assert(shadowArrayNameOrg.find('@') == std::string::npos);
+
+        std::string shadowArrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(shadowArrayNameOrg, namespaceName, shadowArrayName);
+
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(
+            new SystemCatalog::LockDesc(
+                namespaceName,
+                shadowArrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::WR));
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         assert(resLock);
         assert(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);

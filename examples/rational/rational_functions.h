@@ -211,6 +211,12 @@ void ints2Rational(const Value** args, Value* res, void*)
 // will be the "lowest common denominator" (pardon the pun) converter.
 void rational2Str(const Value** args, Value* res, void*)
 {
+    // This is to fix #5006.
+    if (args[0]->isNull()) {
+        *res = *args[0];
+        return;
+    }
+
     SciDB_Rational* r = (SciDB_Rational*)args[0]->data();
 
     std::stringstream ss;

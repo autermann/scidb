@@ -66,12 +66,13 @@ struct UnitTestRootArenaLogical : LogicalOperator
         ADD_PARAM_CONSTANT(TID_UINT64);                  // Allocation size
     }
 
-    ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query>)
+    ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query> query)
     {
         return ArrayDesc("array",
-            Attributes(1,AttributeDesc(0,"a",TID_BOOL,0,0)),
-            Dimensions(1,DimensionDesc("i",0,0,0,0)),
-            defaultPartitioning());
+                         Attributes(1,AttributeDesc(0,"a",TID_BOOL,0,0)),
+                         Dimensions(1,DimensionDesc("i",0,0,0,0)),
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

@@ -32,26 +32,31 @@
  * Maybe useful for debugging and embedding scidb into users applications.
  */
 
-#include <stdlib.h>
-#include <string>
-#include <memory>
-#include <boost/bind.hpp>
-#include <log4cxx/logger.h>
+#include "SciDBExecutor.h"
 
+#include <SciDBAPI.h>
 #include <network/Connection.h>
-#include <array/StreamArray.h>
-#include <system/Exceptions.h>
+#include <network/MessageUtils.h>
+#include <network/NetworkManager.h>
+#include <query/QueryPlan.h>
 #include <query/QueryProcessor.h>
 #include <query/Serialize.h>
-#include <network/NetworkManager.h>
-#include <network/MessageUtils.h>
+#include <query/optimizer/Optimizer.h>
 #include <system/Cluster.h>
-#include <util/RWLock.h>
+#include <system/Config.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
+#include <usr_namespace/SecurityCommunicator.h>
 
-#include "SciDBAPI.h"
+#include <log4cxx/logger.h>
+
+#include <boost/bind.hpp>
+#include <boost/serialization/serialization.hpp>
+
+#include <memory>
+#include <string>
 
 using namespace std;
-using namespace boost;
 
 namespace scidb
 {
@@ -114,12 +119,13 @@ class SciDBExecutor: public scidb::SciDB
     {
         ASSERT_EXCEPTION(connection, "NULL connection");
 
-        // Parsing query string
+        // Chosen Query ID should *not* be already in use!
         if (Query::getQueryByID(queryResult.queryID, false)) {
             assert(false);
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "SciDBExecutor::prepareQuery";
         }
 
+        // Query string must be of reasonable length!
         size_t querySize = queryString.size();
         size_t maxSize = Config::getInstance()->getOption<size_t>(CONFIG_QUERY_MAX_SIZE);
         if (querySize > maxSize) {
@@ -130,6 +136,7 @@ class SciDBExecutor: public scidb::SciDB
             *reinterpret_cast<std::shared_ptr<Connection> *>(connection);
         ASSERT_EXCEPTION(scidb_connection.get()!=nullptr, "NULL scidb_connection");
 
+        // Create local query object, tie it to our session!
         std::shared_ptr<QueryProcessor> queryProcessor = QueryProcessor::create();
         std::shared_ptr<Query> query = queryProcessor->createQuery(
             queryString,
@@ -139,10 +146,17 @@ class SciDBExecutor: public scidb::SciDB
             queryResult.queryID == query->getQueryID(),
             "queryResult.queryID == query->getQueryID()");
 
+        // register the query on the thread
+        // so that the performance of everything after this can be tracked
+        // its ugly that this can't be done by the caller
+        // maybe the query should be created before its prepared
+        // then we wouldn't have to assume the caller is the client thread (ugly)
+        Query::setQueryPerThread(query);
 
         StatisticsScope sScope(&query->statistics);
-        LOG4CXX_DEBUG(logger, "Parsing query(" << query->getQueryID() << "): " << queryString << "");
-
+        LOG4CXX_DEBUG(logger, "Parsing query(" << query->getQueryID() << "): "
+            << " user_id=" << query->getSession()->getUser().getId()
+            << " " << queryString << "");
 
         try {
             prepareQueryBeforeLocking(query, queryProcessor, afl, programOptions);
@@ -211,6 +225,14 @@ class SciDBExecutor: public scidb::SciDB
         queryProcessor->parseLogical(query, afl);
         LOG4CXX_TRACE(logger, "Query is parsed");
 
+        std::string permissions = queryProcessor->inferPermissions(query);
+        std::shared_ptr<Session> session = query->getSession();
+        if(session->getSecurityMode().compare("trust") != 0)
+        {
+            scidb::namespaces::Communicator::checkNamespacePermissions(
+                session, session->getNamespace(), permissions);
+        }
+
         const ArrayDesc& desc = queryProcessor->inferTypes(query);
         fillUsedPlugins(desc, queryResult.plugins);
         LOG4CXX_TRACE(logger, "Types of query are inferred");
@@ -229,7 +251,7 @@ class SciDBExecutor: public scidb::SciDB
     void executeQuery(const std::string& queryString, bool afl, QueryResult& queryResult, void* connection) const
     {
         const clock_t startClock = clock();
-        assert(queryResult.queryID>0);
+        SCIDB_ASSERT(queryResult.queryID.isValid());
 
         // Executing query string
         std::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
@@ -246,7 +268,6 @@ class SciDBExecutor: public scidb::SciDB
         queryResult.explainLogical = planString.str();
         // Note: Optimization will be performed while execution
         std::shared_ptr<Optimizer> optimizer =  Optimizer::create();
-        bool isDdl = true;
         try {
             query->start();
 
@@ -254,9 +275,9 @@ class SciDBExecutor: public scidb::SciDB
             {
                 LOG4CXX_DEBUG(logger, "Query is optimized");
 
-                isDdl = query->getCurrentPhysicalPlan()->isDdl();
-                query->isDDL = isDdl;
-                LOG4CXX_DEBUG(logger, "The physical plan is detected as " << (isDdl ? "DDL" : "DML") );
+                const bool isDdl = query->getCurrentPhysicalPlan()->isDdl();
+                LOG4CXX_DEBUG(logger, "The physical plan is detected as "
+                              << (isDdl ? "DDL" : "DML") );
                 if (logger->isDebugEnabled())
                 {
                     std::ostringstream planString;
@@ -287,15 +308,8 @@ class SciDBExecutor: public scidb::SciDB
                     std::shared_ptr<const InstanceLiveness> queryLiveness(query->getCoordinatorLiveness());
                     serializeQueryLiveness(queryLiveness, preparePhysicalPlanRecord);
 
-                    size_t redundancy = Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY);
                     Cluster* cluster = Cluster::getInstance();
                     assert(cluster);
-                    std::shared_ptr<const InstanceMembership> membership(cluster->getInstanceMembership());
-                    assert(membership);
-                    if ((membership->getViewId() != queryLiveness->getViewId()) ||
-                        ((instancesCount + redundancy) < membership->getInstances().size())) {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-                    }
                     preparePhysicalPlanRecord->set_cluster_uuid(cluster->getUuid());
                     networkManager->broadcastLogical(preparePhysicalPlanMsg);
                     LOG4CXX_DEBUG(logger, "Prepare physical plan was sent out");
@@ -312,7 +326,7 @@ class SciDBExecutor: public scidb::SciDB
                 LOG4CXX_DEBUG(logger, "Query is executed locally");
 
                 // Wait for results from every instance except itself
-                Semaphore::ErrorChecker ec = bind(&Query::validate, query);
+                Semaphore::ErrorChecker ec = boost::bind(&Query::validate, query);
                 query->results.enter(instancesCount-1, ec);
                 LOG4CXX_DEBUG(logger, "The responses are received");
                 /**
@@ -335,10 +349,16 @@ class SciDBExecutor: public scidb::SciDB
         queryResult.executionTime = query->statistics.executionTime;
         queryResult.explainPhysical = query->statistics.explainPhysical;
         queryResult.selective = query->getCurrentResultArray().get()!=nullptr;
+        queryResult.autoCommit = query->isAutoCommit();
         if (queryResult.selective) {
+            SCIDB_ASSERT(!queryResult.autoCommit);
             queryResult.array = query->getCurrentResultArray();
         }
-        LOG4CXX_DEBUG(logger, "The result of query is returned")
+
+        LOG4CXX_DEBUG(logger, "The result of query (autoCommit="
+                      << queryResult.autoCommit
+                      <<", selective="<<queryResult.selective
+                      <<") is returned")
     }
 
     void cancelQuery(QueryID queryID, void* connection) const
@@ -363,8 +383,7 @@ class SciDBExecutor: public scidb::SciDB
 
     virtual void newClientStart(
         void*                   connection,
-        const std::string &     name,
-        const std::string &     password) const
+        const std::string &     userInfoFileName) const
     {
         ASSERT_EXCEPTION_FALSE(
             "newClientStart - not needed, to implement in engine");

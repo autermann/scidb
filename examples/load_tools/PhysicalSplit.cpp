@@ -98,11 +98,11 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot open file";
         }
-        _dataSize = fread(&_buffer[0], 1, _bufferSize, _inputFile);
+        _dataSize = scidb::fread_unlocked(&_buffer[0], 1, _bufferSize, _inputFile);
         if (_dataSize != _bufferSize)
         {
             _endOfFile= true;
-            fclose(_inputFile);
+            scidb::fclose(_inputFile);
             _inputFile =0;
         }
         _dataStartPos = &_buffer[0];
@@ -112,7 +112,7 @@ public:
     {
         if(_inputFile!=0)
         {
-            fclose(_inputFile);
+            scidb::fclose(_inputFile);
         }
     }
 
@@ -181,11 +181,11 @@ private:
         }
         char *newDataStart = bufStart + _dataSize;
         size_t remainderSize = _bufferSize - _dataSize;
-        size_t bytesRead = fread( newDataStart, 1, remainderSize, _inputFile);
+        size_t bytesRead = scidb::fread_unlocked( newDataStart, 1, remainderSize, _inputFile);
         if(bytesRead != remainderSize)
         {
             _endOfFile = true;
-            fclose(_inputFile);
+            scidb::fclose(_inputFile);
             _inputFile =0;
         }
         _dataStartPos = bufStart;
@@ -324,7 +324,8 @@ public:
 
     virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
     {
-        return RedistributeContext(defaultPartitioning());
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
@@ -343,12 +344,13 @@ public:
         {
             result = std::shared_ptr<EmptySinglePass>(new EmptySinglePass(_schema));
         }
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
 
-        result = redistributeToRandomAccess(result, query, defaultPartitioning(),
-                                                 ALL_INSTANCE_MASK,
-                                                 std::shared_ptr<CoordinateTranslator>(),
-                                                 0,
-                                                 std::shared_ptr<PartitioningSchemaData>());
+        result = redistributeToRandomAccess(result,
+                                            _schema.getDistribution(),
+                                            ArrayResPtr(), // default query residency
+                                            query);
+
         return result;
     }
 };

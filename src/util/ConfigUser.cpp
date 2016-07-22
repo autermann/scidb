@@ -43,24 +43,15 @@ namespace scidb
 
         if(filename.empty())
         {
-            std::stringstream ss;
-            ss << "Unknown file=" << filename;
-
-            throw USER_EXCEPTION(
-                SCIDB_SE_INTERNAL,
-                SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
-                    << ss.str();
+            throw USER_EXCEPTION(SCIDB_SE_INTERNAL,SCIDB_LE_CONFIGURATION_FILE_BLANK_NAME);
         }
 
         if(lstat(filename.c_str(), &stats))
         {
-            std::stringstream ss;
-            ss << "getStats file=" << filename;
-
             throw USER_EXCEPTION(
                 SCIDB_SE_INTERNAL,
-                SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
-                    << ss.str();
+                SCIDB_LE_CONFIGURATION_FILE_MISSING)
+                    << filename.c_str();
         }
 
         switch(stats.st_mode)
@@ -68,17 +59,16 @@ namespace scidb
             default:
             {
                 std::stringstream ss;
-                ss
+                ss  << " file=" << filename << std::endl
                     << "stats.st_mode="
                         << std::oct
                         << stats.st_mode
                         << std::dec
-                        << "(octal)"
-                    << " file=" << filename;
+                        << " (octal)";
 
                 throw USER_EXCEPTION(
                     SCIDB_SE_INTERNAL,
-                    SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
+                    SCIDB_LE_CONFIGURATION_FILE_MODE)
                         << ss.str();
             } break;
 
@@ -98,7 +88,7 @@ namespace scidb
 
             throw USER_EXCEPTION(
                 SCIDB_SE_INTERNAL,
-                SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
+                SCIDB_LE_CONFIGURATION_FILE_MODE)
                     << ss.str();
         }
 
@@ -109,7 +99,7 @@ namespace scidb
 
             throw USER_EXCEPTION(
                 SCIDB_SE_INTERNAL,
-                SCIDB_LE_ERROR_IN_CONFIGURATION_FILE)
+                SCIDB_LE_CONFIGURATION_FILE_OWNER)
                     << ss.str();
         }
     }

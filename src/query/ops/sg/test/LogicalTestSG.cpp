@@ -142,7 +142,64 @@ public:
         return res;
     }
 
+    private:
+
+    PartitioningSchema getPartitioningSchema(const std::shared_ptr<Query>& query) const
+    {
+        ASSERT_EXCEPTION(_parameters[0], "Partitioning schema is not specified by the user");
+        OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[0].get());
+        const PartitioningSchema ps = static_cast<PartitioningSchema>( evaluate(lExp->getExpression(), query, TID_INT32).getInt32());
+        if (! isValidPartitioningSchema(ps, false) && ps != psLocalInstance) // false = not allow optional data associated with the partitioning schema
+        {
+            throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_REDISTRIBUTE_ERROR);
+        }
+        return ps;
+    }
+
+    /// @return logical instance ID specified by the user, or ALL_INSTANCE_MASK if not specified
+    InstanceID getInstanceId(const std::shared_ptr<Query>& query) const
+    {
+        InstanceID instanceId = ALL_INSTANCE_MASK;
+        if (_parameters.size() >=2 )
+        {
+            OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[1].get());
+            instanceId = static_cast<InstanceID>( evaluate(lExp->getExpression(), query, TID_INT64).getInt64());
+        }
+        instanceId = (instanceId==COORDINATOR_INSTANCE_MASK) ? query->getInstanceID() : instanceId;
+        return instanceId;
+    }
+
+    string getSGMode(const std::shared_ptr<Query>& query)
+    {
+        if (_parameters.size() < 3) {
+            return string();
+        }
+        OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[2].get());
+        std::string sgmode(evaluate(lExp->getExpression(), query, TID_STRING).getString());
+        return sgmode;
+    }
+
+    DimensionVector getOffsetVector(const vector<ArrayDesc> & inputSchemas,
+                                    const std::shared_ptr<Query>& query) const
+    {
+        if (_parameters.size() <= 4) {
+            return DimensionVector();
+        }
+
+        const Dimensions&  dims = inputSchemas[0].getDimensions();
+        DimensionVector result(dims.size());
+        ASSERT_EXCEPTION(_parameters.size() == dims.size() + 4,
+                         "Invalid coordinate offset is specified");
+
+        for (size_t i = 0; i < result.numDimensions(); ++i) {
+            OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[i+4].get());
+            result[i] = static_cast<Coordinate>( evaluate(lExp->getExpression(), query, TID_INT64).getInt64());
+        }
+        return result;
+    }
+
     public:
+
     /**
      * The schema of output array is the same as input
      */
@@ -152,16 +209,12 @@ public:
         ArrayDesc const& desc = inputSchemas[0];
 
         //validate the partitioning schema
-        const PartitioningSchema ps = (PartitioningSchema)
-            evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_INT32).getInt32();
-        if (! isValidPartitioningSchema(ps, false)) // false = not allow optional data associated with the partitioning schema
-        {
-            throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_REDISTRIBUTE_ERROR);
-        }
+        const PartitioningSchema ps = getPartitioningSchema(query) ;
+        InstanceID localInstance = getInstanceId(query);
+        DimensionVector offset = getOffsetVector(inputSchemas,query);
+        std::string sgMode = getSGMode(query);
 
-        // get the name of the supplied result array
         const std::string& resultArrayName = desc.getName();
-
         if (isDebug()) {
             if (_parameters.size() >= 4) {
                 assert(_parameters[3]->getParamType() == PARAM_LOGICAL_EXPRESSION);
@@ -170,8 +223,52 @@ public:
                 assert(lExp->getExpectedType()==TypeLibrary::getType(TID_BOOL));
             }
         }
-        return ArrayDesc(resultArrayName, desc.getAttributes(), desc.getDimensions(), defaultPartitioning());
+        std::string distCtx;
+        if (ps == psLocalInstance) {
+            ASSERT_EXCEPTION((localInstance < query->getInstancesCount()),
+                             "The specified instance is larger than total number of instances");
+            stringstream ss;
+            ss<<localInstance;
+            distCtx = ss.str();
+        }
+        std::shared_ptr<CoordinateTranslator> translator;
+        if (!offset.isEmpty()) {
+            translator = OffsetCoordinateTranslator::createOffsetMapper(offset);
+        }
+
+        ArrayDistPtr arrDist = ArrayDistributionFactory::getInstance()->construct(ps,
+                                                                                  DEFAULT_REDUNDANCY,
+                                                                                  distCtx,
+                                                                                  translator,
+                                                                                  0);
+        ArrayResPtr arrRes = query->getDefaultArrayResidency(); // use the query live set because we dont know better
+        if (sgMode == "randomRes") {
+            if (_randomRes) {
+                arrRes = _randomRes;
+            } else {
+                std::vector<InstanceID> someInstances;
+                someInstances.reserve(arrRes->size());
+                for (size_t i=0; i < arrRes->size(); ++i) {
+
+                    if (ps == psLocalInstance && i<=localInstance) {
+                        someInstances.push_back(arrRes->getPhysicalInstanceAt(i));
+                    } else if ((rand() % (i+1)) == 0) {
+                        someInstances.push_back(arrRes->getPhysicalInstanceAt(i));
+                    }
+                }
+                if (someInstances.size() == 0) {
+                    someInstances.push_back(arrRes->getPhysicalInstanceAt(0));
+                }
+                arrRes = createDefaultResidency(PointerRange<InstanceID>(someInstances));
+                _randomRes = arrRes;
+            }
+        }
+
+        return ArrayDesc(resultArrayName, desc.getAttributes(), desc.getDimensions(), arrDist, arrRes);
     }
+    private:
+    ArrayResPtr _randomRes;
+
 };
 
 REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalTestSG, "test_sg");

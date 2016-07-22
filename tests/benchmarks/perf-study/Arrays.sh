@@ -111,7 +111,7 @@ echo $CMD
 #
 #  Find out how big storage.data1 on the 0 instance is.
 #
-du -b $SCIDB_DATA_DIR/000/0/storage.data1
+du -b $SCIDB_DATA_DIR/0/0/storage.data1
 #
 # save() the array, and compress it.
 #

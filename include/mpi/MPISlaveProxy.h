@@ -49,8 +49,10 @@ namespace scidb
         {
         public:
             InvalidStateException(const char* file, const char* function, int32_t line)
-            : SystemException(file, function, line, "scidb", SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR,
-                              "SCIDB_SE_INTERNAL", "SCIDB_LE_UNKNOWN_ERROR", uint64_t(0))
+            : SystemException(file, function, line, "scidb",
+                              SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR,
+                              "SCIDB_SE_INTERNAL", "SCIDB_LE_UNKNOWN_ERROR",
+                              INVALID_QUERY_ID)
             {
             }
 

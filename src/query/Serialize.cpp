@@ -29,6 +29,13 @@
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  */
 
+#include <query/Serialize.h>
+
+#include <query/Expression.h>
+#include <query/LogicalExpression.h>
+#include <query/Operator.h>
+#include <query/QueryPlan.h>
+
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #include <boost/archive/text_oarchive.hpp>
@@ -36,13 +43,7 @@
 
 #include <sstream>
 
-#include <query/Serialize.h>
-#include <query/QueryPlan.h>
-#include <query/LogicalExpression.h>
-#include <query/Operator.h>
-
 using namespace std;
-using namespace boost;
 using namespace boost::archive;
 
 namespace scidb
@@ -62,6 +63,13 @@ string serializePhysicalPlan(const std::shared_ptr<PhysicalPlan> &plan)
 
     return ss.str();
 }
+
+//
+// There is no deserializePhysicalPlan here.  Deserialization of
+// physical plans happens in QueryProcessor::parsePhysical(), by way
+// of an mtPreparePhysicalPlan message and
+// ServerMessageHandleJob::handlePreparePhysicalPlan().
+//
 
 string serializePhysicalExpression(const Expression &expr)
 {

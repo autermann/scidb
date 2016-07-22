@@ -28,8 +28,10 @@
  * @author roman.simakov@gmail.com
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 
 namespace scidb
@@ -69,12 +71,21 @@ public:
         ADD_PARAM_CONSTANT("string")
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have proper permissions
+        std::string permissions;
+        permissions.push_back(scidb::permissions::Root);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         //FIXME: Need parameters to infer the schema correctly
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
         return arrDesc;
     }
 };

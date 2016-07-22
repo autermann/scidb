@@ -73,13 +73,13 @@ namespace scidb {
 class LogicalDiskInfo: public LogicalOperator
 {
 public:
-	LogicalDiskInfo(const string& logicalName, const std::string& alias)
+    LogicalDiskInfo(const string& logicalName, const std::string& alias)
     : LogicalOperator(logicalName, alias)
-	{
-	}
+    {
+    }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
-	{
+    {
         assert(schemas.size() == 0);
         assert(_parameters.size() == 0);
 
@@ -93,8 +93,10 @@ public:
         const size_t nInstances = query->getInstancesCount();
         size_t end        = nInstances>0 ? nInstances-1 : 0;
         dimensions[0]     = DimensionDesc("Instance", 0, 0, end, end, 1, 0);
-        return ArrayDesc("DiskInfo", attributes, dimensions, defaultPartitioning());
-	}
+        return ArrayDesc("DiskInfo", attributes, dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalDiskInfo, "_diskinfo")

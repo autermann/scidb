@@ -105,7 +105,7 @@ private:
     void setEmptyBitmap(size_t nAttrs, size_t chunkIndex);
 
 public:
-    int binarySearch(PointerRange<const Value> tuple);
+    size_t binarySearch(PointerRange<const Value> tuple);
 
     int operator()(int i, int j)
     {

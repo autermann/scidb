@@ -10,22 +10,22 @@ store(redimension(us_presidents, president_stats, count(last_name) as count, sum
 store(president_stats, A)
 store(A, B)
 store(B, C)
---shell --command " iquery -o lcsv+ -aq 'scan(A)' " --store
---shell --command " iquery -o lcsv+ -aq 'scan(B)' " --store
---shell --command " iquery -o lcsv+ -aq 'scan(C)' " --store
---shell --command " iquery -o lcsv+ -aq 'scan(president_stats)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(A)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(B)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(C)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(president_stats)' " --store
 
 remove(president_stats)
---shell --command " iquery -o lcsv+ -aq 'scan(A)' " --store
---shell --command " iquery -o lcsv+ -aq 'scan(B)' " --store
---shell --command " iquery -o lcsv+ -aq 'scan(C)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(A)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(B)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(C)' " --store
 
 remove(A)
---shell --command " iquery -o lcsv+ -aq 'scan(B)' " --store
---shell --command " iquery -o lcsv+ -aq 'scan(C)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(B)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(C)' " --store
 
 remove(B)
---shell --command " iquery -o lcsv+ -aq 'scan(C)' " --store
+--shell --command " iquery -o csv+:l -aq 'scan(C)' " --store
 --error --code=scidb::SCIDB_SE_QPROC::SCIDB_LE_ARRAY_DOESNT_EXIST "scan(president_stats@1:first_name)"
 
 remove(C)

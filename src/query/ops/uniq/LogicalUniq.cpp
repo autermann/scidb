@@ -19,14 +19,16 @@
 *
 * END_COPYRIGHT
 */
-
+#include <log4cxx/logger.h>
 #include <query/Operator.h>
 #include "UniqSettings.h"
+
 
 using namespace std;
 
 namespace scidb
 {
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.logical_scan"));
 
 /**
  * An operator that removes duplicates from a sorted one-dimensional array. In other words, it works just like
@@ -112,7 +114,10 @@ public:
         outputAttributes = addEmptyTagAttribute(outputAttributes);
         Dimensions outputDimensions;
         outputDimensions.push_back(DimensionDesc("i", 0, CoordinateBounds::getMax(), settings.outputChunkSize(), 0));
-        return ArrayDesc(inputSchema.getName(), outputAttributes, outputDimensions, defaultPartitioning());
+
+        return ArrayDesc(inputSchema.getName(), outputAttributes, outputDimensions,
+                         createDistribution(psUndefined),
+                         inputSchema.getResidency());
     }
 };
 

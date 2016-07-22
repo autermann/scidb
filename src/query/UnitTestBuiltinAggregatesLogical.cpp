@@ -138,7 +138,9 @@ public:
         attributes[0] = AttributeDesc((AttributeID)0, "val_approxdc",  type, 0, 0);
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("i"), in_start, in_end, in_chunkInterval, uint32_t(0));
-        return ArrayDesc("dummy_array", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("dummy_array", attributes, dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

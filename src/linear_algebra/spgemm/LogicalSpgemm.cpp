@@ -131,8 +131,21 @@ public:
                 || schemas[0].getDimensions()[1].getStartMin() != schemas[1].getDimensions()[0].getStartMin())
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_MULTIPLY_ERROR5);
 
-        if (schemas[0].getDimensions()[1].getChunkInterval() != schemas[1].getDimensions()[0].getChunkInterval())
+#if 0
+        // Chunk intervals are checked in PhysicalSpgemm::requiresRedimensionOrRepartition().
+#else
+        // Enabling "local auto-repart" (as implied above) would require changes to the
+        // checkin.scalapack.14_gemm_neg test.  I'm reluctant to do that while ticket #5049 is open,
+        // since a bogus result would have to be recorded in the .expected file.  So for now, keep
+        // the old behavior so as not to break the test.
+        //
+        if (schemas[0].getDimensions()[1].getRawChunkInterval() != schemas[1].getDimensions()[0].getRawChunkInterval())
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_MULTIPLY_ERROR6);
+        // Two autochunked inputs don't count as having "same intervals".
+        if (schemas[0].getDimensions()[1].isAutochunked())
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED) << "spgemm";
+#endif
+
         if (schemas[0].getAttributes()[0].getType() != schemas[1].getAttributes()[0].getType())
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_MULTIPLY_ERROR7);
         if (schemas[0].getAttributes()[0].isNullable() || schemas[1].getAttributes()[0].isNullable())
@@ -189,7 +202,7 @@ public:
                                 d1.getCurrStart(),
                                 d1.getCurrEnd(),
                                 d1.getEndMax(),
-                                d1.getChunkInterval(),
+                                d1.getRawChunkInterval(),
                                 0);
 
         DimensionDesc const& d2 = schemas[1].getDimensions()[1];
@@ -199,10 +212,10 @@ public:
                                 d2.getCurrStart(),
                                 d2.getCurrEnd(),
                                 d2.getEndMax(),
-                                d2.getChunkInterval(),
+                                d2.getRawChunkInterval(),
                                 0);
 
-        return ArrayDesc("Multiply", addEmptyTagAttribute(atts), dims, defaultPartitioning());
+        return ArrayDesc("Multiply", addEmptyTagAttribute(atts), dims, createDistribution(psByRow), query->getDefaultArrayResidency());
     }
 
 };

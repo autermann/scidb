@@ -23,7 +23,7 @@
 #define FITS_PARSER_H
 
 #include <fstream>
-
+#include <vector>
 
 namespace scidb
 {
@@ -52,7 +52,7 @@ public:
     float               getBZero() const;
     float               getBScale() const;
 
-    void                moveToCell(int cell);
+    void                moveToCell(int64_t cell);
     short int           readInt16();
     int                 readInt32();
     float               readFloat32();
@@ -78,8 +78,8 @@ private:
     char                buffer[kBlockSize];
     ifstream            file;
     filebuf             *pbuffer;
-    int                 bufferPos;              // Current position in buffer
-    int                 dataPos;                // Position in file where the data part of the HDU begins
+    size_t              bufferPos;              // Current position in buffer
+    std::streamoff      dataPos;                // Position in file where the data part of the HDU begins
 
     int                 bitpix;
     int                 bitpixsize;             // bitpix converted to bytes

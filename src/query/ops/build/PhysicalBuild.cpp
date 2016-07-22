@@ -43,20 +43,17 @@ log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.build"));
 #define debug(e) LOG4CXX_DEBUG(logger, "PhysicalBuild: " << e)
 #define trace(e) LOG4CXX_TRACE(logger, "PhysicalBuild: " << e)
 
-
-
 class PhysicalBuild: public PhysicalOperator
 {
 public:
-	PhysicalBuild(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-	    PhysicalOperator(logicalName, physicalName, parameters, schema),
-	    _asArrayLiteral(false)
-	{
+    PhysicalBuild(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+    : PhysicalOperator(logicalName, physicalName, parameters, schema), _asArrayLiteral(false)
+    {
         if (_parameters.size() == 3)
         {
             _asArrayLiteral = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[2])->getExpression()->evaluate().getBool();
         }
-	}
+    }
 
     PartitioningSchema getOutDist() const
     {
@@ -65,33 +62,34 @@ public:
             return psLocalInstance;
         }
         debug("getOutputDistribution: returning defaultPartitioning =" << defaultPartitioning());
-        return defaultPartitioning();
+        return defaultPartitioning()->getPartitioningSchema();
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                    const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
         assert(inputDistributions.size() == 0);
-        assert(getOutDist() == _schema.getPartitioningSchema());
-        return RedistributeContext(_schema.getPartitioningSchema());
+        assert(getOutDist() == _schema.getDistribution()->getPartitioningSchema());
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
-    //
-    // Build is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-    // that overrides the chunkiterator method.
-    //
+    /**
+     * Build is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+     * that overrides the chunkiterator method.
+     */
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 0);
-        debug("execute: _schema  partitioning:  " << _schema.getPartitioningSchema() << ", getOutDist(): " << getOutDist());
-        assert(_schema.getPartitioningSchema() == getOutDist());
+        debug("execute: _schema  distribution:  " << _schema.getDistribution() << ", getOutDist(): " << getOutDist());
+        assert(_schema.getDistribution()->getPartitioningSchema() == getOutDist());
 
         std::shared_ptr<Array> result;
 
         std::shared_ptr<Expression> expr = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression();
         if (_asArrayLiteral)
         {
-            assert(_schema.getPartitioningSchema() == psLocalInstance);   // cf getOutputDistribution
+            assert(_schema.getDistribution()->getPartitioningSchema() == psLocalInstance);   // cf getOutputDistribution
             //We will produce this array only on coordinator
             if (query->isCoordinator())
             {
@@ -123,8 +121,8 @@ public:
             result = make_shared<BuildArray>(query, _schema, expr);
         }
 
-        debug("execute: returning array with  partitioning:  " << result->getArrayDesc().getPartitioningSchema() << ", getOutDist(): " << getOutDist());
-        assert(result->getArrayDesc().getPartitioningSchema() == getOutDist());
+        debug("execute: returning array with distribution:  " << result->getArrayDesc().getDistribution() << ", getOutDist(): " << getOutDist());
+        assert(result->getArrayDesc().getDistribution()->getPartitioningSchema() == getOutDist());
         return result;
     }
 

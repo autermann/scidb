@@ -22,7 +22,7 @@ SCIDB QUERY : <store((apply((apply((apply((build(A1,x+y+2.5) As Q1),val2,x) As Q
 
 SCIDB QUERY : <show(A2)>
 {i} schema
-{0} 'A2<val1:double,val2:int64,val3:string,val4:int64> [x=0:3,2,0,y=0:3,2,0]'
+{0} 'A2<val1:double,val2:int64 NOT NULL,val3:string NOT NULL,val4:int64 NOT NULL> [x=0:3,2,0,y=0:3,2,0]'
 
 SCIDB QUERY : <aggregate(A1,approxdc(val1))>
 {i} val1_approxdc

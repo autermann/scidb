@@ -115,7 +115,7 @@ SCIDB QUERY : <store(unpack(project(subarray(cross_join(regrid(between(join(appl
 
 SCIDB QUERY : <show(ZZZ)>
 {i} schema
-{0} 'ZZZ<x:int64,y:int64,x_2:int64,y_2:int64,val:double> [i=0:*,16,0]'
+{0} 'ZZZ<x:int64 NOT NULL,y:int64 NOT NULL,x_2:int64 NOT NULL,y_2:int64 NOT NULL,val:double> [i=0:*,16,0]'
 
 SCIDB QUERY : <_explain_logical('select * from ZZZ', 'aql')>
 [Query was executed successfully, ignoring data output by this query.]

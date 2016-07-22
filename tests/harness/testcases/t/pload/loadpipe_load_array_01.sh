@@ -69,6 +69,6 @@ PYTHONPATH=$PYTHONPATH:${SCIDB_INSTALL_PATH}/bin ${DATA_GEN} --dims-sizes 1000,1
 
 echo "Ok."
 
-iquery -ocsv -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -aq "dimensions(real_01_A_0)"
+iquery -ocsv:l -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -aq "dimensions(real_01_A_0)"
 
 echo "Done."

@@ -276,7 +276,10 @@ procNum_t getFactorizationSpecialCases(procNum_t numMPIProc)
     return procNum_t( ::sqrt(numMPIProc) ) ; // e.g for  50, would return 7 -> 7 x 7
 }
 
-InstanceID PartitioningSchemaDataForScaLAPACK::getInstanceID(const Coordinates& chunkPos, const Query& query) const {
+InstanceID
+ScaLAPACKArrayDistribution::PartitioningSchemaDataForScaLAPACK::getInstanceID(const Coordinates& chunkPos,
+                                                                              const ProcGrid* const procGrid ) const
+{
     //
     // Compute instanceID for the SciDB instance that is the master
     // to the ScaLAPACK-MPI process where the chunk will be processed by
@@ -287,20 +290,105 @@ InstanceID PartitioningSchemaDataForScaLAPACK::getInstanceID(const Coordinates& 
     // of things.
     //
 
-    const ProcGrid * const procGrid = query.getProcGrid();
+    SCIDB_ASSERT(procGrid);
 
     procRowCol_t gridPos;
-    gridPos.row = procGrid->gridPos1D(chunkPos[0], _blacsBlockSize.row, _blacsGridSize.row);
-    gridPos.col = procGrid->gridPos1D(chunkPos[1], _blacsBlockSize.col, _blacsGridSize.col);
+    gridPos.row = procGrid->gridPos1D(safe_static_cast<procNum_t>(chunkPos[0]),
+                                      _blacsBlockSize.row, _blacsGridSize.row);
+    gridPos.col = procGrid->gridPos1D(safe_static_cast<procNum_t>(chunkPos[1]),
+                                      _blacsBlockSize.col, _blacsGridSize.col);
     procNum_t mpiRank = procGrid->procNum(gridPos, _blacsGridSize);
 
-    LOG4CXX_TRACE(logger, "PartitioningSchemaDataScaLAPACK::getInstanceID(chunkPos=(" << chunkPos[0] << ", " <<chunkPos[1] << ")"
+    LOG4CXX_TRACE(logger, "PartitioningSchemaDataScaLAPACK::getInstanceID(chunkPos=("
+                          << chunkPos[0] << ", " <<chunkPos[1] << ")"
                           << ", _blacsBlockSize (" << _blacsBlockSize.row << "," << _blacsBlockSize.col << ")"
                           << ", _blacsGridSize (" << _blacsGridSize.row << "," << _blacsGridSize.col << ")"
                           << "-> gridPos (" << gridPos.row << "," << gridPos.col << ")"
                           << "-> rank " << mpiRank);
     return mpiRank;
 
+}
+
+ScaLAPACKArrayDistribution::ScaLAPACKArrayDistribution(size_t redundancy,
+                                                       const std::string& ctx)
+  : ArrayDistribution(psScaLAPACK, redundancy) {
+    SCIDB_ASSERT(redundancy==0);
+    ASSERT_EXCEPTION(!ctx.empty(),
+                     "ScaLAPACKArrayDistribution: invalid context");
+    std::stringstream sin(ctx);
+    std::vector<procNum_t> dataGridVals;
+    dataGridVals.reserve(4);
+
+    dist::readInts(sin, dataGridVals);
+    ASSERT_EXCEPTION(dataGridVals.size() == 4,
+                     "ScaLAPACKArrayDistribution: invalid context");
+
+    // FYI: typedef RowCol<procNum_t> procRowCol_t ;
+    procRowCol_t blacsGridSize;
+    blacsGridSize.row = dataGridVals[0];
+    blacsGridSize.col = dataGridVals[1];
+
+    RowCol<procNum_t> blacsBlockSize;
+    blacsBlockSize.row = dataGridVals[2];
+    blacsBlockSize.col = dataGridVals[3];
+
+    _repartInfo.reset(new PartitioningSchemaDataForScaLAPACK(blacsGridSize, blacsBlockSize));
+}
+
+
+std::string
+ScaLAPACKArrayDistribution::getContext() const
+{
+    std::stringstream sout;
+    std::vector<procNum_t> dataGridVals(4);
+    dataGridVals[0] = _repartInfo->getBlacsGridSize().row;
+    dataGridVals[1] = _repartInfo->getBlacsGridSize().col;
+    dataGridVals[2] = _repartInfo->getBlacsBlockSize().row;
+    dataGridVals[3] = _repartInfo->getBlacsBlockSize().col;
+
+    dist::writeInts(sout, dataGridVals);
+    return sout.str();
+}
+
+bool
+ScaLAPACKArrayDistribution::checkCompatibility(const ArrayDistPtr& otherArrDist) const
+{
+    if (!ArrayDistribution::checkPs(otherArrDist)) {
+        return false;
+    }
+    const ScaLAPACKArrayDistribution* dist = dynamic_cast<const ScaLAPACKArrayDistribution*>(otherArrDist.get());
+    if (dist == NULL) {
+        return false;
+    }
+    bool same = (_repartInfo->getBlacsGridSize().row  == dist->_repartInfo->getBlacsGridSize().row &&
+                 _repartInfo->getBlacsGridSize().col  == dist->_repartInfo->getBlacsGridSize().col &&
+                 _repartInfo->getBlacsBlockSize().row == dist->_repartInfo->getBlacsBlockSize().row &&
+                 _repartInfo->getBlacsBlockSize().col == dist->_repartInfo->getBlacsBlockSize().col);
+    return same;
+}
+
+InstanceID
+ScaLAPACKArrayDistribution::getPrimaryChunkLocation(Coordinates const& chunkPosition,
+                                                    Dimensions const& dims,
+                                                    size_t nInstances) const
+{
+    if ( dims.size() < 1 ||  // distribution is defined only for vectors
+         dims.size() > 2) {  // and matrices, (not tensors, etc)
+        throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
+    }
+    SCIDB_ASSERT(_repartInfo);
+
+    if (!_procGrid) {
+        _procGrid.reset(new ProcGrid(safe_static_cast<procNum_t>(nInstances)));
+    } else if (isDebug()) {
+        ProcGrid tmp(safe_static_cast<procNum_t>(nInstances));
+        SCIDB_ASSERT(tmp._maxGridSize.row == _procGrid->_maxGridSize.row);
+        SCIDB_ASSERT(tmp._maxGridSize.col == _procGrid->_maxGridSize.col);
+    }
+
+    InstanceID destInstanceId = _repartInfo->getInstanceID(chunkPosition, _procGrid.get());
+
+    return destInstanceId % nInstances;
 }
 
 } // namespace

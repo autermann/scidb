@@ -3,7 +3,7 @@ load_library('tile_integration')
 create array V <v:int64> [n=1:3571,727,0]
 --start-igdata
 # prime size tile
-setopt('tile-size','9941')
+_setopt('tile-size','9941')
 store(build(V, 7), V)
 --stop-igdata
 --test
@@ -59,7 +59,7 @@ store( aggregate( tile_apply (V, f, sqrt(v)), stdev(f), n), D)
 aggregate(filter(project(apply(join(C as left , D as right), diff, left.n - right.n), diff), diff <>0),count(*))
 --cleanup
 --start-igdata
-setopt('tile-size','10000')
+_setopt('tile-size','10000')
 --stop-igdata
 remove(C)
 remove(D)

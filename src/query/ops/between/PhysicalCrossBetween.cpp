@@ -56,14 +56,19 @@ public:
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
                                       std::shared_ptr<Query> query)
     {
-        // Ensure inputArray supports random access, and rangesArray is replicated.
         assert(inputArrays.size() == 2);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
+        // Ensure inputArray supports random access, and rangesArray is replicated.
         std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
-        std::shared_ptr<Array> rangesArray = redistributeToRandomAccess(inputArrays[1], query, psReplication,
-                                                                   ALL_INSTANCE_MASK,
-                                                                   std::shared_ptr<CoordinateTranslator>(),
-                                                                   0,
-                                                                   std::shared_ptr<PartitioningSchemaData>());
+
+        SCIDB_ASSERT(inputArrays[0]->getArrayDesc().getResidency()->isEqual(_schema.getResidency()));
+        SCIDB_ASSERT(inputArray->getArrayDesc().getResidency()->isEqual(_schema.getResidency()));
+
+        std::shared_ptr<Array> rangesArray = redistributeToRandomAccess(inputArrays[1],
+                                                                        createDistribution(psReplication),
+                                                                        inputArray->getArrayDesc().getResidency(),
+                                                                        query);
 
         // Some variables.
         SchemaUtils schemaUtilsInputArray(inputArray);
@@ -77,7 +82,7 @@ public:
 
         vector<std::shared_ptr<ConstIterator> > rangesArrayIters(nDims*2);
         for (size_t i=0; i<nDims*2; ++i) {
-            rangesArrayIters[i] = rangesArray->getConstIterator(i);
+            rangesArrayIters[i] = rangesArray->getConstIterator(safe_static_cast<AttributeID>(i));
         }
         MultiConstIterators multiItersRangesArray(rangesArrayIters);
         while (!multiItersRangesArray.end()) {

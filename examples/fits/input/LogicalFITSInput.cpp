@@ -27,10 +27,11 @@
  *        The operator syntax is:
  *        FITS_INPUT(<Array>, <File Path>, [ <HDU Number> [ , <Instance ID> ]] )
  */
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
-#include "system/Cluster.h"
+#include <query/Operator.h>
+#include <system/Cluster.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 
 namespace scidb
@@ -80,7 +81,17 @@ public:
         const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
         ArrayDesc arrayDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, query->getCatalogVersion(arrayName), arrayDesc);
+        std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(query);
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(namespaceName, arrayName, arrayId, arrayDesc);
+
+        stringstream ss;
+        ss << query->getInstanceID(); // coordinator instance
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        arrayDesc.setDistribution(localDist);
+        arrayDesc.setResidency(query->getDefaultArrayResidency());
 
         return arrayDesc;
     }

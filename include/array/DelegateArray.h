@@ -162,6 +162,7 @@ public:
 
     std::shared_ptr<Array> getInputArray() const;
 
+    // XXX Can anyone explain why these methods should be const?  It seems overly restrictive.
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
@@ -172,6 +173,9 @@ protected:
     bool isClone;
 };
 
+/**
+ * XXX Dead code!
+ */
 class ShallowDelegateArray : public DelegateArray
 {
 public:
@@ -217,7 +221,7 @@ class NonEmptyableArray : public DelegateArray
     };
 
 public:
-	NonEmptyableArray(std::shared_ptr<Array> input);
+	NonEmptyableArray(const std::shared_ptr<Array>& input);
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
     virtual DelegateChunkIterator* createChunkIterator(DelegateChunk const* chunk, int iterationMode) const;

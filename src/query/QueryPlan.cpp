@@ -26,7 +26,6 @@
  * @author roman.simakov@gmail.com
  */
 
-#include <boost/foreach.hpp>
 #include <memory>
 
 #include <log4cxx/logger.h>
@@ -94,6 +93,44 @@ void LogicalQueryPlanNode::inferArrayAccess(std::shared_ptr<Query>& query)
     _logicalOperator->inferArrayAccess(query);
 }
 
+std::string LogicalQueryPlanNode::inferPermissions(std::shared_ptr<Query>& query)
+{
+    std::stringstream ss;
+
+    // Consider non-recursive implementation
+    for (size_t i=0, end=_childNodes.size(); i<end; i++)
+    {
+        ss << _childNodes[i]->inferPermissions(query);
+    }
+    assert(_logicalOperator);
+    ss << _logicalOperator->inferPermissions(query);
+    std::string permissions = ss.str();
+
+    // Remove duplicates
+    std::map<char, int> hashMap;
+
+    std::string::const_iterator itStr;
+    for (   itStr = permissions.begin();
+            itStr != permissions.end();
+            ++itStr)
+    {
+        // Add/overwrite the node in the hashMap
+        hashMap[*itStr] = 1;
+    }
+
+    std::map<char, int>::const_iterator itHashMap;
+    std::string response;
+    for (   itHashMap = hashMap.begin();
+            itHashMap != hashMap.end();
+            ++itHashMap)
+    {
+        // Append each character from the hashMap
+        response += itHashMap->first;
+    }
+
+    return response;
+}
+
 void LogicalQueryPlanNode::toString(std::ostream &out, int indent, bool children) const
 {
     Indent prefix(indent);
@@ -154,9 +191,15 @@ void PhysicalQueryPlanNode::toString(std::ostream &out, int indent, bool childre
       <<" cells "<<_boundaries.getNumCells();
 
     if (_boundaries.getStartCoords().size() == schema.getDimensions().size()) {
-        out  <<" chunks "<<_boundaries.getNumChunks(schema.getDimensions())
-            <<" est_bytes "<<_boundaries.getSizeEstimateBytes(schema)
-           <<"\n";
+        out  << " chunks ";
+        try {
+            uint64_t n = _boundaries.getNumChunks(schema.getDimensions());
+            out << n;
+        } catch (PhysicalBoundaries::UnknownChunkIntervalException&) {
+            out << '?';
+        }
+        out << " est_bytes " << _boundaries.getSizeEstimateBytes(schema)
+            << '\n';
     }
     else {
         out <<" [improperly initialized]\n";
@@ -220,6 +263,68 @@ bool PhysicalQueryPlanNode::getInputIsStrict(const PhysicalOperator::Parameters&
         isStrict = paramExpr->getExpression()->evaluate().getBool();
     }
     return isStrict;
+}
+
+void
+PhysicalQueryPlanNode::supplantChild(const PhysNodePtr& targetChild,
+                                     const PhysNodePtr& newChild)
+{
+    assert(newChild);
+    assert(targetChild);
+    assert(newChild.get() != this);
+    int removed = 0;
+    std::vector<PhysNodePtr> newChildren;
+
+    if (logger->isTraceEnabled()) {
+        std::ostringstream os;
+        os << "Supplanting targetChild Node:\n";
+        targetChild->toString(os, 0 /*indent*/,false /*children*/);
+        os << "\nwith\n";
+        newChild->toString(os, 0 /*indent*/,false /*children*/);
+        LOG4CXX_TRACE(logger, os.str());
+    }
+
+    for(auto &child : _childNodes) {
+        if (child != targetChild) {
+            newChildren.push_back(child);
+        }
+        else {
+            // Set the parent of the newChild to this node.
+            newChild->_parent = shared_from_this();
+
+            // NOTE: Any existing children of the newChild are removed from the
+            // Query Plan.
+            if ((newChild->_childNodes).size() > 0) {
+                LOG4CXX_INFO(logger,
+                             "Child nodes of supplanting node are being removed from the tree.");
+            }
+
+            // Re-parent the children of the targetChild to the newChild
+            newChild->_childNodes.swap(targetChild->_childNodes);
+            for (auto grandchild : newChild -> _childNodes) {
+                assert(grandchild != newChild);
+                grandchild->_parent = newChild;
+            }
+
+            // Remove any references to the children from the targetChild
+            targetChild->_childNodes.clear();
+            targetChild->resetParent();
+
+            // Add the newChild to this node
+            newChildren.push_back(newChild);
+            ++removed;
+        }
+    }
+    _childNodes.swap(newChildren);
+
+    if (logger->isTraceEnabled()) {
+        std::ostringstream os;
+        newChild->toString(os);
+        LOG4CXX_TRACE(logger, "New Node subplan:\n"
+                      << os.str());
+    }
+
+    SCIDB_ASSERT(removed==1);
 }
 
 // LogicalPlan

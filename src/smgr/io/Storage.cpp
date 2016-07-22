@@ -69,7 +69,6 @@ using namespace std;
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.smgr"));
 static log4cxx::LoggerPtr chunkLogger(log4cxx::Logger::getLogger("scidb.smgr.chunk"));
 
-
 const size_t DEFAULT_TRANS_LOG_LIMIT = 1024; // default limit of transaction log file (in mebibytes)
 const size_t MAX_CFG_LINE_LENGTH = 1*KiB;
 const int MAX_REDUNDANCY = 8;
@@ -121,12 +120,18 @@ inline static double getTimeSecs()
     return (((double) tv.tv_sec) * 1000000 + ((double) tv.tv_usec)) / 1000000;
 }
 
-static void collectArraysToRollback(std::shared_ptr<std::map<ArrayID, VersionID> >& arrsToRollback, const VersionID& lastVersion,
-                                    const ArrayID& baseArrayId, const ArrayID& newArrayId)
+/* Accumulate the uaid/aid (base and version array ids) of a version that
+   should be rolled back.
+ */
+static void collectArraysToRollback(
+    std::shared_ptr<Storage::RollbackMap>& arrsToRollback,
+    const VersionID& lastVersion,
+    const ArrayID& baseArrayId,
+    const ArrayID& versionArrayId)
 {
     assert(arrsToRollback);
     assert(baseArrayId>0);
-    (*arrsToRollback.get())[baseArrayId] = lastVersion;
+    (*arrsToRollback.get())[baseArrayId] = std::make_pair(versionArrayId, lastVersion);
 }
 
 VersionControl* VersionControl::instance;
@@ -166,10 +171,10 @@ CachedStorage::initStorageDescriptionFile(const std::string& storageDescriptorFi
     {
         _databasePath = storageDescriptorFilePath.substr(0, pathEnd + 1);
     }
-    FILE* f = fopen(descPath, "r");
+    FILE* f = scidb::fopen(descPath, "r");
     if (f == NULL)
     {
-        f = fopen(descPath, "w");
+        f = scidb::fopen(descPath, "w");
         if (!f)
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_CANT_OPEN_FILE) << descPath << ferror(f);
         size_t fileNameBeg = (pathEnd == string::npos) ? 0 : pathEnd + 1;
@@ -181,8 +186,8 @@ CachedStorage::initStorageDescriptionFile(const std::string& storageDescriptorFi
         string databaseName = storageDescriptorFilePath.substr(fileNameBeg, fileNameEnd - fileNameBeg);
         _databaseHeader = _databasePath + databaseName + ".header";
         _databaseLog = _databasePath + databaseName + ".log";
-        fprintf(f, "%s.header\n", databaseName.c_str());
-        fprintf(f, "%ld %s.log\n", (long) DEFAULT_TRANS_LOG_LIMIT, databaseName.c_str());
+        scidb::fprintf(f, "%s.header\n", databaseName.c_str());
+        scidb::fprintf(f, "%ld %s.log\n", (long) DEFAULT_TRANS_LOG_LIMIT, databaseName.c_str());
         _logSizeLimit = (uint64_t) DEFAULT_TRANS_LOG_LIMIT * MiB;
     }
     else
@@ -199,7 +204,7 @@ CachedStorage::initStorageDescriptionFile(const std::string& storageDescriptorFi
         _databaseLog = relativePath(_databasePath, strtrim(buf + pos));
         _logSizeLimit = (uint64_t) sizeMb * MiB;
     }
-    fclose(f);
+    scidb::fclose(f);
 }
 
 /* Record an extent in the extent map
@@ -326,7 +331,7 @@ CachedStorage::checkExtentsForOverlaps(Extents& extents)
             std::stringstream ss;
 
             size_t rc = _hd->read(&desc, sizeof(ChunkDescriptor), *over_it);
-            assert(rc == sizeof(ChunkDescriptor));
+            SCIDB_ASSERT(rc == sizeof(ChunkDescriptor));
 
             ss<< "    [dsguid=" << desc.hdr.pos.dsGuid <<
                 "] [offset=" << desc.hdr.pos.offs <<
@@ -389,7 +394,7 @@ CachedStorage::initChunkMap()
 {
     LOG4CXX_TRACE(logger, "smgr open:  reading chunk map, nchunks " << _hdr.nChunks);
 
-    _redundancy = Config::getInstance()->getOption<size_t> (CONFIG_REDUNDANCY);
+    _redundancyEnabled = true;
     _syncReplication = !Config::getInstance()->getOption<bool> (CONFIG_ASYNC_REPLICATION);
     _enableChunkmapRecovery =
         Config::getInstance()->getOption<bool> (CONFIG_ENABLE_CHUNKMAP_RECOVERY);
@@ -433,9 +438,7 @@ CachedStorage::initChunkMap()
         {
             assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
 
-            LOG4CXX_TRACE(chunkLogger,"chunkl: initchunkmap: found chunk desc " << desc.toString());
-            
-	if (desc.hdr.arrId != 0)
+            if (desc.hdr.arrId != 0)
             {
                 /* Check if unversioned array exists
                  */
@@ -471,8 +474,10 @@ CachedStorage::initChunkMap()
                 if (it == existentArrays.end())
                 {
                     desc.hdr.arrId = 0;
-                    LOG4CXX_TRACE(chunkLogger,"chunkl: initchunkmap: remove chunk desc "<< "for non-existant array at position " << chunkPos); 
-
+                    LOG4CXX_TRACE(chunkLogger,
+                                  "chunkl: initchunkmap: remove chunk desc "
+                                  << "for non-existant array at position "
+                                  << chunkPos);
                     _hd->writeAll(&desc.hdr, sizeof(ChunkHeader), chunkPos);
                     assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
                     _freeHeaders.insert(chunkPos);
@@ -532,11 +537,7 @@ CachedStorage::initChunkMap()
                     {
                         /* Chunk is live, put it in the map
                          */
-                        LOG4CXX_TRACE(chunkLogger,
-                                    "chunkl: initchunkmap: add live chunk to map for pos "
-                                     << chunkPos); 
-
-			std::shared_ptr<PersistentChunk>& chunk =(*innerMap)[addr].getChunk();
+                        std::shared_ptr<PersistentChunk>& chunk =(*innerMap)[addr].getChunk();
                         ASSERT_EXCEPTION((!chunk), "smgr open: NOT unique chunk");
                         if (!desc.hdr.is<ChunkHeader::TOMBSTONE>())
                         {
@@ -547,8 +548,8 @@ CachedStorage::initChunkMap()
                         else
                         {
                             (*innerMap)[addr].setTombstonePos(
-                                InnerChunkMapEntry::TOMBSTONE,
-                                desc.hdr.pos.hdrPos);
+                                    InnerChunkMapEntry::TOMBSTONE,
+                                    desc.hdr.pos.hdrPos);
                         }
 
                         /* Now check if by inserting this chunk we made the previous one dead...
@@ -578,8 +579,7 @@ CachedStorage::initChunkMap()
                         desc.hdr.arrId = 0;
                         LOG4CXX_TRACE(chunkLogger, "chunkl: initchunkmap: "
                                       << "remove dead chunk desc for non-existent "
- 	                              << "array version at position " << chunkPos); 
-
+                                      << "array version at position " << chunkPos);
                         _hd->writeAll(&desc.hdr, sizeof(ChunkHeader), chunkPos);
                         assert(desc.hdr.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
                         _freeHeaders.insert(chunkPos);
@@ -687,8 +687,9 @@ CachedStorage::open(const string& storageDescriptorFilePath, size_t cacheSizeByt
 
     _writeLogThreshold = Config::getInstance()->getOption<int> (CONFIG_IO_LOG_THRESHOLD);
     _enableDeltaEncoding = Config::getInstance()->getOption<bool> (CONFIG_ENABLE_DELTA_ENCODING);
-    _nInstances = SystemCatalog::getInstance()->getNumberOfInstances();
-    _redundancy = 0; // disable replication during rollback: each instance is perfroming rollback locally
+
+    // disable replication during rollback: each instance is perfroming rollback locally
+    _redundancyEnabled = false;
 
     if (rc == 0 || (_hdr.magic == SCIDB_STORAGE_HEADER_MAGIC && _hdr.currPos < HEADER_SIZE))
     {
@@ -919,7 +920,8 @@ inline bool CachedStorage::isResponsibleFor(ArrayDesc const& desc,
 {
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
-    assert(chunk._hdr.instanceId < size_t(_nInstances));
+
+    size_t redundancy = desc.getDistribution()->getRedundancy();
 
     if (chunk._hdr.instanceId == _hdr.instanceId)
     {
@@ -929,13 +931,14 @@ inline bool CachedStorage::isResponsibleFor(ArrayDesc const& desc,
     {
         return false;
     }
-    if (_redundancy == 1)
+    if (redundancy == 1)
     {
+        // the only chunks that are not mine must be from the dead instance
         return true;
     }
     InstanceID replicas[MAX_REDUNDANCY + 1];
     getReplicasInstanceId(replicas, desc, chunk.getAddress());
-    for (size_t i = 1; i <= _redundancy; i++)
+    for (size_t i = 1; i <= redundancy; ++i)
     {
         if (replicas[i] == _hdr.instanceId)
         {
@@ -974,9 +977,8 @@ std::shared_ptr<PersistentChunk> CachedStorage::createChunk(ArrayDesc const& des
     chunk.reset(new PersistentChunk());
     chunk->setAddress(desc, addr, compressionMethod);
     LOG4CXX_TRACE(chunkLogger, "chunkl: createchunk: chunk created for addr "
-                   << "[attrid=" << addr.attId << "][arrid=" << addr.arrId
-                   << "]" << CoordsToStr(addr.coords)); 
-
+                  << "[attrid=" << addr.attId << "][arrid=" << addr.arrId
+                  << "]" << CoordsToStr(addr.coords));
     chunk->_accessCount = 1; // newly created chunk is pinned
     chunk->_timestamp = ++_timestamp;
     return chunk;
@@ -1142,42 +1144,64 @@ void CachedStorage::removeVersionFromMemory(ArrayUAID uaId, ArrayID arrId)
     }
 }
 
+/// @return the physical instance ID of the primary chunk copy (i.e. of the zeroth replica)
+/// @param desc chunk array descriptor
+/// @param address chunk storage address containing the chunk coordinates
 InstanceID CachedStorage::getPrimaryInstanceId(ArrayDesc const& desc, StorageAddress const& address) const
 {
-    //in this context we have to be careful to use nInstances which was set at the beginning of system lifetime
-    //this method must return the same value regardless of whether or not there were failures
-    return desc.getPrimaryInstanceId(address.coords, _nInstances);
+      ArrayResPtr arrRes = desc.getResidency();
+      size_t nInstances = arrRes->size();
+      InstanceID logicalInstancePos = desc.getPrimaryInstanceId(address.coords, nInstances);
+      InstanceID physicalInstance = arrRes->getPhysicalInstanceAt(logicalInstancePos);
+      return physicalInstance;
 }
 
-void CachedStorage::getReplicasInstanceId(InstanceID* replicas, ArrayDesc const& desc, StorageAddress const& address) const
+/// Compute the physical instance IDs for all the replica of a given chunk
+/// @param desc chunk array descriptor
+/// @param address chunk storage address containing the chunk coordinates
+/// @param replicas [out] an array of replica instance IDs
+void CachedStorage::getReplicasInstanceId(InstanceID* replicas,
+                                          ArrayDesc const& desc,
+                                          StorageAddress const& address) const
 {
     replicas[0] = getPrimaryInstanceId(desc, address);
-    for (size_t i = 0; i < _redundancy; i++)
+    size_t redundancy = desc.getDistribution()->getRedundancy();
+    size_t nInstances = desc.getResidency()->size();
+
+    if (nInstances <= redundancy) {
+        throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_INVALID_REDUNDANCY);
+    }
+
+    for (size_t i = 0; i < redundancy; ++i)
     {
         // A prime number can be used to smear the replicas as follows
         // InstanceID instanceId = (chunk.getArrayDesc().getHashedChunkNumber(chunk.addr.coords) + (i+1)) % PRIME_NUMBER % nInstances;
         // the PRIME_NUMBER needs to be just shy of the number of instances to work, so we would need a table.
         // For Fibonacci no table is required, and it seems to work OK.
 
-        const uint64_t nReplicas = (_redundancy + 1);
-        const uint64_t currReplica = (i + 1);
-        //XXX TODO: each array/distribution should implement the replica mapping function
-        //XXX TODO: for now hard-wire psHashPartitioned mapping
-        //XXX TODO: this implies that the replicas are NOT distributed with the distribution of the primary chunks
-        const static size_t infinity(std::numeric_limits<size_t>::max());
+        const size_t nReplicas = (redundancy + 1);
+        const size_t currReplica = (i + 1);
+
         Dimensions const& dims = desc.getDimensions();
+
+        // NOTICE: Currently, getHashedChunkNumber() hashes the chunk numbers along each dimension
+        //         rather than the coordinates. Originally getHashedChunkNumber() returned
+        //         the chunk number in the row-major ordering. After hashing was introduced
+        //         (to accommodate unbound dimensions)
+        //         the domain of fibHash64() changed potentially resulting in worse performance.
         const uint64_t chunkId =
-            getPrimaryInstanceForChunk(psHashPartitioned, address.coords, dims, infinity) * (nReplicas) + currReplica;
-        InstanceID instanceId = fibHash64(chunkId, MAX_INSTANCE_BITS) % _nInstances;
+            HashedArrayDistribution::getHashedChunkNumber(dims, address.coords) * (nReplicas) + currReplica;
+
+        InstanceID instanceId = fibHash64(chunkId, MAX_INSTANCE_BITS) % nInstances;
         for (size_t j = 0; j <= i; j++)
         {
-            if (replicas[j] == instanceId)
+            if (replicas[j] == desc.getResidency()->getPhysicalInstanceAt(instanceId))
             {
-                instanceId = (instanceId + 1) % _nInstances;
+                instanceId = (instanceId + 1) % nInstances;
                 j = -1;
             }
         }
-        replicas[i + 1] = instanceId;
+        replicas[i + 1] = desc.getResidency()->getPhysicalInstanceAt(instanceId);
     }
 }
 
@@ -1193,16 +1217,21 @@ void CachedStorage::replicate(ArrayDesc const& desc,
     ScopedMutexLock cs(_mutex);
     Query::validateQueryPtr(query);
 
-    if (_redundancy <= 0 || (chunk && !isPrimaryReplica(chunk)))
-    { // self chunk
+    size_t redundancy = desc.getDistribution()->getRedundancy();
+
+    if ((!_redundancyEnabled) || // in recovery ?
+        redundancy <= 0 ||       // no replication ?
+        (chunk && !isPrimaryReplica(chunk, redundancy))) // replica chunk ?
+    {
         return;
     }
-    replicasVec.reserve(_redundancy);
+    replicasVec.reserve(redundancy);
     InstanceID replicas[MAX_REDUNDANCY + 1];
     getReplicasInstanceId(replicas, desc, addr);
 
     QueryID queryId = query->getQueryID();
-    assert(queryId != 0);
+    SCIDB_ASSERT(queryId.isValid());
+
     std::shared_ptr<MessageDesc> chunkMsg;
     if (chunk && data)
     {
@@ -1238,7 +1267,7 @@ void CachedStorage::replicate(ArrayDesc const& desc,
         chunkRecord->set_tombstone(true);
     }
 
-    for (size_t i = 1; i <= _redundancy; i++)
+    for (size_t i = 1; i <= redundancy; ++i)
     {
         std::shared_ptr<ReplicationManager::Item> item = make_shared <ReplicationManager::Item>(replicas[i], chunkMsg, query);
         assert(_replicationManager);
@@ -1519,7 +1548,7 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
 
     VersionID dstVersion = adesc.getVersionId();
     void const* deflated = buf.get();
-    int nCoordinates = chunk._addr.coords.size();
+    size_t nCoordinates = chunk._addr.coords.size();
     DBArrayChunkInternal intChunk(adesc, &chunk);
     size_t compressedSize = _compressors[chunk.getCompressionMethod()]->compress(buf.get(), intChunk);
     assert(compressedSize <= chunk.getSize());
@@ -1589,8 +1618,8 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
                 _logSize = 0;
                 _currLog ^= 1;
             }
-           LOG4CXX_TRACE(logger, "CachedStorage::writeChunk: write log entry chunk pos "
- 	                 << transLogRecord->hdr.pos.offs << " at log pos " << _logSize); 
+            LOG4CXX_TRACE(logger, "CachedStorage::writeChunk: write log entry chunk pos "
+                          << transLogRecord->hdr.pos.offs << " at log pos " << _logSize);
 
             /* Write the transaction... log is opened O_SYNC so no flush is necessary
              */
@@ -1607,17 +1636,17 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
          */
         ChunkDescriptor cdesc;
         cdesc.hdr = chunk._hdr;
-        for (int i = 0; i < nCoordinates; i++)
+        for (size_t i = 0; i < nCoordinates; i++)
         {
             cdesc.coords[i] = chunk._addr.coords[i];
         }
         assert(chunk._hdr.pos.hdrPos != 0);
 
         LOG4CXX_TRACE(chunkLogger, "chunkl: writechunk: write chunk desc at pos "
- 	            << chunk._hdr.pos.hdrPos);
- 	LOG4CXX_TRACE(chunkLogger, "chunkl: writechunk: desc: "
- 	            << cdesc.toString());   
-        
+                      << chunk._hdr.pos.hdrPos);
+        LOG4CXX_TRACE(chunkLogger, "chunkl: writechunk: desc: "
+                      << cdesc.toString());
+
         _hd->writeAll(&cdesc, sizeof(ChunkDescriptor), chunk._hdr.pos.hdrPos);
 
         /* Update storage header (for nchunks field)
@@ -1626,7 +1655,8 @@ CachedStorage::writeChunk(ArrayDesc const& adesc,
 
         InjectedErrorListener<WriteChunkInjectedError>::check();
 
-        if (isPrimaryReplica(&chunk)) {
+        if (isPrimaryReplica(&chunk,
+                             adesc.getDistribution()->getRedundancy())) {
             chunkCleaner.disarm();
             chunk.unPin();
             notifyChunkReady(chunk);
@@ -1652,7 +1682,7 @@ void CachedStorage::markChunkAsFree(InnerChunkMapEntry& entry, std::shared_ptr<D
     {
         /* Handle tombstone chunks
          */
-        int rc = _hd->read(&header, sizeof(ChunkHeader), entry.getTombstonePos());
+        size_t rc = _hd->read(&header, sizeof(ChunkHeader), entry.getTombstonePos());
         if (rc != 0 && rc != sizeof(ChunkHeader)) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_STORAGE,
                                    SCIDB_LE_OPERATION_FAILED_WITH_ERRNO)
@@ -1672,9 +1702,8 @@ void CachedStorage::markChunkAsFree(InnerChunkMapEntry& entry, std::shared_ptr<D
      */
     header.arrId = 0;
     LOG4CXX_TRACE(chunkLogger,
- 	         "chunkl: markchunkasfree: free chunk descriptor at position "
- 	         << header.pos.hdrPos);
-
+                  "chunkl: markchunkasfree: free chunk descriptor at position "
+                  << header.pos.hdrPos);
     _hd->writeAll(&header, sizeof(ChunkHeader), header.pos.hdrPos);
     assert(header.nCoordinates < MAX_NUM_DIMS_SUPPORTED);
     _freeHeaders.insert(header.pos.hdrPos);
@@ -1737,7 +1766,7 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
     tombstoneDesc.hdr.flags = 0;
     tombstoneDesc.hdr.set<ChunkHeader::TOMBSTONE>(true);
     tombstoneDesc.hdr.arrId = arrayDesc.getId();
-    tombstoneDesc.hdr.nCoordinates = coords.size();
+    tombstoneDesc.hdr.nCoordinates = safe_static_cast<uint16_t>(coords.size());
     tombstoneDesc.hdr.instanceId = getPrimaryInstanceId(arrayDesc, StorageAddress(arrayDesc.getId(), 0, coords));
     tombstoneDesc.hdr.allocatedSize = 0;
     tombstoneDesc.hdr.compressedSize = 0;
@@ -1797,17 +1826,18 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
             _logSize = 0;
             _currLog ^= 1;
         }
-        LOG4CXX_TRACE(logger, "ChunkDesc: Write in log chunk tombstone header " << transLogRecord->hdr.pos.offs
-                      << " at position " << _logSize);
+        LOG4CXX_TRACE(logger, "CachedStorage::removeLocalChunkVersion: "
+                      << " write log entry chunk tombstone pos " << transLogRecord->hdr.pos.offs
+                      << " at log pos " << _logSize);
 
         _log[_currLog]->writeAll(transLogRecord, sizeof(TransLogRecord) * 2, _logSize);
         _logSize += sizeof(TransLogRecord);
 
         LOG4CXX_TRACE(chunkLogger, "chunkl: removelocalchunkversion: "
-             << "write chunk tombstone at pos " <<  tombstoneDesc.hdr.pos.hdrPos);
+                      << "write chunk tombstone at pos " <<  tombstoneDesc.hdr.pos.hdrPos);
         LOG4CXX_TRACE(chunkLogger, "chunkl: removelocalchunkversion: "
- 	     << "tombstone to write: " << tombstoneDesc.toString());
-        
+                      << "tombstone to write: " << tombstoneDesc.toString());
+
         _hd->writeAll(&tombstoneDesc, sizeof(ChunkDescriptor), tombstoneDesc.hdr.pos.hdrPos);
     }
     _hd->writeAll(&_hdr, HEADER_SIZE, 0);
@@ -1818,7 +1848,7 @@ void CachedStorage::removeLocalChunkVersion(ArrayDesc const& arrayDesc,
 /// @note rollback must be called only when the query calling it is in error state
 ///       thus, before performing any updates under THE _mutex, the query context must be validated
 ///       to avoid leaving chunks behind
-void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
+void CachedStorage::rollback(RollbackMap const& undoUpdates)
 {
     LOG4CXX_DEBUG(logger, "Performing rollback");
 
@@ -1845,19 +1875,22 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
                 break;
             }
             pos += sizeof(TransLogRecord);
-            std::map<ArrayID, VersionID>::const_iterator it = undoUpdates.find(transLogRecord.arrayUAID);
+            RollbackMap::const_iterator it = undoUpdates.find(transLogRecord.arrayUAID);
             VersionID lastVersionID = -1;
-            if (it != undoUpdates.end() && (lastVersionID = it->second) < transLogRecord.version)
+            if (it != undoUpdates.end() && (it->second.first <= transLogRecord.arrayId))
             {
+                lastVersionID = it->second.second;
+
                 // this version is to be un-done
                 assert(transLogRecord.oldSize == 0);
+                assert(lastVersionID == transLogRecord.version - 1);
 
                 transLogRecord.hdr.arrId = 0; // mark chunk as free
                 assert(transLogRecord.hdr.pos.hdrPos != 0);
                 LOG4CXX_TRACE(chunkLogger, "chunkl: rollback: undo chunk descriptor creation at position "
-                             << transLogRecord.hdr.pos.hdrPos); 
+                              << transLogRecord.hdr.pos.hdrPos);
                 LOG4CXX_TRACE(chunkLogger, "chunkl: rollback: hdr: "
- 	                     << transLogRecord.hdr.toString()); 
+                              << transLogRecord.hdr.toString());
                 _hd->writeAll(&transLogRecord.hdr, sizeof(ChunkHeader), transLogRecord.hdr.pos.hdrPos);
                 _freeHeaders.insert(transLogRecord.hdr.pos.hdrPos);
 
@@ -1877,17 +1910,17 @@ void CachedStorage::rollback(std::map<ArrayID, VersionID> const& undoUpdates)
     }
     flush();
 
-    for(std::map<ArrayID, VersionID>::const_iterator it = undoUpdates.begin();
+    for(RollbackMap::const_iterator it = undoUpdates.begin();
         it != undoUpdates.end();
         ++it)
     {
         // If we rolled back the first version, delete the datastore
-        if (it->second == 0)
+        if (it->second.second == 0)
         {
             _datastores.closeDataStore(it->first, true /* remove from disk */);
         }
         LOG4CXX_DEBUG(logger, "Rolling back arrId = "
-                      << it->first << ", version = " << it->second);
+                      << it->first << ", version = " << it->second.second);
     }
 
     LOG4CXX_DEBUG(logger, "Rollback complete");
@@ -1899,12 +1932,15 @@ void CachedStorage::doTxnRecoveryOnStartup()
     list<std::shared_ptr<SystemCatalog::LockDesc> > workerLocks;
 
     SystemCatalog::getInstance()->readArrayLocks(getInstanceId(), coordLocks, workerLocks);
-    std::shared_ptr<map<ArrayID, VersionID> > arraysToRollback = make_shared <map<ArrayID, VersionID> > ();
+    std::shared_ptr<RollbackMap> arraysToRollback =
+        make_shared <RollbackMap> ();
     UpdateErrorHandler::RollbackWork collector = bind(&collectArraysToRollback, arraysToRollback, _1, _2, _3);
 
     { // Deal with the  SystemCatalog::LockDesc::COORD type locks first
 
-        for (list<std::shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = coordLocks.begin(); iter != coordLocks.end(); ++iter)
+        for (list<std::shared_ptr<SystemCatalog::LockDesc> >::const_iterator iter = coordLocks.begin();
+             iter != coordLocks.end();
+             ++iter)
         {
             const std::shared_ptr<SystemCatalog::LockDesc>& lock = *iter;
 
@@ -2059,8 +2095,8 @@ void CachedStorage::loadChunk(ArrayDesc const& desc, PersistentChunk* aChunk)
             {
                 chunk._waiting = true;
                 Semaphore::ErrorChecker ec;
-                std::shared_ptr<Query> query = Query::getQueryByID(Query::getCurrentQueryID(), false);
-                if (query)
+                std::shared_ptr<Query> query = Query::getQueryPerThread();
+                if (query) // in what use case is query unset?
                 {
                     ec = bind(&Query::validate, query);
                 }
@@ -2105,11 +2141,6 @@ CachedStorage::readChunk(ArrayDesc const& desc,
 InstanceID CachedStorage::getInstanceId() const
 {
     return _hdr.instanceId;
-}
-
-size_t CachedStorage::getNumberOfInstances() const
-{
-    return _nInstances;
 }
 
 void CachedStorage::setInstanceId(InstanceID id)
@@ -2780,14 +2811,16 @@ void CachedStorage::DBArrayChunkBase::free()
     _inputChunk->free();
 }
 
-void CachedStorage::DBArrayChunkBase::compress(CompressedBuffer& buf,
-                                               std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+void
+CachedStorage::DBArrayChunkBase::compress(CompressedBuffer& buf,
+                                          std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
 {
     ASSERT_EXCEPTION_FALSE("DBArrayChunkBase::compress");
 }
 
-void CachedStorage::DBArrayChunk::compress(CompressedBuffer& buf,
-                                           std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
+void
+CachedStorage::DBArrayChunk::compress(CompressedBuffer& buf,
+                                      std::shared_ptr<ConstRLEEmptyBitmap>& emptyBitmap) const
 {
     if (emptyBitmap)
     {
@@ -2818,15 +2851,17 @@ void CachedStorage::DBArrayChunk::decompress(CompressedBuffer const& buf)
     _arrayIter._storage->decompressChunk(getArrayDesc(), dbChunk, buf);
 }
 
-bool CachedStorage::isPrimaryReplica(PersistentChunk const* chunk)
+bool CachedStorage::isPrimaryReplica(PersistentChunk const* chunk, size_t redundancy)
 {
     assert(chunk);
     bool res = (chunk->getHeader().instanceId == _hdr.instanceId);
-    if (! (res || (_redundancy > 0) )) {
-        LOG4CXX_TRACE(logger, "isPrimaryReplica: chunk->getHeader().instanceId " << chunk->getHeader().instanceId );
+    if ( logger->isTraceEnabled() && (! (res || (redundancy > 0) ))) {
+        LOG4CXX_TRACE(logger, "isPrimaryReplica: chunk->getHeader().instanceId "
+                      << chunk->getHeader().instanceId );
         LOG4CXX_TRACE(logger, "isPrimaryReplica: _hdr.instanceId " << _hdr.instanceId );
     }
-    ASSERT_EXCEPTION((res || (_redundancy > 0)), "cannot store replica chunk when redundancy==0");
+    ASSERT_EXCEPTION((res || (redundancy > 0)),
+                     "cannot store replica chunk when redundancy==0");
     return res;
 }
 

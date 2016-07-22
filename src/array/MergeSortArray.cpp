@@ -64,10 +64,11 @@ namespace scidb
             streams[i].size = (*streamSizes)[i];
 
             if (streams[i].size > 0) {
-                for (size_t j = 0; j < nAttrs; j++) {
+                for (AttributeID j = 0; j < nAttrs; j++) {
                     streams[i].inputArrayIterators[j] = inputArrays[i]->getConstIterator(j);
                     while (!streams[i].inputArrayIterators[j]->end()) {
-                        streams[i].inputChunkIterators[j] = streams[i].inputArrayIterators[j]->getChunk().getConstIterator();
+                        streams[i].inputChunkIterators[j] =
+                            streams[i].inputArrayIterators[j]->getChunk().getConstIterator();
                         if (!streams[i].inputChunkIterators[j]->end()) {
                             streams[i].tuple[j] = streams[i].inputChunkIterators[j]->getItem();
                             streams[i].endOfStream = false;
@@ -77,17 +78,17 @@ namespace scidb
                     }
                 }
                 if (!streams[i].endOfStream) {
-                    permutation.push_back(i);
+                    permutation.push_back(safe_static_cast<int>(i));
                 }
             }
         }
         iqsort(&permutation[0], permutation.size(), *this);
     }
 
-    int MergeSortArray::binarySearch(PointerRange<const Value> tuple) {
-        int l = 0, r = permutation.size();
+    size_t MergeSortArray::binarySearch(PointerRange<const Value> tuple) {
+        size_t l = 0, r = permutation.size();
         while (l < r) {
-            int m = (l + r) >> 1;
+            size_t m = (l + r) >> 1;
             if (comparator->compare(&streams[permutation[m]].tuple[0], &tuple[0]) > 0) {
                 l = m + 1;
             } else {
@@ -111,7 +112,7 @@ namespace scidb
 
         while (permutation.size() != 0) {
             if (!chunkIterators[0]) {
-                for (size_t i = 0; i < nAttrs; i++) {
+                for (AttributeID i = 0; i < nAttrs; i++) {
                     Address addr(i, chunkPos);
                     MemChunk& chunk = attributes[i].chunks[chunkIndex % CHUNK_HISTORY_SIZE];
                     chunk.initialize(this, &desc, addr,

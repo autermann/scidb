@@ -102,7 +102,7 @@ SCIDB QUERY : <regrid(A4516,1,2,sum(v),count(*),8)>
 
 SCIDB QUERY : <show('aggregate(A4516,sum(v),count(*),j,1)', 'afl')>
 {i} schema
-{0} 'A4516@1<v_sum:int64 NULL DEFAULT null,count:uint64 NULL DEFAULT null> [j=1:10,1,0]'
+{0} 'A4516@1<v_sum:int64,count:uint64> [j=1:10,1,0]'
 
 SCIDB QUERY : <aggregate(A4516,sum(v),count(*),j,1)>
 {j} v_sum,count
@@ -119,7 +119,7 @@ SCIDB QUERY : <aggregate(A4516,sum(v),count(*),j,1)>
 
 SCIDB QUERY : <show('aggregate(A4516,sum(v),count(*),j,i,1,2)', 'afl')>
 {i} schema
-{0} 'A4516@1<v_sum:int64 NULL DEFAULT null,count:uint64 NULL DEFAULT null> [j=1:10,1,0,i=1:8,2,0]'
+{0} 'A4516@1<v_sum:int64,count:uint64> [j=1:10,1,0,i=1:8,2,0]'
 
 SCIDB QUERY : <aggregate(A4516,sum(v),count(*),j,i,1,2)>
 {j,i} v_sum,count
@@ -206,7 +206,7 @@ SCIDB QUERY : <aggregate(A4516,sum(v),count(*),j,i,1,2)>
 
 SCIDB QUERY : <show('regrid(A4516,1,2,sum(v),count(*),8, 7)', 'afl')>
 {i} schema
-{0} 'A4516@1<v_sum:int64 NULL DEFAULT null,count:uint64 NULL DEFAULT null> [i=1:8,8,0,j=1:5,7,0]'
+{0} 'A4516@1<v_sum:int64,count:uint64> [i=1:8,8,0,j=1:5,7,0]'
 
 SCIDB QUERY : <regrid(A4516,1,2,sum(v),count(*),8, 7)>
 {i,j} v_sum,count

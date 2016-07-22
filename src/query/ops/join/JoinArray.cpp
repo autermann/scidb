@@ -272,9 +272,9 @@ namespace scidb
     {
         ArrayDesc const& leftDesc = left->getArrayDesc();
         ArrayDesc const& rightDesc = right->getArrayDesc();
-        nLeftAttributes = leftDesc.getAttributes().size();
+        nLeftAttributes = safe_static_cast<AttributeID>(leftDesc.getAttributes().size());
         emptyTagPosition = desc.getEmptyBitmapAttribute()->getId();
-        leftEmptyTagPosition = leftDesc.getEmptyBitmapAttribute() != NULL ? leftDesc.getEmptyBitmapAttribute()->getId() : -1;
-        rightEmptyTagPosition = rightDesc.getEmptyBitmapAttribute() != NULL ? rightDesc.getEmptyBitmapAttribute()->getId() : -1;
+        leftEmptyTagPosition = leftDesc.getEmptyBitmapAttribute() != NULL ? leftDesc.getEmptyBitmapAttribute()->getId() : INVALID_ATTRIBUTE_ID;
+        rightEmptyTagPosition = rightDesc.getEmptyBitmapAttribute() != NULL ? rightDesc.getEmptyBitmapAttribute()->getId() : INVALID_ATTRIBUTE_ID;
     }
 }

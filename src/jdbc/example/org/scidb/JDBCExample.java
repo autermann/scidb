@@ -22,10 +22,12 @@
 package org.scidb;
 
 import org.scidb.jdbc.IResultSetWrapper;
+import org.scidb.client.AuthenticationFile;
+import org.scidb.client.ConfigUser;
+import org.scidb.client.ConfigUserException;
+import org.scidb.jdbc.Connection;
 
 import java.io.IOException;
-import java.sql.DriverManager;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -46,25 +48,33 @@ class JDBCExample
 
         String iqueryHost = "localhost";
         String iqueryPort = "1239";
+        String authFileName = "";
 
-        switch (args.length)
+        if (args.length >= 1 && args.length <= 3)
         {
-            case 1:
+            if (args.length >= 1)
+            {
                 iqueryHost = args[0];
-                break;
-            case 2:
-                iqueryHost = args[0];
+            }
+            if (args.length >= 2)
+            {
                 iqueryPort = args[1];
-                break;
-            default:
-                break;
+            }
+            if (args.length >= 3)
+            {
+                authFileName = args[2];
+            }
         }
 
         try
         {
-            String connString = "jdbc:scidb://" + iqueryHost + ":" + iqueryPort + "/";
+            Connection conn = new Connection(iqueryHost, Integer.parseInt(iqueryPort));
 
-            Connection conn = DriverManager.getConnection(connString);
+            ConfigUser configUser =  ConfigUser.getInstance();
+            configUser.verifySafeFile(authFileName, false);
+            AuthenticationFile authFile = new AuthenticationFile(authFileName);
+            conn.getSciDBConnection().startNewClient(authFile.getUserName(), authFile.getUserPassword());
+
             Statement st = conn.createStatement();
             //create array A<a:string>[x=0:2,3,0, y=0:2,3,0];
             //select * into A from array(A, '[["a","b","c"]["d","e","f"]["123","456","789"]]');
@@ -89,7 +99,7 @@ class JDBCExample
                 res.next();
             }
         }
-        catch (SQLException e)
+        catch (Exception e)
         {
             System.out.println(e);
         }

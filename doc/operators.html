@@ -575,7 +575,7 @@ Reshape takes definition of attributes from the source array and definition of d
 <dt><b>Syntax</b></dt>
 <dd><u>save</u> ( <i>array-reference</i> , <i>file-path</i> [ [ <i>, instance-id</i> [ <i>, store-format</i>  ] ] )
 <dd><i>instance-id</i> - instanceID or -1 (all instances) or -2 (coordinator). Default -2</dd>
-<dd><i>store-format</i> - "opaque", "store", "sparse", "dense", "csv", "csv+", "lcsv+"  or binary loader template, for example: "(int32,dummy(4),string)". Default "store"</dd>
+<dd><i>store-format</i> - "opaque", "store", "sparse", "dense", "csv", "csv+", "tsv", "tsv+"  or binary loader template, for example: "(int32,dummy(4),string)". Default "store"</dd>
 <dt><b>Example</b></dt>
 <dd><code>iquery -aq "save(testarr, '/data/testarr.dat')"</code></dd>
 <dd><code>iquery -aq "save(testarr, '/data/testarr.dat', -2, '(int32,float,string)')"</code></dd>

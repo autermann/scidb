@@ -74,11 +74,12 @@ public:
             std::vector<RedistributeContext> const&,
             std::vector<ArrayDesc> const&) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
-                                     std::shared_ptr<Query> query)
+                                   std::shared_ptr<Query> query)
     {
         const string filePath = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getString();
         uint32_t hdu = getHDU();

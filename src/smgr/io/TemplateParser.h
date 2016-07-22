@@ -159,8 +159,15 @@ namespace scidb
      *    Date: 8/4/2013
      *    Ticket: 3417
      *    Note: Initial version (existing implementation).
+     *
+     * SCIDB_OPAQUE_FORMAT_VERSION = 2:
+     *    Author: tigor
+     *    Date: 7/11/2015
+     *    Ticket: XXX
+     *    Note: Support ArrayDistribution and ArrayResidency
+     *
      */
-    const uint32_t SCIDB_OPAQUE_FORMAT_VERSION = 1;
+    const uint32_t SCIDB_OPAQUE_FORMAT_VERSION = 2;
 
     struct OpaqueChunkHeader
     {

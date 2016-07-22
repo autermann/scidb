@@ -81,7 +81,7 @@ public:
         attrs.push_back(AttributeDesc(0, "att", TID_INT64, AttributeDesc::IS_NULLABLE, 0));
         Dimensions dims;
         dims.push_back(DimensionDesc("i",0,CoordinateBounds::getMax(),_defaultChunkSize,0));
-        ArrayDesc schema("arr", attrs, dims, defaultPartitioning());
+        ArrayDesc schema("arr", attrs, dims, defaultPartitioning(), query->getDefaultArrayResidency());
         std::shared_ptr<Array> array(new MemArray(schema,query));
         Coordinates pos(1,0);
         std::shared_ptr<ArrayIterator> aiter = array->getIterator(0);

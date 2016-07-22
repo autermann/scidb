@@ -27,29 +27,31 @@
  *      Author: Knizhnik
  */
 
+#include <array/Array.h>
+#include <array/DBArray.h>
+#include <array/DelegateArray.h>
+#include <array/Metadata.h>
+#include <array/ParallelAccumulatorArray.h>
+#include <array/TransientCache.h>
 #include <boost/foreach.hpp>
-
-#include "query/Operator.h"
-#include "query/QueryProcessor.h"
-#include "query/TypeSystem.h"
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "array/DBArray.h"
-#include "array/TransientCache.h"
-#include "system/SystemCatalog.h"
-#include "network/NetworkManager.h"
-#include "smgr/io/Storage.h"
-#include "query/Statistics.h"
-
-#include "array/ParallelAccumulatorArray.h"
-#include "array/DelegateArray.h"
-#include "system/Config.h"
-#include "system/SciDBConfigOptions.h"
+#include <log4cxx/logger.h>
+#include <network/NetworkManager.h>
+#include <query/Operator.h>
+#include <query/QueryProcessor.h>
+#include <query/Statistics.h>
+#include <query/TypeSystem.h>
+#include <smgr/io/Storage.h>
+#include <system/Config.h>
+#include <system/SciDBConfigOptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb {
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.physical_store"));
 
 class PhysicalStore: public PhysicalUpdate
 {
@@ -95,31 +97,75 @@ class PhysicalStore: public PhysicalUpdate
             return;
         }
 
-        // If input was manually repartitioned, we're not allowed to override
-        // it, so you're scrod.
-        //
-        if (modifiedPtrs[0] != NULL) {
-            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_REPART_FORBIDDEN)
-                << getLogicalName();
-        }
-
         // Request a repartition to the target array's schema.
         modifiedPtrs[0] = &_schema;
     }
 
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
+            std::vector<ArrayDesc> const& inputSchemas) const
+    {
+        RedistributeContext distro(_schema.getDistribution(),
+                                   _schema.getResidency());
+        LOG4CXX_TRACE(logger, "store() output distro: "<< distro);
+        return distro;
+    }
+
     virtual DistributionRequirement getDistributionRequirement(const std::vector< ArrayDesc> & inputSchemas) const
     {
+        ArrayDistPtr arrDist = _schema.getDistribution();
+        SCIDB_ASSERT(arrDist);
+        SCIDB_ASSERT(arrDist->getPartitioningSchema()!=psUninitialized);
+        SCIDB_ASSERT(arrDist->getPartitioningSchema()!=psUndefined);
+
+        std::shared_ptr<Query> query(_query);
+        SCIDB_ASSERT(query);
+        SCIDB_ASSERT(_schema.getResidency());
+        SCIDB_ASSERT(_schema.getResidency()->size() > 0);
+
+        //XXX TODO: for now just check that all the instances in the residency are alive
+        //XXX TODO: once we allow writes in a degraded mode, this call might have more semantics
+        query->isDistributionDegradedForWrite(_schema);
+
+        // make sure PhysicalStore informs the optimizer about the actual array residency
+        ArrayResPtr arrRes = _schema.getResidency();
+        SCIDB_ASSERT(arrRes);
+
+        RedistributeContext distro(arrDist, arrRes);
+        LOG4CXX_TRACE(logger, "store() input req distro: "<< distro);
+
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder,
-                                       vector<RedistributeContext>(1,RedistributeContext(defaultPartitioning())));
+                                       vector<RedistributeContext>(1, distro));
     }
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         SCIDB_ASSERT(inputArrays.size() == 1);
+        executionPreamble(inputArrays[0], query);
+
         VersionID version = _schema.getVersionId();
-        SCIDB_ASSERT(version == ArrayDesc::getVersionFromName (_schema.getName()));
-        const string& unvArrayName = getArrayName(_parameters);
-        SCIDB_ASSERT(unvArrayName == ArrayDesc::makeUnversionedName(_schema.getName()));
+
+        typedef struct {
+            std::string arrayNameOrg;
+            std::string namespaceName;
+            std::string arrayName;
+            std::string unvArrayName;
+        } ARRAY_NAME_COMPONENTS;
+        ARRAY_NAME_COMPONENTS schemaVars, paramVars;
+
+        // why is public.A1@1 ?
+        schemaVars.arrayNameOrg = _schema.getQualifiedArrayName();
+        query->getNamespaceArrayNames(
+            schemaVars.arrayNameOrg, schemaVars.namespaceName, schemaVars.arrayName);
+        schemaVars.unvArrayName = ArrayDesc::makeUnversionedName(schemaVars.arrayName);
+
+        paramVars.arrayNameOrg = getArrayName(_parameters);
+        query->getNamespaceArrayNames(
+            paramVars.arrayNameOrg, paramVars.namespaceName, paramVars.arrayName);
+        paramVars.unvArrayName = ArrayDesc::makeUnversionedName(paramVars.arrayName);
+
+        SCIDB_ASSERT(version == ArrayDesc::getVersionFromName(schemaVars.arrayName));
+        SCIDB_ASSERT(paramVars.unvArrayName == schemaVars.unvArrayName);
 
         if (!_lock)
         {
@@ -127,12 +173,16 @@ class PhysicalStore: public PhysicalUpdate
             const SystemCatalog::LockDesc::LockMode lockMode =
                 _schema.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
 
-            _lock = std::shared_ptr<SystemCatalog::LockDesc>(make_shared<SystemCatalog::LockDesc>(
-                                                           unvArrayName,
-                                                           query->getQueryID(),
-                                                           Cluster::getInstance()->getLocalInstanceId(),
-                                                           SystemCatalog::LockDesc::WORKER,
-                                                           lockMode));
+             std::string namespaceName = _schema.getNamespaceName();
+            _lock = std::shared_ptr<SystemCatalog::LockDesc>(
+                make_shared<SystemCatalog::LockDesc>(
+                    schemaVars.namespaceName,
+                    schemaVars.unvArrayName,
+                    query->getQueryID(),
+                    Cluster::getInstance()->getLocalInstanceId(),
+                    SystemCatalog::LockDesc::WORKER,
+                    lockMode));
+
             if (lockMode == SystemCatalog::LockDesc::WR) {
                 SCIDB_ASSERT(!_schema.isTransient());
                 _lock->setArrayVersion(version);
@@ -180,6 +230,8 @@ class PhysicalStore: public PhysicalUpdate
         ArrayDesc const&   srcArrayDesc(srcArray->getArrayDesc());
         std::shared_ptr<Array>  dstArray    (DBArray::newDBArray(_schema, query));
         ArrayDesc const&   dstArrayDesc(dstArray->getArrayDesc());
+        std::string descArrayName = dstArrayDesc.getName();
+        std::string descNamespaceName = dstArrayDesc.getNamespaceName();
         SCIDB_ASSERT(dstArrayDesc == _schema);
 
         query->getReplicationContext()->enableInboundQueue(dstArrayDesc.getId(), dstArray);
@@ -199,10 +251,11 @@ class PhysicalStore: public PhysicalUpdate
 
         // Perform parallel evaluation of aggregate
         std::shared_ptr<JobQueue> queue = PhysicalOperator::getGlobalQueueForOperators();
-        size_t nJobs = false // until we have a trully multi-threaded storage manager and
-                             // StoreJob that yields its thread, store() is single-threaded
-            ? Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE)
-            : 1;
+
+        size_t nJobs = 1;
+        // until we have a truly multi-threaded storage manager and StoreJob that
+        // yields its thread, store() is single-threaded so nJobs = 1.
+        // nJobs = Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE)
 
         vector< std::shared_ptr<StoreJob> > jobs(nJobs);
         Dimensions const& dims = dstArrayDesc.getDimensions();
@@ -220,7 +273,7 @@ class PhysicalStore: public PhysicalUpdate
         int errorJob = -1;
         for (size_t i = 0; i < nJobs; i++) {
             if (!jobs[i]->wait()) {
-                errorJob = i;
+                errorJob = safe_static_cast<int>(i);
             }
             else {
                 bounds = bounds.unionWith(jobs[i]->bounds);

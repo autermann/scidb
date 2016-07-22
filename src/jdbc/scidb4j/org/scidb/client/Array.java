@@ -34,7 +34,7 @@ public class Array
 {
     private static Logger log = Logger.getLogger(Connection.class.getName());
 
-    private long queryId;
+    private QueryID queryId;
     private Schema schema;
     private Network net;
     private IChunk[] chunks;
@@ -47,7 +47,7 @@ public class Array
      * @param schema Array schema
      * @param net Network object
      */
-    public Array(long queryId, Schema schema, Network net)
+    public Array(QueryID queryId, Schema schema, Network net)
     {
         this.queryId = queryId;
         this.schema = schema;
@@ -60,7 +60,7 @@ public class Array
      * Returns query ID
      * @return Query ID
      */
-    public long getQueryId()
+    public QueryID getQueryId()
     {
         return queryId;
     }

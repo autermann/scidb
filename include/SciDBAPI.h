@@ -43,6 +43,7 @@
 #include <stdint.h>
 #include <queue>
 
+#include <query/QueryID.h>
 #include <array/Array.h>
 #include <system/Warnings.h>
 
@@ -59,7 +60,9 @@ typedef std::queue<Warning> WarningsQueue;
 class QueryResult
 {
 public:
-    QueryResult(): queryID(0), selective(false), requiresExclusiveArrayAccess(false), executionTime(0)
+    QueryResult()
+    : selective(false), autoCommit(false),
+      requiresExclusiveArrayAccess(false), executionTime(0)
     {
     }
 
@@ -67,9 +70,10 @@ public:
     ~QueryResult();
 #endif
 
-	// Query result fields
+    // Query result fields
     QueryID queryID;
     bool selective;
+    bool autoCommit;
     bool requiresExclusiveArrayAccess;
     std::shared_ptr<Array> array;
 
@@ -172,13 +176,11 @@ public:
      * @brief Notify the SciDB server that a new client is starting.
      * Provide SciDB server with the username and password details.
      *
-     * @param - name The name of the user to use.
-     * @param - password The password of the user to use.
+     * @param - userInfoFileName The name of the file that contains user authentication information.
      */
     virtual void newClientStart(
         void*                   connection,
-        const std::string &     name,
-        const std::string &     password) const = 0;
+        const std::string &     userInfoFileName) const = 0;
 };
 
 

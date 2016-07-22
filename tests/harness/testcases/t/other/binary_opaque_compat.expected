@@ -1,4 +1,4 @@
-SCIDB QUERY : <create array SortedPrevious <d:int64> [ X=0:*,10000,0]>
+SCIDB QUERY : <create array SortedPrevious <d:int64 NOT NULL> [ X=0:*,10000,0]>
 Query was executed successfully
 
 SCIDB QUERY : <${SCIDB_INSTALL_PATH}/bin/scidb -V | sed -n 1p | sed s/[^\:]*\:[^0-9]*// | sed s/\.[0-9]*$/\<=15.7/ | bc>

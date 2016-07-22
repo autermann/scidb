@@ -77,7 +77,7 @@ def log_mem_info():
                 'large-memalloc-limit',
                 'network-buffer',
                 'async-io-buffer'):
-        val = iquery(['-otsv:l', '-aq', "setopt('%s')" % opt]).splitlines()[1]
+        val = iquery(['-otsv:l', '-aq', "_setopt('%s')" % opt]).splitlines()[1]
         log(opt, '=', val)
     log("Contents of /proc/meminfo:")
     try:

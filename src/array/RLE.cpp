@@ -926,7 +926,7 @@ namespace scidb
             return false;
         }
         if (_seg[r].null()) {
-            value.setNull(_seg[r].valueIndex());
+            value.setNull(safe_static_cast<Value::reason>(_seg[r].valueIndex()));
         } else {
             getValueByIndex(value, _seg[r].valueIndex() + (_seg[r].same() ? 0 : pos - _seg[r].pPosition()));
         }
@@ -960,7 +960,8 @@ namespace scidb
         // varying size
         if (_elemSize == 0)
         {
-            varpart_offset_t voff = idxToVoff(_payload, index);
+            uint32_t idx = safe_static_cast<uint32_t>(index);
+            varpart_offset_t voff = idxToVoff(_payload, idx);
             char* src = _payload + _varOffs + voff;
             size_t sizeHeader;
             getSizeOfVarPartForOneDatum(src, sizeHeader, size);
@@ -1011,7 +1012,7 @@ namespace scidb
     {
         assert(!end());
         if (defaultValue.isNull()) {
-            return _cs->null() && defaultValue.getMissingReason() == static_cast<int>(_cs->valueIndex());
+            return _cs->null() && defaultValue.getMissingReason() == safe_static_cast<Value::reason>(_cs->valueIndex());
         } else if (_cs->null() || !_cs->same()) {
             return false;
         }
@@ -1028,7 +1029,7 @@ namespace scidb
         assert(!end());
         if(_cs->null())
         {
-            item.setNull(_cs->valueIndex());
+            item.setNull(safe_static_cast<Value::reason>(_cs->valueIndex()));
         }
         else
         {
@@ -1114,7 +1115,7 @@ namespace scidb
 
             if(val.getBool())
             {
-                _data[_dataSize-1] |= (1 << (valueIndex&7));
+                _data[_dataSize-1] |= static_cast<char>(1 << (valueIndex&7));
             }
         }
         else
@@ -1126,7 +1127,7 @@ namespace scidb
                 if (varPart.size() > RLE_MAX_VARPART_OFFSET) {
                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_TOO_HUGE) << varPart.size();
                 }
-                varpart_offset_t voff = varPart.size();
+                varpart_offset_t voff = safe_static_cast<varpart_offset_t>(varPart.size());
                 *(varpart_offset_t*)&_data[_dataSize] = voff;
                 appendValueToTheEndOfVarPart(varPart, val);
             }
@@ -1155,18 +1156,23 @@ namespace scidb
      * @param[in]    valueIndexInSrc the valueIndex in src
      * @param[in]    length          how many bits to copy
      */
-    void copyRLEBoolValues(char* dstData, char* srcData, uint32_t valueIndexInDst, uint32_t valueIndexInSrc, position_t length)
+    void copyRLEBoolValues(char* dstData,
+                           char* srcData,
+                           uint32_t valueIndexInDst,
+                           uint32_t valueIndexInSrc,
+                           position_t length)
     {
+        assert(length >= 0);
         for (position_t i=0; i<length; ++i) {
-            uint32_t srcByte = (valueIndexInSrc+i) >> 3;
-            uint32_t srcBit = (valueIndexInSrc+i) & 7;
-            uint32_t dstByte = (valueIndexInDst+i) >> 3;
-            uint32_t dstBit = (valueIndexInDst+i) & 7;
+            size_t srcByte = (valueIndexInSrc+i) >> 3;
+            uint8_t srcBit = static_cast<uint8_t>((valueIndexInSrc+i) & 7);
+            size_t dstByte = (valueIndexInDst+i) >> 3;
+            uint8_t dstBit = static_cast<uint8_t>((valueIndexInDst+i) & 7);
 
             if (srcData[srcByte] & (1 << srcBit)) {
-                dstData[dstByte] |= (1 << dstBit);
+                dstData[dstByte] |= char(1 << dstBit);
             } else {
-                dstData[dstByte] &= ~(1 << dstBit);
+                dstData[dstByte] &= char(~(1 << dstBit));
             }
         }
     }
@@ -1192,7 +1198,9 @@ namespace scidb
         if (_isBoolean)
         {
             addBoolValues(realLength);
-            copyRLEBoolValues(_payload, srcPayload._payload, _valuesCount - realLength, valueIndexInSrc, realLength);
+            copyRLEBoolValues(_payload, srcPayload._payload,
+                              safe_static_cast<uint32_t>(_valuesCount - realLength), valueIndexInSrc,
+                              realLength);
         }
         else
         {
@@ -1209,7 +1217,8 @@ namespace scidb
             if (_elemSize == 0) {
                 // The var-part offset of the first item to copy in src, and the total size of the var part to copy.
                 varpart_offset_t voffFirst = idxToVoff(srcPayload._payload, valueIndexInSrc);
-                varpart_offset_t voffLast = idxToVoff(srcPayload._payload, valueIndexInSrc + realLength - 1);
+                varpart_offset_t voffLast = idxToVoff(srcPayload._payload,
+                                                      safe_static_cast<uint32_t>(valueIndexInSrc + realLength - 1));
                 size_t sizeOfLast = srcPayload.getSizeOfVarPartForOneDatum(voffLast);
                 size_t numBytes = voffLast - voffFirst + sizeOfLast;
 
@@ -1222,10 +1231,15 @@ namespace scidb
                 // Update all the pointers stored in the fixed part.
                 // The first appended element needs to store an offset = varPart.size() in dst;
                 // yet what's copied from the source was storing an offset = voffFirst.
-                int offsetAdjustment = static_cast<int>(varPart.size()) - voffFirst;
+                int offsetAdjustment =
+                    safe_static_cast<int>(varPart.size()) - safe_static_cast<int>(voffFirst);
                 if (offsetAdjustment!=0) {
+                    // realLength is a position_t (int64_t),
+                    ASSERT_EXCEPTION(realLength < static_cast<int64_t>(std::numeric_limits<int>::max()),
+                                     "Not going to allow infinite loop");
                     for (int i=0; i<realLength; ++i) {
-                        *idxToVoffAddr(&_data[0], _valuesCount + i) += offsetAdjustment;
+                        uint32_t index = safe_static_cast<uint32_t>(_valuesCount + i);
+                        *idxToVoffAddr(&_data[0], index) += offsetAdjustment;
                     }
                 }
 
@@ -1329,10 +1343,10 @@ namespace scidb
                 } else {
                     currSeg.setNull(false);
                     if (carry) {
-                        currSeg.setValueIndex(valueIndex-1);
+                        currSeg.setValueIndex(safe_static_cast<uint32_t>(valueIndex-1));
                     } else {
                         appendValue(varPart, val, valueIndex);
-                        currSeg.setValueIndex(valueIndex++);
+                        currSeg.setValueIndex(safe_static_cast<uint32_t>(valueIndex++));
                     }
                 }
                 currSeg.setSame(true);
@@ -1499,7 +1513,7 @@ namespace scidb
                             << (varHead + *(end - 1));
                     }
                     while (p < end) {
-                        *p++ += varHead;
+                        *p++ += static_cast<varpart_offset_t>(varHead);
                     }
                     _data.insert(_data.end(), payload._data.begin() + payload._varOffs, payload._data.end());
                     headItems = _varOffs/sizeof(varpart_offset_t);
@@ -1624,17 +1638,19 @@ namespace scidb
                                 _data.resize((dstValueIndex + nItems + 7) >> 3);
                                 for (size_t k = 0; k < nItems; k++) {
                                     if (otherData[(srcValueIndex + k) >> 3] & (1 << ((srcValueIndex + k) & 7))) {
-                                        _data[(dstValueIndex + k) >> 3] |= 1 << ((dstValueIndex + k) & 7);
+                                        _data[(dstValueIndex + k) >> 3] |= char(1 << ((dstValueIndex + k) & 7));
                                     }
                                 }
                             } else {
                                 if (_elemSize == 0) {
                                     _data.resize(_data.size() + nItems*sizeof(varpart_offset_t));
-                                    varpart_offset_t* dst = idxToVoffAddr(&_data[0], dstValueIndex);
-                                    varpart_offset_t* src = idxToVoffAddr(payload.getFixData(), srcValueIndex);
+                                    varpart_offset_t* dst =
+                                        idxToVoffAddr(&_data[0], safe_static_cast<uint32_t>(dstValueIndex));
+                                    varpart_offset_t* src =
+                                        idxToVoffAddr(payload.getFixData(), safe_static_cast<uint32_t>(srcValueIndex));
                                     varpart_offset_t* end = src + nItems;
                                     while (src < end) {
-                                        size_t offs = varPart.size();
+                                        varpart_offset_t offs = safe_static_cast<varpart_offset_t>(varPart.size());
                                         if (size_t(*dst) + offs > RLE_MAX_VARPART_OFFSET) {
                                             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_TOO_HUGE)
                                                 << (size_t(*dst) + offs);
@@ -1661,7 +1677,7 @@ namespace scidb
                                 }
                                 rs.setSame(ps.same());
                                 rs.setNull(false);
-                                rs.setValueIndex(dstValueIndex);
+                                rs.setValueIndex(safe_static_cast<uint32_t>(dstValueIndex));
                                 segLength = length;
                             }
                             dstValueIndex += nItems;
@@ -1710,17 +1726,19 @@ namespace scidb
                             _data.resize((dstValueIndex + nItems + 7) >> 3);
                             for (size_t k = 0; k < nItems; k++) {
                                 if (otherData[(srcValueIndex + k) >> 3] & (1 << ((srcValueIndex + k) & 7))) {
-                                    _data[(dstValueIndex + k) >> 3] |= 1 << ((dstValueIndex + k) & 7);
+                                    _data[(dstValueIndex + k) >> 3] |= static_cast<char>(1 << ((dstValueIndex + k) & 7));
                                 }
                             }
                         } else {
                             if (_elemSize == 0) {
                                 _data.resize(_data.size() + nItems * sizeof(varpart_offset_t));
-                                varpart_offset_t* dst = idxToVoffAddr(&_data[0], dstValueIndex);
-                                varpart_offset_t* src = idxToVoffAddr(payload.getFixData(), srcValueIndex);
+                                varpart_offset_t* dst =
+                                    idxToVoffAddr(&_data[0], safe_static_cast<uint32_t>(dstValueIndex));
+                                varpart_offset_t* src =
+                                    idxToVoffAddr(payload.getFixData(), safe_static_cast<uint32_t>(srcValueIndex));
                                 varpart_offset_t* end = src + nItems;
                                 while (src < end) {
-                                    size_t offs = varPart.size();
+                                    varpart_offset_t offs = safe_static_cast<varpart_offset_t>(varPart.size());
                                     if (size_t(*dst) + offs > RLE_MAX_VARPART_OFFSET) {
                                         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_CHUNK_TOO_HUGE)
                                             << (size_t(*dst) + offs);
@@ -1747,7 +1765,7 @@ namespace scidb
                             }
                             rs.setSame(ps.same());
                             rs.setNull(false);
-                            rs.setValueIndex(dstValueIndex);
+                            rs.setValueIndex(safe_static_cast<uint32_t>(dstValueIndex));
                             segLength = length;
                         }
                         dstValueIndex += nItems;
@@ -1858,7 +1876,7 @@ namespace scidb
                     _valueIndex += 1;
                 } else {
                     size = _result->_elemSize*size_t(count);
-                    _valueIndex += size_t(count);
+                    _valueIndex += safe_static_cast<uint32_t>(count);
                 }
                 _result->_data.resize(_result->_dataSize + size);
                 memcpy(& _result->_data[_result->_dataSize], ii.getFixedValues(), size);
@@ -1999,7 +2017,7 @@ namespace scidb
             offs += sizeof(uint32_t);
         } else {
             varPart.resize(offs + len + 1);
-            varPart[offs++] = len;
+            varPart[offs++] = static_cast<char>(len);
         }
         memcpy(&varPart[offs], value.data(), len);
     }

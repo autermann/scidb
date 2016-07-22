@@ -105,6 +105,50 @@ private:
 };
 
 /**
+ * The type of a function, that decides whether a tuple should be skipped.
+ * @param tuple              a tuple
+ * @param additionalInfo     additional information needed to make the decision.
+ * @return whether the tuple should be skipped.
+ */
+typedef bool (*TupleSkipperFunction)(
+        Value const* tuple,
+        void* additionalInfo);
+
+/**
+ * A structure that bundles a TupleSkipperFunction and an additional info to be passed to the function.
+ */
+struct TupleSkipper
+{
+    TupleSkipperFunction _skipperFunc;
+    void* _additionalInfo;
+
+    TupleSkipper(TupleSkipperFunction skipperFunc, void* additionalInfo)
+    : _skipperFunc(skipperFunc), _additionalInfo(additionalInfo)
+    {}
+};
+
+/**
+ * An instance of TupleSkipperFunction, that skips a tuple if any of the specified attributes has a missing value.
+ * @see TupleSkipperFunction.
+ * @param additionalInfo  a pointer to a SortingAttributeInfos object.
+ * @note This function is intended to be called once per tuple. So it is "in the inner loop".
+ */
+inline bool tupleSkipperIfAnyAttributeIsMissing(
+        Value const* tuple,
+        void* additionalInfo)
+{
+    assert(tuple);
+    SortingAttributeInfos const& sortingAttributeInfos = *static_cast<SortingAttributeInfos*>(additionalInfo);
+    for (size_t i = 0, n = sortingAttributeInfos.size(); i < n; i++) {
+        size_t attrId = sortingAttributeInfos[i].columnNo;
+        if (tuple[attrId].isNull()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * A wrapper around a TupleComparator object, to support boolean operator() needed by STL.
  */
 class TupleLessThan
@@ -173,6 +217,7 @@ public:
      * @param pageSize            the page size used by the resetting arena. See class Arena.
      * @param parentArena         the parent memory arena, from which a child & resetting arena can be attached.
      * @param preservePositions   whether the TupleArray, when appending data from an input array, should append cell position as well.
+     * @param tupleSkipper        decider on whether to skip a tuple.
      *
      * @note The first tuple will have a coordinate = outputSchema.getDimensions()[0].getStartMin().
      */
@@ -183,7 +228,9 @@ public:
                size_t sizeHint,
                size_t pageSize,
                arena::ArenaPtr const& parentArena,
-               bool preservePositions);
+               bool preservePositions,
+               TupleSkipper* skipper = NULL
+               );
 
     /**
      * This is the version used by everywhere in the system except SortArray.
@@ -207,21 +254,35 @@ public:
      * @param inputSchema    the schema of the input array.
      * @param arrayIterators the input array iterators.
      * @param nChunks        the number of chunks to read.
+     * @param tupleSkipper   decider on whether to skip a tuple.
      */
-    virtual void append(ArrayDesc const& inputSchema, PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators, size_t nChunks);
+    virtual void append(
+            ArrayDesc const& inputSchema,
+            PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators,
+            size_t nChunks,
+            TupleSkipper* skipper = NULL
+            );
 
     /**
      * Append all data from an input array.
-     * @param inputArray an input array.
+     * @param inputArray     an input array.
+     * @param tupleSkipper   decider on whether to skip a tuple.
      */
-    virtual void append(std::shared_ptr<Array> const& inputArray);
+    virtual void append(
+            std::shared_ptr<Array> const& inputArray,
+            TupleSkipper* skipper = NULL
+            );
 
     /**
      * Append a single tuple to the array.
-     * @param inputTuple  an input tuple.
+     * @param inputTuple     an input tuple.
+     * @param tupleSkipper   decider on whether to skip a tuple.
      * @note This function allocates memory, and copies the inputTuple into the allocated memory.
      */
-    virtual void appendTuple(PointerRange<const Value> inputTuple);
+    virtual void appendTuple(
+            PointerRange<const Value> inputTuple,
+            TupleSkipper* skipper = NULL
+           );
 
     /**
     * Hint for the number of items to be stored in array

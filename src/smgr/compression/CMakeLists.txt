@@ -33,6 +33,11 @@ set (compression_src
 
 file(GLOB compression_include "*.h")
 
+# These files are to be deprecated/removed. No reason to waste time
+# checking the conversions. See Issue #4996
+set_source_files_properties(RunLengthEncoding.cpp BitmapEncoding.cpp NullSuppression.cpp DictionaryEncoding.cpp
+                             PROPERTIES COMPILE_FLAGS "-Wno-conversion")
+
 add_library(compression_lib STATIC ${compression_src} ${compression_include})
 
 target_link_libraries(compression_lib ${Boost_LIBRARIES} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES} system_lib)

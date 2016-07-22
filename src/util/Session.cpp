@@ -29,6 +29,7 @@
 
 #include <util/session/Session.h>
 
+#include <log4cxx/logger.h>
 #include <system/SystemCatalog.h>
 #include <usr_namespace/NamespacesCommunicator.h>
 #include <usr_namespace/SecurityCommunicator.h>
@@ -36,6 +37,8 @@
 
 namespace scidb
 {
+    static log4cxx::LoggerPtr logger( log4cxx::Logger::getLogger("scidb.session"));
+
     Session::Session()
         : _securityMode("Uninitialized")
         , _currentNamespaceDesc(NamespaceDesc("public"))
@@ -172,24 +175,41 @@ namespace scidb
 
 
 
-    void Session::setUser(const UserDesc &userDesc)
+    void Session::setUser(const scidb::UserDesc &userDesc)
     {
         _userDesc = userDesc;
+
+        scidb::RoleDesc desc(userDesc.getName());
+        setRole(desc);
     }
 
-    const UserDesc &Session::getUser() const
+    const scidb::UserDesc &Session::getUser() const
     {
         return _userDesc;
     }
 
-    void Session::changeUser(const UserDesc &newUser)
+    void Session::changeUser(const scidb::UserDesc &newUser)
     {
-        _userDesc = newUser;
+        setUser(newUser);
     }
 
     void Session::invalidateUser()
     {
-        _userDesc = UserDesc();
+        scidb::UserDesc userDesc = scidb::UserDesc();
+        setUser(userDesc);
+    }
+
+
+    void Session::setRole(const scidb::RoleDesc &roleDesc)
+    {
+        // todo:  determine if role is valid first?
+        LOG4CXX_DEBUG(logger, "Session::setRole(" << roleDesc.getName() << ")");
+        _roleDesc = roleDesc;
+    }
+
+    const scidb::RoleDesc &Session::getRole() const
+    {
+        return _roleDesc;
     }
 
 

@@ -813,7 +813,7 @@ public:
             return _currPpos;
         }
 
-        uint32_t getValueIndex() const
+        size_t getValueIndex() const
         {
             assert(!end());
             return (_cs->same() || _cs->null())

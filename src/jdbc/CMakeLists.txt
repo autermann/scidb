@@ -21,8 +21,6 @@ set (JAVA_SOURCES
 
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/iquery/Iquery.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/iquery/Config.java
-    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/iquery/ConfigUser.java
-    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/iquery/ConfigUserException.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/iquery/XsvFormatter.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/util/ByteBufferExtensions.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/util/InputStreamWithReadall.java
@@ -42,6 +40,9 @@ set (JAVA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/Type.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/Connection.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/Array.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/AuthenticationFile.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/ConfigUser.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/ConfigUserException.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/Schema.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/WarningCallback.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/IChunk.java
@@ -49,8 +50,13 @@ set (JAVA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/Result.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/PrepareResult.java
     ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/scidb/client/SciDBException.java
-    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/gnu/getopt/Getopt.java
-    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/gnu/getopt/LongOpt.java
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/apache/commons/cli/Option.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/apache/commons/cli/Options.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/apache/commons/cli/CommandLine.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/apache/commons/cli/CommandLineParser.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/apache/commons/cli/DefaultParser.java
+    ${CMAKE_CURRENT_SOURCE_DIR}/scidb4j/org/apache/commons/cli/ParseException.java
 
     ${CMAKE_CURRENT_SOURCE_DIR}/jdbctest/org/scidb/JDBCBasicTestCase.java
     ${CMAKE_CURRENT_SOURCE_DIR}/jdbctest/org/scidb/JDBCTest.java

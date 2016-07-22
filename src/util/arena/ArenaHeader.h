@@ -140,6 +140,8 @@ class Header
     static  const field*      rewind(const void*);
 
  protected:                // Representation
+     static size_t      const _SIZE_MASK = size_t(~0) >> 3;
+     static size_t      const _FLAGS_MASK = 0x7;
             size_t            _size  : std::numeric_limits<size_t>::digits - 3;
             size_t            _flags : 3;                // Attribute flags
 };
@@ -188,8 +190,8 @@ struct Header::CV {count_t _c;finalizer_t _f;Header _h;CV (size_t n,finalizer_t 
  *  flags 'f'.
  */
 inline Header::Header(size_t n,flags_t f)
-             : _size (n),
-               _flags(f)
+    : _size (n & _SIZE_MASK),
+      _flags(f & _FLAGS_MASK)
 {
     assert(_size==n && _flags==f);                       // Check they fit ok
     assert(consistent());                                // Check consistency

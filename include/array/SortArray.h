@@ -70,11 +70,14 @@ public:
      * @param[in] inputArray array to sort, schema must match input schema
      * @param[in] query query context
      * @param[in] tcomp class which provides comparison operator
+     * @param[in] skipper whether to skip a tuple.
      * @return sorted one-dimensional array.
      */
     std::shared_ptr<MemArray> getSortedArray(std::shared_ptr<Array> inputArray,
                                                std::shared_ptr<Query> query,
-                                               std::shared_ptr<TupleComparator> tcomp);
+                                               std::shared_ptr<TupleComparator> tcomp,
+                                               TupleSkipper* skipper = NULL
+                                               );
 
     /**
      * @return the array descriptor from the input array.
@@ -85,11 +88,15 @@ public:
     }
 
     /**
+     * @param expanded  whether to include the extra fields (which exist when _preservePositions is true).
      * @return the array descriptor for the output array
      */
-    const ArrayDesc& getOutputArrayDesc()
+    const ArrayDesc& getOutputSchema(bool expanded)
     {
-        return *_outputSchema;
+        if (expanded) {
+            return _outputSchemaExpanded;
+        }
+        return _outputSchemaNonExpanded;
     }
 
     /**
@@ -184,9 +191,10 @@ private:
     void calcOutputSchema(const ArrayDesc& inputSchema, size_t chunkSize);
 
     ArrayDesc const _inputSchema;
-    arena::ArenaPtr const _arena;                          // parent memory arena
+    arena::ArenaPtr const _arena;                        // parent memory arena
     std::shared_ptr<Array> _input;                       // array to sort
-    std::shared_ptr<ArrayDesc> _outputSchema;            // shape of output
+    ArrayDesc _outputSchemaExpanded;                     // output schema including the two extra fields (in case preservePositions)
+    ArrayDesc _outputSchemaNonExpanded;                  // output schema without the two extra fields.
     std::shared_ptr<TupleComparator> _tupleComp;         // comparison to use between cells
 
     size_t _memLimit;           // how big are the sorted runs
@@ -213,6 +221,9 @@ private:
      * Whether the cell positions of all records need to be preserved.
      */
     bool const _preservePositions;
+
+    // whether to skip a tuple.
+    TupleSkipper* _skipper;
 };
 
 } //namespace scidb

@@ -103,7 +103,7 @@ class JoinEmptyableArray : public DelegateArray
   private:
     std::shared_ptr<Array> left;
     std::shared_ptr<Array> right;
-    size_t nLeftAttributes;
+    AttributeID nLeftAttributes;
     int    leftEmptyTagPosition;
     int    rightEmptyTagPosition;
     int    emptyTagPosition;

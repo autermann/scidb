@@ -30,6 +30,10 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/benchGen" DESTINATION bin COMPONEN
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/loadpipe.py" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/calculate_chunk_length.py" DESTINATION bin COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/remove_arrays.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/list_arrays.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/setup_scidb_example.py" DESTINATION bin COMPONENT scidb-utils)
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/openssl_gen_password_example.sh" DESTINATION bin COMPONENT scidb-utils)
+
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/PSF_license.txt" DESTINATION bin/scidblib COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/__init__.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_math.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
@@ -43,6 +47,9 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_psf.py" DESTINATION
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/scidb_control.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidblib/pgpass_updater.py" DESTINATION bin/scidblib COMPONENT scidb-utils)
 
+  
+
+
 #scidb-jdbc package
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/scidb4j.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/jdbc/example.jar" DESTINATION jdbc COMPONENT scidb-jdbc)
@@ -54,6 +61,7 @@ install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestharness" DESTINATION bin 
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/arg_separator" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/scidbtestprep.py" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/mu_admin.py" DESTINATION bin COMPONENT scidb-dev-tools)
+install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/box_of_points.py" DESTINATION bin COMPONENT scidb-dev-tools)
 install(PROGRAMS "${GENERAL_OUTPUT_DIRECTORY}/daemon.py" DESTINATION etc COMPONENT scidb-dev-tools)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/mu_config.ini" DESTINATION etc COMPONENT scidb-dev-tools)
 install(FILES "${GENERAL_OUTPUT_DIRECTORY}/log4j.properties" DESTINATION etc COMPONENT scidb-dev-tools)
@@ -110,10 +118,6 @@ if (NOT WITHOUT_SERVER)
 
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/data/meta.sql" DESTINATION share/scidb COMPONENT scidb)
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/log4cxx.properties" DESTINATION share/scidb COMPONENT scidb)
-
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/scidb-sample.conf" DESTINATION etc COMPONENT scidb)
-    install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/sample_config.ini" DESTINATION etc COMPONENT scidb)
-
     install(FILES "${GENERAL_OUTPUT_DIRECTORY}/packaging_only/prelude.txt"       DESTINATION lib/scidb/modules COMPONENT scidb)
 endif()
 
@@ -190,11 +194,17 @@ set(SRC_PACKAGE_FILE_NAME
     "scidb-${SCIDB_VERSION_MAJOR}.${SCIDB_VERSION_MINOR}.${SCIDB_VERSION_PATCH}.${SCIDB_REVISION}")
 
 add_custom_target(src_package
-    COMMAND rm -rf ${SRC_PACKAGE_FILE_NAME}
+    COMMAND rm -rf /tmp/${SRC_PACKAGE_FILE_NAME}
     COMMAND rm -rf ${CMAKE_BINARY_DIR}/${SRC_PACKAGE_FILE_NAME}.tgz
-    COMMAND svn export ${CMAKE_SOURCE_DIR} ${SRC_PACKAGE_FILE_NAME}
-    COMMAND cp ${CMAKE_BINARY_DIR}/revision ${SRC_PACKAGE_FILE_NAME}
-    COMMAND ${CMAKE_BINARY_DIR}/../utils/licensing.pl ${SRC_PACKAGE_FILE_NAME} ${CMAKE_BINARY_DIR}/../utils/scidb.lic
-    COMMAND tar -czf ${CMAKE_BINARY_DIR}/${SRC_PACKAGE_FILE_NAME}.tgz ${SRC_PACKAGE_FILE_NAME}
-    WORKING_DIRECTORY /tmp
+    #
+    COMMAND rm -rf /tmp/${SRC_PACKAGE_FILE_NAME}.tar
+    COMMAND git archive --prefix=${SRC_PACKAGE_FILE_NAME}/ --output=/tmp/${SRC_PACKAGE_FILE_NAME}.tar HEAD
+    COMMAND tar --directory=/tmp -xf /tmp/${SRC_PACKAGE_FILE_NAME}.tar
+    COMMAND rm -rf /tmp/${SRC_PACKAGE_FILE_NAME}.tar
+    #
+    COMMAND cp ${CMAKE_SOURCE_DIR}/revision /tmp/${SRC_PACKAGE_FILE_NAME}
+    COMMAND ${CMAKE_BINARY_DIR}/../utils/licensing.pl /tmp/${SRC_PACKAGE_FILE_NAME} ${CMAKE_BINARY_DIR}/../utils/scidb.lic
+    COMMAND tar  --directory=/tmp/${SRC_PACKAGE_FILE_NAME} -czf ${CMAKE_BINARY_DIR}/${SRC_PACKAGE_FILE_NAME}.tgz .
+    COMMAND rm -rf /tmp/${SRC_PACKAGE_FILE_NAME}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )

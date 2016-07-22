@@ -55,6 +55,7 @@
 #include <util/Timing.h>
 #include <util/MultiConstIterators.h>
 #include <util/session/Session.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 using namespace boost;
@@ -240,12 +241,12 @@ void PhysicalOperator::dumpArrayToLog(std::shared_ptr<Array> const& input, log4c
 {
     ArrayDesc const& schema = input->getArrayDesc();
     Attributes const& attrs = schema.getAttributes(true);
-    size_t const nAttrs = attrs.size();
+    AttributeID const nAttrs = safe_static_cast<AttributeID>(attrs.size());
     vector<FunctionPointer> converters(nAttrs,NULL);
     FunctionLibrary *functionLib = FunctionLibrary::getInstance();
     vector<std::shared_ptr<ConstArrayIterator> > aiters (nAttrs);
     vector<std::shared_ptr<ConstChunkIterator> > citers (nAttrs);
-    for (size_t i =0; i<nAttrs; ++i)
+    for (AttributeID i =0; i<nAttrs; ++i)
     {
         TypeId const& typeId = attrs[i].getType();
         converters[i] = functionLib->findConverter(typeId, TID_STRING, false, false, NULL);
@@ -317,6 +318,58 @@ PhysicalOperator::ensureRandomAccess(std::shared_ptr<Array>& input,
     input.reset();
 
     return memCopy;
+}
+
+RedistributeContext
+PhysicalOperator::getOutputDistribution(std::vector<RedistributeContext> const& inputDistributions,
+                                        std::vector<ArrayDesc> const& inputSchemas) const
+{
+    /// XXX TODO: we should probably get rid of changesDistribution() altogether
+    if (changesDistribution(inputSchemas)) {
+        throw USER_EXCEPTION(SCIDB_SE_INTERNAL,
+                             SCIDB_LE_NOT_IMPLEMENTED)
+        << "getOutputDistribution";
+    }
+
+    if (inputDistributions.empty()) {
+
+        std::shared_ptr<Query> query(_query);
+        SCIDB_ASSERT(query);
+        return RedistributeContext(defaultPartitioning(),
+                                   query->getDefaultArrayResidency());
+    } else {
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
+        ArrayDistPtr dist = convertToDefaultRedundancy(inputDistributions[0].getArrayDistribution());
+        mySchema->setDistribution(dist);
+
+        return RedistributeContext(mySchema->getDistribution(),
+                                   mySchema->getResidency());
+
+    }
+}
+
+ArrayDistPtr
+PhysicalOperator::convertToDefaultRedundancy(ArrayDistPtr const& inputDist)
+{
+    if ( inputDist->getRedundancy() != DEFAULT_REDUNDANCY) {
+        size_t instanceShift(0);
+        Coordinates offset;
+        ArrayDistributionFactory::getTranslationInfo(inputDist.get(), offset, instanceShift);
+
+        std::shared_ptr<CoordinateTranslator> translator =
+        ArrayDistributionFactory::createOffsetTranslator(offset);
+
+        ArrayDistPtr dist =
+        ArrayDistributionFactory::getInstance()->construct(inputDist->getPartitioningSchema(),
+                                                           DEFAULT_REDUNDANCY,
+                                                           inputDist->getContext(),
+                                                           translator,
+                                                           instanceShift);
+        return dist;
+    }
+    return inputDist;
 }
 
 /*
@@ -442,7 +495,7 @@ Coordinates PhysicalBoundaries::getCoordinates(uint64_t& cellNum, Dimensions con
         return Coordinates(dims.size(), CoordinateBounds::getMax());
     }
     Coordinates result (dims.size(), 0);
-    for (int i = dims.size(); --i >= 0;)
+    for (int i = safe_static_cast<int>(dims.size()); --i >= 0;)
     {
         result[i] = dims[i].getStartMin() + (cellNum % dims[i].getLength());
         cellNum /= dims[i].getLength();
@@ -506,17 +559,6 @@ uint64_t PhysicalBoundaries::getNumCells() const
     return getNumCells(_startCoords, _endCoords);
 }
 
-uint64_t PhysicalBoundaries::getCellsPerChunk (Dimensions const& dims)
-{
-    uint64_t cellsPerChunk = 1;
-    for (size_t i = 0; i<dims.size(); i++)
-    {
-        //assume the dimensions that are passed in come from an array, therefore this is overflow-safe
-        cellsPerChunk *= dims[i].getChunkInterval();
-    }
-    return cellsPerChunk;
-}
-
 uint64_t PhysicalBoundaries::getNumChunks(Dimensions const& dims) const
 {
     if (_startCoords.size() != dims.size())
@@ -539,6 +581,11 @@ uint64_t PhysicalBoundaries::getNumChunks(Dimensions const& dims) const
         }
 
         DimensionDesc const& dim = dims[i];
+        if (!dim.isIntervalResolved() )
+        {
+            throw UnknownChunkIntervalException(__FILE__, __LINE__);
+        }
+
         if (_startCoords[i] < dim.getStartMin() || _endCoords[i] > dim.getEndMax())
         {
             stringstream ss;
@@ -619,13 +666,13 @@ PhysicalBoundaries PhysicalBoundaries::intersectWith (PhysicalBoundaries const& 
         end.push_back( myEnd > otherEnd ? otherEnd : myEnd);
     }
 
-    double myCells = getNumCells();
-    double otherCells = other.getNumCells();
-    double intersectionCells = getNumCells(start,end);
+    double intersectionCells = static_cast<double>(getNumCells(start,end));
 
     double resultDensity = 1.0;
     if (intersectionCells > 0)
     {
+        double myCells = static_cast<double>(getNumCells());
+        double otherCells = static_cast<double>(other.getNumCells());
         double maxMyDensity = min( _density * myCells / intersectionCells, 1.0 );
         double maxOtherDensity = min ( other._density * otherCells / intersectionCells, 1.0);
         resultDensity = min (maxMyDensity, maxOtherDensity);
@@ -666,9 +713,9 @@ PhysicalBoundaries PhysicalBoundaries::unionWith (PhysicalBoundaries const& othe
         end.push_back( myEnd < otherEnd ? otherEnd : myEnd);
     }
 
-    double myCells = getNumCells();
-    double otherCells = other.getNumCells();
-    double resultCells = getNumCells(start, end);
+    double myCells = static_cast<double>(getNumCells());
+    double otherCells = static_cast<double>(other.getNumCells());
+    double resultCells = static_cast<double>(getNumCells(start, end));
     double maxDensity = min ( (myCells * _density + otherCells * other._density ) / resultCells, 1.0);
 
     return PhysicalBoundaries(start,end, maxDensity);
@@ -727,8 +774,8 @@ PhysicalBoundaries PhysicalBoundaries::reshape(Dimensions const& oldDims, Dimens
         }
     }
 
-    double startingCells = getNumCells();
-    double resultCells = getNumCells(start, end);
+    double startingCells = static_cast<double>(getNumCells());
+    double resultCells = static_cast<double>(getNumCells(start, end));
 
     return PhysicalBoundaries(start,end, _density * startingCells / resultCells);
 }
@@ -820,72 +867,30 @@ uint32_t PhysicalBoundaries::getCellSizeBytes(const Attributes& attrs )
 double PhysicalBoundaries::getSizeEstimateBytes(const ArrayDesc& schema) const
 {
     uint64_t numCells = getNumCells();
-    uint64_t numChunks = getNumChunks(schema.getDimensions());
     size_t numDimensions = schema.getDimensions().size();
     size_t numAttributes = schema.getAttributes().size();
 
-    uint32_t cellSize = getCellSizeBytes(schema.getAttributes());
+    size_t cellSize = getCellSizeBytes(schema.getAttributes());
 
     //we assume that every cell is part of sparse chunk
     cellSize += numAttributes * (numDimensions  * sizeof(Coordinate) + sizeof(int));
-    double size = numCells * 1.0 * cellSize ;
+    double size = static_cast<double>(numCells) * static_cast<double>(cellSize) ;
 
-    //Assume all chunks are sparse and add header
-    size += numChunks *
-            numAttributes;
+    // Assume all chunks are sparse and add header (if we can).
+    uint64_t numChunks = 0;
+    try {
+        numChunks = getNumChunks(schema.getDimensions());
+    } catch (UnknownChunkIntervalException&) {
+        numChunks = 0;
+    }
+    size += static_cast<double>(numChunks) *
+        static_cast<double>(numAttributes);
 
     return size * _density;
 }
 
-
-/*
- * RedistributeContext methods
- */
-bool operator== (RedistributeContext const& lhs, RedistributeContext const& rhs)
-{
-    return lhs._partitioningSchema == rhs._partitioningSchema &&
-           (lhs._partitioningSchema != psLocalInstance || lhs._instanceId == rhs._instanceId) &&
-           ((!lhs.hasMapper() && !rhs.hasMapper()) || ( lhs.hasMapper() && rhs.hasMapper() && *lhs._distMapper.get() == *rhs._distMapper.get()));
-}
-
-std::ostream& operator<<(std::ostream& stream, const RedistributeContext& dist)
-{
-    switch (dist._partitioningSchema)
-    {
-        case psReplication:     stream<<"repl";
-                                break;
-        case psHashPartitioned: stream<<"hash";
-                                break;
-        case psLocalInstance:   stream<<"loca";
-                                break;
-        case psByRow:           stream<<"byro";
-                                break;
-        case psByCol:           stream<<"byco";
-                                break;
-        case psUndefined:       stream<<"undefined";
-                                break;
-        case psGroupby:         stream<<"groupby";
-                                break;
-        case psScaLAPACK:       stream<<"ScaLAPACK";
-                                break;
-    default:
-            assert(0);
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << "operator<<(std::ostream& stream, const RedistributeContext& dist)";
-    }
-
-    if (dist._partitioningSchema == psLocalInstance)
-    {
-        stream<<" instance "<<dist._instanceId;
-    }
-    if (dist._distMapper.get() != NULL)
-    {
-        stream<<" "<<*dist._distMapper;
-    }
-    return stream;
-}
-
 /**
- * Implementation of SCATTER/GATHER method.
+ * Broadcast a "sync" message and wait for an acknowledgement from every instance.
  */
 void sync(NetworkManager* networkManager, const std::shared_ptr<Query>& query, uint64_t instanceCount, bool isSendLocal=false)
 {
@@ -899,10 +904,10 @@ void sync(NetworkManager* networkManager, const std::shared_ptr<Query>& query, u
         ++instanceCount;
     }
 
-    LOG4CXX_DEBUG(logger, "Sending sync to every one and waiting for " << instanceCount - 1 << " sync confirmations")
+    LOG4CXX_DEBUG(logger, "sync: sending sync to every one and waiting for " << instanceCount - 1 << " sync confirmations")
     Semaphore::ErrorChecker ec = bind(&Query::validate, query);
-    query->syncSG.enter(instanceCount - 1, ec);
-    LOG4CXX_DEBUG(logger, "All confirmations received - continuing")
+    query->syncSG.enter(instanceCount - 1, ec, PTCW_SG_RCV);
+    LOG4CXX_DEBUG(logger, "sync: All confirmations received - continuing")
 }
 
 
@@ -916,7 +921,7 @@ void barrier(uint64_t barrierId, NetworkManager* networkManager, const std::shar
 
     LOG4CXX_DEBUG(logger, "Sending barrier to every one and waiting for " << instanceCount - 1 << " barrier messages")
     Semaphore::ErrorChecker ec = bind(&Query::validate, query);
-    query->semSG[barrierId].enter(instanceCount - 1, ec);
+    query->semSG[barrierId].enter(instanceCount - 1, ec, PTCW_BAR);
     LOG4CXX_DEBUG(logger, "All barrier messages received - continuing")
 }
 
@@ -933,6 +938,7 @@ void syncBarrier(uint64_t barrierId, const std::shared_ptr<Query>& query)
     const uint64_t instanceCount = query->getInstancesCount();
     assert(instanceCount>0);
     barrier(barrierId%MAX_BARRIERS, networkManager, query, instanceCount);
+    LOG4CXX_DEBUG(logger, "syncBarrier: returning");
 }
 
 void syncSG(const std::shared_ptr<Query>& query)
@@ -944,233 +950,7 @@ void syncSG(const std::shared_ptr<Query>& query)
     const uint64_t instanceCount = query->getInstancesCount();
     assert(instanceCount>0);
     sync(networkManager, query, instanceCount, true);
-}
-
-/**
- * Compute hash over the groupby dimensions.
- * @param   allDims   Coordinates containing all the dims.
- * @param   isGroupby   For every dimension, whether it is a groupby dimension.
- *
- * @note The result can be larger than #instances!!! The caller should mod it.
- *
- */
-InstanceID hashForGroupby(const Coordinates& allDims, const vector<bool>& isGroupby ) {
-    assert(allDims.size()==isGroupby.size());
-    Coordinates groups;
-    for (size_t i=0; i<allDims.size(); ++i) {
-        if (isGroupby[i]) {
-            groups.push_back(allDims[i]);
-        }
-    }
-    return VectorHash<Coordinate>()(groups);
-}
-
-/**
- * Compute the instanceID for a group.
- * For psGroupby, if the logic is modified, also change PhysicalQuantile.cpp::GroupbyQuantileArrayIterator::getInstanceForChunk.
- */
-InstanceID getInstanceForChunk(std::shared_ptr<Query> const& query,
-                               Coordinates const& chunkPos,
-                               ArrayDesc const& desc,
-                               PartitioningSchema ps,
-                               const std::shared_ptr<CoordinateTranslator>& distMapper,
-                               uint64_t instanceIdShift,
-                               InstanceID psLocal_DestInstanceId, // TODO: eliminate special case arg -- pass via psData
-                               PartitioningSchemaData* psData)
-{
-    static const char *funcName = "getInstanceForChunk: ";
-
-    if(ps==psReplication) {
-        return ALL_INSTANCE_MASK;       // magic (negative) number, NEVER remapped, shifted, or %instanceCount
-    }
-
-    // NOTE: be careful distinguishing ArrayDesc::_ps and the argument ps.
-    // The former is from the existing array that is going to have its data redistributed
-    // and the latter is the new distribution for the data.
-    // because of this, one may not call ArrayDesc::getPrimaryInstanceId(pos, icount)
-    // but instead the lower-level getPrimaryInstanceForChunk(ps, pos, dims, icount)
-
-    Dimensions const& dims = desc.getDimensions();
-    const uint64_t instanceCount = query->getInstancesCount();
-
-    // handle optional pos translation
-    const Coordinates *chunkPosition = &chunkPos;
-
-    Coordinates mappedChunkPos;
-    if (distMapper)
-    {
-        mappedChunkPos = distMapper->translate(chunkPos);
-        chunkPosition = &mappedChunkPos;
-    }
-
-    InstanceID destInstanceId = 0 ;
-    switch (ps)
-    {
-
-    //
-    // persistable cases: no psData, no psLocal_DestInstanceId
-    //
-    case psHashPartitioned:
-    case psByRow:
-    case psByCol:
-    {
-        // use the factored standard for non "psData" cases
-        // note: (these calculations can't be modified across releases anyway, so they don't need to be here)
-        destInstanceId =  getPrimaryInstanceForChunk(ps, *chunkPosition, dims, instanceCount);
-        break;
-    }
-
-    //
-    // the non persistable cases (at this time): ones that rely on parameters other than
-    // (ps, pos, dims, originalInstanceCount)
-    // + the additional info is not persisted at this time
-    // + because its not persisted, their parameterization has not be carefully specd
-    // + requires generalization where ArrayDesc::_ps is currently  persisted
-    //
-    case psScaLAPACK:
-    {
-        if ( dims.size() < 1 ||  // distribution is defined only for vectors
-             dims.size() > 2) {  // and matrices, (not tensors, etc)
-            throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
-        }
-        PartitioningSchemaDataForScaLAPACK* repartInfo = dynamic_cast<PartitioningSchemaDataForScaLAPACK*>(psData);
-        if (!repartInfo) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REDISTRIBUTE_ERROR);
-        }
-        destInstanceId = repartInfo->getInstanceID((*chunkPosition), *(query.get()));
-        break;
-    }
-    case psLocalInstance:
-    {
-        // a specified instanceId with a shift
-
-        // TODO: eliminate psLocal_InstanceId, use psData like the others
-        destInstanceId = psLocal_DestInstanceId ;
-        ASSERT_EXCEPTION((destInstanceId < instanceCount), funcName);
-        break;
-    }
-    case psGroupby:
-    {
-        PartitioningSchemaDataGroupby* pIsGroupbyDim = dynamic_cast<PartitioningSchemaDataGroupby*>(psData);
-        if (pIsGroupbyDim!=NULL) {
-            destInstanceId = hashForGroupby((*chunkPosition), pIsGroupbyDim->_arrIsGroupbyDim);
-        } else {
-            stringstream ss;
-            ss << funcName << "psGroupby";
-            ASSERT_EXCEPTION(false, ss.str());
-        }
-        break;
-    }
-    case psReplication:
-        ASSERT_EXCEPTION(false, "getInstanceForChunk: internal error: psReplication should not reach this switch statement");
-    case psUndefined:
-        ASSERT_EXCEPTION(false, "getInstanceForChunk: caller error: psUndefined should never be used as an argument");
-    default:
-    {
-        stringstream ss;
-        ss << funcName << "internal error: unknown PartitioningSchema "<< ps; // print the number
-        ASSERT_EXCEPTION(false, ss.str());
-    }
-    }
-    return (destInstanceId + instanceIdShift) % instanceCount;
-}
-
-void sendToRemoteInstance(
-        bool cachingLastEmptyBitmap,
-        bool cachingReceivedChunks,
-        bool isEmptyable,
-        bool isEmptyIndicator,
-        AttributeID attrId,
-        std::shared_ptr<ConstRLEEmptyBitmap>& sharedEmptyBitmap,
-        const ConstChunk& chunk,
-        Coordinates const& coordinates,
-        size_t& totalBytesSent,
-        size_t& totalBytesSynced,
-        std::shared_ptr<Query>& query,
-        NetworkManager* networkManager,
-        MessageType mt,
-        InstanceID instanceID,
-        size_t instanceCount,
-        size_t networkBufferLimit
-        )
-{
-    std::shared_ptr<CompressedBuffer> buffer = std::make_shared<CompressedBuffer>();
-    std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-    if (isEmptyable && !cachingLastEmptyBitmap && !cachingReceivedChunks && !isEmptyIndicator) {
-        emptyBitmap = sharedEmptyBitmap;
-        assert(emptyBitmap);
-    }
-    chunk.compress(*buffer, emptyBitmap);
-    assert(buffer && buffer->getData());
-
-    std::shared_ptr<MessageDesc> chunkMsg = std::make_shared<MessageDesc>(mt, buffer);
-    std::shared_ptr<scidb_msg::Chunk> chunkRecord = chunkMsg->getRecord<scidb_msg::Chunk>();
-    chunkRecord->set_eof(false);
-    chunkRecord->set_compression_method(buffer->getCompressionMethod());
-    chunkRecord->set_attribute_id(attrId);
-    chunkRecord->set_decompressed_size(buffer->getDecompressedSize());
-    chunkRecord->set_count(chunk.isCountKnown() ? chunk.count() : 0);
-    chunkMsg->setQueryID(query->getQueryID());
-    for (size_t i = 0; i < coordinates.size(); i++)
-    {
-        chunkRecord->add_coordinates(coordinates[i]);
-    }
-
-    networkManager->send(instanceID, chunkMsg);
-    LOG4CXX_TRACE(logger, "Sending chunk with att=" << attrId << " to instance=" << instanceID);
-    totalBytesSent += buffer->getDecompressedSize();
-    if (totalBytesSent > totalBytesSynced + networkBufferLimit) {
-        sync(networkManager, query, instanceCount);
-        totalBytesSynced = totalBytesSent;
-    }
-}
-
-void mergeToLocalInstance(
-        bool isEmptyable,
-        bool isEmptyIndicator,
-        AttributeID attrId,
-        std::shared_ptr<Query>& query,
-        std::shared_ptr<Array> outputArray,
-        vector<std::shared_ptr<ArrayIterator> >& outputIters,
-        std::shared_ptr<ConstRLEEmptyBitmap>& sharedEmptyBitmap,
-        const ConstChunk& chunk,
-        Coordinates const& coordinates,
-        vector <AggregatePtr> const& aggs,
-        ArrayDesc const& desc
-)
-{
-    ScopedMutexLock cs(query->resultCS);
-    if (!outputIters[attrId]) {
-        outputIters[attrId] = outputArray->getIterator(attrId);
-    }
-    if (outputIters[attrId]->setPosition(coordinates))
-    {
-        Chunk& dstChunk = outputIters[attrId]->updateChunk();
-        if (aggs[attrId].get())
-        {
-            if (desc.getEmptyBitmapAttribute() == NULL)
-            {
-                dstChunk.nonEmptyableAggregateMerge(chunk, aggs[attrId], query);
-            }
-            else
-            {
-                dstChunk.aggregateMerge(chunk, aggs[attrId], query);
-            }
-        }
-        else
-        {
-            dstChunk.merge(chunk, query);
-        }
-    }
-    else
-    {
-        std::shared_ptr<ConstRLEEmptyBitmap> emptyBitmap;
-        if (isEmptyable && !isEmptyIndicator) {
-            emptyBitmap = sharedEmptyBitmap;
-        }
-        outputIters[attrId]->copyChunk(chunk, emptyBitmap);
-    }
-    LOG4CXX_TRACE(logger, "Storing chunk with att=" << attrId << " locally")
+    LOG4CXX_DEBUG(logger, "syncSG: returning");
 }
 
 AggregatePtr resolveAggregate(std::shared_ptr <OperatorParamAggregateCall>const& aggregateCall,
@@ -1249,11 +1029,13 @@ void addAggregatedAttribute (
         throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_AGGREGATION_ORDER_MISMATCH) << agg->getName();
     }
 
-    outputDesc.addAttribute( AttributeDesc(outputDesc.getAttributes().size(),
-                                           outputName,
-                                           agg->getResultType().typeId(),
-                                           AttributeDesc::IS_NULLABLE,
-                                           0));
+    outputDesc.addAttribute(
+        AttributeDesc(
+            safe_static_cast<AttributeID>(outputDesc.getAttributes().size()),
+            outputName,
+            agg->getResultType().typeId(),
+            AttributeDesc::IS_NULLABLE,
+            0));
 }
 
 void PhysicalBoundaries::updateFromChunk(ConstChunk const* chunk, bool chunkShapeOnly)
@@ -1425,7 +1207,7 @@ PhysicalBoundaries PhysicalBoundaries::createFromChunkList(std::shared_ptr<Array
     // update bounds using the boundary chunks
     PhysicalBoundaries bounds = PhysicalBoundaries::createEmpty(nDims);
 
-    const AttributeID attr = arrayDesc.getAttributes().size() - 1;
+    const AttributeID attr = safe_static_cast<AttributeID>(arrayDesc.getAttributes().size() - 1);
     const bool isNoEmptyTag = (arrayDesc.getEmptyBitmapAttribute() == NULL);
     std::shared_ptr<ConstArrayIterator> arrayIter = inputArray->getConstIterator(attr);
     for (CoordHashSet::const_iterator iter = chunksToExamine.begin();
@@ -1458,21 +1240,28 @@ void LogicalOperator::inferArrayAccess(std::shared_ptr<Query>& query)
 {
     for (size_t i=0, end=_parameters.size(); i<end; ++i) {
         const std::shared_ptr<OperatorParam>& param = _parameters[i];
-        string arrayName;
+        string arrayNameOrg;
         if (param->getParamType() == PARAM_ARRAY_REF) {
-            arrayName = ((std::shared_ptr<OperatorParamReference>&)param)->getObjectName();
+            arrayNameOrg = ((std::shared_ptr<OperatorParamReference>&)param)->getObjectName();
         } else if (param->getParamType() == PARAM_SCHEMA) {
-            arrayName = ((std::shared_ptr<OperatorParamSchema>&)param)->getSchema().getName();
+            arrayNameOrg = ((std::shared_ptr<OperatorParamSchema>&)param)->getSchema().getName();
         }
-        if (arrayName.empty()) {
+        if (arrayNameOrg.empty()) {
             continue;
         }
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
         const string baseName = ArrayDesc::makeUnversionedName(arrayName);
-        std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(baseName,
-        query->getQueryID(),
-        Cluster::getInstance()->getLocalInstanceId(),
-        SystemCatalog::LockDesc::COORD,
-        SystemCatalog::LockDesc::RD));
+        std::shared_ptr<SystemCatalog::LockDesc> lock(
+            make_shared<SystemCatalog::LockDesc>(
+                namespaceName,
+                baseName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::RD));
         query->requestLock(lock);
     }
 }
@@ -1485,7 +1274,7 @@ Mutex PhysicalOperator::_mutexGlobalQueueForOperators;
 
 std::shared_ptr<JobQueue> PhysicalOperator::getGlobalQueueForOperators()
 {
-    ScopedMutexLock cs(_mutexGlobalQueueForOperators);
+    ScopedMutexLock cs(_mutexGlobalQueueForOperators, PTCW_MUT_OTHER);
     if (!_globalThreadPoolForOperators) {
         _globalQueueForOperators = std::shared_ptr<JobQueue>(new JobQueue());
         _globalThreadPoolForOperators = std::shared_ptr<ThreadPool>(
@@ -1495,6 +1284,41 @@ std::shared_ptr<JobQueue> PhysicalOperator::getGlobalQueueForOperators()
     return _globalQueueForOperators;
 }
 
+
+void PhysicalOperator::checkOrUpdateIntervals(ArrayDesc& checkMe, std::shared_ptr<Array>& input)
+{
+    checkOrUpdateIntervals(checkMe, input->getArrayDesc().getDimensions());
+}
+
+void PhysicalOperator::checkOrUpdateIntervals(ArrayDesc& checkMe, Dimensions const& inDims)
+{
+    // If the input schema was autochunked, we must now fix it up with actual intervals on *all* the
+    // instances.  If *not* autochunked... well, we need to scan the dimensions anyway to find that
+    // out... so we might as well do this inexpensive check in that case as well.
+
+    Dimensions& cDims = checkMe.getDimensions();
+    const size_t N_DIMS = cDims.size();
+    SCIDB_ASSERT(inDims.size() == N_DIMS);
+
+    for (size_t i = 0; i < N_DIMS; ++i) {
+        int64_t hardInterval = inDims[i].getChunkInterval();
+        int64_t softInterval = cDims[i].getRawChunkInterval();
+        if (! cDims[i].isIntervalResolved()) {
+            cDims[i].setChunkInterval(hardInterval);
+        } else if (softInterval != hardInterval) {
+            // By throwing here, we'll have wasted our earlier call to catalog->getNextArrayId(), and
+            // burned an array id.  Oh well.  (This is re. calls from PhysicalUpdate.)
+
+            // With autochunking, it's the optimizer (or something that should eventually be in the
+            // optimizer) that's responsible for chunk size mismatches getting resolved.  So we use
+            // that "short" error code when doing the late re-checking of the intervals.
+            throw USER_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_DIMENSIONS_DONT_MATCH)
+                << inDims[i] << cDims[i];
+        }
+    }
+}
+
+
 void PhysicalOperator::repartByLeftmost(
     vector<ArrayDesc> const& inputSchemas,
     vector<ArrayDesc const*>& modifiedPtrs) const
@@ -1502,51 +1326,77 @@ void PhysicalOperator::repartByLeftmost(
     const size_t N_SCHEMAS = inputSchemas.size();
     assert(N_SCHEMAS > 1); // ... else you are calling the wrong canned implementation.
     assert(N_SCHEMAS == modifiedPtrs.size());
+    // NOTE:  N_SCHEMAS may (someday) be  > 2
 
+    // Find leftmost *non-autochunked* schema, use *that* as the exemplar for
+    // the following aspects of dimensions: chunkInterval and chunkOverlap.  The
+    // names, start indices, and end indices of dimensions are preserved for each
+    // of the input schemas.
+    size_t exemplarIndex = 0;
+    for (ArrayDesc const& schema : inputSchemas) {
+        if (schema.isAutochunked()) {
+                ++exemplarIndex;
+        }
+        else {
+            break;
+        }
+    }
+    // At least one of the input schemas must be non-autochunked
+    if (exemplarIndex == N_SCHEMAS) {
+        throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ALL_INPUTS_AUTOCHUNKED)
+            << getLogicalName();
+    }
+
+    // We don't expect to be called twice, but that may change later on:
+    //  wipe any previous result.
     _redimRepartSchemas.clear();
-    ArrayDesc const&    leftSchema  = inputSchemas[0];
-    const size_t        nDimensions = leftSchema.getDimensions().size();
-    modifiedPtrs[0] = 0;       // Do not repartition leftmost input array.
 
-    for (size_t nSchema = 1; nSchema < N_SCHEMAS; ++nSchema)
+    // Do not repartition leftmost (non-autochunked) input array.
+    modifiedPtrs[exemplarIndex] = nullptr;
+
+    ArrayDesc const& exemplarSchema = inputSchemas[exemplarIndex];
+    const size_t     nDimensions    = exemplarSchema.getDimensions().size();
+    // Check the other input schemas, adding a desired schema to modifiedPtrs
+    // for each input that needs to have an automatic repart operator added.
+    for (size_t iSchema = 0; iSchema < N_SCHEMAS; ++iSchema)
     {
-        ArrayDesc const& rightSchema = inputSchemas[nSchema];
-        assert(rightSchema.getDimensions().size() == nDimensions);
+        if (iSchema == exemplarIndex) {
+            // This is the exemplar Schema. There is no need to insert a
+            // repart/redimension to make the partitioning match itself.
+            continue;
+        }
 
-        if (leftSchema.samePartitioning(rightSchema)) {
-            // Already has right chunkSize and overlap, do nothing.
-            modifiedPtrs[nSchema] = 0;
-        } else {
-            // If explicit repart is present, we're forbidden to change it---yet it *must* match!!!
-            if (modifiedPtrs[nSchema]) {
-                throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_BAD_EXPLICIT_REPART)
-                    << getLogicalName()
-                    << leftSchema.getDimensions()
-                    << rightSchema.getDimensions();
-            }
-
-            // Clone this schema and adjust dimensions according to leftmost.
-            Dimensions const& leftDimensions = leftSchema.getDimensions();
-            Dimensions mergedDimensions(rightSchema.getDimensions());
-            for (size_t nDimension = 0; nDimension < nDimensions; ++nDimension)
+        ArrayDesc const& targetSchema = inputSchemas[iSchema];
+        if (exemplarSchema.samePartitioning(targetSchema)) {
+            // Already has correct chunkSize and overlap, do nothing.
+            modifiedPtrs[iSchema] = nullptr;
+        }
+        else {
+            // Clone this schema and adjust dimensions according to exemplar.
+            Dimensions const& exemplarDimensions = exemplarSchema.getDimensions();
+            // maintain the names of the dimensions by starting with the
+            // original dimension information from the input schema
+            Dimensions targetDimensions(targetSchema.getDimensions());
+            assert(targetDimensions.size() == nDimensions);
+            for (size_t iDim = 0; iDim < nDimensions; ++iDim)
             {
-                DimensionDesc const & leftDimension   = leftDimensions[nDimension];
-                DimensionDesc       & mergedDimension = mergedDimensions[nDimension];
+                DimensionDesc const & exemplarDim = exemplarDimensions[iDim];
+                DimensionDesc       & targetDim   = targetDimensions[iDim];
 
-                mergedDimension.setChunkInterval(leftDimension.getChunkInterval());
+                targetDim.setChunkInterval(exemplarDim.getChunkInterval());
 
                 // Take smallest overlap since we can't (easily) conjure up cells that aren't there.
-                mergedDimension.setChunkOverlap(min(
-                    leftDimension.getChunkOverlap(),
-                    mergedDimension.getChunkOverlap()));
+                targetDim.setChunkOverlap(min(exemplarDim.getChunkOverlap(),
+                                              targetDim.getChunkOverlap()));
             }
 
             _redimRepartSchemas.push_back(make_shared<ArrayDesc>(
-                rightSchema.getName(),
-                rightSchema.getAttributes(),
-                mergedDimensions,
-                defaultPartitioning()));
-            modifiedPtrs[nSchema] = _redimRepartSchemas.back().get();
+                                              targetSchema.getName(),
+                                              targetSchema.getAttributes(),
+                                              targetDimensions,
+                                              targetSchema.getDistribution(),
+                                              targetSchema.getResidency()));
+            modifiedPtrs[iSchema] = _redimRepartSchemas.back().get();
         }
     }
     if (_redimRepartSchemas.empty()) {
@@ -1571,11 +1421,25 @@ PhysicalOperator::assertLastVersion(std::string const& arrayName,
     }
 }
 
+void
+PhysicalOperator::assertConsistency(ArrayDesc const& inputSchema,
+                                    RedistributeContext const& inputDistribution)
+{
+   if (isDebug()) {
+       SCIDB_ASSERT(inputSchema.getResidency()->isEqual(inputDistribution.getArrayResidency()));
+       if (inputSchema.getId() > 0 && inputDistribution.getArrayDistribution()->getPartitioningSchema() == psUndefined) {
+           // in degraded mode scan() reports psUndefined but
+           // it has to preserve the original distribution for SMGR to make sense of the chunks
+       } else {
+           SCIDB_ASSERT(inputSchema.getDistribution()->checkCompatibility(inputDistribution.getArrayDistribution()));
+       }
+   }
+}
+
 void StoreJob::run()
 {
     ArrayDesc const& dstArrayDesc = _dstArray->getArrayDesc();
     size_t nAttrs = dstArrayDesc.getAttributes().size();
-    Query::setCurrentQueryID(_query->getQueryID());
 
     for (size_t i = _shift; i != 0 && !_srcArrayIterators[0]->end(); --i)
     {
@@ -1635,6 +1499,8 @@ PhysicalUpdate::PhysicalUpdate(const string& logicalName,
                                const ArrayDesc& schema,
                                const std::string& catalogArrayName):
 PhysicalOperator(logicalName, physicalName, parameters, schema),
+_preambleDone(false),
+_deferLockUpdate(false),
 _unversionedArrayName(catalogArrayName),
 _arrayUAID(0),
 _arrayID(0),
@@ -1643,38 +1509,48 @@ _lastVersion(0)
 
 void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
 {
-    std::shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-    SCIDB_ASSERT(membership);
-    if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-        (membership->getInstances().size() != query->getInstancesCount())) {
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-    }
-
     // Figure out the array descriptor for the new array
     // Several options:
     // 1. _schema represents the unversioned array already in the catalog (obtained by the LogicalOperator)
-    // 2. _schema represents the input array and the output array does not yet exists in the catalog
-    // 3. _schema represents the input array and the output array may/not exist in the catalog (in case of PhysicalInput)
-    // Transient arrays do not have versions; for the persistent arrays we need to update _schema to represent a new version array
+    // 2. _schema represents the input array and the output array does not yet exist in the catalog
+    // 3. _schema represents the input array and the output array may/not exist in the catalog
+    //    (in case of PhysicalInput, user-inserted SG)
+    // Transient arrays do not have versions; for the persistent arrays we need to update _schema
+    // to represent a new version array.
+    //
+    // Life gets complicated when the input array is autochunked, that is, its chunk intervals are
+    // not yet known and won't be known until execute() time.  In that case, we defer the work that
+    // depends on having known intervals until executionPreamble() is called.
+    //
+    // ALL SUBCLASS execute() METHODS >>>MUST<<< CALL executionPreamble() FIRST.
+
     bool rc = false;
-    PartitioningSchema ps = _schema.getPartitioningSchema();
 
     SystemCatalog* catalog = SystemCatalog::getInstance();
     SCIDB_ASSERT(catalog);
     SCIDB_ASSERT(!_unversionedArrayName.empty());
 
     // throw away the alias name, and restore the catalog name
-    _schema.setName(_unversionedArrayName);
-
-    LOG4CXX_DEBUG(logger, "PhysicalUpdate::preSingleExecute: schema: "<< _schema);
+    std::string arrayName;
+    std::string namespaceName;
+    query->getNamespaceArrayNames(_unversionedArrayName, namespaceName, arrayName);
+    _schema.setName(arrayName);
+    _unversionedArrayName = arrayName;
+    LOG4CXX_DEBUG(logger, "PhysicalUpdate::preSingleExecute begin: "
+        << " namespaceName=" << namespaceName
+        << " arrayName=" << arrayName
+        << " schema: "<< _schema);
 
     bool isArrayInCatalog = (_schema.getId() > 0);
     if (!isArrayInCatalog) {
-        isArrayInCatalog = catalog->getArrayDesc(_schema.getName(),
-                                                 query->getCatalogVersion(_schema.getName()),
-                                                 _unversionedSchema,
-                                                 false);
-        assertLastVersion(_schema.getName(), isArrayInCatalog, _unversionedSchema);
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        isArrayInCatalog = scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName,
+            arrayName,
+            arrayId,
+            _unversionedSchema,
+            false);
+        assertLastVersion(arrayName, isArrayInCatalog, _unversionedSchema);
     } else {
         SCIDB_ASSERT(_schema.getId() != INVALID_ARRAY_ID);
         SCIDB_ASSERT(_schema.getId() == _schema.getUAId());
@@ -1684,12 +1560,16 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
 
     // set up error handling
     const SystemCatalog::LockDesc::LockMode lockMode =
-        _unversionedSchema.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
-    _lock = make_shared<SystemCatalog::LockDesc>(_schema.getName(),
-                                                 query->getQueryID(),
-                                                 Cluster::getInstance()->getLocalInstanceId(),
-                                                 SystemCatalog::LockDesc::COORD,
-                                                 lockMode);
+        _unversionedSchema.isTransient()
+            ? SystemCatalog::LockDesc::XCL
+            : SystemCatalog::LockDesc::WR;
+    _lock = make_shared<SystemCatalog::LockDesc>(
+        namespaceName,
+        arrayName,
+        query->getQueryID(),
+        Cluster::getInstance()->getLocalInstanceId(),
+        SystemCatalog::LockDesc::COORD,
+        lockMode);
 
     {  //XXX HACK to make sure we got the right (more restrictive) lock
         _lock->setLockMode(SystemCatalog::LockDesc::RD);
@@ -1698,8 +1578,8 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
         _lock->setLockMode(resLock->getLockMode());
         if (_lock->getLockMode() !=  lockMode) {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAYS_NOT_CONFORMANT) <<
-            string("Transient array with name: ") + _lock->getArrayName() +
-            string(" cannot be removed/inserted concurrently with another store/insert");
+            string("Transient array with name: \'") + _lock->getArrayName() +
+            string("\' cannot be removed/inserted concurrently with another store/insert");
         }
     }
 
@@ -1707,6 +1587,8 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
         std::shared_ptr<Query::ErrorHandler> ptr(make_shared<UpdateErrorHandler>(_lock));
         query->pushErrorHandler(ptr);
     }
+
+    const size_t redundancy = Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY);
 
     if (!isArrayInCatalog) {
         // so, we need to add the unversioned array as well
@@ -1716,8 +1598,9 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
         _lock->setLockMode(SystemCatalog::LockDesc::CRT);
         rc = catalog->updateArrayLock(_lock);
         SCIDB_ASSERT(rc);
-        SCIDB_ASSERT(ps == defaultPartitioning());
-        _schema.setPartitioningSchema(ps);
+        SCIDB_ASSERT(_schema.getDistribution()->checkCompatibility(defaultPartitioning(redundancy)));
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidencyForWrite()));
+
         _unversionedSchema = _schema;
         ArrayID uAId = catalog->getNextArrayId();
         _unversionedSchema.setIds(uAId, uAId, VersionID(0));
@@ -1731,6 +1614,7 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
         _lock->setArrayVersionId(_arrayID     = _unversionedSchema.getId());
         rc = catalog->updateArrayLock(_lock);
         SCIDB_ASSERT(rc);
+        query->isDistributionDegradedForWrite(_unversionedSchema);
         return;
 
     } else {
@@ -1739,22 +1623,38 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
     }
     SCIDB_ASSERT(_unversionedSchema.getUAId() == _unversionedSchema.getId());
 
-    // all aspects of conformity should be checked at the physical stage
-    ArrayDesc::checkConformity(_schema, _unversionedSchema);
+    if (_unversionedSchema.getDistribution()->getRedundancy() >=
+        _unversionedSchema.getResidency()->size()) {
+        throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_INVALID_REDUNDANCY);
+    }
+
+    //XXX TODO: for now just check that all the instances in the residency are alive
+    //XXX TODO: once we allow writes in a degraded mode, this call might have more semantics
+    query->isDistributionDegradedForWrite(_unversionedSchema);
+
+    // All aspects of conformity should be checked at the physical stage, but we must postpone the
+    // interval check if we don't have the interval(s) yet.
+    _deferLockUpdate = _schema.isAutochunked();
+    unsigned flags = _deferLockUpdate ? ArrayDesc::IGNORE_INTERVAL : 0;
+    ArrayDesc::checkConformity(_schema, _unversionedSchema, flags);
 
     _arrayUAID = _unversionedSchema.getId();
 
-    _schema = ArrayDesc(ArrayDesc::makeVersionedName(_schema.getName(), _lastVersion+1),
-                        _unversionedSchema.getAttributes(),
-                        _unversionedSchema.getDimensions(),
-                        _unversionedSchema.getPartitioningSchema());
+    _schema = ArrayDesc(
+        namespaceName,
+        ArrayDesc::makeVersionedName(arrayName, _lastVersion+1),
+        _unversionedSchema.getAttributes(),
+        _unversionedSchema.getDimensions(),
+        _unversionedSchema.getDistribution(),
+        _unversionedSchema.getResidency());
 
     BOOST_FOREACH (DimensionDesc& d, _schema.getDimensions())
     {
         d.setCurrStart(CoordinateBounds::getMax());
         d.setCurrEnd(CoordinateBounds::getMin());
     }
-    SCIDB_ASSERT(_schema.getPartitioningSchema() == defaultPartitioning());
+    // XXX TODO: For now we are allowing only the default distribution
+    SCIDB_ASSERT(_schema.getDistribution()->checkCompatibility(defaultPartitioning(redundancy)));
 
     _arrayID = catalog->getNextArrayId();
 
@@ -1763,12 +1663,59 @@ void PhysicalUpdate::preSingleExecute(std::shared_ptr<Query> query)
     _lock->setArrayId(_arrayUAID);
     _lock->setArrayVersion(_lastVersion+1);
     _lock->setArrayVersionId(_arrayID);
-    rc = catalog->updateArrayLock(_lock);
-    SCIDB_ASSERT(rc);
+
+    // Do not update the array lock until the intervals have been checked.
+    if (!_deferLockUpdate) {
+        rc = catalog->updateArrayLock(_lock);
+        SCIDB_ASSERT(rc);
+    }
+}
+
+
+void PhysicalUpdate::executionPreamble(std::shared_ptr<Array>& input, std::shared_ptr<Query>& query)
+{
+    // Catch bad subclasses that don't make this call!
+    SCIDB_ASSERT(!_preambleDone);
+    _preambleDone = true;
+
+    checkOrUpdateIntervals(_schema, input);
+    if (!_unversionedSchema.getAttributes().empty()) {
+        // On the coordinator, sometimes _schema receives values from _unversionedSchema and
+        // sometimes it's the other way around.  We must reconcile autochunked dimensions in both.
+        SCIDB_ASSERT(query->isCoordinator());
+        checkOrUpdateIntervals(_unversionedSchema, input);
+    }
+
+    // Finally the catalog can be updated.
+    if (_deferLockUpdate) {
+        SCIDB_ASSERT(query->isCoordinator());
+        SystemCatalog* catalog = SystemCatalog::getInstance();
+        SCIDB_ASSERT(catalog);
+        bool rc = catalog->updateArrayLock(_lock);
+        SCIDB_ASSERT(rc);
+    }
+
+    // Everybody get together!
+    // XXX Very heavyweight in terms of number of messages, suggestions welcome.
+    // XXX What would be nice is an per-operator-object base barrier number (perhaps assigned by
+    //     QueryProcessor::execute()?).  Without that, we need two calls here.
+    // XXX Tigor says that workers might not really need to wait, so long as the lock is updated on
+    //     the coordinator before execute()... i.e. we *might* not need to defer updating the lock.
+    //     Worth testing at some point.
+    syncBarrier(0, query);
+    syncBarrier(1, query);
 }
 
 void PhysicalUpdate::postSingleExecute(std::shared_ptr<Query> query)
 {
+    // Some assertions to ensure that all PhysicalUpdate instances either (a) ran the execute
+    // preamble, or (b) are working on a shadow array and therefore didn't need to (since a shadow
+    // array cannot be autochunked).
+    bool shadowArrayUpdater = (getPhysicalName() == "shadow_update_physical");
+    SCIDB_ASSERT(!shadowArrayUpdater || !_deferLockUpdate);
+    ASSERT_EXCEPTION(_preambleDone || shadowArrayUpdater,
+                     "PhysicalUpdate subclass failed to run executionPreamble()");
+
     if (_arrayID != 0 && !_unversionedSchema.isTransient()) {
         SCIDB_ASSERT(_lock);
         SCIDB_ASSERT(_arrayID > 0);
@@ -1792,20 +1739,18 @@ void PhysicalUpdate::recordPersistent(const std::shared_ptr<Query>& query)
     SCIDB_ASSERT(_arrayUAID == _unversionedSchema.getId());
     SCIDB_ASSERT(_arrayUAID == _schema.getUAId());
     SCIDB_ASSERT(_arrayID   == _schema.getId());
+    SCIDB_ASSERT(_schema.getNamespaceName() == _unversionedSchema.getNamespaceName());
     SCIDB_ASSERT(query->getSession());
 
     // if the catalog update fails (for a reason other than disconnect)
     // the finalizer code exercising this routine will abort() the process
     if (_lock->getLockMode()==SystemCatalog::LockDesc::CRT) {
-        SystemCatalog::getInstance()->addArrayVersion(
-            query->getSession()->getNamespace(),
-            &_unversionedSchema, _schema);
+        SystemCatalog::getInstance()->addArrayVersion(&_unversionedSchema, _schema);
     } else {
         SCIDB_ASSERT(_lock->getLockMode()==SystemCatalog::LockDesc::WR);
-        SystemCatalog::getInstance()->addArrayVersion(
-            query->getSession()->getNamespace(),
-            NULL, _schema);
+        SystemCatalog::getInstance()->addArrayVersion(NULL, _schema);
     }
+    LOG4CXX_DEBUG(logger, "PhysicalUpdate::recordPersistent: recorded: "<< _schema);
 }
 
 void PhysicalUpdate::recordTransient(const std::shared_ptr<Array>& t,
@@ -1884,7 +1829,7 @@ PhysicalUpdate::updateSchemaBoundaries(ArrayDesc& schema,
                     assert(dimension.has_end_max());
                     assert(dimension.end_max() == dims[i].getEndMax());
                     assert(dimension.has_chunk_interval());
-                    assert(dimension.chunk_interval() == dims[i].getChunkInterval());
+                    assert(dimension.chunk_interval() == dims[i].getRawChunkInterval());
                     assert(dimension.has_chunk_overlap());
                     assert(dimension.chunk_overlap() == dims[i].getChunkOverlap());
                 }
@@ -1926,7 +1871,7 @@ PhysicalUpdate::updateSchemaBoundaries(ArrayDesc& schema,
             dimension->set_name(dims[i].getBaseName());
             dimension->set_start_min(dims[i].getStartMin());
             dimension->set_end_max(dims[i].getEndMax());
-            dimension->set_chunk_interval(dims[i].getChunkInterval());
+            dimension->set_chunk_interval(dims[i].getRawChunkInterval());
             dimension->set_chunk_overlap(dims[i].getChunkOverlap());
 
             dimension->set_curr_start(start[i]);

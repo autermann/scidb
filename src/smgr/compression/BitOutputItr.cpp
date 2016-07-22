@@ -23,7 +23,7 @@
 //#include "smgr/compression/BitOutputItr.h"
 #include "BitOutputItr.h"
 #include <iostream>
-
+#include <util/Utility.h>
 namespace scidb
 {
   // put bits lower-order bits, higher 8 minus bits must be 0
@@ -34,28 +34,26 @@ int32_t BitOutputItr::put(const uint8_t e, const size_t bits)
     int32_t putValue;
     uint8_t shift;
 
-
     // we have to divide it among two bytes
     // modify this, copy over lhs length, then memcpy remaining bits, except rhs length, which is masked
     if(bits + _bitsWritten > 8) {
-      lhsLength = 8 - _bitsWritten; // first byte
-      rhsLength = bits - lhsLength; // second byte
-      _bits = _bits | (e >> rhsLength);
+      lhsLength = static_cast<uint8_t>(8 - _bitsWritten); // first byte
+      rhsLength = static_cast<uint8_t>(bits - lhsLength); // second byte
+      _bits = static_cast<uint8_t>(_bits | (e >> rhsLength));
       putValue = _dst->put(_bits);
 
       // set up for the next values
       _bits = 0;
-      _bits = _bits | (e << (8-rhsLength));
+      _bits = static_cast<uint8_t>(_bits | (e << (8-rhsLength)));
       _bitsWritten = rhsLength;
       return putValue;
-
     }
 
-    shift = 8 - _bitsWritten - bits;
+    shift = static_cast<uint8_t>(8 - _bitsWritten - bits);
 
     // else, just pack the bits
-    _bits = _bits | (e << shift);
-    _bitsWritten += bits;
+    _bits = static_cast<uint8_t>(_bits | (e << shift));
+    _bitsWritten = static_cast<uint8_t>(_bitsWritten + bits);
     if(_bitsWritten == 8)
       {
 	_bitsWritten = 0;
@@ -72,7 +70,6 @@ int32_t BitOutputItr::put(const uint8_t e, const size_t bits)
   {
     if(_bitsWritten > 0)
       {
-
 	return _dst->put(_bits);
       }
     else
@@ -91,6 +88,6 @@ int32_t BitOutputItr::put(const uint8_t e, const size_t bits)
       }
     if(r == -1)
       { return -1; }
-    return _dst->close();
+    return safe_static_cast<int32_t>(_dst->close());
   }
 }

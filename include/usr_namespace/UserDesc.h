@@ -42,10 +42,19 @@ namespace scidb
      */
     class UserDesc
     {
+    public:
+        typedef uint64_t ID;  //Note:  0 is an invalid ID
+        static inline ID rootId() { return 1; }
+        static inline const char *rootName() { return "root"; }
+
+        static bool isRoot(UserDesc::ID id) { return id == rootId(); }
+        static bool isRoot(const std::string &rName) { return (0 == rName.compare(rootName())); }
+
     private:
         std::string _name;
         std::string _password;
         std::string _passwordMethod;
+        ID          _id;
 
     public:
         /**
@@ -55,14 +64,17 @@ namespace scidb
 
         /**
          * @brief Constructor given a reference name, password, & method
-         * param[in] rName - the name representing this role
-         * param[in] rPassword - the user's password
-         * param[in] rPasswordMethod - the crypto algorithm performed on the passwrod
+         * @param[in] rName - the name representing this role
+         * @param[in] rPassword - the user's password
+         * @param[in] rPasswordMethod - the crypto algorithm performed on the passwrod
+         * @param[in] id - the identification number of the user
          */
          UserDesc(
             const std::string &rName,
             const std::string &rPassword = "",
-            const std::string &rPasswordMethod = "raw");
+            const std::string &rPasswordMethod = "raw",
+            const ID &id = 0 );
+
 
         /**
          * @brief Retrieves the user's name
@@ -91,6 +103,15 @@ namespace scidb
             return _passwordMethod;
         }
 
+        /**
+         * @brief Retrieves the user's identification number
+         * @returns - the user's id
+         */
+        inline const ID &getId() const
+        {
+            return _id;
+        }
+
 		/**
          * @brief Sets the user's name
          * @param[in] name - the user's name
@@ -109,7 +130,7 @@ namespace scidb
             _password = password;
         }
 
-		/**
+        /**
          * @brief Sets the user's password crypto method
          * @param[in] passwordMethod - the user's password crypto method
          */
@@ -117,9 +138,17 @@ namespace scidb
         {
             _passwordMethod = passwordMethod;
         }
+
+        /**
+         * @brief Sets the user's identification number
+         */
+        inline void setId(const ID &id)
+        {
+            _id = id;
+        }
     };
 
-	/**
+    /**
      * @brief Comparison operator - "less than"
      *
      * @param[in] lhs - left hand side of the operator
@@ -133,7 +162,7 @@ namespace scidb
         return (lhs.getName() < rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "greater than"
      *
      * @param[in] lhs - left hand side of the operator
@@ -144,10 +173,10 @@ namespace scidb
         const UserDesc& lhs,
         const UserDesc& rhs)
     {
-        return lhs > rhs;
+        return (lhs.getName() > rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "less than or equal to"
      *
      * @param[in] lhs - left hand side of the operator
@@ -161,7 +190,7 @@ namespace scidb
         return !(lhs > rhs);
     }
 
-	/**
+    /**
      * @brief Comparison operator - "greater than or equal to"
      *
      * @param[in] lhs - left hand side of the operator
@@ -175,7 +204,7 @@ namespace scidb
         return !(lhs < rhs);
     }
 
-	/**
+    /**
      * @brief Comparison operator - "equality"
      *
      * @param[in] lhs - left hand side of the operator
@@ -189,7 +218,7 @@ namespace scidb
         return (lhs.getName() == rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "inequality"
      *
      * @param[in] lhs - left hand side of the operator

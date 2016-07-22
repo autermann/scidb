@@ -64,7 +64,7 @@ public:
      * @param[in]    percentNull a number from 0 to 100, where 0 means never generate null, and 100 means always generate null
      * @return       the value from the parameter
      */
-    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, int nullReason)
+    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, Value::reason nullReason)
     {
         assert(percentNull>=0 && percentNull<=100);
 
@@ -134,7 +134,8 @@ public:
         vector< std::shared_ptr<ArrayIterator> > arrayIters(array.getArrayDesc().getAttributes(true).size());
         vector< std::shared_ptr<ChunkIterator> > chunkIters(arrayIters.size());
 
-        for (size_t i = 0; i < arrayIters.size(); i++)
+        AttributeID iterSize = safe_static_cast<AttributeID>(arrayIters.size());
+        for (AttributeID i = 0; i < iterSize; i++)
         {
             arrayIters[i] = array.getIterator(i);
             chunkIters[i] =
@@ -212,7 +213,9 @@ public:
 
             vector<DimensionDesc> dimensions(1);
             dimensions[0] = DimensionDesc(string("dummy_dimension"), start, end, chunkInterval, 0);
-            ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
+            ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions,
+                             defaultPartitioning(),
+                             query->getDefaultArrayResidency());
 
             // Define the array
             std::shared_ptr<MemArray> arrayInst(new MemArray(schema,query));
@@ -288,11 +291,11 @@ public:
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        srand(time(NULL));
+        srand(static_cast<unsigned int>(time(NULL)));
 
         testOnce_MemArray(query, TID_INT64, 0, 500000, 10000, 2);
 
-        return std::shared_ptr<Array> (new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(_schema,query));
     }
 
 };

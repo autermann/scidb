@@ -36,7 +36,6 @@ using namespace std;
 
 namespace scidb
 {
-
     //
     // Xgrid chunk iterator methods
     //
@@ -177,7 +176,9 @@ namespace scidb
         return inputIterator->setPosition(inPos);
     }
 
-    XgridArrayIterator::XgridArrayIterator(XgridArray const& arr, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator)
+    XgridArrayIterator::XgridArrayIterator(XgridArray const& arr,
+                                           AttributeID attrID,
+                                           std::shared_ptr<ConstArrayIterator> inputIterator)
     : DelegateArrayIterator(arr, attrID, inputIterator),
       array(arr),
       inPos(arr.getArrayDesc().getDimensions().size()),
@@ -225,5 +226,44 @@ namespace scidb
             scale[i] = newDims[i].getLength() / oldDims[i].getLength();
         }
     }
-}
 
+    std::shared_ptr<Array> XgridArray::create(ArrayDesc const& partlyScaledDesc,
+                                              std::vector<int32_t> const& scaleFactors,
+                                              std::shared_ptr<Array>& inputArray)
+    {
+        // Easy case: no late scaling to perform.
+        if (scaleFactors.empty()) {
+            return std::shared_ptr<Array>(new XgridArray(partlyScaledDesc, inputArray));
+        }
+
+        // Need to build a new set of scaled dimensions.  We rely on scaleFactors being all 1 for
+        // already-scaled dimensions.
+        //
+        Dimensions const& psDims = partlyScaledDesc.getDimensions();
+        Dimensions const& inputDims = inputArray->getArrayDesc().getDimensions();
+        size_t const nDims = psDims.size();
+        Dimensions newDims(nDims);
+        int64_t chunkInterval;
+        for (size_t i = 0; i < nDims; ++i) {
+            newDims[i] = psDims[i];
+            if (scaleFactors[i] == 1) {
+                // This is one of the already-scaled dimensions.
+                chunkInterval = psDims[i].getChunkInterval();
+            } else {
+                // Late scaling needed for this autochunked dimension.
+                SCIDB_ASSERT(psDims[i].isAutochunked());
+                chunkInterval = inputDims[i].getChunkInterval() * scaleFactors[i];
+            }
+            newDims[i].setChunkInterval(chunkInterval);
+        }
+
+        return std::shared_ptr<Array>(new XgridArray(ArrayDesc(
+                                                         partlyScaledDesc.getName(),
+                                                         partlyScaledDesc.getAttributes(),
+                                                         newDims,
+                                                         partlyScaledDesc.getDistribution(),
+                                                         partlyScaledDesc.getResidency()),
+                                                     inputArray));
+    }
+
+} // namespace

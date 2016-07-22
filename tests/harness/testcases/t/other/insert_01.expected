@@ -67,7 +67,7 @@ SCIDB QUERY : <insert(A,D)>
 {3} 6
 
 SCIDB QUERY : <insert(repart(D,<val:double> [x=0:3,2,0]),D)>
-[An error expected at this place for the query "insert(repart(D,<val:double> [x=0:3,2,0]),D)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN.]
+[An error expected at this place for the query "insert(repart(D,<val:double> [x=0:3,2,0]),D)". And it failed with error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_BAD_EXPLICIT_REPART. Expected error code = scidb::SCIDB_SE_OPERATOR::SCIDB_LE_BAD_EXPLICIT_REPART.]
 
 SCIDB QUERY : <insert(repart(D, <val:double> [x=0:3,4,0]),D)>
 {x} sal

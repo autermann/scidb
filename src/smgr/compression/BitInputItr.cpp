@@ -22,6 +22,7 @@
 
 //#include "smgr/compression/BitInputItr.h"
 #include "BitInputItr.h"
+#include <assert.h>
 
 #include <iostream>
 namespace scidb
@@ -29,6 +30,7 @@ namespace scidb
   // get _bits contents, must request <= 8 bits
   int32_t BitInputItr::get(uint8_t &dst, const size_t bits)
   {
+    assert(bits <= 8);
     uint8_t mask = 0;
     uint8_t i, start;
 
@@ -49,34 +51,34 @@ namespace scidb
 	// create a bitmask for this
 	for(i = 0; i < bits; ++i)
 	  {
-	    mask = mask | (1 << i);
+            mask = static_cast<uint8_t>(mask | (1 << i));
 	  }
 	// now shift it all over to the start offset
-	start = 8 - _bitsRead - bits;
+	start = static_cast<uint8_t>(8 - _bitsRead - bits);
 
 	// get rid of rhs
-	dst = _bits >> start;
+	dst = static_cast<uint8_t>(_bits >> start);
 	// get lower lhs bits
 	dst = dst & mask;
-	_bitsRead += bits;
+	_bitsRead = static_cast<uint8_t>(_bitsRead + bits);
 
 	return 0;
       }
     else
       {
-	lhsLength = 8 - _bitsRead;
-	rhsLength = bits - lhsLength;
+        lhsLength = static_cast<uint8_t>(8 - _bitsRead);
+        rhsLength = static_cast<uint8_t>(bits - lhsLength);
 
 	for(i = 0; i < lhsLength; ++i)
 	  {
-	    mask = mask | (1 << i);
+            mask = static_cast<uint8_t>(mask | (1 << i));
 	  }
 
 	dst = _bits & mask;
-	dst = dst << rhsLength;
+	dst = static_cast<uint8_t>(dst << rhsLength);
 
 	getValue = _src->get(_bits);
-	dst = dst | (_bits >> (8 - rhsLength));
+	dst = dst | static_cast<uint8_t>(_bits >> (8 - rhsLength));
 	_bitsRead = rhsLength;
 
 	return getValue;

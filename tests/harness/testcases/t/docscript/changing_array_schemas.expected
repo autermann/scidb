@@ -105,7 +105,7 @@ SCIDB QUERY : <SELECT * INTO m1 FROM unpack(m3x3,k)>
 
 SCIDB QUERY : <show(m1)>
 {i} schema
-{0} 'm1<i:int64,j:int64,val:double> [k=0:*,9,0]'
+{0} 'm1<i:int64 NOT NULL,j:int64 NOT NULL,val:double> [k=0:*,9,0]'
 
 SCIDB QUERY : <show(m3x3)>
 {i} schema

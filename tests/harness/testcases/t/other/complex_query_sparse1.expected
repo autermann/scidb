@@ -128,7 +128,7 @@ SCIDB QUERY : <store(unpack(project(subarray(cross_join(regrid(between(join(appl
 
 SCIDB QUERY : <show(ZZZ)>
 {i} schema
-{0} 'ZZZ<x:int64,y:int64,x_2:int64,y_2:int64,val:double> [i=0:*,16,0]'
+{0} 'ZZZ<x:int64 NOT NULL,y:int64 NOT NULL,x_2:int64 NOT NULL,y_2:int64 NOT NULL,val:double> [i=0:*,16,0]'
 
 SCIDB QUERY : <unpack(project(subarray(cross_join(regrid(between(join(apply(subarray(xgrid(m5x5_array,2,2),0,1,9,8),z,x),repart(m5x5_array,<val:double>[x=0:4,10,0,y=0:4,10,0])),0,0,3,3),2,2,sum(z)),m5x5_array),0,0,0,0,1,1,1,1),val),i)>
 {i} x,y,x,y,val
@@ -146,7 +146,7 @@ SCIDB QUERY : <store(unpack(project(subarray(cross_join(regrid(between(join(appl
 
 SCIDB QUERY : <show(MMM)>
 {i} schema
-{0} 'MMM<x:int64,y:int64,x_2:int64,y_2:int64,val:double> [i=0:*,16,0]'
+{0} 'MMM<x:int64 NOT NULL,y:int64 NOT NULL,x_2:int64 NOT NULL,y_2:int64 NOT NULL,val:double> [i=0:*,16,0]'
 
 SCIDB QUERY : <rank(m5x5_sparse)>
 {x,y} val,val_rank

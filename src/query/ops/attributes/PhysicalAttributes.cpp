@@ -33,6 +33,7 @@
 #include "query/Operator.h"
 #include "array/TupleArray.h"
 #include "system/SystemCatalog.h"
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 using namespace boost;
@@ -43,24 +44,34 @@ namespace scidb
 class PhysicalAttributes: public PhysicalOperator
 {
 public:
-    PhysicalAttributes(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalAttributes(
+        const string& logicalName, const string& physicalName,
+        const Parameters& parameters, const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
+        assert(!_schema.isAutochunked());
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)
     {
         assert(_parameters.size() == 1);
-        const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string &arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         ArrayDesc arrayDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, query->getCatalogVersion(arrayName), arrayDesc);
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(namespaceName, arrayName, arrayId, arrayDesc);
         Attributes const& attrs = arrayDesc.getAttributes(true);
 
         std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));

@@ -89,7 +89,7 @@ namespace scidb {
     {
         if (!hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_CURRENT_ELEMENT);
-        for (int i = currPos.size(); --i >= 0;) {
+        for (int i = safe_static_cast<int>(currPos.size()); --i >= 0;) {
             if (++currPos[i] > lastPos[i]) {
                 currPos[i] = firstPos[i];
             } else {
@@ -257,7 +257,7 @@ namespace scidb {
     {
         chunkInitialized = false;
         while (true) {
-            int i = dims.size() - 1;
+            int i = safe_static_cast<int>(dims.size()) - 1;
             while ((currPos[i] += dims[i].getChunkInterval()) > dims[i].getEndMax()) {
                 if (i == 0) {
                     hasCurrent = false;

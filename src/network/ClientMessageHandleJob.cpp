@@ -31,19 +31,24 @@
  *      Author: roman.simakov@gmail.com
  */
 
+#include "ClientMessageHandleJob.h"
+
+#include <query/RemoteArray.h>
+
 #include "log4cxx/logger.h"
 #include <memory>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <time.h>
 
-#include "ClientMessageHandleJob.h"
 #include <system/Exceptions.h>
+#include <system/Warnings.h>
 #include <query/QueryProcessor.h>
 #include <network/NetworkManager.h>
 #include <network/MessageUtils.h>
 #include <query/Serialize.h>
 #include <array/Metadata.h>
 #include <query/executor/SciDBExecutor.h>
+#include <query/executor/ScopedQueryThread.h>
 #include <util/Mutex.h>
 #include <util/session/Session.h>
 
@@ -51,9 +56,8 @@
 #include <usr_namespace/NamespacesCommunicator.h>
 #include <usr_namespace/SecurityCommunicator.h>
 
-
+#include <SciDBAPI.h>
 using namespace std;
-using namespace boost;
 
 namespace scidb
 {
@@ -189,6 +193,7 @@ ClientMessageHandleJob::fetchChunk()
     {
         _query = Query::getQueryByID(queryID);
         _query->validate();
+        ScopedActiveQueryThread saqt(_query); // _query is set appropriately
 
         std::shared_ptr<scidb_msg::Fetch> fetchRecord = _messageDesc->getRecord<scidb_msg::Fetch>();
 
@@ -273,7 +278,7 @@ ClientMessageHandleJob::fetchChunk()
         if (_query) {
             _query->handleError(e.copy());
         }
-        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(e, queryID));
         sendMessageToClient(msg);
     }
 }
@@ -282,6 +287,8 @@ void ClientMessageHandleJob::fetchMergedChunk(std::shared_ptr<RemoteMergedArray>
                                               AttributeID attributeId,
                                               Notification<scidb::Exception>::ListenerID queryErrorListenerID)
 {
+    ScopedActiveQueryThread saqt(_query); // _query is set appropriately
+
     static const char *funcName="ClientMessageHandleJob::fetchMergedChunk: ";
     const QueryID queryID = _messageDesc->getQueryID();
     RemoteMergedArray::RescheduleCallback cb;
@@ -352,7 +359,7 @@ void ClientMessageHandleJob::fetchMergedChunk(std::shared_ptr<RemoteMergedArray>
         if (_query) {
             _query->handleError(e.copy());
         }
-        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(e, queryID));
         sendMessageToClient(msg);
     }
 }
@@ -362,6 +369,8 @@ void ClientMessageHandleJob::populateClientChunk(const std::string& arrayName,
                                                  const ConstChunk* chunk,
                                                  std::shared_ptr<MessageDesc>& chunkMsg)
 {
+    // called from fetch chunk, do not reset times
+
     static const char *funcName="ClientMessageHandleJob::populateClientChunk: ";
     std::shared_ptr<scidb_msg::Chunk> chunkRecord;
     if (chunk)
@@ -416,6 +425,9 @@ void ClientMessageHandleJob::populateClientChunk(const std::string& arrayName,
 
 void ClientMessageHandleJob::prepareClientQuery()
 {
+    std::shared_ptr<Query> nullPtr;
+    ScopedActiveQueryThread saqt(nullPtr);  // _query not set
+
     assert(_connection);
     ASSERT_EXCEPTION(_connection.get()!=nullptr, "NULL connection");
     ASSERT_EXCEPTION(_connection->getSession().get()!=nullptr, "NULL session");
@@ -425,7 +437,7 @@ void ClientMessageHandleJob::prepareClientQuery()
     try
     {
         queryResult.queryID = Query::generateID();
-        assert(queryResult.queryID > 0);
+        SCIDB_ASSERT(queryResult.queryID.isValid());
         _connection->attachQuery(queryResult.queryID);
 
         // Getting needed parameters for execution
@@ -434,15 +446,17 @@ void ClientMessageHandleJob::prepareClientQuery()
         bool afl = record->afl();
         const string programOptions = record->program_options();
 
-        assert(queryResult.queryID > 0);
+        SCIDB_ASSERT(queryResult.queryID.isValid());
         try
         {
+            // create, parse, and prepare query
             scidb.prepareQuery(
                 queryString,
                 afl,
                 getProgramOptions(programOptions),
                 queryResult,
                 &_connection);
+            Query::setQueryPerThread(Query::getQueryByID(queryResult.queryID)); // now exists
         }
         catch (const scidb::SystemCatalog::LockBusyException& e)
         {
@@ -453,6 +467,8 @@ void ClientMessageHandleJob::prepareClientQuery()
             reschedule(Query::getLockTimeoutNanoSec()/1000);
             return;
         }
+        Query::setQueryPerThread(Query::getQueryByID(queryResult.queryID)); // now exists
+
         postPrepareQuery(queryResult);
     }
     catch (const Exception& e)
@@ -466,7 +482,10 @@ void ClientMessageHandleJob::prepareClientQuery()
 
 void ClientMessageHandleJob::retryPrepareQuery(scidb::QueryResult& queryResult)
 {
-    assert(queryResult.queryID > 0);
+    std::shared_ptr<Query> nullPtr;
+    ScopedActiveQueryThread saqt(nullPtr);  // _query not set
+
+    SCIDB_ASSERT(queryResult.queryID.isValid());
     const scidb::SciDB& scidb = getSciDBExecutor();
     try {
         // Getting needed parameters for execution
@@ -477,6 +496,7 @@ void ClientMessageHandleJob::retryPrepareQuery(scidb::QueryResult& queryResult)
         try
         {
             scidb.retryPrepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
+            Query::setQueryPerThread(Query::getQueryByID(queryResult.queryID)); // now exists
         }
         catch (const scidb::SystemCatalog::LockBusyException& e)
         {
@@ -490,7 +510,7 @@ void ClientMessageHandleJob::retryPrepareQuery(scidb::QueryResult& queryResult)
     }
     catch (const Exception& e)
     {
-        LOG4CXX_ERROR(logger, "prepareClientQuery failed to complete: " << e.what())
+        LOG4CXX_ERROR(logger, "retryPrepareClientQuery failed to complete: " << e.what())
         const scidb::SciDB& scidb = getSciDBExecutor();
         handleExecuteOrPrepareError(e, queryResult, scidb);
     }
@@ -498,7 +518,7 @@ void ClientMessageHandleJob::retryPrepareQuery(scidb::QueryResult& queryResult)
 
 void ClientMessageHandleJob::postPrepareQuery(scidb::QueryResult& queryResult)
 {
-    assert(queryResult.queryID > 0);
+    SCIDB_ASSERT(queryResult.queryID.isValid());
     _timer.reset();
 
     // Creating message with result for sending to client
@@ -539,7 +559,7 @@ void ClientMessageHandleJob::handleExecuteOrPrepareError(const Exception& err,
                                                          const scidb::SciDB& scidb)
 {
     assert(_connection);
-    if (queryResult.queryID != 0) {
+    if (queryResult.queryID.isValid()) {
         try {
             scidb.cancelQuery(queryResult.queryID);
             _connection->detachQuery(queryResult.queryID);
@@ -557,7 +577,7 @@ void ClientMessageHandleJob::handleExecuteOrPrepareError(const Exception& err,
 
 void ClientMessageHandleJob::reportErrorToClient(const Exception& err)
 {
-    std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(err));
+    std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(err,INVALID_QUERY_ID));
     sendMessageToClient(msg);
 }
 
@@ -575,6 +595,10 @@ void ClientMessageHandleJob::sendMessageToClient(std::shared_ptr<MessageDesc>& m
 
 void ClientMessageHandleJob::executeClientQuery()
 {
+    std::shared_ptr<Query> nullPtr;
+    ScopedActiveQueryThread saqt(nullPtr);  // _query not set
+
+    // TODO: calling the executor class "SciDB" is not helpful, rename it Executor
     const scidb::SciDB& scidb = getSciDBExecutor();
     scidb::QueryResult queryResult;
     try
@@ -595,13 +619,15 @@ void ClientMessageHandleJob::executeClientQuery()
         bool afl = record->afl();
         queryResult.queryID = _messageDesc->getQueryID();
 
-        if (queryResult.queryID <= 0) {
+        if (!queryResult.queryID.isValid()) {
+            // make a query object
             const string programOptions = record->program_options();
             queryResult.queryID = Query::generateID();
-            assert(queryResult.queryID > 0);
+            SCIDB_ASSERT(queryResult.queryID.isValid());
             _connection->attachQuery(queryResult.queryID);
             try
             {
+                // creates the query
                 scidb.prepareQuery(
                     queryString,
                     afl,
@@ -611,6 +637,7 @@ void ClientMessageHandleJob::executeClientQuery()
 
                 std::shared_ptr<Query> query = Query::getQueryByID(
                     queryResult.queryID);
+                Query::setQueryPerThread(query); // now exists
 
                 ASSERT_EXCEPTION(query.get()!=nullptr, "NULL query");
                 ASSERT_EXCEPTION(
@@ -627,12 +654,14 @@ void ClientMessageHandleJob::executeClientQuery()
                 return;
             }
         }
-        assert(queryResult.queryID>0);
-        assert(Query::getQueryByID(queryResult.queryID)->queryString == queryString);
+        SCIDB_ASSERT(queryResult.queryID.isValid());
+        std::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
+        SCIDB_ASSERT(query->queryString == queryString);
+        Query::setQueryPerThread(query);
 
         scidb.executeQuery(queryString, afl, queryResult);
 
-        postExecuteQueryInternal(queryResult);
+        postExecuteQueryInternal(queryResult, query);
     }
     catch (const Exception& e)
     {
@@ -643,7 +672,10 @@ void ClientMessageHandleJob::executeClientQuery()
 
 void ClientMessageHandleJob::retryExecuteQuery(scidb::QueryResult& queryResult)
 {
-    assert(queryResult.queryID>0);
+    std::shared_ptr<Query> nullPtr;
+    ScopedActiveQueryThread saqt(nullPtr);  // _query not set
+
+    SCIDB_ASSERT(queryResult.queryID.isValid());
     const scidb::SciDB& scidb = getSciDBExecutor();
     try
     {
@@ -654,6 +686,7 @@ void ClientMessageHandleJob::retryExecuteQuery(scidb::QueryResult& queryResult)
         try
         {
             scidb.retryPrepareQuery(queryString, afl, getProgramOptions(programOptions), queryResult);
+            Query::setQueryPerThread(Query::getQueryByID(queryResult.queryID));  // now exists
         }
         catch (const scidb::SystemCatalog::LockBusyException& e)
         {
@@ -663,16 +696,17 @@ void ClientMessageHandleJob::retryExecuteQuery(scidb::QueryResult& queryResult)
             reschedule(Query::getLockTimeoutNanoSec()/1000);
             return;
         }
-        assert(queryResult.queryID>0);
-        assert(Query::getQueryByID(queryResult.queryID)->queryString == queryString);
+        SCIDB_ASSERT(queryResult.queryID.isValid());
+        std::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
+        SCIDB_ASSERT(query->queryString == queryString);
 
         scidb.executeQuery(queryString, afl, queryResult);
 
-        postExecuteQueryInternal(queryResult);
+        postExecuteQueryInternal(queryResult, query);
     }
     catch (const Exception& e)
     {
-       LOG4CXX_ERROR(logger, "executeClientQuery failed to complete: " << e.what())
+       LOG4CXX_ERROR(logger, "retryExecuteClient failed to complete: " << e.what())
        handleExecuteOrPrepareError(e, queryResult, scidb);
     }
 }
@@ -817,11 +851,13 @@ void ClientMessageHandleJob::handleSecurityMessageResponse()
 }
 
 
-void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryResult)
+void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryResult,
+                                                      const std::shared_ptr<Query>& query)
+
 {
     _timer.reset();
 
-    assert(queryResult.queryID>0);
+    SCIDB_ASSERT(queryResult.queryID.isValid());
 
     // Creating message with result for sending to client
     std::shared_ptr<MessageDesc> resultMessage = std::make_shared<MessageDesc>(mtQueryResult);
@@ -831,6 +867,7 @@ void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryR
     queryResultRecord->set_explain_logical(queryResult.explainLogical);
     queryResultRecord->set_explain_physical(queryResult.explainPhysical);
     queryResultRecord->set_selective(queryResult.selective);
+    queryResultRecord->set_auto_commit(queryResult.autoCommit);
 
     if (queryResult.selective)
     {
@@ -861,12 +898,10 @@ void ClientMessageHandleJob::postExecuteQueryInternal(scidb::QueryResult& queryR
             dimension->set_curr_start(dimensions[i].getCurrStart());
             dimension->set_curr_end(dimensions[i].getCurrEnd());
             dimension->set_end_max(dimensions[i].getEndMax());
-            dimension->set_chunk_interval(dimensions[i].getChunkInterval());
+            dimension->set_chunk_interval(dimensions[i].getRawChunkInterval());
             dimension->set_chunk_overlap(dimensions[i].getChunkOverlap());
         }
     }
-
-    std::shared_ptr<Query> query = Query::getQueryByID(queryResult.queryID);
 
     vector<Warning> v = query->getWarnings();
     for (vector<Warning>::const_iterator it = v.begin(); it != v.end(); ++it)
@@ -913,7 +948,7 @@ void ClientMessageHandleJob::cancelQuery()
     catch (const Exception& e)
     {
         LOG4CXX_ERROR(logger, e.what()) ;
-        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(e, queryID));
         sendMessageToClient(msg);
     }
 }
@@ -923,8 +958,13 @@ void ClientMessageHandleJob::completeQuery()
     const scidb::SciDB& scidb = getSciDBExecutor();
 
     const QueryID queryID = _messageDesc->getQueryID();
+    auto query = Query::getQueryByID(queryID);
     try
     {
+        // ScopedActiveQueryThread must be destroyed
+        // prior to query->perfTimeLog()
+        ScopedActiveQueryThread saqt(query); // _query is not set
+
         scidb.completeQuery(queryID);
         _connection->detachQuery(queryID);
         std::shared_ptr<MessageDesc> msg(makeOkMessage(queryID));
@@ -934,9 +974,14 @@ void ClientMessageHandleJob::completeQuery()
     catch (const Exception& e)
     {
         LOG4CXX_ERROR(logger, e.what()) ;
-        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(e, queryID));
         sendMessageToClient(msg);
     }
+    // saqt should be destroyed at this point
+    assert(!Query::getQueryPerThread().get());
+
+    // so we know that query will be up-to-date w.r.t. time logging
+    // when it is destroyed, which is when it logs
 }
 
 void ClientMessageHandleJob::dispatch(std::shared_ptr<WorkQueue>& requestQueue,
@@ -978,7 +1023,7 @@ void ClientMessageHandleJob::dispatch(std::shared_ptr<WorkQueue>& requestQueue,
         {
             throw SYSTEM_EXCEPTION(
                 SCIDB_SE_NETWORK,
-                SCIDB_LE_AUTHENTICATION_ERROR);
+                SCIDB_LE_AUTHENTICATION_ERROR) << "not authenticated";
         }
 
 
@@ -1032,7 +1077,7 @@ void ClientMessageHandleJob::dispatch(std::shared_ptr<WorkQueue>& requestQueue,
                       << ", for queryID=" << _messageDesc->getQueryID()
                       << ", from CLIENT"
                       << " because "<<e.what());
-        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, queryID));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(e, queryID));
         sendMessageToClient(msg);
     }
 }
@@ -1058,7 +1103,7 @@ void ClientMessageHandleJob::enqueue(std::shared_ptr<WorkQueue>& q)
     {
         LOG4CXX_ERROR(logger, "Overflow exception from the message queue ("
                       << q.get() << "): " << e.what());
-        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromException(e, _messageDesc->getQueryID()));
+        std::shared_ptr<MessageDesc> msg(makeErrorMessageFromExceptionForClient(e, _messageDesc->getQueryID()));
         sendMessageToClient(msg);
     }
 }

@@ -26,6 +26,8 @@
  * @brief Implementation of the pull-based SG context
  */
 
+#include "PullSGContext.h"
+
 #include <memory>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
@@ -33,7 +35,6 @@
 #include <log4cxx/logger.h>
 
 #include <system/Config.h>
-#include <query/PullSGContext.h>
 
 using namespace std;
 using namespace boost;
@@ -109,7 +110,7 @@ PullSGContext::getNextChunks(const std::shared_ptr<Query>& query,
     std::unordered_set<size_t> unavailable(_unavailableAttributes);
     for (std::unordered_set<size_t>::const_iterator iter = unavailable.begin();
          iter != unavailable.end(); ++iter) {
-        const AttributeID currAttrId = *iter;
+        const AttributeID currAttrId = safe_static_cast<AttributeID>(*iter);
 
         if (currAttrId == attrId) { continue; }
 
@@ -392,7 +393,7 @@ PullSGContext::findCachedChunksToSend(std::shared_ptr<ConstArrayIterator>& input
             if (logger->isTraceEnabled()) {
                 Coordinates coords;
                 std::shared_ptr<scidb_msg::Chunk> chunkRecord = msg->getRecord<scidb_msg::Chunk>();
-                for (size_t i = 0, n= chunkRecord->coordinates_size(); i < n;  ++i) {
+                for (int i = 0, n= chunkRecord->coordinates_size(); i < n;  ++i) {
                     coords.push_back(chunkRecord->coordinates(i));
                 }
                 LOG4CXX_TRACE(logger, funcName << "Found position attID= "<<attrId
@@ -424,17 +425,18 @@ PullSGContext::findCachedChunksToSend(std::shared_ptr<ConstArrayIterator>& input
             if (logger->isTraceEnabled()) {
                 Coordinates coords;
                 std::shared_ptr<scidb_msg::Chunk> chunkRecord = msg->getRecord<scidb_msg::Chunk>();
-                size_t n = chunkRecord->coordinates_size();
+                int n = chunkRecord->coordinates_size();
+                ASSERT_EXCEPTION ((n>0), funcName);
                 coords.reserve(n);
-                for (size_t i = 0; i < n;  ++i) {
+                for (int i = 0; i < n;  ++i) {
                     coords.push_back(chunkRecord->coordinates(i));
                 }
                 Coordinates nextCoords;
                 InstanceID nextDest = INVALID_INSTANCE;
                 if (chunkRecord->has_next()) {
-                    ASSERT_EXCEPTION ((n == size_t(chunkRecord->next_coordinates_size())), funcName);
+                    ASSERT_EXCEPTION ((n == chunkRecord->next_coordinates_size()), funcName);
                     nextCoords.reserve(n);
-                    for (size_t i = 0; i < n;  ++i) {
+                    for (int i = 0; i < n;  ++i) {
                         nextCoords.push_back(chunkRecord->next_coordinates(i));
                     }
                     nextDest = chunkRecord->next_dest_instance();
@@ -514,7 +516,7 @@ PullSGContext::setNextPosition(std::shared_ptr<MessageDesc>& chunkMsg,
         assert(chunkRecord->coordinates_size() == nextChunkRecord->coordinates_size());
         assert(nextChunkRecord->coordinates_size()>0);
 
-        for (size_t i = 0, n= nextChunkRecord->coordinates_size(); i < n;  ++i) {
+        for (int i = 0, n= nextChunkRecord->coordinates_size(); i < n;  ++i) {
             chunkRecord->add_next_coordinates(nextChunkRecord->coordinates(i));
         }
         chunkRecord->set_next_dest_instance(nextChunkRecord->dest_instance());
@@ -554,7 +556,7 @@ PullSGContext::getPositionMesg(const std::shared_ptr<MessageDesc>& fullChunkMsg)
     std::shared_ptr<scidb_msg::Chunk> fullChunkRecord = fullChunkMsg->getRecord<scidb_msg::Chunk>();
 
     // set chunk coordinates
-    for (size_t i = 0, n = fullChunkRecord->coordinates_size(); i < n; ++i) {
+    for (int i = 0, n = fullChunkRecord->coordinates_size(); i < n; ++i) {
         chunkRecord->add_coordinates(fullChunkRecord->coordinates(i));
     }
     chunkMsg->setQueryID(fullChunkMsg->getQueryID());

@@ -32,8 +32,11 @@
 #include "array/Array.h"
 #include "query/ops/apply/ApplyArray.h"
 
+#include <log4cxx/logger.h>
 
 namespace scidb {
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.apply"));
 
 using namespace boost;
 using namespace std;
@@ -56,6 +59,8 @@ class PhysicalApply: public  PhysicalOperator
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size()%2 == 0);
+
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
         vector<std::shared_ptr<Expression> > expressions(0);
 

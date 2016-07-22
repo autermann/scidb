@@ -52,8 +52,8 @@ SCIDB QUERY : <select name, start, length, chunk_interval, chunk_overlap, low, h
 
 SCIDB QUERY : <select * into C from attributes(B)>
 {No} name,type_id,nullable
-{0} 'a','int32',false
-{1} 'b','string',false
+{0} 'a','int32',true
+{1} 'b','string',true
 
 SCIDB QUERY : <select * from attributes(C)>
 {No} name,type_id,nullable
@@ -63,8 +63,8 @@ SCIDB QUERY : <select * from attributes(C)>
 
 SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
 {No} name,type_id,nullable
-{0} 'a','int32',false
-{1} 'b','string',false
+{0} 'a','int32',true
+{1} 'b','string',true
 
 SCIDB QUERY : <select * into B from build(T,x+5),build(TS,string(x+1))>
 {x,y} a,b
@@ -104,8 +104,8 @@ SCIDB QUERY : <select * from apply(B,z,x)>
 
 SCIDB QUERY : <select * from attributes(B)>
 {No} name,type_id,nullable
-{0} 'a','int32',false
-{1} 'b','string',false
+{0} 'a','int32',true
+{1} 'b','string',true
 
 SCIDB QUERY : <select * from dimensions(B)>
 {No} name,start,length,chunk_interval,chunk_overlap,low,high,type
@@ -128,8 +128,8 @@ SCIDB QUERY : <select name, start, length, chunk_interval, chunk_overlap, low, h
 
 SCIDB QUERY : <select name, type_id, nullable from attributes(B)>
 {No} name,type_id,nullable
-{0} 'a','int32',false
-{1} 'b','string',false
+{0} 'a','int32',true
+{1} 'b','string',true
 
 SCIDB QUERY : <select * from aggregate(versions(B),count(*))>
 {i} count

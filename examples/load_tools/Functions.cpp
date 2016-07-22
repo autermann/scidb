@@ -70,8 +70,13 @@ enum conversion_type
 };
 
 /**
- * DCAST: cast with default, does not throw an error. Tries to cast input to the appropriate type. If the cast fails,
- * returns the supplied default.
+ * DCAST: cast with default, does not throw an error.
+ * Tries to cast input type S to the appropriate T type.
+ * If the cast fails, returns the supplied default.
+ * @parameter args two element array of Value pointers,
+ *             element 0 contains the string value to be converted into type S
+ *             element 1 contains the default value in case of cast failure
+ * @parameter res pointer to the result Value
  */
 template <typename T, typename S, conversion_type C>
 static void dcast (const Value** args, Value* res, void*)
@@ -88,13 +93,13 @@ static void dcast (const Value** args, Value* res, void*)
     if(C == INTEGER)
     {
         errno = 0;
-        val = strtoll(start,  &end, 10);
+        val = static_cast<S>(strtoll(start,  &end, 10));
         error = (errno != 0);
     }
     else if (C == DOUBLE)
     {
         errno = 0;
-        val = strtold(start, &end);
+        val = static_cast<S>(strtold(start, &end));
         error = (errno != 0);
     }
     else if (C == UINT64)
@@ -115,7 +120,7 @@ static void dcast (const Value** args, Value* res, void*)
         if(!error)
         {
             errno = 0;
-            val = strtoull(start, &end, 10);
+            val = static_cast<S>(strtoull(start, &end, 10));
             error = (errno != 0);
         }
     }
@@ -376,13 +381,13 @@ void maxlen_tdv(const scidb::Value** args, scidb::Value* res, void*)
        }
     }
     split(values, cell, is_any_of(separator));
-    uint32_t maxSize =0;
+    size_t maxSize =0;
     for(size_t i=0, n=values.size(); i<n; ++i)
     {
         if(values[i].size()> maxSize)
             maxSize=values[i].size();
     }
-    res->setUint32(maxSize);
+    res->setUint64(maxSize);
 }
 
 static scidb::UserDefinedFunction mlcsv( scidb::FunctionDescription("maxlen_csv", list_of("string"),           "uint32", &maxlen_tdv<false>));

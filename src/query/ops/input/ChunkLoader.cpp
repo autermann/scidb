@@ -29,6 +29,7 @@
 #include "ChunkLoader.h"
 #include "InputArray.h"
 
+#include <system/Warnings.h>
 #include <util/StringUtil.h>    // for debugEncode
 #include <util/TsvParser.h>
 
@@ -168,6 +169,12 @@ ArrayDesc const& ChunkLoader::schema() const
     return _inArray->getArrayDesc();
 }
 
+ArrayDistPtr ChunkLoader::preferredDistributionForParallelLoad()
+{
+    SCIDB_ASSERT(isParallelLoad());
+    return _preferredDist;
+}
+
 /// Validate and return the query pointer.
 /// @return shared_ptr to valid Query object
 std::shared_ptr<Query> ChunkLoader::query()
@@ -240,10 +247,18 @@ void ChunkLoader::bind(InputArray* parent, std::shared_ptr<Query>& query)
     //
     _attrVals.resize(nAttrs);
     for (size_t i = 0; i < nAttrs; i++) {
-        _attrVals[i] = Value(TypeLibrary::getType(typeIdOfAttr(i)));
+        _attrVals[i] = Value(TypeLibrary::getType(typeIdOfAttr(safe_static_cast<AttributeID>(i))));
         if (attrs[i].isEmptyIndicator()) {
             _attrVals[i].setBool(true);
         }
+    }
+
+    _preferredDist = schema().getDistribution();
+    if (_preferredDist->getPartitioningSchema() == psUndefined) {
+        // the array descriptor does not specify a preferred distribution,
+        // will use the default one
+        SCIDB_ASSERT(isParallelLoad());
+        _preferredDist = defaultPartitioning();
     }
 
     // Tell derived classes they can look at the schema() now.
@@ -267,12 +282,8 @@ void ChunkLoader::nextImplicitChunkPosition(WhoseChunk whose)
                     // _chunkPos points at one of my chunks.
                     break;
                 }
-                if (schema().getPartitioningSchema() == psUndefined) {
-		  // the array descriptor does not specify a preferred distribution,
-		  // will use the default one
-		  array()->adjustArrayDistributionForParallelMode(defaultPartitioning());
-                }
-                if (schema().getPrimaryInstanceId(_chunkPos, numInstances()) == myInstance())
+                if (preferredDistributionForParallelLoad()->getPrimaryChunkLocation(_chunkPos, dims,
+                                                           numInstances()) == myInstance())
                 {
                     // _chunkPos points at one of my chunks.
                     break;
@@ -404,7 +415,7 @@ bool OpaqueChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
 
     OpaqueChunkHeader hdr;
     for (size_t i = 0; i < nAttrs; i++) {
-        if (fread(&hdr, sizeof hdr, 1, fp()) != 1) {
+        if (scidb::fread_unlocked(&hdr, sizeof hdr, 1, fp()) != 1) {
             if (i == 0) {
                 return false;
             }
@@ -414,24 +425,37 @@ bool OpaqueChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
         if (hdr.magic != OPAQUE_CHUNK_MAGIC) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_OP_INPUT_ERROR10);
         }
-        if (hdr.version != SCIDB_OPAQUE_FORMAT_VERSION) {
+        if (hdr.version != SCIDB_OPAQUE_FORMAT_VERSION &&
+            hdr.version != SCIDB_OPAQUE_FORMAT_VERSION-1) {
+            // We must be able to load opaque data from the previous release of SciDB
+            // (and obviously from the current one).
+            // SCIDB_OPAQUE_FORMAT_VERSION does not necessarily change from one SciDB release to the next.
+            // Technically, supporting the previous opaque format version is a stronger guarantee,
+            // but it does not appear more burdensome.
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MISMATCHED_OPAQUE_FORMAT_VERSION)
                   << hdr.version << SCIDB_OPAQUE_FORMAT_VERSION;
         }
         if (hdr.flags & OpaqueChunkHeader::ARRAY_METADATA)  {
             string arrayDescStr;
             arrayDescStr.resize(hdr.size);
-            if (fread(&arrayDescStr[0], 1, hdr.size, fp()) != hdr.size) {
+            if (scidb::fread_unlocked(&arrayDescStr[0], 1, hdr.size, fp()) != hdr.size) {
                 throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
             }
             _fileOffset += hdr.size;
             stringstream ss;
             ss << arrayDescStr;
-            ArrayDesc opaqueDesc;
             boost::archive::text_iarchive ia(ss);
-            ia & opaqueDesc;
-            compareArrayMetadata(schema(), opaqueDesc);
-            i -= 1; // compencate increment in for: repeat loop and try to load more mapping arrays
+            if (hdr.version == SCIDB_OPAQUE_FORMAT_VERSION) {
+                ArrayDesc opaqueDesc;
+                ia & opaqueDesc;
+                compareArrayMetadata(schema(), opaqueDesc);
+            } else {
+                OpaqueMetadataLoaderCompat metaLoader(hdr.version);
+                ia & metaLoader;
+                compareArrayMetadata(schema(), metaLoader.getArrayDesc());
+            }
+
+            i -= 1; // compensate increment in for: repeat loop and try to load more mapping arrays
             continue;
         }
         if (hdr.signature != _signature) {
@@ -441,7 +465,7 @@ bool OpaqueChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
         if (hdr.nDims != nDims) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_WRONG_NUMBER_OF_DIMENSIONS);
         }
-        if (fread(&_chunkPos[0], sizeof(Coordinate), hdr.nDims, fp()) != hdr.nDims) {
+        if (scidb::fread_unlocked(&_chunkPos[0], sizeof(Coordinate), hdr.nDims, fp()) != hdr.nDims) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
         }
         _fileOffset += sizeof(Coordinate) * hdr.nDims;
@@ -451,15 +475,17 @@ bool OpaqueChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
         if (i==0) {
             enforceChunkOrder("opaque loader");
         }
-        Address addr(i, _chunkPos);
-        MemChunk& chunk = getLookaheadChunk(i, chunkIndex);
+        Address addr(safe_static_cast<AttributeID>(i), _chunkPos);
+        MemChunk& chunk =
+            getLookaheadChunk(safe_static_cast<AttributeID>(i), chunkIndex);
         chunk.initialize(array(), &schema(), addr, hdr.compressionMethod);
         chunk.allocate(hdr.size);
-        if (fread(chunk.getData(), 1, hdr.size, fp()) != hdr.size) {
+        if (scidb::fread_unlocked(chunk.getData(), 1, hdr.size, fp()) != hdr.size) {
             throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
         }
         _fileOffset += hdr.size;
-        _line += chunk.getNumberOfElements(false /*no overlap*/);  // Unclear how useful this number is, but...
+        // SDB-5220: DON'T do this safe_static_cast, chunk elements can exceed 32-bits!!!
+        // _line += safe_static_cast<unsigned>(chunk.getNumberOfElements(false /*no overlap*/));  // Unclear how useful this number is, but...
         chunk.write(query);
     }
 
@@ -489,10 +515,119 @@ void BinaryChunkLoader::bindHook()
     _binVal.resize(attrs.size());
 }
 
-/**
+//
+// the following 4 function/methods have useful trace statements included
+// however having them in the code as LOG4CXX_TRACE slows down the query
+// load(array_name, '/public/data/graph500/g500s19.dat', -2, '(int64,int64)') by a factor of 1.35
+// therefore these traces are left in the code as a LOCALXX_TRACE macro, which can be enabled and
+// disabled by a developer
+#define WITH_LOCALXX_TRACING 0
+#if WITH_LOCALXX_TRACING
+# define LOCALXX_TRACE(logger, expression) LOG4CXX(logger, (expression))
+#else
+# define LOCALXX_TRACE(logger, expression) // as nothing
+#endif
+
+///
+/// helper for readField() and readByteSequence()
+/// @param dbgName[in] -- string printed in LOG4 messages within
+/// @param rowReads[in] -- (one-based) 1st, 2nd, 3rd, etc read of the cell
+/// @param fp[in] -- FILE* used by the fread_unlocked()
+/// @param bytesReq[in] -- number of bytes requested on the fread_unlocked()
+/// @param bytesRead[in] -- return value of the fread_unlocked()
+/// @return true if data was read correctly, false if 1st read && EOF detected
+/// all other cases throw FILE_READ_ERROR
+///
+bool expectedEOF(const char* dbgName, size_t rowReads, FILE* fp, size_t bytesReq, size_t bytesRead) {
+    assert(bytesReq>0);
+
+    LOCALXX_TRACE(logger, "expectedEOF: @ " << dbgName << " rowReads " << rowReads);
+    LOCALXX_TRACE(logger, "expectedEOF: bytesReq " << bytesReq << " vs bytesRead " << bytesRead);
+
+    if(bytesRead == bytesReq) {  // was it the "good" case? [typical]
+        LOCALXX_TRACE(logger, "expectedEOF: returns true");
+        return true;    // yes, the data was read correctly
+    }
+
+    auto error = ferror(fp);
+    auto eof   = feof(fp);
+    if(rowReads<2 && !error && eof && !bytesRead) { // EOF on 1st fread_unlocked() of cell?
+        LOCALXX_TRACE(logger, "expectedEOF: acceptable EOF");
+        return false; // no data, EOF OK
+    }
+
+    // all other cases are errors, log it in detail NOTE: not LOCALXX
+    LOG4CXX_ERROR(logger, "binary loader: ERROR, rowReads " << rowReads
+                          << " errorCode " << error
+                          << " isEOF " << eof
+                          << " bytesRead " << bytesRead
+                          << " bytesReq " << bytesReq);
+
+    // NOTE: in the future, we need to distinguish, where possible, whether
+    //       it was bad formatting of the file by the user (e.g. premature EOF)
+    //       or something worse (bug in code, filesystem problem, etc)
+    //       The code historically only raised FILE_READ_ERROR, so we continue
+    //       to do that, until the code could make use of multiple
+    //       types of exception.
+    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << error;
+}
+
+
+
+///
+/// helper for loadChunk()
+/// this is used to read fixed-size fields
+/// @return true if data was read correctly, false if 1st read && EOF detected
+///
+template<typename T>
+bool readField(const char* dbgName, T& value, FILE* fp, size_t& rowReads)
+{
+    rowReads++;
+    auto bytesWanted = sizeof(value);
+    auto bytesRead=scidb::fread_unlocked(&value, 1, bytesWanted, fp);
+    bool isValueValid = expectedEOF(dbgName, rowReads, fp, bytesWanted, bytesRead);
+    if(WITH_LOCALXX_TRACING) {
+        if(isValueValid) {
+            LOCALXX_TRACE(logger, "  "<<dbgName<<"=" << value <<")");
+        }
+    }
+    return  isValueValid;       // false -> acceptable EOF
+}
+
+///
+/// helper for loadChunk()
+/// this is used to read sequences of char from the input
+/// this routine uses length, not null-termination
+/// @return true if data was read correctly, false if 1st read && EOF detected
+///
+bool readByteSequence(void* buf, size_t bytesWanted, FILE* fp, size_t& rowReads)
+{
+    rowReads++;
+
+    if (bytesWanted == 0) { // 0-length strings allowed
+        return true;        // no actual fread, but does count as a "rowRead" (cellRead)
+                            // because no longer on cell boundary
+    } else {
+        auto bytesRead=scidb::fread_unlocked(buf, 1, bytesWanted, fp);
+        bool isValueValid = expectedEOF("readByteSequence", rowReads, fp, bytesWanted, bytesRead);
+
+        if(WITH_LOCALXX_TRACING) {
+            if(isValueValid && logger->isTraceEnabled()) {
+                const char* bufAsChars = reinterpret_cast<char*>(buf);
+                std::string asString(bufAsChars, bytesRead);
+                LOCALXX_TRACE(logger, "  readByteSequence: '" << asString << "')");
+            }
+        }
+        return isValueValid;       // the field was read completely
+    }
+}
+
+/**-
  * Read binary data based on a template.
  * @see ArrayWriter
  * @see saveUsingTemplate()
+ * @note this method is > 200 lines long when it has adequate tracing in it to find bugs
+ *       it is due for refactoring.
  */
 bool BinaryChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 {
@@ -506,11 +641,21 @@ bool BinaryChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
     Value emptyTagVal;
     emptyTagVal.setBool(true);
 
-    int ch = getc(fp());
-    if (ch == EOF) {
-        return false;
+    // NOTE: we'd like the code to function correctly without any use of the following
+    // getc()/ungetc() "trick" (since there are no unlocked_stdio equivalents)
+    // however, the code fails without this block
+    // further refactoring should look at what modifications to object state
+    // happen between here and the top of the while loop that are perhaps being
+    // done prematurely
+    {
+        int ch = getc(fp());
+        if (ch == EOF) {
+            LOG4CXX_TRACE(logger, "loadChunk early return");    // NOTE: not LOCALXX_TRACE
+            return false;       // when first read on empty chunk fails, must return false, not throw error
+        }
+        ungetc(ch, fp());
     }
-    ungetc(ch, fp());
+
 
     nextImplicitChunkPosition(MY_CHUNK);
     enforceChunkOrder("binary loader");
@@ -519,89 +664,121 @@ bool BinaryChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
     // of the lookahead chunks, and obtains iterators for them.  (We
     // don't seem to be doing any actual lookahead in this code path.)
     for (size_t i = 0; i < nAttrs; i++) {
-        Address addr(i, _chunkPos);
-        MemChunk& chunk = getLookaheadChunk(i, chunkIndex);
+        Address addr(safe_static_cast<AttributeID>(i), _chunkPos);
+        MemChunk& chunk = getLookaheadChunk(safe_static_cast<AttributeID>(i), chunkIndex);
         chunk.initialize(array(), &schema(), addr, attrs[i].getDefaultCompressionMethod());
         chunkIterators[i] = chunk.getIterator(query,
                                               ChunkIterator::NO_EMPTY_CHECK |
                                               ConstChunkIterator::SEQUENTIAL_WRITE);
     }
 
+    // NOTE: potential optimization
+    // the format is "row oriented", requiring up to 3 reads and decisions per cell to "parse" the binary input
+    // a "column oriented" format could require up to 3 reads per *chunk*.
+    // now that the stdio locking is avoided, cpu-profiling will show the cost
     size_t nCols = _templ.columns.size();
     vector<uint8_t> buf(8);
     uint32_t size = 0;
     bool conversionError = false;
-    while (!chunkIterators[0]->end() && (ch = getc(fp())) != EOF) {
-        ungetc(ch, fp());
+
+    LOCALXX_TRACE(logger, "loadChunk: PRE OUTER WHILE");
+    bool initialEOF=false;  // true upon detecting EOF exactly at a cell boundary
+    while (!chunkIterators[0]->end() && !initialEOF) {  // for each cell
+        size_t rowReads=0;    // actualy counting in-cell reads
         _line += 1;             // really record count
         _column = 0;
-        array()->countCell();
+        array()->countCell();   // clear lastBadAttr to -1, increase nLoadedCells (prematurely!)
+        LOCALXX_TRACE(logger, "loadChunk: WHILE TOP _line "<< _line);
         for (size_t i = 0, j = 0; i < nAttrs; i++, j++) {
+            LOCALXX_TRACE(logger, "loadChunk: FOR TOP i "<< i << " j " << j);
+            // "skip over" colum data for skipped columns
             while (j < nCols && _templ.columns[j].skip) {
+                // NOTE: these reads not in a try block, but later reads are. Why?
+                LOCALXX_TRACE(logger, "loadChunk: WHILE SKIPs j "<< j );
                 ExchangeTemplate::Column const& column = _templ.columns[j++];
                 if (column.nullable) {
+                    // potential optimization:
+                    // add a skipField() function to fseek() instead of fread_unlocked() + ignore data
                     int8_t missingReason;
-                    if (fread(&missingReason, sizeof(missingReason), 1, fp()) != 1) {
-                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
-                    }
+                    if(!readField("skip missing", missingReason, fp(), rowReads)) { initialEOF=true; break; }
                     _fileOffset += sizeof(missingReason);
+                    LOCALXX_TRACE(logger, "loadChunk: 'skip missing' _fileOffset: "<< _fileOffset);
                 }
                 size = static_cast<uint32_t>(column.fixedSize);
+                LOCALXX_TRACE(logger, "loadChunk: (skip fixedSize: "<< size <<")");
                 if (size == 0) {
-                    if (fread(&size, sizeof(size), 1, fp()) != 1) {
-                        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
-                    }
+                    if(!readField("skip size", size, fp(), rowReads)) { initialEOF=true; break;}
                     _fileOffset += sizeof(size);
+                    LOCALXX_TRACE(logger, "loadChunk: 'skip size' _fileOffset: "<< _fileOffset);
                 }
+
                 if (buf.size() < size) {
                     buf.resize(size * 2);
                 }
-                if (size && fread(&buf[0], size, 1, fp()) != 1) {
-                    throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
+
+                if (size) {
+                    // potential optimization:
+                    // add and use a skipSequence() function, like skipField() mentioned above
+                    if(!readByteSequence(&(buf[0]), size, fp(), rowReads)) { initialEOF=true; break;}
+                    _fileOffset += size;
+                    LOCALXX_TRACE(logger, "loadChunk: skip sequence _fileOffset: "<< _fileOffset);
                 }
-                _fileOffset += size;
+            }  // end inner while
+
+            if(initialEOF) {
+                LOCALXX_TRACE(logger, "loadChunk: break due to initialEOF #1");
+                break;
             }
-            try {
+
+            try { // read (vs skip) a cell
                 if (j < nCols) {
                     ExchangeTemplate::Column const& column = _templ.columns[j];
+                    LOCALXX_TRACE(logger, "loadChunk: (try column[j: "<<j<<")]");
                     int8_t missingReason = -1;
                     if (column.nullable) {
-                        if (fread(&missingReason, sizeof(missingReason), 1, fp()) != 1) {
-                            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
-                        }
+                        if(!readField("missing", missingReason, fp(), rowReads)) { initialEOF=true; goto endTry;}
                         _fileOffset += sizeof(missingReason);
+                        LOCALXX_TRACE(logger, "loadChunk missingReason _fileOffset: "<< _fileOffset);
                     }
                     size = static_cast<uint32_t>(column.fixedSize);
+                    LOCALXX_TRACE(logger, "loadChunk: (size=column.fixedSize B: "<<size<<")");
                     if (size == 0) {
-                        if (fread(&size, sizeof(size), 1, fp()) != 1) {
-                            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
-                        }
+                        if(!readField("size", size, fp(), rowReads)) { initialEOF=true; goto endTry;}
                         _fileOffset += sizeof(size);
+                        LOCALXX_TRACE(logger, "loadChunk size _fileOffset: "<< _fileOffset);
                     }
                     if (missingReason >= 0) {
                         if (buf.size() < size) {
                             buf.resize(size * 2);
                         }
-                        if (size && fread(&buf[0], size, 1, fp()) != 1) {
-                            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
+                        if (size) {
+                            // skip over the space reserved for the value (unfortunate design)
+                            if(!readByteSequence(&(buf[0]), size, fp(), rowReads)) { initialEOF=true; goto endTry;}
+                            _fileOffset += size;
+                            LOCALXX_TRACE(logger, "loadChunk 'missing sequence' _fileOffset: "<< _fileOffset);
                         }
-                        _fileOffset += size;
-                        attrVal(i).setNull(missingReason);
-                        chunkIterators[i]->writeItem(attrVal(i));
+                        attrVal(safe_static_cast<AttributeID>(i)).setNull(missingReason);
+                        chunkIterators[i]->writeItem(attrVal(safe_static_cast<AttributeID>(i)));
                     } else {
+                        // Potential optimization: could there be a version of .setSize() or way of
+                        // coding that would avoid a realloc() on each pass through here?
+                        // (as is done with buf)
                         _binVal[i].setSize(size);
-                        if (fread(_binVal[i].data(), 1, size, fp()) != size) {
-                            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_FILE_READ_ERROR) << ferror(fp());
-                        }
+                        if(!readByteSequence(_binVal[i].data(), size, fp(), rowReads)) { initialEOF=true; goto endTry;}
                         _fileOffset += size;
+                        LOCALXX_TRACE(logger, "loadChunk 'sequence' _fileOffset: "<< _fileOffset);
+
                         if (column.converter) {
                             conversionError = false;
                             try {
                                 Value const* v = &_binVal[i];
-                                column.converter(&v, &attrVal(i), NULL);
-                                chunkIterators[i]->writeItem(attrVal(i));
+                                column.converter(&v, &attrVal(safe_static_cast<AttributeID>(i)), NULL);
+                                chunkIterators[i]->writeItem(attrVal(safe_static_cast<AttributeID>(i)));
                             } catch (...) {
-                                conversionError = true;
+                                conversionError = true; // TODO: latent bug?
+                                                        // resets to false only on next non-missing,
+                                                        // so maybe a 2nd error after another missing
+                                                        // would be incorrectly labelled a conversionError
                                 throw;
                             }
                         } else {
@@ -612,24 +789,43 @@ bool BinaryChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkInd
                     // empty tag
                     chunkIterators[i]->writeItem(emptyTagVal);
                 }
-            } catch(Exception const& x) {
+            }
+            catch(Exception const& x) {
                 if (conversionError) {
+                    LOCALXX_TRACE(logger, "loadChunk: catching conversion error");
                     // We don't know _binVal[i]'s type, but this will
                     // at least show us the initial bytes of data.
                     char* s = static_cast<char*>(_binVal[i].data());
                     string badBinVal(s, _binVal[i].size());
                     _badField = badBinVal;
                 } else {
-                    // Probably an fread(3) failure.
+                    LOCALXX_TRACE(logger, "loadChunk: catching read error");
                     _badField = "(unreadable)";
                 }
-                array()->handleError(x, chunkIterators[i], i);
+                LOCALXX_TRACE(logger, "loadChunk: doing handleError");
+                array()->handleError(x, chunkIterators[i], safe_static_cast<AttributeID>(i));
             }
+
+endTry:     if(initialEOF) {
+                _line-- ;       // undo premature increment
+                LOCALXX_TRACE(logger, "loadChunk: break due to initialEOF #2");
+                break;
+            }
+
             _column += 1;
             ++(*chunkIterators[i]);
+            LOCALXX_TRACE(logger, "loadChunk: end for at _line " << _line << " _column" << _column);
+        }   // end for
+        LOCALXX_TRACE(logger, "loadChunk: exited FOR at _line " << _line << " _column" << _column);
+
+        if(initialEOF) {
+            LOCALXX_TRACE(logger, "loadChunk: break due to initialEOF #3");
+            break;
         }
-        array()->completeShadowArrayRow(); // done with cell/record
-    }
+        array()->completeShadowArrayRow(); // done with cell
+    } // end for each cell
+
+    LOCALXX_TRACE(logger, "loadChunk: about to flush chunkIterators at _line " << _line << " _column " << _column);
     for (size_t i = 0; i < nAttrs; i++) {
         if (chunkIterators[i]) {
             chunkIterators[i]->flush();
@@ -653,7 +849,7 @@ bool TextChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex
 
     Dimensions const& dims = schema().getDimensions();
     Attributes const& attrs = schema().getAttributes();
-    size_t nAttrs = attrs.size();
+    AttributeID nAttrs = safe_static_cast<AttributeID>(attrs.size());
     size_t nDims = dims.size();
     vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
     Value tmpVal;
@@ -731,7 +927,7 @@ BeginScanChunk:
             }
             array()->countCell();
             if (tkn == TKN_LITERAL || (inParen && tkn == TKN_COMMA)) {
-                for (size_t i = 0; i < nAttrs; i++) {
+                for (AttributeID i = 0; i < nAttrs; i++) {
                     if (!chunkIterators[i]) {
                         if (isSparse && !explicitChunkPosition) {
                             _chunkPos = pos;
@@ -781,13 +977,15 @@ BeginScanChunk:
                             if (_scanner.isNull()) {
                                 if (!schema().getAttributes()[i].isNullable())
                                     throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
-                                attrVal(i).setNull(_scanner.getMissingReason());
+                                attrVal(i).setNull(safe_static_cast<Value::reason>(
+                                                       _scanner.getMissingReason()));
                             } else if (converter(i)) {
                                 tmpVal.setString(_scanner.getValue().c_str());
                                 const Value* v = &tmpVal;
                                 (*converter(i))(&v, &attrVal(i), NULL);
                             } else {
-                                StringToValue(typeIdOfAttr(i), _scanner.getValue(), attrVal(i));
+                                StringToValue(typeIdOfAttr(i),
+                                              _scanner.getValue(), attrVal(i));
                             }
                             if (i == emptyTagAttrId()) {
                                 if (!attrVal(i).getBool())
@@ -824,7 +1022,7 @@ BeginScanChunk:
                     }
                 }
             } else if (inParen && tkn == TKN_TUPLE_END && !isSparse) {
-                for (size_t i = 0; i < nAttrs; i++) {
+                for (AttributeID i = 0; i < nAttrs; i++) {
                     if (!chunkIterators[i]) {
                         if (i==0) {
                             enforceChunkOrder("text loader 3");
@@ -862,7 +1060,7 @@ BeginScanChunk:
                     StringToValue(TID_INT64, _scanner.getValue(), countVal);
                     int64_t count = countVal.getInt64();
                     while (--count != 0) {
-                        for (size_t i = 0; i < nAttrs; i++) {
+                        for (AttributeID i = 0; i < nAttrs; i++) {
                             chunkIterators[i]->writeItem(attrVal(i));
                             ++(*chunkIterators[i]);
                         }
@@ -979,9 +1177,9 @@ bool TsvChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 
     // Initialize a chunk and chunk iterator for each attribute.
     Attributes const& attrs = schema().getAttributes();
-    size_t nAttrs = attrs.size();
+    AttributeID nAttrs = safe_static_cast<AttributeID>(attrs.size());
     vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
-    for (size_t i = 0; i < nAttrs; i++) {
+    for (AttributeID i = 0; i < nAttrs; i++) {
         Address addr(i, _chunkPos);
         MemChunk& chunk = getLookaheadChunk(i, chunkIndex);
         chunk.initialize(array(), &schema(), addr, attrs[i].getDefaultCompressionMethod());
@@ -1020,7 +1218,7 @@ bool TsvChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
         // have to 'continue;' after a writeItem() call, make sure the
         // iterator (and possibly the _column) gets incremented.
         //
-        for (size_t i = 0; i < nAttrs; ++i) {
+        for (AttributeID i = 0; i < nAttrs; ++i) {
             try {
                 // Handle empty tag...
                 if (i == emptyTagAttrId()) {
@@ -1098,5 +1296,4 @@ bool TsvChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 
     return sawData;
 }
-
 } // namespace

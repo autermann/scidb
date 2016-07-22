@@ -33,12 +33,10 @@ import re
 # Consume query template
 CONSUME_QUERY = 'consume(<query>)'
 
-# Message contained in case of an Error
+# All our error messages contain (at least) this
 ERROR_MSG = 'Error id:'
 
-
 def loadLibQueries():
-
     libs = [
         'dense_linear_algebra',
         ]
@@ -174,7 +172,7 @@ def getOpTestQueries(dbq):
          'reshape('                + dbq.build(r=[(0,9)]) + ',array_for_reshape_test)',
          'save('                   + defBuild + ',\'test1.txt\')',
          'scan(array_for_reshape_test)',
-         'setopt(\'mem-array-threshold\')',
+         '_setopt(\'mem-array-threshold\')',
          '_sg('                    + defBuild + ',3)',
          'show(\''                 + defBuild + '\',\'afl\')',
          'slice('                  + defBuild + ',j,22)',
@@ -300,14 +298,17 @@ def generateQueries(dType):
 
 #-----------------------------------------------------------------------------
 # Main entry point into the script.
-if __name__ == '__main__':
 
-    for dType in ['checkin', 'load_lib', 'checkin_plugin']:
-        print '\n\n*** Running "' + dType + '" queries ***\n'
+def main():
+    for dType in ('checkin', 'load_lib', 'checkin_plugin'):
+        print '\n\n*** Running "', dType, '"queries ***\n'
         it = myTestCase(*generateQueries(dType))
         it.runTest()
-        if (it.exitCode != 0):
+        if it.exitCode:
             print 'Error(s) occurred.'
-            sys.exit(it.exitCode) # Signal to test harness pass or failure.
+            return it.exitCode # Signal to test harness pass or failure.
     print 'All done.'
+    return 0
 
+if __name__ == '__main__':
+    sys.exit(main())

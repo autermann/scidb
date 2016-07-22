@@ -61,10 +61,14 @@ inline const DimensionDesc& dimSubscript(const Dimensions& dims, size_t idx, boo
 
 // operate on Dimensions
 enum RowCol_e {ROW=0, COL=1};
-inline size_t nRow(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, ROW, transpose).getLength(); }
-inline size_t nCol(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, COL, transpose).getLength(); }
-inline unsigned int chunkRow(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, ROW, transpose).getChunkInterval(); }
-inline unsigned int chunkCol(const Dimensions& dims, bool transpose=false) { return dimSubscript(dims, COL, transpose).getChunkInterval(); }
+inline size_t nRow(const Dimensions& dims, bool transpose=false) {
+    return dimSubscript(dims, ROW, transpose).getLength(); }
+inline size_t nCol(const Dimensions& dims, bool transpose=false) {
+    return dimSubscript(dims, COL, transpose).getLength(); }
+inline unsigned int chunkRow(const Dimensions& dims, bool transpose=false) {
+    return safe_static_cast<unsigned int>(dimSubscript(dims, ROW, transpose).getChunkInterval()); }
+inline unsigned int chunkCol(const Dimensions& dims, bool transpose=false) {
+    return safe_static_cast<unsigned int>(dimSubscript(dims, COL, transpose).getChunkInterval()); }
 
 // operate on ArrayDesc -- handy for LogicalOperator::inferSchema() overloads
 inline size_t nRow(const ArrayDesc& desc, bool transpose=false) { return nRow(desc.getDimensions(), transpose); }

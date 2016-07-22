@@ -95,7 +95,7 @@ public:
             coord[0] = _origin[0] + pos;
             assert(pos < _chunkIntervals[0]);
         } else {
-            for (int i=_nDims; --i>=0;) {
+            for (int i=safe_static_cast<int>(_nDims); --i>=0;) {
                 coord[i] = _origin[i] + (pos % _chunkIntervals[i]);
                 pos /= _chunkIntervals[i];
             }

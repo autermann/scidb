@@ -5,8 +5,8 @@ load_library('linear_algebra')
 #
 # t1 empty left, non-square chunk size
 #
-create array SAleft <a:double>[x=4:5,2,0, y=4:4,1,0]
-create array SAright <b:double>[x=4:4,1,0, y=4:5,2,0]
+create array SAleft <a:double NOT NULL>[x=4:5,2,0, y=4:4,1,0]
+create array SAright <b:double NOT NULL>[x=4:4,1,0, y=4:5,2,0]
 store( filter(build(SAleft, 0), x=4), SAleft )
 store( filter(build(SAright, 5-y), true), SAright )
 # [jhm] an expression that is unique in every cell of right would be far more diagnostic
@@ -14,8 +14,8 @@ store( filter(build(SAright, 5-y), true), SAright )
 #
 # t2, empty left, unique-cell right, non-square chunksize, distributed beyond 4 instances
 #
-create array spLeft  <v:double>[row=1:4,1,0, col=1:10,2,0]
-create array spRight <v:double>[row=1:10,2,0, col=1:4,1,0]
+create array spLeft  <v:double NOT NULL>[row=1:4,1,0, col=1:10,2,0]
+create array spRight <v:double NOT NULL>[row=1:10,2,0, col=1:4,1,0]
 store( filter(build(spLeft,  0),         row=3), spLeft)
 store( filter(build(spRight, 10*row+col), true), spRight)
 

@@ -9,9 +9,10 @@
  *
  *  WHEN EDITING THIS FILE:
  *  1. Remember, there is no space in "cannot".
- *  2. Code numbers are ignored and will go away soon, but for now you
- *      must still put something there.
- *  3. Prefer strerror(errno) over raw errno values in error output.
+ *  2. Going forward, code numbers are important for binary compatibility of
+ *      client APIs, so please do not renumber.
+ *  3. Keep errors numerically sorted by code.
+ *  4. Prefer strerror(errno) over raw errno values in error output.
  *
  *  See http://www.drdobbs.com/the-new-c-x-macros/184401387 .
  */
@@ -104,7 +105,7 @@ X(SCIDB_LE_LOGICAL_OP_ALREADY_REGISTERED,     60,     "Logical operator '%1%' al
 X(SCIDB_LE_PHYSICAL_OP_ALREADY_REGISTERED,    61,     "Physical operator '%1%' for logical operator '%2%'"
                                                       " already registered")
 X(SCIDB_LE_QUERY_CANCELLED,                   62,     "Query %1% was cancelled")
-X(SCIDB_LE_NO_QUORUM,                         63,     "Instance liveness has changed")
+X(SCIDB_LE_NO_QUORUM,                         63,     "Not enough online instances to execute query")
 X(SCIDB_LE_QUERY_NOT_FOUND,                   64,     "Query %1% not found")
 X(SCIDB_LE_QUERY_NOT_FOUND2,                  65,     "Query already deallocated/cancelled")
 X(SCIDB_LE_QUERY_WAS_EXECUTED,                66,     "Query was executed previously")
@@ -219,7 +220,7 @@ X(SCIDB_LE_EXTRACT_EXPECTED_FIXED_SIZE_ATTRIBUTE,170, "Extract attribute should 
 X(SCIDB_LE_EXTRACT_UNEXPECTED_BOOLEAN_ATTRIBUTE, 171, "Extract attribute cannot have boolean type")
 /* Prefer ...DIMENSION_COUNT_MISMATCH to ...WRONG_NUMBER_OF_DIMENSIONS if possible. */
 X(SCIDB_LE_WRONG_NUMBER_OF_DIMENSIONS,        172,    "Wrong number of dimensions")
-X(SCIDB_LE_UNALIGNED_COORDINATES,             173,    "Coordinates should be aligned on chunk boundary")
+X(SCIDB_LE_UNALIGNED_COORDINATES,             173,    "Coordinates should be aligned on chunk boundary: %1%")
 X(SCIDB_LE_CANT_ALLOCATE_MEMORY,              174,    "Failed to allocate memory")
 X(SCIDB_LE_NO_CURRENT_CHUNK,                  175,    "No current chunk")
 X(SCIDB_LE_CHUNK_OUT_OF_BOUNDARIES,           176,    "Chunk at %1% is outside of array boundaries: %2%")
@@ -242,7 +243,7 @@ X(SCIDB_LE_NO_MEMORY_TO_ALLOCATE_MATRIX,      200,    "Not enough memory to allo
 X(SCIDB_LE_NO_MEMORY_TO_ALLOCATE_VECTOR,      201,    "Not enough memory to allocate vector")
 X(SCIDB_LE_CANT_UPDATE_CHUNK,                 202,    "Cannot update disk chunk")
 X(SCIDB_LE_INVALID_REDUNDANCY,                203,    "Redundancy should be smaller than number of instances")
-X(SCIDB_LE_INSTANCE_OFFLINE,                  204,    "Instance #%1% is offline")
+X(SCIDB_LE_INSTANCE_OFFLINE,                  204,    "Instance #%1% is offline or invalid")
 X(SCIDB_LE_DIVISION_BY_ZERO,                  205,    "Division by zero")
 X(SCIDB_LE_FAILED_PARSE_STRING,               206,    "Failed to parse string '%1%' as %2%")
 X(SCIDB_LE_DIMENSION_EXPECTED,                207,    "Dimension has to be specified")
@@ -251,7 +252,7 @@ X(SCIDB_LE_REDISTRIBUTE_ERROR1,               210,    "Empty tag attribute shoul
 X(SCIDB_LE_CANT_MERGE_READONLY_CHUNK,         211,    "Cannot merge read-only chunk")
 X(SCIDB_LE_INVALID_SPECIFIED_DATE,            214,    "Specified date is not valid")
 X(SCIDB_LE_CANT_CONVERT_NULL,                 215,    "Cannot convert NULL value")
-X(SCIDB_LE_NO_QUORUM2,                        216,    "Not enough online instances to execute query")
+X(SCIDB_LE_NO_QUORUM2,                        216,    "Instance liveness has changed")
 X(SCIDB_LE_OP_REGRID_ERROR1,                  217,    "Regrid interval should be positive")
 X(SCIDB_LE_OP_WINDOW_ERROR2,                  219,    "Window doesn't fit in overlap area")
 X(SCIDB_LE_OP_BUILD_ERROR1,                   220,    "Build expression should not access attributes")
@@ -529,8 +530,19 @@ X(SCIDB_LE_MAX_TOO_LARGE,                     472,    "The maximum value %1% is 
 X(SCIDB_LE_REPART_FORBIDDEN,                  473,    "Operator '%1%' forbids manual repartition of its input(s)")
 X(SCIDB_LE_BAD_EXPLICIT_REPART,               474,    "Operator '%1%' inputs have incorrect chunk intervals"
                                                       " and/or overlaps: %2% vs. %3%")
-X(SCIDB_LE_EXPRESSION_HAS_TOO_MANY_OPERANDS,  475,    "A SciDB expression may have no more than 446 operands")
-X(SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS, 476,    "A SciDB query may have no more than 95 levels of nesting")
+X(SCIDB_LE_EXPRESSION_HAS_TOO_MANY_OPERANDS,  475,    "A SciDB expression may have no more than %1% operands")
+X(SCIDB_LE_QUERY_HAS_TOO_DEEP_NESTING_LEVELS, 476,    "A SciDB query may have no more than %1% levels of nesting")
+X(SCIDB_LE_CANNOT_RELOAD_LABELS_IN_PARALLEL,  477,    "Ignoring request for labels in parallel save() output")
+X(SCIDB_LE_VALUE_TOO_BIG,                     478,    "Maximum Value size exceeded")
+X(SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED,        479,    "Operator '%1%' does not support automatic chunk interval"
+                                                      " selection")
+X(SCIDB_LE_ALL_INPUTS_AUTOCHUNKED,            480,    "At least one input to '%1%' must have a specified chunk size")
+X(SCIDB_LE_INSTANCE_PATH_FORMAT_ERROR,        481,    "Instance data path %1% does not conform to"
+                                                      " <base-path>/<server-id>/<server-instance-id>")
+X(SCIDB_LE_AUTOCHUNKED_EXECUTE_RESULT,        482,    "Operator '%1%' returned array with autochunked"
+                                                      " dimensions <>[%2%] from physical execute()")
+X(SCIDB_LE_BAD_EXPLICIT_REPART2,              483,    "Operator '%1%' inputs specified as repart(),"
+                                                      " but redimension() is needed")
 
 /*
  * Next long error code goes here!
@@ -547,6 +559,9 @@ X(SCIDB_LE_UNREACHABLE_CODE,                  1004,   "Fatal: Unreachable code i
 X(SCIDB_LE_UNITTEST_FAILED,                   1005,   "Unit test failed! Test = '%1%', failure = '%2%'")
 X(SCIDB_LE_NEED_UPGRADE_CONFIRMATION,         1006,   "In order to proceed, the 'enable-catalog-upgrade'"
                                                       " setting must be enabled")
+X(SCIDB_LE_ASSERTION_FAILED,                  1007,   "Assertion '%1%' failed at %2%:%3% (%4%)")
+
+X(SCIDB_LE_OPTION_NOT_ALLOWED,                1008,   "Option '%1%' not alllowed")
 
 /*
  * Error codes copied from P4.
@@ -572,3 +587,10 @@ X(SCIDB_LE_UNKNOWN_REQUEST,                   2106,   "Unknown request")
 X(SCIDB_LE_INVALID_OPERATION,                 2107,   "Invalid operation")
 X(SCIDB_LE_NOT_UNIQUE,                        2108,   "Item is not unique - name='%1%'")
 X(SCIDB_LE_INVALID_PASSWORD_METHOD,           2109,   "Invalid password method")
+
+X(SCIDB_LE_ARRAY_NAME_ALREADY_QUALIFIED,      2200,   "ArrayName already qualified namespace='%1%' array='%2%'")
+X(SCIDB_LE_CANNOT_RENAME_ACROSS_NAMESPACES,   2201,   "Cannot rename '%1%' to '%2%' across namespaces")
+X(SCIDB_LE_CONFIGURATION_FILE_BLANK_NAME,     2202,   "Configuration filename is blank")
+X(SCIDB_LE_CONFIGURATION_FILE_MISSING,        2203,   "Configuration file '%1%' is missing")
+X(SCIDB_LE_CONFIGURATION_FILE_MODE,           2204,   "Configuration file '%1%' has incorrect mode")
+X(SCIDB_LE_CONFIGURATION_FILE_OWNER,          2205,   "Configuration file '%1%' has incorrect owner")

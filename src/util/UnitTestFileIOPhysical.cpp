@@ -70,7 +70,12 @@ public:
             stringstream filename;
 
             filename << basepath << '/' << i << ".fileio-test";
-            fileobjs.push_back(FileManager::getInstance()->openFileObj(filename.str().c_str(), O_CREAT | O_EXCL | O_RDWR));
+            std::shared_ptr< File > fobj = FileManager::getInstance()->openFileObj(filename.str().c_str(), O_CREAT | O_EXCL | O_RDWR);
+            if (!fobj) {
+                throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNITTEST_FAILED)
+                << "UnitTestFileIOPhysical" << string("failed to open file:")+filename.str();
+            }
+            fileobjs.push_back(fobj);
         }
 
         for (i = 0; i < nfileobjs; ++i)

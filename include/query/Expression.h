@@ -104,8 +104,8 @@ private:
 public:
     ExpressionContext(Expression& expression);
 
-    const Value& operator[](int i) const;
-    Value& operator[](int i);
+    const Value& operator[](size_t i) const;
+    Value& operator[](size_t i);
 };
 
 /**

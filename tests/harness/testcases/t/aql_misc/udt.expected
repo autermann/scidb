@@ -8,7 +8,7 @@ name,library
 'rational','rational'
 
 {No} name,type_id,nullable
-{0} 'N','rational',false
+{0} 'N','rational',true
 
 {I,J} Res_Plus,Res_Minus,Res_Times,Res_Divide
 {0,0} '(410/10807)','(-196/10807)','(3/10807)','(107/303)'

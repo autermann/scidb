@@ -163,6 +163,7 @@ void updateRmap(CountsMap& input, std::shared_ptr<SharedBuffer> buf, size_t nCoo
 }
 
 ArrayDesc getRankingSchema(ArrayDesc const& inputSchema,
+                           std::shared_ptr<Query> const& query,
                            AttributeID rankedAttributeID,
                            bool dualRank)
 {
@@ -212,11 +213,12 @@ ArrayDesc getRankingSchema(ArrayDesc const& inputSchema,
                                    srcDim.getCurrStart(),
                                    srcDim.getCurrEnd(),
                                    srcDim.getEndMax(),
-                                   srcDim.getChunkInterval(),
+                                   srcDim.getRawChunkInterval(),
                                    0);
     }
-
-    return ArrayDesc(inputSchema.getName(), outputAttrs, outDims, defaultPartitioning());
+    return ArrayDesc(inputSchema.getName(), outputAttrs, outDims,
+                     createDistribution(psUndefined),
+                     query->getDefaultArrayResidency());
 }
 
 
@@ -278,35 +280,48 @@ makePreSortMap(std::shared_ptr<Array>& ary, AttributeID aId, Dimensions const& d
 
 //inputArray must be distributed round-robin
 std::shared_ptr<Array> buildRankArray(std::shared_ptr<Array>& inputArray,
-                                 AttributeID rankedAttributeID,
-                                 Dimensions const& groupedDimensions,
-                                 std::shared_ptr<Query>& query,
-                                 std::shared_ptr<RankingStats> rstats)
+                                      AttributeID rankedAttributeID,
+                                      Dimensions const& groupedDimensions,
+                                      std::shared_ptr<Query>& query,
+                                      std::shared_ptr<RankingStats> rstats)
 {
     std::shared_ptr<PreSortMap> preSortMap =
         makePreSortMap(inputArray, rankedAttributeID, groupedDimensions);
 
     const ArrayDesc& input = inputArray->getArrayDesc();
-    ArrayDesc outputSchema = getRankingSchema(input,rankedAttributeID);
+    ArrayDesc outputSchema = getRankingSchema(input, query, rankedAttributeID);
+
+    if (isDebug()) {
+        SCIDB_ASSERT(input.getResidency()->isEqual(query->getDefaultArrayResidency()));
+        SCIDB_ASSERT(input.getDistribution()->checkCompatibility(createDistribution(psHashPartitioned)));
+        SCIDB_ASSERT(outputSchema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+        SCIDB_ASSERT(outputSchema.getDistribution()->checkCompatibility(createDistribution(psUndefined)));
+    }
+
     std::shared_ptr<Array> runningRank(new RankArray(outputSchema,
-                                                inputArray,
-                                                preSortMap,
-                                                rankedAttributeID,
-                                                false,
-                                                rstats));
+                                                     inputArray,
+                                                     preSortMap,
+                                                     rankedAttributeID,
+                                                     false,
+                                                     rstats));
 
     const size_t nInstances = query->getInstancesCount();
     for (size_t i =1; i<nInstances; i++)
     {
         LOG4CXX_DEBUG(logger, "Performing rotation "<<i);
-        runningRank = redistributeToRandomAccess(runningRank, query, psHashPartitioned,
-                                                 ALL_INSTANCE_MASK,
-                                                 std::shared_ptr<CoordinateTranslator>(),
-                                                 i,
-                                                 std::shared_ptr<PartitioningSchemaData>());
+
+        ArrayDistPtr psHashShiftedDist = ArrayDistributionFactory::getInstance()->construct(psHashPartitioned,
+                                                                                            DEFAULT_REDUNDANCY,
+                                                                                            std::string(),
+                                                                                            std::shared_ptr<CoordinateTranslator>(),
+                                                                                            i);
+        runningRank = redistributeToRandomAccess(runningRank,
+                                                 psHashShiftedDist,
+                                                 ArrayResPtr(), // default query residency
+                                                 query);
 
         runningRank = std::shared_ptr<Array>(new RankArray(outputSchema, runningRank,
-                                                      preSortMap, 0, true, rstats));
+                                                           preSortMap, 0, true, rstats));
     }
 
     return runningRank;
@@ -323,28 +338,43 @@ std::shared_ptr<Array> buildDualRankArray(std::shared_ptr<Array>& inputArray,
         makePreSortMap(inputArray, rankedAttributeID, groupedDimensions);
 
     const ArrayDesc& input = inputArray->getArrayDesc();
-    ArrayDesc dualRankSchema = getRankingSchema(input,rankedAttributeID, true);
+    ArrayDesc dualRankSchema = getRankingSchema(input, query, rankedAttributeID, true);
+
+    if (isDebug()) {
+        SCIDB_ASSERT(input.getResidency()->isEqual(query->getDefaultArrayResidency()));
+        SCIDB_ASSERT(input.getDistribution()->checkCompatibility(createDistribution(psHashPartitioned)));
+        SCIDB_ASSERT(dualRankSchema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+        SCIDB_ASSERT(dualRankSchema.getDistribution()->checkCompatibility(createDistribution(psUndefined)));
+    }
+
     std::shared_ptr<Array> runningRank(new DualRankArray(dualRankSchema,
-                                                    inputArray,
-                                                    preSortMap,
-                                                    rankedAttributeID,
-                                                    false,
-                                                    rstats));
+                                                         inputArray,
+                                                         preSortMap,
+                                                         rankedAttributeID,
+                                                         false,
+                                                         rstats));
 
     const size_t nInstances = query->getInstancesCount();
     for (size_t i =1; i<nInstances; i++)
     {
         LOG4CXX_DEBUG(logger, "Performing rotation "<<i);
-        runningRank = redistributeToRandomAccess(runningRank, query, psHashPartitioned,
-                                                 ALL_INSTANCE_MASK,
-                                                 std::shared_ptr<CoordinateTranslator>(),
-                                                 i,
-                                                 std::shared_ptr<PartitioningSchemaData>());
-        runningRank = std::shared_ptr<Array>(new DualRankArray(dualRankSchema, runningRank,
-                                                          preSortMap, 0, true, rstats));
+
+        ArrayDistPtr psHashShiftedDist = ArrayDistributionFactory::getInstance()->construct(psHashPartitioned,
+                                                                                            DEFAULT_REDUNDANCY,
+                                                                                            std::string(),
+                                                                                            std::shared_ptr<CoordinateTranslator>(),
+                                                                                            i);
+        runningRank = redistributeToRandomAccess(runningRank,
+                                                 psHashShiftedDist,
+                                                 ArrayResPtr(), // default query residency
+                                                 query);
+
+        runningRank = std::shared_ptr<Array>(new DualRankArray(dualRankSchema,
+                                                               runningRank,
+                                                               preSortMap, 0, true, rstats));
     }
 
-    ArrayDesc outputSchema = getRankingSchema(input,rankedAttributeID);
+    ArrayDesc outputSchema = getRankingSchema(input,query, rankedAttributeID);
     return std::shared_ptr<Array> (new AvgRankArray(outputSchema, runningRank));
 }
 

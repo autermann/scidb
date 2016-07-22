@@ -181,7 +181,7 @@ namespace scidb
          */
         RLEEncoding (TypeId typeId)
         : BaseEncoding( BaseEncoding::RLE, typeId ),
-        _lastDistinctVal(-1),
+        _lastDistinctVal(BAD_DATA_INDEX),
         _maxRunlen (static_cast<uint32_t>(sizeof(rle::Segment) / sizeof(Type))+1),
         _nextPosition (0),
         _currSegIndex (0)
@@ -195,7 +195,7 @@ namespace scidb
          */
         RLEEncoding ( scidb::TypeId typeId, size_t max_size)
         : BaseEncoding( BaseEncoding::RLE, typeId ),
-        _lastDistinctVal(-1),
+        _lastDistinctVal(BAD_DATA_INDEX),
         _maxRunlen (static_cast<uint32_t>(sizeof(rle::Segment) / sizeof(Type))+1),
         _nextPosition (0),
         _currSegIndex (0)
@@ -376,7 +376,8 @@ namespace scidb
                     assert(valueNum > startValueIndexShift);
                     valueNum -= startValueIndexShift;
 
-                    _segments[0].setDataIndex(startValueSeg->valueIndex() + startValueIndexShift);
+                    _segments[0].setDataIndex(startValueSeg->valueIndex() +
+                                              safe_static_cast<uint32_t>(startValueIndexShift));
                 }
 
                 // adjust the last segment value count if we dont need the entire literal
@@ -403,7 +404,7 @@ namespace scidb
             assert(_data.size() <= _nextPosition);
             finalizeInternal(true);
 
-            _lastDistinctVal = _data.size()-1;
+            _lastDistinctVal = _data.empty() ? BAD_DATA_INDEX : safe_static_cast<uint32_t>(_data.size()-1);
             _currSegIndex = 0;
 
             assert(checkConsistency());
@@ -444,7 +445,7 @@ namespace scidb
                 assert(segValueData);
 
                 // set the new data index
-                nextSeg.setDataIndex(dataOff);
+                nextSeg.setDataIndex(safe_static_cast<uint32_t>(dataOff));
 
                 // copy the value data
                 for (size_t valueCount=0;
@@ -482,7 +483,7 @@ namespace scidb
 
             std::vector<rle::Segment>::const_iterator lastSeg = _segments.end()-2;
             _nextPosition = (lastSeg+1)->getStartPosition();
-            _lastDistinctVal = _data.size()-1;
+            _lastDistinctVal = _data.empty() ? BAD_DATA_INDEX : safe_static_cast<uint32_t>(_data.size()-1);
             _currSegIndex = 0;
 
             assert(checkConsistency());
@@ -502,17 +503,17 @@ namespace scidb
                 getLastSegment()->isNull()) {
                 //   Last segment is a 'null' segment so
                 //   start a new 'value' segment
-                append_data ( value );
-                _lastDistinctVal = _data.size()-1; // overflow?
+                _data.push_back(value);
+                _lastDistinctVal = safe_static_cast<uint32_t>(_data.size()-1);
                 rle::Segment newSeg( _nextPosition, _lastDistinctVal, 0, 0 );
                 append_segment( newSeg );
 
-            } else if ( -1 == _lastDistinctVal ) {
+            } else if ( BAD_DATA_INDEX == _lastDistinctVal ) {
                 assert(_segments.empty());
 
                 //  Adding the initial element to the encode.
                 _data.push_back ( value );
-                const size_t payload_offset = _data.size()-1;
+                const uint32_t payload_offset = safe_static_cast<uint32_t>(_data.size()-1);
                 rle::Segment S( _nextPosition, payload_offset, 0, 0 );
                 append_segment ( S );
                 _lastDistinctVal = payload_offset;
@@ -575,7 +576,8 @@ namespace scidb
                                 //  We have adjusted the data back to remove
                                 //  any redundant elements.
                                 size_t new_segment_start = _nextPosition - _maxRunlen;
-                                size_t new_segment_index = _data.size() - 1;
+                                assert(!_data.empty());
+                                uint32_t new_segment_index = safe_static_cast<uint32_t>(_data.size() - 1);
                                 rle::Segment Srun( new_segment_start,
                                                    new_segment_index,
                                                    1, 0 );
@@ -589,14 +591,14 @@ namespace scidb
                                 S->setRun(true);
                             }
                         } else {
-                            append_data ( value );
+                            _data.push_back(value);
                         }
                     }
                 } else {
                     //
                     //   Appending a different value.
-                    append_data ( value );
-                    _lastDistinctVal = _data.size()-1; // overflow?
+                    _data.push_back(value);
+                    _lastDistinctVal = safe_static_cast<uint32_t>(_data.size()-1);
 
                     //
                     //   If we previously had a run (not a literal) then
@@ -696,7 +698,7 @@ namespace scidb
         {
             _data.clear();
             _segments.clear();
-            _lastDistinctVal = -1;
+            _lastDistinctVal = BAD_DATA_INDEX;
             _nextPosition = 0;
             _currSegIndex = 0;
         }
@@ -854,7 +856,8 @@ namespace scidb
         {
             assert(!isFinalized()); //exception ?
             if (!preallocated) {
-                rle::Segment S( _nextPosition, _data.size() + 1, 0, 0 );
+                uint32_t dataIndex = safe_static_cast<uint32_t>(_data.size() + 1);
+                rle::Segment S( _nextPosition, dataIndex, 0, 0 );
                 append_segment ( S );
             } else {
                 rle::Segment& finalSeg = _segments[_segments.size()-1];
@@ -863,7 +866,7 @@ namespace scidb
                 finalSeg.setStartPosition(_nextPosition);
 
                 assert(finalSeg.getDataIndex() == 0);
-                finalSeg.setDataIndex(_data.size() + 1);
+                finalSeg.setDataIndex(safe_static_cast<uint32_t>(_data.size() + 1));
 
                 assert(!finalSeg.isRun());
                 assert(!finalSeg.isNull());
@@ -1003,7 +1006,7 @@ namespace scidb
         {
             assert(! const_cast<EncodingType*>(this)->getLastSegment()->isNull());
             size_t result = 0;
-            if ( -1 != _lastDistinctVal ) {
+            if ( BAD_DATA_INDEX != _lastDistinctVal ) {
                 result = _data.size() - _lastDistinctVal;
             }
             return result;
@@ -1034,10 +1037,16 @@ namespace scidb
         /**
          * When adding a value, we want the
          * RLE encoding to be able to combine
-         * runs of the same value. This ptr
+         * runs of the same value. This index
          * refers to the last distinct value.
          */
-        int64_t  _lastDistinctVal;
+        uint32_t  _lastDistinctVal;
+
+        /**
+         * A known bad data index value.  Used to indicate that
+         * _lastDistinctVal has not been set yet.
+         */
+        static const uint32_t BAD_DATA_INDEX = rle::Segment::MAX_DATA_INDEX + 1;
 
         /**
          * The number of repeated values in
@@ -1073,15 +1082,6 @@ namespace scidb
 
         static log4cxx::LoggerPtr _logger;
         static const Type _dummy;
-
-        /**
-         *   (Type *)value points to a typed data value. Append it (copy it) to
-         *  the data block. Returns index to data.
-         */
-        void append_data ( const Type& value )
-        {
-            _data.push_back ( value );
-        }
 
         /// @return a reference to the data in the block at the specified index.
         const Type& read_data ( size_t index ) const
@@ -1119,8 +1119,9 @@ namespace scidb
         {
             EncodingType *self = const_cast<EncodingType*>(this);
             assert ( where < this->size() );
-            { // fast path
-                self->_currSegIndex = _currSegIndex % (_segments.size()-1);
+
+            // in bounds: frequent case -- check nearby (fast path)
+            if(_currSegIndex < _segments.size()-1) {    // needs two valid indices
                 const rle::Segment& segL = read_segment ( _currSegIndex );
                 const rle::Segment& segR = read_segment ( _currSegIndex+1 );
 
@@ -1136,6 +1137,7 @@ namespace scidb
                 }
             }
 
+            // no quick match or out-of-bounds: binary search
             SegmentLessCmp comparator;
             std::vector<rle::Segment>::const_iterator iter = std::lower_bound(_segments.begin(),
                                                                               _segments.end(),
@@ -1159,6 +1161,7 @@ namespace scidb
                 assert(iter->getStartPosition()==where);
             }
             size_t mid = std::distance(_segments.begin(), iter);
+            assert(mid < _segments.size()-1 );     // correct search behavior
 
             self->_currSegIndex = mid;
             return _currSegIndex;
@@ -1329,7 +1332,7 @@ namespace scidb
             int32_t missing(-1);
             const ElemType& e = _encoding.at(index, missing);
             if (missing>=0) {
-                val.setNull(missing);
+                val.setNull(safe_static_cast<Value::reason>(missing));
             } else {
                 val.set<Type>(e);
             }
@@ -1631,7 +1634,7 @@ namespace scidb
             int32_t missing(-1);
             const Value& elem =_encoding.at(index,missing);
             if (missing >= 0) {
-                val.setNull(missing);
+                val.setNull(safe_static_cast<Value::reason>(missing));
             } else {
                 val = elem;
             }
@@ -1644,7 +1647,7 @@ namespace scidb
      * @param T data type
      * @param E encoding type
      */
-    template<typename T, template<typename T> class E>
+    template<typename T, template<typename> class E>
     class TileBuilder
     {
     public:
@@ -1664,7 +1667,7 @@ namespace scidb
     };
 
     /// Helper method to register built-in tiles
-    template<typename T, template<typename T> class E>
+    template<typename T, template<typename> class E>
     void TileFactory::registerBuiltin(const scidb::TypeId typeId,
                                       const BaseEncoding::EncodingID encodingId)
     {

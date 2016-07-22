@@ -16,7 +16,7 @@ store(A,B)
 # load a diff macro module
 load_module('${TEST_DATA_DIR}/diff_macro_module.txt')
 
---set-format csv
+--set-format csv:l
 --start-query-logging
 
 # Run the diff macros: result should be 0.

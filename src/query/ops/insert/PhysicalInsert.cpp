@@ -28,28 +28,30 @@
  */
 
 
-#include "query/Operator.h"
-#include "query/QueryProcessor.h"
-#include "query/TypeSystem.h"
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "array/DBArray.h"
-#include "array/TransientCache.h"
-#include "system/SystemCatalog.h"
-#include "network/NetworkManager.h"
-#include "smgr/io/Storage.h"
-#include "query/Statistics.h"
-
-#include "array/ParallelAccumulatorArray.h"
-#include "array/DelegateArray.h"
-#include "system/Config.h"
-#include "system/SciDBConfigOptions.h"
+#include <array/Array.h>
+#include <array/DBArray.h>
+#include <array/DelegateArray.h>
+#include <array/Metadata.h>
+#include <array/ParallelAccumulatorArray.h>
+#include <array/TransientCache.h>
+#include <log4cxx/logger.h>
+#include <query/Operator.h>
+#include <query/QueryProcessor.h>
+#include <query/Statistics.h>
+#include <query/TypeSystem.h>
+#include <network/NetworkManager.h>
+#include <smgr/io/Storage.h>
+#include <system/Config.h>
+#include <system/SciDBConfigOptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb
 {
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.physical_insert"));
 
 /**
  * Insert operator.
@@ -90,26 +92,39 @@ public:
     void fillPreviousDesc(ArrayDesc& placeholder) const
     {
         //XXX TODO: avoid these catalog calls by getting the latest version in LogicalInsert
-       const string& arrayName = getArrayName(_parameters);
-       if(_schema.getId() == _schema.getUAId()) //new version (our version) was not created yet
-       {
-           SystemCatalog::getInstance()->getArrayDesc(arrayName,
-                                                      SystemCatalog::ANY_VERSION,
-                                                      LAST_VERSION,
-                                                      placeholder, true);
-       }
-       else //new version was already created; locate the previous
-       {
-           assert(_schema.getId() > _schema.getUAId());
-           VersionID ver = _schema.getVersionId() - 1;
-           if (ver == 0)
-           {
-               return;
-           }
-           SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION,
-                                                      ver, placeholder, true);
-           assert(placeholder.getId() < _schema.getId());
-       }
+        const string& arrayNameOrg = getArrayName(_parameters);
+
+        std::shared_ptr<Query> query(_query);
+        SCIDB_ASSERT(query);
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+        if(_schema.getId() == _schema.getUAId()) //new version (our version) was not created yet
+        {
+            scidb::namespaces::Communicator::getArrayDesc(
+                namespaceName,
+                arrayName,
+                SystemCatalog::ANY_VERSION,
+                LAST_VERSION,
+                placeholder, true);
+        }
+        else //new version was already created; locate the previous
+        {
+            assert(_schema.getId() > _schema.getUAId());
+            VersionID ver = _schema.getVersionId() - 1;
+            if (ver == 0)
+            {
+                return;
+            }
+            scidb::namespaces::Communicator::getArrayDesc(
+                namespaceName,
+                arrayName,
+                SystemCatalog::ANY_VERSION,
+                ver, placeholder, true);
+            assert(placeholder.getId() < _schema.getId());
+        }
     }
 
     /**
@@ -172,27 +187,46 @@ public:
             return;
         }
 
-        // If input was manually repartitioned, we're not allowed to
-        // override it, so you're scrod.
-        //
-        if (modifiedPtrs[0] != NULL) {
-            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_REPART_FORBIDDEN)
-                << getLogicalName();
-        }
-
         // Request a repartition to the target array's schema.
         modifiedPtrs[0] = &_schema;
     }
 
+    virtual RedistributeContext
+    getOutputDistribution(std::vector<RedistributeContext> const& inputDistributions,
+                          std::vector<ArrayDesc> const& inputSchemas) const
+    {
+        // the schema is determined by the catalog
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
+    }
+
     /**
      * Get the distribution requirement.
-     * @return a DistributionRquirement requiring defaultPartitioning()
+     * @return a DistributionRquirement requiring what is in the catalog
      */
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
-        vector<RedistributeContext> requiredDistribution;
-        requiredDistribution.push_back(RedistributeContext(defaultPartitioning()));
-        return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
+        ArrayDistPtr arrDist = _schema.getDistribution();
+        SCIDB_ASSERT(arrDist);
+        SCIDB_ASSERT(arrDist->getPartitioningSchema()!=psUninitialized);
+        SCIDB_ASSERT(arrDist->getPartitioningSchema()!=psUndefined);
+
+        std::shared_ptr<Query> query(_query);
+        SCIDB_ASSERT(query);
+        SCIDB_ASSERT(_schema.getResidency());
+        SCIDB_ASSERT(_schema.getResidency()->size() > 0);
+
+        //XXX TODO: for now just check that all the instances in the residency are alive
+        //XXX TODO: once we allow writes in a degraded mode, this call might have more semantics
+        query->isDistributionDegradedForWrite(_schema);
+
+        // make sure PhysicalStore informs the optimizer about the actual array residency
+        ArrayResPtr arrRes = _schema.getResidency();
+        SCIDB_ASSERT(arrRes);
+
+        return DistributionRequirement(DistributionRequirement::SpecificAnyOrder,
+                                       vector<RedistributeContext>(1,
+                                                                   RedistributeContext(arrDist, arrRes)));
     }
 
     /**
@@ -422,10 +456,16 @@ public:
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         SCIDB_ASSERT(inputArrays.size() == 1);
+        executionPreamble(inputArrays[0], query);
         VersionID version = _schema.getVersionId();
         SCIDB_ASSERT(version == ArrayDesc::getVersionFromName (_schema.getName()));
-        const string& unvArrayName = getArrayName(_parameters);
-        SCIDB_ASSERT(unvArrayName == ArrayDesc::makeUnversionedName(_schema.getName()));
+        string unvArrayName = getArrayName(_parameters);
+        string schArrayName = ArrayDesc::makeUnversionedName(_schema.getName());
+
+        std::string arrayName;
+        std::string namespaceName = _schema.getNamespaceName();
+        query->getNamespaceArrayNames(unvArrayName, namespaceName, unvArrayName);
+        SCIDB_ASSERT(unvArrayName == schArrayName);
 
         if (_schema.isTransient())
         {
@@ -438,12 +478,14 @@ public:
             const SystemCatalog::LockDesc::LockMode lockMode =
                 _schema.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
 
-            _lock = std::shared_ptr<SystemCatalog::LockDesc>(make_shared<SystemCatalog::LockDesc>(
-                                                           unvArrayName,
-                                                           query->getQueryID(),
-                                                           Cluster::getInstance()->getLocalInstanceId(),
-                                                           SystemCatalog::LockDesc::WORKER,
-                                                           lockMode));
+            _lock = std::shared_ptr<SystemCatalog::LockDesc>(
+                make_shared<SystemCatalog::LockDesc>(
+                    namespaceName,
+                    unvArrayName,
+                    query->getQueryID(),
+                    Cluster::getInstance()->getLocalInstanceId(),
+                    SystemCatalog::LockDesc::WORKER,
+                    lockMode));
             if (lockMode == SystemCatalog::LockDesc::WR) {
                 SCIDB_ASSERT(!_schema.isTransient());
                 _lock->setArrayVersion(version);
@@ -460,15 +502,22 @@ public:
         }
 
         size_t nDims = _schema.getDimensions().size();
+        // Start with an empty box
         Coordinates currentLo(nDims, CoordinateBounds::getMax());
         Coordinates currentHi(nDims, CoordinateBounds::getMin());
 
-        if (const ArrayDesc* previousDesc = getPreviousDesc())
+        if(query->isCoordinator())
         {
-            currentLo = previousDesc->getLowBoundary();
-            currentHi = previousDesc->getHighBoundary();
+            // update the empty box with boundaries from the previous array version
+            const ArrayDesc* previousDesc = getPreviousDesc();
+            if (previousDesc != NULL)
+            {
+                currentLo = previousDesc->getLowBoundary();
+                currentHi = previousDesc->getHighBoundary();
+            }
         }
-
+        // at the end of performInsertion all of the local boundaries will be combined
+        // to form the new global boundaries by the coordinator
         std::shared_ptr<Array> dstArray =  performInsertion(inputArrays[0], query, currentLo, currentHi, nDims);
 
         getInjectedErrorListener().check();

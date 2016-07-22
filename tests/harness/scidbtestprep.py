@@ -132,6 +132,6 @@ if __name__ == "__main__":
   baseDataPath = d.get('base-path')
 
   if (cmd == "linkdata"):
-    linkData(baseDataPath + "/000/" + linkdst, srcpath)
+    linkData(baseDataPath + "/0/" + linkdst, srcpath)
 
   sys.exit(0)

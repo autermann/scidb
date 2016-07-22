@@ -76,9 +76,6 @@ def verify_result():
     try:
         with open(fname) as F:
             rdr = csv.reader(F)
-            if 1:
-                # 14.3 compatibility, soon to be deprecated
-                rdr.next()      # skip header
             row_num = 0         # scope to 'with' stmt, not 'for' stmt
             for row_num, row in enumerate(rdr):
                 if row_num != int(row[0]):

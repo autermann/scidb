@@ -27,15 +27,18 @@
  *      Author: Knizhnik
  */
 
+#include <log4cxx/logger.h>
+
 #include <query/Operator.h>
 #include <array/Metadata.h>
 #include <array/ProjectArray.h>
-
 
 namespace scidb {
 
 using namespace boost;
 using namespace std;
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.project"));
 
 class PhysicalProject: public  PhysicalOperator
 {
@@ -51,15 +54,16 @@ public:
         return inputBoundaries[0];
     }
 
-	/***
-	 * Project is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-	 * that overrides the chunkiterator method.
-	 */
-	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
+    /***
+     * Project is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+     * that overrides the chunkiterator method.
+     */
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 1);
+        assert(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
-		vector<AttributeID> projection(_schema.getAttributes().size());
+        vector<AttributeID> projection(_schema.getAttributes().size());
         const size_t n = _parameters.size();
         for (size_t i = 0; i < n; i++)
         {
@@ -69,8 +73,8 @@ public:
             projection[n] = inputArrays[0]->getArrayDesc().getEmptyBitmapAttribute()->getId();
         }
 
-		return std::shared_ptr<Array>(new ProjectArray(_schema, inputArrays[0], projection));
-	 }
+        return std::shared_ptr<Array>(new ProjectArray(_schema, inputArrays[0], projection));
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalProject, "project", "physicalProject")

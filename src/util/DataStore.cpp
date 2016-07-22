@@ -451,7 +451,7 @@ DataStore::initializeFreelist()
 /* Read free lists from disk file
    @returns number of buckets successfully read
 */
-int
+size_t
 DataStore::readFreelistFromFile()
 {
     /* Try to open the freelist file

@@ -39,23 +39,26 @@ using namespace std;
 /***
  * Helper function to construct array descriptor for the unpacked array
  ***/
-inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName, size_t const chunkSize)
+inline ArrayDesc addAttributes(ArrayDesc const& desc,
+                               std::string const& dimName,
+                               size_t const chunkSize,
+                               std::shared_ptr<Query> const& query)
 {
     Attributes const& oldAttributes = desc.getAttributes();
     Dimensions const& dims = desc.getDimensions();
     Attributes newAttributes(oldAttributes.size() + dims.size());
-    size_t i = 0;
+    AttributeID i = 0;
     uint64_t arrayLength = 1;
-    for (size_t j = 0; j < dims.size(); j++, i++)
+    for (size_t j = 0; j < dims.size(); ++j, ++i)
     {
         arrayLength *= dims[j].getLength();
         newAttributes[i] = AttributeDesc(i, dims[j].getBaseName(), TID_INT64, 0, 0);
     }
 
-    for (size_t j = 0; j < oldAttributes.size(); j++, i++)
+    for (size_t j = 0; j < oldAttributes.size(); ++j, ++i)
     {
         AttributeDesc const& attr = oldAttributes[j];
-        newAttributes[i] = AttributeDesc((AttributeID)i, attr.getName(), attr.getType(), attr.getFlags(),
+        newAttributes[i] = AttributeDesc(i, attr.getName(), attr.getType(), attr.getFlags(),
             attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
             attr.getDefaultValueExpr());
     }
@@ -69,7 +72,11 @@ inline ArrayDesc addAttributes(ArrayDesc const& desc, string const& dimName, siz
         CoordinateBounds::getMax(),
         chunkSize, 0);
 
-    return ArrayDesc(desc.getName(), newAttributes, newDimensions, defaultPartitioning());
+    return ArrayDesc(desc.getName(),
+                     newAttributes,
+                     newDimensions,
+                     createDistribution(psUndefined),
+                     desc.getResidency() );
 }
 
 /**
@@ -156,7 +163,7 @@ public:
             }
         }
 
-        return addAttributes(schemas[0], dimName, chunkSize);
+        return addAttributes(schemas[0], dimName, chunkSize, query);
     }
 };
 

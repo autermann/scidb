@@ -39,6 +39,8 @@
 #include <query/TileFunctions.h>
 #include <query/Aggregate.h>
 
+#include <SciDBAPI.h> // for #define EXPORTED_FUNCTION
+
 #include "rational_functions.h"
 
 using namespace std;

@@ -4,7 +4,7 @@ load_library('point')
 load_library('more_math')
 
 --test
---set-format csv
+--set-format csv:l
 sort(filter(list('operators'),library='scidb'),name)
 sort(filter(list('functions'),library='scidb'),name, profile)
 --igdata "store(list('queries'),query_array)"

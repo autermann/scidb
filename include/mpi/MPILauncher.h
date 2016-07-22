@@ -61,7 +61,7 @@ class MpiLauncher : public std::enable_shared_from_this<MpiLauncher>
       InvalidStateException(const char* file, const char* function, int32_t line)
       : SystemException(file, function, line, "scidb",
                         scidb::SCIDB_SE_INTERNAL, scidb::SCIDB_LE_UNKNOWN_ERROR,
-                        "SCIDB_SE_INTERNAL", "SCIDB_LE_UNKNOWN_ERROR", uint64_t(0))
+                        "SCIDB_SE_INTERNAL", "SCIDB_LE_UNKNOWN_ERROR", INVALID_QUERY_ID)
       {
       }
        ~InvalidStateException() throw () {}
@@ -124,7 +124,7 @@ class MpiLauncher : public std::enable_shared_from_this<MpiLauncher>
 
     static void getSortedInstances(std::map<scidb::InstanceID,
                                    const scidb::InstanceDesc*>& sortedInstances,
-                                   const scidb::Instances& instances,
+                                   const std::shared_ptr<const scidb::InstanceMembership>& membership,
                                    const std::shared_ptr<scidb::Query>& query);
     const std::string& getInstallPath()
     {

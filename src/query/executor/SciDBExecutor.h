@@ -30,11 +30,9 @@
 #ifndef SCIDBEXECUTOR_H_
 #define SCIDBEXECUTOR_H_
 
-#include "SciDBAPI.h"
-
 namespace scidb
 {
-
+class SciDB;
 /**
  *  @return a reference to scidb executor instance.
  */

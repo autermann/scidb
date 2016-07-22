@@ -102,22 +102,31 @@ public:
     static InstanceID instanceForChunk(const std::shared_ptr<Query>& query,
                                        const Coordinates& chunkPosition,
                                        const ArrayDesc& arrayDesc,
-                                       PartitioningSchema ps,
-                                       std::shared_ptr<CoordinateTranslator>& distMapper,
-                                       size_t shift,
-                                       InstanceID instanceIdMask,
-                                       std::shared_ptr<PartitioningSchemaData>& psData)
+                                       const ArrayDistPtr& outputArrayDist,
+                                       const ArrayResPtr& outputArrayRes)
+
+
     {
-        const InstanceID destInstance = getInstanceForChunk(query,
-                                                            chunkPosition,
-                                                            arrayDesc,
-                                                            ps,
-                                                            distMapper,
-                                                            shift,
-                                                            instanceIdMask,
-                                                            psData.get());
+        const InstanceID destInstance = getInstanceForChunk(chunkPosition,
+                                                            arrayDesc.getDimensions(),
+                                                            outputArrayDist,
+                                                            outputArrayRes,
+                                                            query);
         return destInstance;
     }
+
+    static InstanceID instanceForChunk(const std::shared_ptr<Query>& query,
+                                       const Coordinates& chunkPosition,
+                                       const ArrayDesc& arrayDesc,
+                                       const ArrayDistPtr& outputArrayDist)
+    {
+        const InstanceID destInstance = getInstanceForChunk(chunkPosition,
+                                                            arrayDesc.getDimensions(),
+                                                            outputArrayDist,
+                                                            query);
+        return destInstance;
+    }
+
 
     /**
      * Constructor

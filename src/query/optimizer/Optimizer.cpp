@@ -29,16 +29,18 @@
  * @author knizhnik@garret.ru
  */
 #include <query/optimizer/Optimizer.h>
-#include <network/NetworkManager.h>
 
-using namespace std;
-using namespace boost;
+#include <query/OperatorLibrary.h>
+#include <query/QueryPlan.h>
+
+#include <network/NetworkManager.h>
 
 namespace scidb
 {
     std::shared_ptr< LogicalQueryPlanNode> Optimizer::logicalRewriteIfNeeded(const std::shared_ptr<Query>& query,
                                                                                std::shared_ptr< LogicalQueryPlanNode> const node)
     {
+        using std::make_shared;
         //Note: this rewrite mechanism should be
         //  1. generic
         //  2. user-extensible

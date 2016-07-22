@@ -9,8 +9,9 @@
  *
  *  WHEN EDITING THIS FILE:
  *  1. Remember, there is no space in "cannot".
- *  2. Code numbers are ignored and will go away soon, but for now you
- *      must still put something there.
+ *  2. Going forward, code numbers are important for binary compatibility of
+ *      client APIs, so please do not renumber.
+ *  3. Keep errors numerically sorted by code.
  *
  *  See http://www.drdobbs.com/the-new-c-x-macros/184401387 .
  */

@@ -30,10 +30,12 @@
 #include <boost/foreach.hpp>
 #include <map>
 
-#include "query/Operator.h"
-#include "system/SystemCatalog.h"
-#include "system/Exceptions.h"
+#include <query/Operator.h>
+#include <system/SystemCatalog.h>
+#include <system/Exceptions.h>
 #include <smgr/io/Storage.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 using namespace boost;
@@ -95,6 +97,15 @@ public:
         ADD_PARAM_OUT_ARRAY_NAME()
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to update the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ReadArray);
+        permissions.push_back(scidb::permissions::namespaces::UpdateArray);
+        return permissions;
+    }
+
     /**
      * Request a lock for all arrays that will be accessed by this operator.
      * Calls requestLock with the write lock over the target array (array inserted into)
@@ -105,22 +116,29 @@ public:
         LogicalOperator::inferArrayAccess(query);
         SCIDB_ASSERT(_parameters.size() > 0);
         SCIDB_ASSERT(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayName));
+        const string& arrayNameOrg = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayNameOrg));
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         ArrayDesc srcDesc;
         SCIDB_ASSERT(!srcDesc.isTransient());
-
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION, srcDesc);
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, SystemCatalog::ANY_VERSION, srcDesc);
 
         const SystemCatalog::LockDesc::LockMode lockMode =
             srcDesc.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
 
-        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(arrayName,
-                                                                                       query->getQueryID(),
-                                                                                       Cluster::getInstance()->getLocalInstanceId(),
-                                                                                       SystemCatalog::LockDesc::COORD,
-                                                                                       lockMode));
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(
+            make_shared<SystemCatalog::LockDesc>(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                lockMode));
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         SCIDB_ASSERT(resLock);
         SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
@@ -137,15 +155,22 @@ public:
         SCIDB_ASSERT(schemas.size() == 1);
         SCIDB_ASSERT(_parameters.size() == 1);
 
-        string arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        ArrayDesc const& srcDesc = schemas[0];
-        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayName));
+        string arrayNameOrg =
+			((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayNameOrg));
 
         //Ensure attributes names uniqueness.
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
         ArrayDesc dstDesc;
-        if (!SystemCatalog::getInstance()->getArrayDesc(arrayName,
-                                                        query->getCatalogVersion(arrayName),
-                                                        dstDesc, false)) {
+        ArrayDesc const& srcDesc = schemas[0];
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        bool fArrayDesc = scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, arrayId, dstDesc, false);
+        if (!fArrayDesc) {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_DOESNT_EXIST) << arrayName;
         }
         ArrayDesc::checkConformity(srcDesc, dstDesc,

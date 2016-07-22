@@ -21,8 +21,12 @@
 */
 package org.scidb.iquery;
 
-import gnu.getopt.LongOpt;
-import gnu.getopt.Getopt;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.ParseException;
 
 /**
  * Config is a class managing the config parameters for Iquery.
@@ -40,6 +44,7 @@ public class Config
     private String _queryFile      = new String();
     private String _result         = new String("console");
     private String _format         = new String("dcsv");
+    private String _authFile       = new String();
     private String _userName       = new String();
     private String _userPassword   = new String();
     private boolean _verbose       = false;
@@ -57,6 +62,7 @@ public class Config
     public void setQueryFile(String newValue) { _queryFile = newValue; }
     public void setResult(String newValue) { _result = newValue; }
     public void setFormat(String newValue) { _format = newValue; }
+    public void setAuthFile(String newValue) { _authFile = newValue; }
     public void setUserName(String newValue) { _userName = newValue; }
     public void setUserPassword(String newValue) { _userPassword = newValue; }
     public void setVerbose(boolean newValue) { _verbose = newValue; }
@@ -78,6 +84,7 @@ public class Config
     public String getQueryFile() { return _queryFile; }
     public String getResult() { return _result; }
     public String getFormat() { return _format; }
+    public String getAuthFile() { return _authFile; }
     public String getUserName() { return _userName; }
     public String getUserPassword() { return _userPassword; }
     public boolean getVerbose() { return _verbose; }
@@ -100,6 +107,7 @@ public class Config
         System.out.println("queryFile    = " + getQueryFile());
         System.out.println("result       = " + getResult());
         System.out.println("format       = " + getFormat());
+        System.out.println("authFile     = " + getAuthFile());
         System.out.println("userName     = " + getUserName());
         System.out.println("userPassword = " + getUserPassword());
         System.out.println("verbose      = " + getVerbose());
@@ -114,68 +122,63 @@ public class Config
 
     /**
      * Parse command-line parameters into the Config object.
+     *
+     * @note (For developers:) Please do not use a number as either a short option name or a long option name.
+     *       This will ensure that DefaultParser::isArgument() returns true if and only if the token is not an option.
      */
-    public void parse(String[] args)
+    public void parse(String[] args) throws ParseException
     {
-        // In shortOpts:
-        //  - an option not followed by any colon does not have an argument.
-        //  - an option followed by a single colon has a required argument.
-        //  - an option followed by two colons has an optional argument.
-        //  - @see the comment at the beginnnig of Getopt.java.
-    String shortOpts = "w:c:p:q:f:r:o:vtnahViU:P:b";
+	    Options options = new Options();
+	    options.addOption(Option.builder("w").required(false).hasArg(true).longOpt("precision").build());
+	    options.addOption(Option.builder("c").required(false).hasArg(true).longOpt("host").build());
+	    options.addOption(Option.builder("p").required(false).hasArg(true).longOpt("port").build());
+	    options.addOption(Option.builder("q").required(false).hasArg(true).longOpt("query").build());
+	    options.addOption(Option.builder("f").required(false).hasArg(true).longOpt("query_file").build());
+	    options.addOption(Option.builder("r").required(false).hasArg(true).longOpt("result").build());
+	    options.addOption(Option.builder("o").required(false).hasArg(true).longOpt("format").build());
+	    options.addOption(Option.builder("A").required(false).hasArg(true).longOpt("auth-file").build());
+	    //options.addOption(Option.builder("U").required(false).hasArg(true).longOpt("user-name").build());
+	    //options.addOption(Option.builder("P").required(false).hasArg(true).longOpt("user-password").build());
+	    options.addOption(Option.builder("v").required(false).hasArg(false).longOpt("verbose").build());
+	    options.addOption(Option.builder("t").required(false).hasArg(false).longOpt("timer").build());
+	    options.addOption(Option.builder("n").required(false).hasArg(false).longOpt("no_fetch").build());
+	    options.addOption(Option.builder("a").required(false).hasArg(false).longOpt("afl").build());
+	    options.addOption(Option.builder("h").required(false).hasArg(false).longOpt("help").build());
+	    options.addOption(Option.builder("V").required(false).hasArg(false).longOpt("version").build());
+	    options.addOption(Option.builder("i").required(false).hasArg(false).longOpt("ignore_errors").build());
+	    options.addOption(Option.builder("b").required(false).hasArg(false).longOpt("bypass_usr_cfg_perms_chk").build());
 
-    LongOpt[] longOpts = {
-            new LongOpt("precision",     LongOpt.REQUIRED_ARGUMENT, null, 'w'),
-            new LongOpt("host",          LongOpt.REQUIRED_ARGUMENT, null, 'c'),
-            new LongOpt("port",          LongOpt.REQUIRED_ARGUMENT, null, 'p'),
-            new LongOpt("query",         LongOpt.REQUIRED_ARGUMENT, null, 'q'),
-            new LongOpt("query_file",    LongOpt.REQUIRED_ARGUMENT, null, 'f'),
-            new LongOpt("result",        LongOpt.REQUIRED_ARGUMENT, null, 'r'),
-            new LongOpt("format",        LongOpt.REQUIRED_ARGUMENT, null, 'o'),
-            new LongOpt("user-name",     LongOpt.REQUIRED_ARGUMENT, null, 'U'),
-            new LongOpt("user-password", LongOpt.REQUIRED_ARGUMENT, null, 'P'),
-            new LongOpt("verbose",       LongOpt.NO_ARGUMENT,       null, 'v'),
-            new LongOpt("timer",         LongOpt.NO_ARGUMENT,       null, 't'),
-            new LongOpt("no_fetch",      LongOpt.NO_ARGUMENT,       null, 'n'),
-            new LongOpt("afl",           LongOpt.NO_ARGUMENT,       null, 'a'),
-            new LongOpt("help",          LongOpt.NO_ARGUMENT,       null, 'h'),
-            new LongOpt("version",       LongOpt.NO_ARGUMENT,       null, 'V'),
-            new LongOpt("ignore_errors", LongOpt.NO_ARGUMENT,       null, 'i'),
-            new LongOpt("bypass_usr_cfg_perms_chk", LongOpt.NO_ARGUMENT,  null, 'b'),
-        };
+	    CommandLineParser parser = new DefaultParser();
+	    CommandLine line = parser.parse(options, args);
+	    Option[] processedOptions = line.getOptions();
 
-        Getopt getopt = new Getopt("Iquery", args, shortOpts, longOpts);
-        int c;
-        while ((c = getopt.getopt()) != -1)
-        {
-            switch (c)
+	    for (Option o: processedOptions)
+	    {
+            switch (o.getId())
             {
             case 'w':
-                setPrecision(Integer.parseInt(getopt.getOptarg()));
+                setPrecision(Integer.parseInt(o.getValue()));
                 break;
             case 'c':
-                setHost(getopt.getOptarg());
+                setHost(o.getValue());
                 break;
             case 'p':
-                setPort(Integer.parseInt(getopt.getOptarg()));
+                setPort(Integer.parseInt(o.getValue()));
                 break;
             case 'q':
-                setQuery(getopt.getOptarg());
+                setQuery(o.getValue());
                 break;
             case 'f':
-                setQueryFile(getopt.getOptarg());
+                setQueryFile(o.getValue());
                 break;
             case 'r':
-                setResult(getopt.getOptarg());
+                setResult(o.getValue());
                 break;
             case 'o':
-                setFormat(getopt.getOptarg());
+                setFormat(o.getValue());
                 break;
-            case 'U':
-                setUserName(getopt.getOptarg());
-                break;
-            case 'P':
-                setUserPassword(getopt.getOptarg());
+            case 'A':
+                setAuthFile(o.getValue());
                 break;
             case 'v':
                 setVerbose(true);
@@ -216,7 +219,7 @@ public class Config
     private void printHelp()
     {
         System.out.println("Iquery is a command-line tool that interacts with a SciDB server.\n");
-        System.out.println("usage: CLASSPATH=.../protobuf.jar:.../scidb4j.jar  java  org.scidb.iquery.Iquery  [options] \"QUERY_STRING\"\n");
+        System.out.println("usage: CLASSPATH=.../scidb4j.jar  java  org.scidb.iquery.Iquery  [options] \"QUERY_STRING\"\n");
         System.out.println("Available options:");
         System.out.println("     -w [ --precision ]      arg Precision for printing floating point numbers. ");
         System.out.println("                                 Default is 6");
@@ -229,8 +232,9 @@ public class Config
         System.out.println("     -o [ --format ]         arg Output format: auto, csv, dense, csv+, lcsv+, text, ");
         System.out.println("                                 sparse, lsparse, store, text, opaque, tsv, tsv+, ");
         System.out.println("                                 ltsv+, dcsv. Default is 'dcsv'.");
-        System.out.println("     -U [ --user-name ]      arg User name");
-        System.out.println("     -P [ --user-password ]  arg User password");
+        System.out.println("     -A [ --auth-file ]      arg Authentication file name");
+        //System.out.println("     -U [ --user-name ]      arg User name");
+        //System.out.println("     -P [ --user-password ]  arg User password");
         System.out.println("     -v [ --verbose ]        Print debug info. Disabled by default");
         System.out.println("     -t [ --timer ]          Print query execution time (in milliseconds)");
         System.out.println("     -n [ --no-fetch ]       Skip data fetching. Disabled by default");

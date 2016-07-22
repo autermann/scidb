@@ -23,6 +23,7 @@
 
 #include <inttypes.h>
 #include <unistd.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -31,10 +32,13 @@
 #include <sys/uio.h>
 #include <dirent.h>
 #include <string.h>
+
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <boost/scoped_array.hpp>
+
 #include <util/FileIO.h>
+#include <util/PerfTime.h>
 #include <log4cxx/logger.h>
 #include <system/Exceptions.h>
 #include <system/Config.h>
@@ -64,6 +68,8 @@ namespace scidb
     int
     File::remove(char const* filePath, bool raise)
     {
+        ScopedWaitTimer timer(PTCW_FS_WR);
+
         assert(filePath);
         LOG4CXX_TRACE(logger, "File::remove: " << filePath);
         int err = 0;
@@ -83,6 +89,8 @@ namespace scidb
     int
     File::closeDir(const char* dirName, DIR *dirp, bool raise)
     {
+        ScopedWaitTimer timer(PTCW_FS_RD);              // directories are not modified via DIR*
+
         int err = 0;
         int rc = ::closedir(dirp);
         if (rc!=0) {
@@ -102,6 +110,8 @@ namespace scidb
     void
     File::readDir(const char* dirName, std::list<std::string>& entries)
     {
+        ScopedWaitTimer timer(PTCW_FS_RD);
+
         LOG4CXX_TRACE(logger, "File::readDir: " << dirName);
 
         DIR* dirp = ::opendir(dirName); // closedir
@@ -148,6 +158,8 @@ namespace scidb
     bool
     File::createDir(const std::string& dirPath)
     {
+        ScopedWaitTimer timer(PTCW_FS_WR);
+
         assert(!dirPath.empty());
         int rc = ::mkdir(dirPath.c_str(), (S_IRUSR|S_IWUSR|S_IXUSR));
         if (rc==0) {
@@ -180,6 +192,19 @@ namespace scidb
     int
     File::openFile(const std::string& fileName, int flags)
     {
+        // three possible time categories
+        // FS_RD, FS_WR_SYNC, FS_WR
+
+        auto tc = PTCW_FS_RD; // default is read
+        if (flags & (O_WRONLY|O_RDWR)) {
+            if( flags & O_SYNC) {
+                tc = PTCW_FS_WR_SYNC;
+            } else {
+                tc = PTCW_FS_WR;
+            }
+        }
+        ScopedWaitTimer timer(tc);
+
         int fd = -1;
         size_t eintrRetries=0;
         while (true) {
@@ -214,6 +239,10 @@ namespace scidb
 
         /* Try to write the data, retrying if we are interrupted by signals
          */
+
+        // NOTE O_SYNC files have a separate time category
+        auto tc = (_flags & O_SYNC) ?  PTCW_FS_WR_SYNC : PTCW_FS_WR ;
+        ScopedWaitTimer timer(tc); // after FileMonitor
         const char* src = (const char*)data;
         size_t nRetries = 0;
         size_t eintrRetries = 0;
@@ -284,6 +313,7 @@ namespace scidb
             myiovs[i] = iovs[i];
         }
 
+        ScopedWaitTimer timer(PTCW_FS_WR);  // after FileMonitor
         size_t nRetries = 0;
         size_t eintrRetries = 0;
         while (totalSize != 0) {
@@ -363,6 +393,7 @@ namespace scidb
 
         /* Try to read the data, retrying if we are interrupted by signals
          */
+        ScopedWaitTimer timer(PTCW_FS_RD); // after FileMonitor
         char* dst = (char*)data;
         size_t nRetries = 0;
         size_t eintrRetries = 0;
@@ -433,6 +464,7 @@ namespace scidb
             myiovs[i] = iovs[i];
         }
 
+        ScopedWaitTimer timer(PTCW_FS_RD);
         size_t nRetries = 0;
         size_t eintrRetries = 0;
         while (totalSize != 0) {
@@ -508,6 +540,8 @@ namespace scidb
 
         /* Try to read the data, retrying if we are interrupted by signals
          */
+        ScopedWaitTimer timer(PTCW_FS_RD);
+
         ssize_t rc = 0;
         char* dst = (char*)data;
         size_t nRetries = 0;
@@ -561,6 +595,8 @@ namespace scidb
 
         /* Try to fsync the file
          */
+        ScopedWaitTimer timer(PTCW_FS_FL); // after FileMonitor
+
         int rc = 0;
 
         do
@@ -585,6 +621,7 @@ namespace scidb
 
         /* Try to fdatasync the file
          */
+        ScopedWaitTimer timer(PTCW_FS_FL); // after FileMonitor
         int rc = 0;
 
         do
@@ -610,6 +647,7 @@ namespace scidb
 
         /* Try to ftruncate the file
          */
+        ScopedWaitTimer timer(PTCW_FS_WR); // after FileMonitor
         int rc = 0;
 
         do
@@ -695,6 +733,17 @@ namespace scidb
              */
             if (_fd >= 0)
             {
+                // three possible time categories
+                // FS_RD, FS_WR_SYNC, FS_WR
+                auto tc = PTCW_FS_RD; // default is read
+                if (_flags & (O_WRONLY|O_RDWR)) {
+                    if( _flags & O_SYNC) {
+                        tc = PTCW_FS_WR_SYNC;
+                    } else {
+                        tc = PTCW_FS_WR;
+                    }
+                }
+                ScopedWaitTimer timer(tc);
                 ret = File::closeFd(_fd);
             }
             if (!ret)
@@ -1026,5 +1075,115 @@ namespace scidb
         return tmpDir;
     }
 
+
+//
+// begin stdio wrappers
+// NOTE: these add wait-timing to stdio functions while still matching
+//       the call signatures as they were used in the import/export
+//       code.
+//
+
+FILE* fopen(const char *path, const char *mode)
+{
+    auto tc = PTCW_FS_RD; // default is read
+    if (mode[0] == 'w' || mode[0] == 'a') {
+        tc = PTCW_FS_WR;
+    }
+    ScopedWaitTimer timer(tc);
+    return ::fopen(path, mode);
 }
+
+FILE* fdopen(int fd, const char *mode)
+{
+    auto tc = PTCW_FS_RD; // default is read
+    if (mode[0] == 'w' || mode[0] == 'a') {
+        tc = PTCW_FS_WR;
+    }
+    ScopedWaitTimer timer(tc);
+    return ::fdopen(fd, mode);
+}
+
+FILE* freopen(const char *path, const char *mode, FILE *stream)
+{
+    auto tc = PTCW_FS_RD; // default is read
+    if (mode[0] == 'w' || mode[0] == 'a') {
+        tc = PTCW_FS_WR;
+    }
+    ScopedWaitTimer timer(tc);
+    return ::freopen(path, mode, stream);
+}
+
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    ASSERT_EXCEPTION_FALSE("should not be called, use scidb::fread_unlocked()");
+}
+
+size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    // called more than 1M times/sec from load() operator
+    // so can't afford a ScopedWaitTimer which takes about the same amount of time
+    // instead we do some statistical sampling:
+    // time one out of each UNDERSAMPLE_RATIO calls
+    // UNDERSAMPLE_RATIO should be
+    // a) prime to reduce aliasing
+    // b) greater than 100 to ensure it does not significantly slow down single-byte reads
+    const unsigned UNDERSAMPLE_RATIO=101;  // reduce measurement cost to about 1%
+    static thread_local unsigned numTimesCalledOnThread=0;      // per-thread to avoid cost of atomic increments
+    numTimesCalledOnThread++;
+
+    if(numTimesCalledOnThread >= UNDERSAMPLE_RATIO) {  // slow path, time this one
+        numTimesCalledOnThread=0;                      // reset
+        ScopedWaitTimer timer(PTCW_FS_RD, UNDERSAMPLE_RATIO);
+        return ::fread_unlocked(ptr, size, nmemb, stream);
+    } else {
+        return ::fread_unlocked(ptr, size, nmemb, stream); // fast path, no timing
+    }
+}
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    ScopedWaitTimer timer(PTCW_FS_WR);
+    return ::fwrite(ptr, size, nmemb, stream);
+}
+
+size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    ScopedWaitTimer timer(PTCW_FS_WR);
+    return ::fwrite_unlocked(ptr, size, nmemb, stream);
+}
+
+int fprintf(FILE* stream, const char* format, ...)
+{
+    ScopedWaitTimer timer(PTCW_FS_WR);
+
+    va_list args;
+    va_start(args, format);
+    auto result = ::vfprintf(stream, format, args);
+    va_end(args);
+    return result;
+}
+
+int fflush(FILE *stream)
+{
+    ScopedWaitTimer timer(PTCW_FS_WR);
+    return ::fflush(stream);
+}
+
+int fclose(FILE *fp)
+{
+    auto tc = PTCW_FS_WR; // assume the file was opened for write
+
+    // attempt to correct the assumption
+    // but if there is an error, go on anyway
+    // as it is far more important to close files to avoid resource leaks
+    // than to make the timing breakdown be perfect
+    auto flags = ::fcntl(::fileno(fp), F_GETFL);
+    if (flags != -1 && ((flags & O_RDONLY))) {
+        tc = PTCW_FS_RD;    // actually, it was opened for read
+    }
+    ScopedWaitTimer timer(tc);
+    return ::fclose(fp);
+}
+
+} // namespace scidb
 

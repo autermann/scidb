@@ -4,7 +4,7 @@ Version:   0
 Release:   1
 License:   GPLv3
 Group:     System Environment/Base
-URL:       http://downloads.paradigm4.com
+URL:       https://downloads.paradigm4.com
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 BuildArch: noarch
 

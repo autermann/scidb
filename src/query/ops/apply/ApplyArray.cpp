@@ -253,7 +253,9 @@ ApplyArrayIterator::ApplyArrayIterator(ApplyArray const& array, AttributeID outA
                 }
                 else
                 {
-                    iterators[i] = array.getInputArray()->getConstIterator(array._bindingSets[outAttrID][i].resolvedId);
+                    iterators[i] = array.getInputArray()->
+                        getConstIterator(
+                            safe_static_cast<AttributeID>(array._bindingSets[outAttrID][i].resolvedId));
                 }
                 break;
             case BindInfo::BI_COORDINATE:

@@ -27,10 +27,11 @@
  *      Author: sfridella
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
-
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/Permissions.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 
@@ -75,11 +76,20 @@ public:
             _properties.ddl = true;
 	}
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have the proper permissions
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::DeleteArray);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 0);
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
         return arrDesc;
     }
 
@@ -88,9 +98,9 @@ public:
         LogicalOperator::inferArrayAccess(query);
         assert(_parameters.size() == 2);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName =
+        const string& arrayNameOrg =
             ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        assert(arrayName.find('@') == std::string::npos);
+        assert(arrayNameOrg.find('@') == std::string::npos);
         VersionID targetVersion =
             evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[1])->getExpression(),
                      query,
@@ -99,13 +109,19 @@ public:
         if (targetVersion < 1 || targetVersion > SystemCatalog::MAX_VERSIONID) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_VERSION_DOESNT_EXIST) << targetVersion;
         }
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
         std::shared_ptr<SystemCatalog::LockDesc>  lock(
-            new SystemCatalog::LockDesc(arrayName,
-                                        query->getQueryID(),
-                                        Cluster::getInstance()->getLocalInstanceId(),
-                                        SystemCatalog::LockDesc::COORD,
-                                        SystemCatalog::LockDesc::RM)
-            );
+            new SystemCatalog::LockDesc(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::RM));
         lock->setArrayVersion(targetVersion);
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         assert(resLock);

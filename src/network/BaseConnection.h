@@ -42,9 +42,10 @@
 #include <log4cxx/logger.h>
 #include <vector>
 
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "util/Semaphore.h"
+#include <query/QueryID.h>
+#include <array/Metadata.h>
+#include <array/Array.h>
+#include <util/Semaphore.h>
 #include <util/NetworkMessage.h>
 #include <util/Network.h>
 
@@ -57,6 +58,11 @@ namespace scidb
  * - you must increment this number. Notice that this will impact all the client tools (by breaking backwards compatibility).
  *
  * Revision history:
+ *
+ * NET_PROTOCOL_CURRENT_VER = 8:
+ *    Author: tigor
+ *    Date: 9/XXX/2015
+ *    Ticket: XXX
  *
  * NET_PROTOCOL_CURRENT_VER = 7:
  *    Author: james
@@ -85,7 +91,7 @@ namespace scidb
  *    Ticket: ??
  *    Note: Initial implementation dating back some time
  */
-const uint32_t NET_PROTOCOL_CURRENT_VER = 7;
+const uint32_t NET_PROTOCOL_CURRENT_VER = 8;
 
 /**
  * Messageg types
@@ -138,7 +144,7 @@ private:
     uint64_t _recordSize;                 /** < The size of structured part of message to know what buffer size we must allocate */
     uint64_t _binarySize;                 /** < The size of unstructured part of message to know what buffer size we must allocate */
     InstanceID _sourceInstanceID;         /** < The source instance number */
-    uint64_t _queryID;                    /** < Query ID */
+    QueryID _queryID;                    /** < Query ID */
 
 public:
     MessageHeader()
@@ -146,22 +152,22 @@ public:
           _messageType(0),
           _recordSize(0),
           _binarySize(0),
-          _sourceInstanceID(0),
-          _queryID(0) {}
+          _sourceInstanceID(0)
+          {}
 
     uint16_t getNetProtocolVersion() const { return _netProtocolVersion; }
     uint16_t getMessageType() const { return _messageType; }
     uint64_t getRecordSize() const { return _recordSize; }
     uint64_t getBinarySize() const { return _binarySize; }
     InstanceID getSourceInstanceID() const { return _sourceInstanceID; }
-    uint64_t getQueryID() const { return _queryID; }
+    const QueryID& getQueryID() const { return _queryID; }
 
     void setNetProtocolVersion(uint16_t v) { _netProtocolVersion = v; }
     void setRecordSize(uint64_t v) { _recordSize = v; }
     void setBinarySize(uint64_t v) { _binarySize = v; }
     void setMessageType(uint16_t v){ _messageType = v; }
     void setSourceInstanceID(InstanceID v) { _sourceInstanceID = v; }
-    void setQueryID(uint64_t v) { _queryID = v; }
+    void setQueryID(const QueryID& v) { _queryID = v; }
 
     /**
      * Convert the MessageHeader to a string optionally prefixing a
@@ -312,7 +318,7 @@ public:
         virtual ~BaseConnection();
 
         /// Connect to remote site
-        void connect(std::string address, uint16_t port);
+        void connect(std::string address, uint32_t port);
 
         virtual void disconnect();
 

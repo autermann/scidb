@@ -92,7 +92,8 @@ class StreamArray: public virtual Array
     RetryException(const char* file, const char* function, int32_t line)
     : SystemException(file, function, line, "scidb",
                       SCIDB_SE_INTERNAL, SCIDB_LE_RESOURCE_BUSY,
-                      "SCIDB_SE_INTERNAL", "SCIDB_LE_RESOURCE_BUSY", uint64_t(0))
+                      "SCIDB_SE_INTERNAL", "SCIDB_LE_RESOURCE_BUSY",
+                      INVALID_QUERY_ID)
         {
             operator<<("StreamArray::RetryException");
         }

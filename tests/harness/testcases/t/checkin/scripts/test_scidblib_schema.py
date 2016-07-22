@@ -39,7 +39,8 @@ def test_scidblib_parse_schema():
         e:string DEFAULT 'aa
         Aa',
         f:datetime DEFAULT datetime('25Nov2009:16:11:19'),
-        g:datetimetz DEFAULT datetimetz('11/25/2009 16:11:19 +10:00')
+        g:datetimetz DEFAULT datetimetz('11/25/2009 16:11:19 +10:00'),
+        h:uint16 NOT NULL
         >
         [
         d_0=1:*,?,1,
@@ -49,7 +50,7 @@ def test_scidblib_parse_schema():
     attrs,dims = SS.parse(schema1)
     # Check that the correct number of attributes and dimensions was parsed.
     print 'checking length of attributes list...'
-    assert len(attrs) == 7
+    assert len(attrs) == 8
     print 'checking length of dimensions list...'
     assert len(dims) == 2
     # Check the names of all attributes.
@@ -61,7 +62,8 @@ def test_scidblib_parse_schema():
         'd',
         'e',
         'f',
-        'g'
+        'g',
+        'h'
         ]
     assert [a.name for a in attrs] == attr_names
     # Check the types of all attributes.
@@ -73,19 +75,21 @@ def test_scidblib_parse_schema():
         'uint64',    # d
         'string',    # e
         'datetime',  # f
-        'datetimetz' # g
+        'datetimetz',# g
+        'uint16'     # h
         ]
     assert [a.type for a in attrs] == attr_types
     # Check which attributes are nullable.
     print 'checking if attributes are nullable...'
     attr_nullables = [
         True,  # a
-        False, # b
+        True,  # b
         True,  # c
-        False, # d
-        False, # e
-        False, # f
-        False  # g
+        True,  # d
+        True,  # e
+        True,  # f
+        True,  # g
+        False  # h
         ]
     assert [a.nullable for a in attrs] == attr_nullables
 
@@ -99,7 +103,8 @@ def test_scidblib_parse_schema():
         """\'aa
         Aa\'""", # e
         'datetime(\'25Nov2009:16:11:19\')', # f
-        'datetimetz(\'11/25/2009 16:11:19 +10:00\')' # g
+        'datetimetz(\'11/25/2009 16:11:19 +10:00\')', # g
+        None     # h
         ]
     assert [a.default for a in attrs] == attr_defaults
     # Check dimension names.
@@ -132,6 +137,19 @@ def test_scidblib_parse_schema():
     dim_overlaps = [1,0]
     assert [d.overlap for d in dims] == dim_overlaps
 
+    # Reparse with old nullability rules and check nullable.
+    attrs,_ = SS.parse(schema1, default_nullable=False)
+    attr_nullables = [
+        True,  # a
+        False, # b
+        True,  # c
+        False, # d
+        False, # e
+        False, # f
+        False, # g
+        False  # h
+        ]
+    assert [a.nullable for a in attrs] == attr_nullables
 
 def test_scidblib_unparse_schema():
     """Unit test for the Python schema un-parser."""
@@ -141,17 +159,19 @@ def test_scidblib_unparse_schema():
         "z4:datetime DEFAULT datetime(\'25Nov2009:16:11:19\')," + \
         "z5:datetimetz DEFAULT datetimetz(\'10/13/2008 15:10:20 +9:00\')>" + \
         "[dim1=-77:*,23,0,dim2=0:99,?,1,dim3=-100:7,?,1]"
-    attrs1,dims1 = SS.parse(schema1)
-    schema2 = SS.unparse(attrs1,dims1)
 
-    attrs2,dims2 = SS.parse(schema2)
+    # TODO: Fix for default_nullable=True, see SDB-5138.
+    attrs1,dims1 = SS.parse(schema1, default_nullable=False)
+    schema2 = SS.unparse(attrs1, dims1, default_nullable=False)
+    attrs2,dims2 = SS.parse(schema2, default_nullable=False)
+
     # Check attributes:
     print 'checking attributes...'
-    for attr1,attr2 in zip(attrs1,attrs2):
-        assert attr1.name == attr2.name
-        assert attr1.type == attr2.type
-        assert attr1.nullable == attr2.nullable
-        assert attr1.default == attr2.default
+    for i, (attr1,attr2) in enumerate(zip(attrs1,attrs2)):
+        assert attr1.name == attr2.name, "%d: %s != %s" % (i, attr1.name, attr2.name)
+        assert attr1.type == attr2.type, "%d: %s != %s" % (i, attr1.type, attr2.type)
+        assert attr1.nullable == attr2.nullable,  "%d: %s != %s" % (i, attr1.nullable, attr2.nullable)
+        assert attr1.default == attr2.default, "%d: %s != %s" % (i, attr1.default, attr2.default)
 
     # Check dimensions:
     print 'checking dimensions...'

@@ -179,7 +179,7 @@ namespace scidb
     class ListChunkDescriptorsArrayBuilder;
     class ListChunkMapArrayBuilder;
     class PersistentChunk;
-    class ChunkDescriptor;
+    struct ChunkDescriptor;
     class DataStores;
 
     /**
@@ -193,7 +193,8 @@ namespace scidb
                                      const PersistentChunk*,
                                      uint64_t,
                                      bool)>    ChunkMapVisitor;
-        typedef boost::function<void(const ChunkDescriptor&,bool)>                                      ChunkDescriptorVisitor;
+        typedef boost::function<void(const ChunkDescriptor&,bool)> ChunkDescriptorVisitor;
+        typedef std::map< ArrayID, std::pair<ArrayID, VersionID> > RollbackMap;
 
       public:
         virtual ~Storage() {}
@@ -285,7 +286,7 @@ namespace scidb
          * Rollback uncompleted updates
          * @param map of updated array which has to be rollbacked
          */
-        virtual void rollback(std::map<ArrayID,VersionID> const& undoUpdates) = 0;
+        virtual void rollback(RollbackMap const& undoUpdates) = 0;
 
         struct DiskInfo
         {
@@ -401,8 +402,6 @@ namespace scidb
          * @param chunk chunk to be deleted
          */
         virtual void deleteChunk(ArrayDesc const& desc, PersistentChunk& chunk) = 0;
-
-        virtual size_t getNumberOfInstances() const = 0;
 
         /**
          * Given an array descriptor and an address of a chunk - compute the InstanceID of the primary instance

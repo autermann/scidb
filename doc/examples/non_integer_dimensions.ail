@@ -301,14 +301,14 @@ SELECT * INTO Stock_Prices FROM Raw_Stock_Prices;
 #
 #  Q4: Show me the trades for the Symbol 'AAON'?
 #
-iquery -o lcsv+ -q "
+iquery -o csv+:l -q "
 SELECT * FROM Stock_Prices WHERE Symbol = 'AAON';
 "
 #
 #  Q6: Show me the trades for 'AAON' between '1/2/2011 8:14:9' and 
 #      '1/2/2011 8:14:12'?
 #
-iquery -o lcsv+ -q "
+iquery -o csv+:l -q "
 SELECT * 
   FROM Stock_Prices 
  WHERE Symbol = 'AAON' 
@@ -319,7 +319,7 @@ SELECT *
 #  Q7: Show me the trades for 'AAON' between '1/2/2011 8:14:9' and 
 #      '1/2/2011 8:14:12' where the Qty was more than 500? 
 #
-iquery -o lcsv+ -q "
+iquery -o csv+:l -q "
 SELECT * 
   FROM Stock_Prices 
  WHERE Symbol = 'AAON' 
@@ -331,7 +331,7 @@ SELECT *
 #  Q8: For each Symbol, what is the average price, and the number of 
 #      trades? 
 #
-iquery -o lcsv+ -q "
+iquery -o csv+:l -q "
 SELECT count(*), avg ( Price )  
   FROM Stock_Prices S 
  GROUP BY S.Symbol;
@@ -387,7 +387,7 @@ iquery -aq "
 load_library ( 'liblinear_algebra.so')
 "
 #
-iquery -o lcsv+ -naq "
+iquery -o csv+:l -naq "
 pearson (
     transpose (
         project (

@@ -112,7 +112,7 @@ while [ "$ORD" -le "$ORD_MAX_VERBOSE" ] ; do
     # 3. have a condition number better than O^2
     #
     BUILD="build(${PFX}IN, 1+c+r*${ORD})" # numbered by columns
-    #iquery -ocsv+ -aq "$BUILD"  | sort       | tee /dev/stderr
+    #iquery -ocsv+:l -aq "$BUILD"  | sort       | tee /dev/stderr
     #echo
 
     #
@@ -123,21 +123,21 @@ while [ "$ORD" -le "$ORD_MAX_VERBOSE" ] ; do
     # remove the n in -naq to see the matrix for debugging
     #
     echo "$BASE_SCRIPT_NAME: verbose U test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"   | tee /dev/stderr
-    iquery -ocsv+ -naq "store(gesvd(${BUILD}, 'U'),${PFX}LEFT)"  | sort       #| tee /dev/stderr
+    iquery -ocsv+:l -naq "store(gesvd(${BUILD}, 'U'),${PFX}LEFT)"  | sort       #| tee /dev/stderr
     echo                                                                     #| tee /dev/stderr
     echo "$BASE_SCRIPT_NAME: verbose VT test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"  | tee /dev/stderr
-    iquery -ocsv+ -naq "store(gesvd(${BUILD}, 'VT'),${PFX}RIGHT)" | sort      #| tee /dev/stderr
+    iquery -ocsv+:l -naq "store(gesvd(${BUILD}, 'VT'),${PFX}RIGHT)" | sort      #| tee /dev/stderr
     echo                                                                     #| tee /dev/stderr
     echo "$BASE_SCRIPT_NAME: verbose S test @ ${ORD} x ${ORD} csize ${CSIZE} x ${CSIZE}"   | tee /dev/stderr
-    iquery -ocsv+ -naq "store(gesvd(${BUILD}, 'S'),${PFX}VALS)"   | sort      #| tee /dev/stderr
+    iquery -ocsv+:l -naq "store(gesvd(${BUILD}, 'S'),${PFX}VALS)"   | sort      #| tee /dev/stderr
     echo                                                               #| tee /dev/stderr
 
     # convert S vector to a matrix
     ${SCRIPT_DIR}/diag.sh ${PFX}VALS ${PFX}VALSmat ${PFX}DIAG_VEC_1 ${PFX}DIAG_OUTER_PRODUCT
     #echo "$BASE_SCRIPT_NAME: ${PFX}VALSmat:" ;
-    #iquery -ocsv+ -aq "scan(${PFX}VALSmat)" | sort                          #| tee /dev/stderr
+    #iquery -ocsv+:l -aq "scan(${PFX}VALSmat)" | sort                          #| tee /dev/stderr
 
-    iquery -ocsv+ -aq "
+    iquery -ocsv+:l -aq "
      aggregate (
       apply(
        cross_join(${PFX}LEFT as C,
@@ -192,7 +192,7 @@ while [ "$ORD" -le "$ORD_MAX" ] ; do
 
     # only elapsed/real time E makes sense from iquery
     echo "aggregate(gesvd(${BUILD}, 'U'),count(*))"    | tee /dev/stderr
-    /usr/bin/time -f'%E s' iquery -ocsv+ -aq "aggregate(gesvd(${BUILD}, 'U'),count(*))"    | tee /dev/stderr
+    /usr/bin/time -f'%E s' iquery -ocsv+:l -aq "aggregate(gesvd(${BUILD}, 'U'),count(*))"    | tee /dev/stderr
     echo                                                      #| tee /dev/stderr
 
     if [ "${ORD_STEP_TYPE}" = "+" ] ; then

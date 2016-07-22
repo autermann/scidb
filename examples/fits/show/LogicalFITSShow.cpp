@@ -63,7 +63,14 @@ public:
 
         Dimensions dims(1,DimensionDesc("N", 0, 0, end, end, size, 0));
 
-        return ArrayDesc("", attrs, dims, defaultPartitioning());
+        stringstream ss;
+        ss << query->getInstanceID(); // coordinator instance
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        return ArrayDesc("", attrs, dims,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

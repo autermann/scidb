@@ -36,10 +36,9 @@
 #include "query/Query.h"
 #include "util/Semaphore.h"
 #include "util/Mutex.h"
-
+#include <network/BaseConnection.h>
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.system.resources"));
 
-using namespace boost;
 using namespace std;
 
 namespace scidb
@@ -64,7 +63,7 @@ public:
         LOG4CXX_TRACE(logger, "FileExistsResourcesCollector::collect." << " instanceId=" << instanceId
             << " exists=" << exists);
         {
-            ScopedMutexLock lock(_lock);
+            ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
             _instancesMap[instanceId] = exists;
             if (release)
                 _collectorSem.release();
@@ -72,7 +71,7 @@ public:
     }
 
     ~FileExistsResourcesCollector()  {
-        ScopedMutexLock lock(_lock);
+        ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
     }
 
     map<InstanceID, bool> _instancesMap;
@@ -90,7 +89,7 @@ void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesM
     FileExistsResourcesCollector* collector = new FileExistsResourcesCollector();
     uint64_t id = 0;
     {
-        ScopedMutexLock lock(_lock);
+        ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
         id = ++_lastResourceCollectorId;
         _resourcesCollectors[id] = collector;
 
@@ -100,7 +99,7 @@ void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesM
     std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
     std::shared_ptr<scidb_msg::ResourcesFileExistsRequest> request =
         msg->getRecord<scidb_msg::ResourcesFileExistsRequest>();
-    msg->setQueryID(0);
+    msg->setQueryID(QueryID::getFakeQueryId());
     request->set_resource_request_id(id);
     request->set_file_path(path);
     networkManager->broadcastPhysical(msg);
@@ -117,7 +116,7 @@ void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesM
         LOG4CXX_TRACE(logger, "Resources::fileExists. Waiting for result of collector " << id <<
             " interrupter by error");
         {
-            ScopedMutexLock lock(_lock);
+            ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
             delete _resourcesCollectors[id];
             _resourcesCollectors.erase(id);
         }
@@ -127,7 +126,7 @@ void Resources::fileExists(const string &path, map<InstanceID, bool> &instancesM
     LOG4CXX_TRACE(logger, "Resources::fileExists. Returning result of collector " << id);
 
     {
-        ScopedMutexLock lock(_lock);
+        ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
         instancesMap = ((FileExistsResourcesCollector*) _resourcesCollectors[id])->_instancesMap;
         delete _resourcesCollectors[id];
         _resourcesCollectors.erase(id);
@@ -150,7 +149,7 @@ bool Resources::fileExists(const string &path, InstanceID instanceId, const std:
         FileExistsResourcesCollector* collector = new FileExistsResourcesCollector();
         uint64_t id = 0;
         {
-            ScopedMutexLock lock(_lock);
+            ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
             id = ++_lastResourceCollectorId;
             _resourcesCollectors[id] = collector;
         }
@@ -158,7 +157,7 @@ bool Resources::fileExists(const string &path, InstanceID instanceId, const std:
         std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsRequest);
         std::shared_ptr<scidb_msg::ResourcesFileExistsRequest> request =
             msg->getRecord<scidb_msg::ResourcesFileExistsRequest>();
-        msg->setQueryID(0);
+        msg->setQueryID(QueryID::getFakeQueryId());
         request->set_resource_request_id(id);
         request->set_file_path(path);
         networkManager->sendPhysical(instanceId, msg);
@@ -175,7 +174,7 @@ bool Resources::fileExists(const string &path, InstanceID instanceId, const std:
             LOG4CXX_TRACE(logger, "Resources::fileExists. Waiting for result of collector " << id <<
                 " interrupter by error");
             {
-                ScopedMutexLock lock(_lock);
+                ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
                 delete _resourcesCollectors[id];
                 _resourcesCollectors.erase(id);
             }
@@ -186,7 +185,7 @@ bool Resources::fileExists(const string &path, InstanceID instanceId, const std:
 
         bool result;
         {
-            ScopedMutexLock lock(_lock);
+            ScopedMutexLock lock(_lock, PTCW_MUT_OTHER);
             result = ((FileExistsResourcesCollector*) _resourcesCollectors[id])->_instancesMap[instanceId];
             delete _resourcesCollectors[id];
             _resourcesCollectors.erase(id);
@@ -208,7 +207,7 @@ void Resources::handleFileExists(const std::shared_ptr<MessageDesc>& messageDesc
         LOG4CXX_TRACE(logger, "Checking file " << file);
 
         std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtResourcesFileExistsResponse);
-        msg->setQueryID(0);
+        msg->setQueryID(QueryID::getFakeQueryId());
 
         std::shared_ptr<scidb_msg::ResourcesFileExistsResponse> outMsgRecord =
             msg->getRecord<scidb_msg::ResourcesFileExistsResponse>();

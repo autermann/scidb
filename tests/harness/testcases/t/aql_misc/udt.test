@@ -4,7 +4,7 @@ load_library ( 'rational' )
 --aql create array rational_example_1 < N : int64 > [ I=0:9,10,0, J=0:9,10,0 ]
 
 --test
---set-format csv
+--set-format csv:l
 filter(list('types'),library='rational')
 --set-format dcsv
 attributes (rational_example_2)

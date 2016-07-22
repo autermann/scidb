@@ -70,7 +70,7 @@ static double getTimingSec()
         assert(false);
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
     }
-    return (ts.tv_sec + ts.tv_nsec*1e-9);
+    return (static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9);
 }
 
 class Timing {

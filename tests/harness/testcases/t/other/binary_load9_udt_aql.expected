@@ -1,6 +1,9 @@
 SCIDB QUERY : <load_library('point')>
 Query was executed successfully
 
+SCIDB QUERY : <load_library('rational')>
+Query was executed successfully
+
 SCIDB QUERY : <create array A <a:int32>[x=0:2,3,0]>
 Query was executed successfully
 
@@ -36,11 +39,11 @@ SCIDB QUERY : <store(apply(apply(A,b,point2str(str2point('(1,1)'))) As N1,c,str(
 
 SCIDB QUERY : <select * from show(ZZ)>
 {i} schema
-{0} 'ZZ<a:int32,b:string,c:string> [x=0:2,3,0]'
+{0} 'ZZ<a:int32,b:string NOT NULL,c:string NOT NULL> [x=0:2,3,0]'
 
 SCIDB QUERY : <select * from show(YY)>
 {i} schema
-{0} 'YY<a:int32,b:string,c:string> [x=0:2,3,0]'
+{0} 'YY<a:int32,b:string NOT NULL,c:string NOT NULL> [x=0:2,3,0]'
 
 SCIDB QUERY : <save ZZ into current instance 'zzz.txt' as 'text'>
 {x} a,b,c
@@ -101,9 +104,9 @@ SCIDB QUERY : <load Y from  current instance 'mat.dmp' as '(int32,string,string)
 
 SCIDB QUERY : <load Y from  current instance 'mat.dmp' as '(int32,string,string)' errors 100 shadow array Y_shad>
 {x} a,b,c
-{0} 1,'(1,1)','(0/1)'
-{1} 2,'(1,1)','(0/1)'
-{2} 3,'(1,1)','(0/1)'
+{0} 1,'(1,1)',null
+{1} 2,'(1,1)',null
+{2} 3,'(1,1)',null
 
 SCIDB QUERY : <load Y from current instance 'tri.dmp' as '(int32,string,string)'>
 {x} a,b,c
@@ -128,9 +131,9 @@ SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),string,skip(
 
 SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),string,skip(10))' errors 100 shadow array C_shad>
 {x} c
-{0} '(0/1)'
-{1} '(0/1)'
-{2} '(0/1)'
+{0} null
+{1} null
+{2} null
 
 SCIDB QUERY : <load C from  current instance 'tri.dmp' as '(skip(4),skip(10),string)'>
 {x} c

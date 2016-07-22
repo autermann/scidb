@@ -101,10 +101,7 @@ VERSION_PATCH=`awk -F . '{print $3}' version`
 
 if [ -d .git ]; then
     echo "Extracting revision from git."
-    REVISION=$(git svn find-rev master)
-elif [ -d .svn ]; then
-    echo "Extracting revision from svn."
-    REVISION=$(svn info|grep Revision|awk '{print $2}'|perl -p -e 's/\n//')
+    REVISION=$(git rev-list --abbrev-commit -1 HEAD)
 elif [ -f revision ]; then
     echo "Extracting revision from file."
     REVISION=$(cat revision)
@@ -137,23 +134,24 @@ if [ $target != "insource" ]; then
 
     pushd ${scidb_src_dir}
     if [ -d .git ]; then
-        echo Extracting sources from git
+        echo "Extracting sources from git."
           git archive HEAD | tar -xC "${build_src_dir}"  || die git archive
           git diff HEAD > "${build_src_dir}"/local.patch || die git diff
         pushd "${build_src_dir}"
             (git apply local.patch && rm local.patch) > /dev/null 2>&1
         popd
     elif [ -d .svn ]; then
-        echo Extracting sources from svn
+        echo "Extracting sources from svn."
         svn export --quiet --force . "${build_src_dir}" || die svn export
 	if [ -f revision ]; then
 	    cp revision "${build_src_dir}"
 	fi
     elif [ -f revision ]; then
+        echo "Extracting sources from source tree."
 	mkdir -p ${build_src_dir} || die mkdir ${build_src_dir}
 	cp -a . ${build_src_dir}  || die copy
     else
-	die "Can not extract source control revision."
+	die "Can not extract source."
     fi
     popd
 
@@ -177,7 +175,7 @@ if [ "$type" == "deb" ]; then
         $M4 ${dirSrc}/postinst_in > ${dirTgt}/${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postinst || die $M4 failed
         $M4 ${dirSrc}/postrm_in > ${dirTgt}/${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-plugins.postrm || die $M4 failed
     }
-    DSC_FILE_NAME="${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}_${VERSION_PATCH}-$REVISION.dsc"
+    DSC_FILE_NAME="${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}_${VERSION_PATCH}-1.dsc"
 
     if [ $target != "insource" ]; then
 	    deb_prepare_sources ${debian_dir} "${build_src_dir}/debian"
@@ -258,7 +256,7 @@ elif [ "$type" == "rpm" ]; then
             rpmbuild -D"_topdir ${build_dir}" -bs ./scidb.spec || die rpmbuild failed
         popd
 
-	SCIDB_SRC_RPM=${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-${VERSION_PATCH}-$REVISION.src.rpm
+	SCIDB_SRC_RPM=${PKGNAME}-${VERSION_MAJOR}.${VERSION_MINOR}-${VERSION_PATCH}-1.src.rpm
 
         if [ "$target" == "local" ]; then
             echo Building RPM locally

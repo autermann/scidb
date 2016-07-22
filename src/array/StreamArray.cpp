@@ -465,6 +465,8 @@ MultiStreamArray::nextChunk(AttributeID attId, MemChunk& chunk)
             getNextStreamPositions(readyPos, notReadyPos, currPartialStreams, attId);
             // XXX TODO: this amounts to busy-polling of the stream generating extra network traffic etc.
             // we should probably just back-off for a few mils ...
+            const uint64_t oneMilSec = 1*1000*1000;
+            Thread::nanoSleep(oneMilSec);
         } else {
             break;
         }
@@ -699,7 +701,10 @@ SinglePassArray::getConstIterator(AttributeID attId) const
     // to avoid unnecessary exceptions
     // (in case when getConstIterator(aid) are not called for all attributes before iteration)
     Exception::Pointer err;
-    for (AttributeID a=0, n=_iterators.size(); a<n; ++a) {
+    for (AttributeID a=0, n=safe_static_cast<AttributeID>(_iterators.size());
+         a<n;
+         ++a)
+    {
         try {
             if (!_iterators[a]) {
                 StreamArray* self = const_cast<StreamArray*>(static_cast<const StreamArray*>(this));
@@ -771,7 +776,7 @@ SinglePassArray::nextChunk(AttributeID attId, MemChunk& chunk)
         // run through the rest of the attributes discarding empty chunks
         for (size_t a=0; a < nAttrs; ++a) {
             if (a==attId) { continue; }
-            ConstChunk const* result = nextChunk(a, chunk);
+            ConstChunk const* result = nextChunk(safe_static_cast<AttributeID>(a), chunk);
             ASSERT_EXCEPTION((!hasValues(result)), funcName);
             assert(getCurrentRowIndex() == _rowIndexPerAttribute[a]);
         }

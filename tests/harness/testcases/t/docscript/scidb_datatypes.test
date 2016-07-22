@@ -8,14 +8,14 @@ create array datetime1 <dt:datetime>[i=0:*,100,0]
 create array datetime2 <dtz:datetimetz>[i=0:*,100,0]  
 --shell --store --command="cat $DOC_DATA/dateformats.scidb "
 --shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(datetime1,'${TEST_DATA_DIR}/doc/dateformats.scidb')""
---set-format csv+
+--set-format csv+:l
 --stop-igdata
 scan(datetime1) 
 --shell --store --command="cat $DOC_DATA/dateformatsTZ.scidb "
 --set-format dcsv
 --start-igdata
 --shell --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(datetime2,'${TEST_DATA_DIR}/doc/dateformatsTZ.scidb')""
---set-format csv+
+--set-format csv+:l
 --stop-igdata
 scan(datetime2) 
 --set-format dense

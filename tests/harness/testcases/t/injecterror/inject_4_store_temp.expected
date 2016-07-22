@@ -322,21 +322,17 @@ SCIDB QUERY : <store (build (ARRAY3,-I), ARRAY3)>
 {99} -99
 {100} -100
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=0),count(*))>
-{i} count
-{0} 26
+SCIDB QUERY : <aggregate(ARRAY1, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 5050,0,100
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=1),count(*))>
-{i} count
-{0} 25
+SCIDB QUERY : <aggregate(ARRAY2, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} -5050,-100,0
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=2),count(*))>
-{i} count
-{0} 25
-
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=3),count(*))>
-{i} count
-{0} 25
+SCIDB QUERY : <aggregate(ARRAY3, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} -5050,-100,0
 
 SCIDB QUERY : <apply(ARRAY1,zz,injectError(0, 4))>
 {I} v,zz
@@ -449,108 +445,108 @@ SCIDB QUERY : <aggregate(filter(apply(join(ARRAY1,ARRAY2),attrSum,ARRAY1.v + ARR
 {i} count
 {0} 0
 
-SCIDB QUERY : <apply(ARRAY1,zz,injectError(3, 4))>
+SCIDB QUERY : <apply(ARRAY1,zz,injectError(1, 4))>
 {I} v,zz
 {0} 0,-1
-{1} 1,-1
+{1} 1,4
 {2} 2,-1
-{3} 3,4
+{3} 3,-1
 {4} 4,-1
-{5} 5,-1
+{5} 5,4
 {6} 6,-1
-{7} 7,4
+{7} 7,-1
 {8} 8,-1
-{9} 9,-1
+{9} 9,4
 {10} 10,-1
-{11} 11,4
+{11} 11,-1
 {12} 12,-1
-{13} 13,-1
+{13} 13,4
 {14} 14,-1
-{15} 15,4
+{15} 15,-1
 {16} 16,-1
-{17} 17,-1
+{17} 17,4
 {18} 18,-1
-{19} 19,4
+{19} 19,-1
 {20} 20,-1
-{21} 21,-1
+{21} 21,4
 {22} 22,-1
-{23} 23,4
+{23} 23,-1
 {24} 24,-1
-{25} 25,-1
+{25} 25,4
 {26} 26,-1
-{27} 27,4
+{27} 27,-1
 {28} 28,-1
-{29} 29,-1
+{29} 29,4
 {30} 30,-1
-{31} 31,4
+{31} 31,-1
 {32} 32,-1
-{33} 33,-1
+{33} 33,4
 {34} 34,-1
-{35} 35,4
+{35} 35,-1
 {36} 36,-1
-{37} 37,-1
+{37} 37,4
 {38} 38,-1
-{39} 39,4
+{39} 39,-1
 {40} 40,-1
-{41} 41,-1
+{41} 41,4
 {42} 42,-1
-{43} 43,4
+{43} 43,-1
 {44} 44,-1
-{45} 45,-1
+{45} 45,4
 {46} 46,-1
-{47} 47,4
+{47} 47,-1
 {48} 48,-1
-{49} 49,-1
+{49} 49,4
 {50} 50,-1
-{51} 51,4
+{51} 51,-1
 {52} 52,-1
-{53} 53,-1
+{53} 53,4
 {54} 54,-1
-{55} 55,4
+{55} 55,-1
 {56} 56,-1
-{57} 57,-1
+{57} 57,4
 {58} 58,-1
-{59} 59,4
+{59} 59,-1
 {60} 60,-1
-{61} 61,-1
+{61} 61,4
 {62} 62,-1
-{63} 63,4
+{63} 63,-1
 {64} 64,-1
-{65} 65,-1
+{65} 65,4
 {66} 66,-1
-{67} 67,4
+{67} 67,-1
 {68} 68,-1
-{69} 69,-1
+{69} 69,4
 {70} 70,-1
-{71} 71,4
+{71} 71,-1
 {72} 72,-1
-{73} 73,-1
+{73} 73,4
 {74} 74,-1
-{75} 75,4
+{75} 75,-1
 {76} 76,-1
-{77} 77,-1
+{77} 77,4
 {78} 78,-1
-{79} 79,4
+{79} 79,-1
 {80} 80,-1
-{81} 81,-1
+{81} 81,4
 {82} 82,-1
-{83} 83,4
+{83} 83,-1
 {84} 84,-1
-{85} 85,-1
+{85} 85,4
 {86} 86,-1
-{87} 87,4
+{87} 87,-1
 {88} 88,-1
-{89} 89,-1
+{89} 89,4
 {90} 90,-1
-{91} 91,4
+{91} 91,-1
 {92} 92,-1
-{93} 93,-1
+{93} 93,4
 {94} 94,-1
-{95} 95,4
+{95} 95,-1
 {96} 96,-1
-{97} 97,-1
+{97} 97,4
 {98} 98,-1
-{99} 99,4
+{99} 99,-1
 {100} 100,-1
 
 SCIDB QUERY : <store(ARRAY3,ARRAY1)>
@@ -559,6 +555,18 @@ SCIDB QUERY : <store(ARRAY3,ARRAY1)>
 SCIDB QUERY : <aggregate(filter(apply(join(ARRAY1,ARRAY2),attrSum,ARRAY1.v + ARRAY2.v), attrSum<>0),count(*))>
 {i} count
 {0} 0
+
+SCIDB QUERY : <aggregate(ARRAY1, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 5050,0,100
+
+SCIDB QUERY : <aggregate(ARRAY2, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} -5050,-100,0
+
+SCIDB QUERY : <aggregate(ARRAY3, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} -5050,-100,0
 
 SCIDB QUERY : <remove(ARRAY1)>
 Query was executed successfully

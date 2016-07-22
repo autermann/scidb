@@ -1,4 +1,4 @@
-Source: scidb-15.3-mpich2
+Source: scidb-15.12-mpich2
 Section: devel
 Priority: extra
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
@@ -9,10 +9,10 @@ Homepage: http://www.mcs.anl.gov/research/projects/mpich2/
 Vcs-Browser: http://git.debian.org/?p=debian-science/packages/mpich2.git;a=summary
 Vcs-Git: git://git.debian.org/debian-science/packages/mpich2.git
 
-Package: scidb-15.3-mpich2
+Package: scidb-15.12-mpich2
 Architecture: any
-Depends: scidb-15.3-libmpich2-1.2 (= ${binary:Version}), ${python:Depends}, ${shlibs:Depends}, ${misc:Depends}
-Recommends: scidb-15.3-libmpich2-dev (= ${binary:Version})
+Depends: scidb-15.12-libmpich2-1.2 (= ${binary:Version}), ${python:Depends}, ${shlibs:Depends}, ${misc:Depends}
+Recommends: scidb-15.12-libmpich2-dev (= ${binary:Version})
 Conflicts: mpd
 Description: Implementation of the MPI Message Passing Interface standard
  MPICH2 is a high-performance and widely portable implementation of the
@@ -23,7 +23,7 @@ Description: Implementation of the MPI Message Passing Interface standard
  .
  This package includes the program binaries necessary to run MPICH2 programs.
 
-Package: scidb-15.3-libmpich2-1.2
+Package: scidb-15.12-libmpich2-1.2
 Architecture: any
 Section: libs
 Depends: ${shlibs:Depends}, ${misc:Depends}
@@ -36,11 +36,11 @@ Description: Shared libraries for MPICH2
  .
  This package includes the MPICH2 shared libraries.
 
-Package: scidb-15.3-libmpich2-dev
+Package: scidb-15.12-libmpich2-dev
 Architecture: any
 Section: libdevel
-Depends: scidb-15.3-libmpich2-1.2 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Recommends: scidb-15.3-mpich2 (= ${binary:Version})
+Depends: scidb-15.12-libmpich2-1.2 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Recommends: scidb-15.12-mpich2 (= ${binary:Version})
 Description: Development files for MPICH2
  MPICH2 is a high-performance and widely portable implementation of the
  Message Passing Interface (MPI) standard (both MPI-1 and MPI-2). It

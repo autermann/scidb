@@ -14,7 +14,7 @@ SCIDB QUERY : <store(build(foo, 1.0/i), foo)>
 {9} 0.111111
 {10} 0.1
 
-SCIDB QUERY : <iquery -olcsv+ -aq 'scan(foo)'>
+SCIDB QUERY : <iquery -ocsv+:l -aq 'scan(foo)'>
 i,x
 1,1
 2,0.5
@@ -27,7 +27,7 @@ i,x
 9,0.111111
 10,0.1
 
-SCIDB QUERY : <iquery -olcsv+ -w 10 -aq 'scan(foo)'>
+SCIDB QUERY : <iquery -ocsv+:l -w 10 -aq 'scan(foo)'>
 i,x
 1,1
 2,0.5

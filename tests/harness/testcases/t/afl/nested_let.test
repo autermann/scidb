@@ -5,7 +5,7 @@ store(build(A,i),A)
 
 --test
 
---set-format csv
+--set-format csv:l
 --start-query-logging
 
 # let bindings - currently undocumented

@@ -7,15 +7,15 @@ SCIDB QUERY : <show('select * from A')>
 
 SCIDB QUERY : <show('select sum(a) from A')>
 {i} schema
-{0} 'not empty A<sum:string NULL DEFAULT null> [i=0:0,1,0]'
+{0} 'not empty A<sum:string> [i=0:0,1,0]'
 
 SCIDB QUERY : <show('select sum(a) from A', 'aql')>
 {i} schema
-{0} 'not empty A<sum:string NULL DEFAULT null> [i=0:0,1,0]'
+{0} 'not empty A<sum:string> [i=0:0,1,0]'
 
 SCIDB QUERY : <show('select sum(a) from A', 'AQL')>
 {i} schema
-{0} 'not empty A<sum:string NULL DEFAULT null> [i=0:0,1,0]'
+{0} 'not empty A<sum:string> [i=0:0,1,0]'
 
 SCIDB QUERY : <show('scan(A)', 'afl')>
 {i} schema

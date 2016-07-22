@@ -165,6 +165,8 @@ namespace scidb {
         std::vector<LookAheadChunks> _lookahead;
         /// true if a data integrity issue has been found
         bool _hasDataIntegrityIssue;
+        ArrayDistPtr _preferredDist;
+        ArrayDistPtr preferredDistributionForParallelLoad();
     };
 
     inline MemChunk&
@@ -198,6 +200,55 @@ namespace scidb {
         Where                   _where;
         Value                   _coordVal;
         Scanner                 _scanner;
+    };
+
+    class OpaqueMetadataLoaderCompat
+    {
+    public:
+        OpaqueMetadataLoaderCompat(uint32_t version)
+        {
+            if (version != 1) {
+                stringstream ss;
+                ss << "Unable to parse opaque chunk metadata: incompatible version "
+                   << version;
+                ASSERT_EXCEPTION_FALSE(ss.str());
+            }
+        }
+
+        template<class Archive>
+        void serialize(Archive& ar,unsigned version)
+        {
+            ArrayID arrId=INVALID_ARRAY_ID;
+            ArrayID uAId=INVALID_ARRAY_ID;
+            VersionID versionId=INVALID_ARRAY_ID;
+            std::string name;
+            Attributes attributes;
+            Dimensions dimensions;
+            int32_t flags;
+            PartitioningSchema ps;
+            if (Archive::is_loading::value)
+            {
+                ar & arrId;
+                ar & uAId;
+                ar & versionId;
+                ar & name;
+                ar & attributes;
+                ar & dimensions;
+                ar & flags;
+                ar & ps;
+
+            } else {
+                ASSERT_EXCEPTION_FALSE("OpaqueMetadataLoaderCompat cannot be used for serialization");
+            }
+            _arrayDesc.setName(name);
+            _arrayDesc.setDimensions(dimensions);
+            _arrayDesc.setAttributes(attributes);
+        }
+
+        const ArrayDesc& getArrayDesc() { return _arrayDesc; }
+
+    private:
+        ArrayDesc  _arrayDesc;
     };
 
     class OpaqueChunkLoader : public ChunkLoader

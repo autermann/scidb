@@ -43,7 +43,15 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.netw
 
 #ifndef SCIDB_CLIENT
 
-std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, QueryID queryID)
+std::shared_ptr<MessageDesc> makeErrorMessageFromExceptionForClient(const Exception& e,
+                                                                    QueryID queryID)
+{
+    return makeErrorMessageFromException(e, queryID, true);
+}
+
+std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e,
+                                                           QueryID queryID,
+                                                           bool forClient)
 {
     std::shared_ptr<MessageDesc> errorMessage = std::make_shared<MessageDesc>(mtError);
     std::shared_ptr<scidb_msg::Error> errorRecord = errorMessage->getRecord<scidb_msg::Error>();
@@ -59,7 +67,11 @@ std::shared_ptr<MessageDesc> makeErrorMessageFromException(const Exception& e, Q
     errorRecord->set_long_error_code(e.getLongErrorCode());
     errorRecord->set_stringified_short_error_code(e.getStringifiedShortErrorCode());
     errorRecord->set_stringified_long_error_code(e.getStringifiedLongErrorCode());
-    errorRecord->set_what_str(e.getWhatStr());
+    if (forClient) {
+        errorRecord->set_what_str(e.getWhatStr());
+    } else {
+        errorRecord->set_what_str(e.getErrorMessage());
+    }
 
     if (dynamic_cast<const SystemException*>(&e) != NULL)
     {
@@ -175,13 +187,13 @@ bool parseQueryLiveness(std::shared_ptr<InstanceLiveness>& queryLiveness,
    assert(ppMsg);
    assert(ppMsg->IsInitialized());
 
-   if (!ppMsg->has_view_id()) {
+   if (!ppMsg->has_membership_id()) {
       assert(false);
       return false;
    }
 
    queryLiveness =
-   std::shared_ptr<scidb::InstanceLiveness>(new scidb::InstanceLiveness(ppMsg->view_id(), 0));
+   std::shared_ptr<scidb::InstanceLiveness>(new scidb::InstanceLiveness(ppMsg->membership_id(), 0));
 
    if (!ppMsg->has_dead_list()) {
       assert(false);
@@ -216,7 +228,7 @@ bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLivene
    assert(ppMsg);
    assert(queryLiveness);
 
-   ppMsg->set_view_id(queryLiveness->getViewId());
+   ppMsg->set_membership_id(queryLiveness->getMembershipId());
 
    const InstanceLiveness::DeadInstances& deadInstances = queryLiveness->getDeadInstances();
    scidb_msg::PhysicalPlan_InstanceList* deadList = ppMsg->mutable_dead_list();
@@ -224,8 +236,8 @@ bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLivene
 
    for ( InstanceLiveness::DeadInstances::const_iterator iter = deadInstances.begin();
         iter != deadInstances.end(); ++iter) {
-      google::protobuf::uint64 id = (*iter)->getInstanceId();
-      google::protobuf::uint64 genId = (*iter)->getGenerationId();
+      google::protobuf::uint64 id = iter->getInstanceId();
+      google::protobuf::uint64 genId = iter->getGenerationId();
       scidb_msg::PhysicalPlan_InstanceListEntry* instanceEntry = deadList->add_instance_entry();
       assert(instanceEntry);
       instanceEntry->set_instance_id(id);
@@ -239,8 +251,8 @@ bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLivene
 
    for ( InstanceLiveness::LiveInstances::const_iterator iter = liveInstances.begin();
         iter != liveInstances.end(); ++iter) {
-      google::protobuf::uint64 id = (*iter)->getInstanceId();
-      google::protobuf::uint64 genId = (*iter)->getGenerationId();
+      google::protobuf::uint64 id = iter->getInstanceId();
+      google::protobuf::uint64 genId = iter->getGenerationId();
       scidb_msg::PhysicalPlan_InstanceListEntry* instanceEntry = liveList->add_instance_entry();
       assert(instanceEntry);
       instanceEntry->set_instance_id(id);
@@ -251,28 +263,36 @@ bool serializeQueryLiveness(std::shared_ptr<const InstanceLiveness>& queryLivene
 
 #endif //SCIDB_CLIENT
 
-std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<MessageDesc> &msg)
+std::shared_ptr<Exception> makeExceptionFromErrorMessageOnClient(const std::shared_ptr<MessageDesc> &msg)
+{
+    return makeExceptionFromErrorMessage(msg, true);
+}
+
+std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<MessageDesc> &msg,
+                                                         bool forClient)
 {
     std::shared_ptr<scidb_msg::Error> errorRecord = msg->getRecord<scidb_msg::Error>();
 
     assert(SCIDB_E_NO_ERROR != errorRecord->short_error_code());
-
+    std::shared_ptr<Exception> result;
     switch (errorRecord->type())
     {
         case 1:
-            return std::shared_ptr<Exception>(new SystemException(errorRecord->file().c_str(), errorRecord->function().c_str(),
+                result = std::make_shared<SystemException>(errorRecord->file().c_str(), errorRecord->function().c_str(),
                 errorRecord->line(), errorRecord->errors_namespace().c_str(), errorRecord->short_error_code(),
                 errorRecord->long_error_code(),  errorRecord->what_str().c_str(),
                 errorRecord->stringified_short_error_code().c_str(), errorRecord->stringified_long_error_code().c_str(),
-                msg->getQueryID()));
+                msg->getQueryID());
+                break;
         case 2:
-            return std::shared_ptr<Exception>(new UserException(errorRecord->file().c_str(), errorRecord->function().c_str(),
+                result = std::make_shared<UserException>(errorRecord->file().c_str(), errorRecord->function().c_str(),
                 errorRecord->line(), errorRecord->errors_namespace().c_str(), errorRecord->short_error_code(),
                 errorRecord->long_error_code(),  errorRecord->what_str().c_str(),
                 errorRecord->stringified_short_error_code().c_str(), errorRecord->stringified_long_error_code().c_str(),
-                msg->getQueryID()));
+                msg->getQueryID());
+                break;
         case 3:
-            return std::shared_ptr<Exception>(new UserQueryException(errorRecord->file().c_str(), errorRecord->function().c_str(),
+                result = std::make_shared<UserQueryException>(errorRecord->file().c_str(), errorRecord->function().c_str(),
                 errorRecord->line(), errorRecord->errors_namespace().c_str(), errorRecord->short_error_code(),
                 errorRecord->long_error_code(),  errorRecord->what_str().c_str(),
                 errorRecord->stringified_short_error_code().c_str(), errorRecord->stringified_long_error_code().c_str(),
@@ -282,7 +302,8 @@ std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<M
                         errorRecord->parsing_context().line_end(),
                         errorRecord->parsing_context().col_end()
                 ),
-                msg->getQueryID()));
+                msg->getQueryID());
+                break;
         default:
         {
             assert(0);
@@ -291,12 +312,15 @@ std::shared_ptr<Exception> makeExceptionFromErrorMessage(const std::shared_ptr<M
             throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_INVALID_MESSAGE_FORMAT)  << messageType;
         }
     }
-    return std::shared_ptr<Exception>();
+    if (forClient) {
+        result->setWhatStr(errorRecord->what_str());
+    }
+    return result;
 }
 
-void makeExceptionFromErrorMessageAndThrow(const std::shared_ptr<MessageDesc> &msg)
+void makeExceptionFromErrorMessageAndThrowOnClient(const std::shared_ptr<MessageDesc> &msg)
 {
-    makeExceptionFromErrorMessage(msg)->raise();
+    makeExceptionFromErrorMessageOnClient(msg)->raise();
 }
 
 } // namespace

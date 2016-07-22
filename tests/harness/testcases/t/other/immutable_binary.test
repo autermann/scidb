@@ -28,7 +28,7 @@ scan(Dsp:s)
 scan(Dsp:s)
 scan(Dsp2)
 
---set-format lcsv+
+--set-format csv+:l
 scan(Dsp)
 --reset-format
 

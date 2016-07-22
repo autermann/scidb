@@ -26,6 +26,8 @@
  *
  * @brief NetworkManager class implementation.
  */
+#include "NetworkManager.h"
+
 #include <sys/types.h>
 #include <signal.h>
 #include <boost/bind.hpp>
@@ -34,7 +36,6 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/descriptor.h>
 
-#include "network/NetworkManager.h"
 #include "system/SystemCatalog.h"
 #include "system/Exceptions.h"
 #include "network/MessageHandleJob.h"
@@ -62,19 +63,20 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.netw
  */
 volatile bool NetworkManager::_shutdown=false;
 
-NetworkManager::NetworkManager():
-        _acceptor(_ioService, boost::asio::ip::tcp::endpoint(
-                boost::asio::ip::tcp::v4(),
-                Config::getInstance()->getOption<int>(CONFIG_PORT))),
+NetworkManager::NetworkManager()
+    : _acceptor(_ioService,
+                boost::asio::ip::tcp::endpoint(
+                    boost::asio::ip::tcp::v4(),
+                    safe_static_cast<uint16_t>(
+                        Config::getInstance()->getOption<int>(CONFIG_PORT)))),
         _input(_ioService),
         _aliveTimer(_ioService),
         _aliveTimeout(DEFAULT_ALIVE_TIMEOUT_MICRO),
         _selfInstanceID(INVALID_INSTANCE),
-        _instances(new Instances),
         _repMessageCount(0),
         _maxRepSendQSize(Config::getInstance()->getOption<int>(CONFIG_REPLICATION_SEND_QUEUE_SIZE)),
         _maxRepReceiveQSize(Config::getInstance()->getOption<int>(CONFIG_REPLICATION_RECEIVE_QUEUE_SIZE)),
-        _randInstanceId(0),
+        _randInstanceIndx(0),
         _aliveRequestCount(0),
         _memUsage(0),
         _msgHandlerFactory(new DefaultNetworkMessageFactory)
@@ -107,7 +109,7 @@ void NetworkManager::run(std::shared_ptr<JobQueue> jobQueue)
     }
     boost::asio::ip::tcp::endpoint endPoint = _acceptor.local_endpoint();
     const string address = cfg->getOption<string>(CONFIG_INTERFACE);
-    const unsigned short port = endPoint.port();
+    const uint16_t port = endPoint.port();
 
     const bool registerInstance = cfg->getOption<bool>(CONFIG_REGISTER);
 
@@ -122,11 +124,44 @@ void NetworkManager::run(std::shared_ptr<JobQueue> jobQueue)
         if (_selfInstanceID != INVALID_INSTANCE) {
             throw USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_STORAGE_ALREADY_REGISTERED) << _selfInstanceID;
         }
+
+        // storageConfigDir should be of the form <base-dir>/<server-id>/<server-instance-id>
         string storageConfigDir = scidb::getDir(storageConfigPath);
         if (!isFullyQualified(storageConfigDir)) {
             throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NON_FQ_PATH_ERROR) << storageConfigPath);
         }
-        _selfInstanceID = catalog->addInstance(InstanceDesc(address, port, storageConfigDir));
+
+        stringstream ss;
+        uint32_t sid(~0);
+        uint32_t siid(~0);
+
+        string serverInstanceId = scidb::getFile(storageConfigDir);
+        ss.str(serverInstanceId);
+        if (serverInstanceId.empty() || !(ss >> siid) || !ss.eof()) {
+            throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_INSTANCE_PATH_FORMAT_ERROR) << storageConfigPath);
+        }
+
+        string serverInstanceIdDir = scidb::getDir(storageConfigDir);
+        if (serverInstanceIdDir.empty() || serverInstanceIdDir=="." || serverInstanceIdDir=="/") {
+            throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_INSTANCE_PATH_FORMAT_ERROR) << storageConfigPath);
+        }
+        string serverId = scidb::getFile(serverInstanceIdDir);
+        ss.clear();
+        ss.str(serverId);
+        if (serverId.empty() || !(ss >> sid) || !ss.eof()) {
+            throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_INSTANCE_PATH_FORMAT_ERROR) << storageConfigPath);
+        }
+
+        string basePath = scidb::getDir(serverInstanceIdDir);
+        if (serverInstanceIdDir.empty() || serverInstanceIdDir=="." || serverInstanceIdDir=="/") {
+            throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_INSTANCE_PATH_FORMAT_ERROR) << storageConfigPath);
+        }
+
+        LOG4CXX_DEBUG(logger, "server-id = " << sid);
+        LOG4CXX_DEBUG(logger, "server-instance-id = " << siid);
+
+        const string online = cfg->getOption<string>(CONFIG_ONLINE);
+        _selfInstanceID = catalog->addInstance(InstanceDesc(address, port, basePath, sid, siid), online);
 
         StorageManager::getInstance().setInstanceId(_selfInstanceID);
         LOG4CXX_DEBUG(logger, "Registered instance # " << _selfInstanceID);
@@ -138,7 +173,6 @@ void NetworkManager::run(std::shared_ptr<JobQueue> jobQueue)
         if (cfg->getOption<size_t>(CONFIG_REDUNDANCY) >= SystemCatalog::getInstance()->getNumberOfInstances()) {
             throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_INVALID_REDUNDANCY);
         }
-        catalog->markInstanceOnline(_selfInstanceID, address, port);
     }
     _jobQueue = jobQueue;
 
@@ -168,15 +202,6 @@ void NetworkManager::run(std::shared_ptr<JobQueue> jobQueue)
 
     // main loop
     _ioService.run();
-
-    try
-    {
-        SystemCatalog::getInstance()->markInstanceOffline(_selfInstanceID);
-    }
-    catch(const Exception &e)
-    {
-        LOG4CXX_ERROR(logger, "Marking instance offline failed:\n" << e.what());
-    }
 }
 
 void NetworkManager::handleShutdown()
@@ -244,16 +269,18 @@ void NetworkManager::handleAccept(std::shared_ptr<Connection>& newConnection,
     }
     if (!error)
     {
+        // XXX TODO: we need to provide bookkeeping to reap stale incoming connections
         LOG4CXX_DEBUG(logger, "Waiting for the first message");
         newConnection->start();
         startAccept();
     }
     else
     {
-        stringstream s;
-        s << "Error # " << error.value() << " : " << error.message() << " when accepting connection";
-        LOG4CXX_ERROR(logger, s.str());
-        throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_CANT_ACCEPT_CONNECTION) << error.value() << error.message();
+        LOG4CXX_ERROR(logger, "Error # " << error.value()
+                      << " : " << error.message()
+                      << " when accepting connection");
+        throw SYSTEM_EXCEPTION(SCIDB_SE_NETWORK, SCIDB_LE_CANT_ACCEPT_CONNECTION)
+              << error.value() << error.message();
     }
 }
 
@@ -296,7 +323,7 @@ void NetworkManager::handleMessage(std::shared_ptr< Connection >& connection,
    }
    catch (const Exception& e)
    {
-      // It's possible to continue of message handling for other queries so we just logging error message.
+      // It's possible to continue message handling for other queries so we just log an error message.
       InstanceID instanceId = messageDesc->getSourceInstanceID();
       MessageType messageType = static_cast<MessageType>(messageDesc->getMessageType());
       QueryID queryId = messageDesc->getQueryID();
@@ -311,15 +338,13 @@ void NetworkManager::handleMessage(std::shared_ptr< Connection >& connection,
       if (messageType != mtError
           && messageType != mtCancelQuery
           && messageType != mtAbort
-          && queryId != 0
-          && queryId != INVALID_QUERY_ID
+          && queryId.isValid()
           && instanceId != INVALID_INSTANCE
           && instanceId != _selfInstanceID
-          && instanceId != CLIENT_INSTANCE
-          && instanceId < _instances->size())
+          && instanceId != CLIENT_INSTANCE)
        {
           std::shared_ptr<MessageDesc> errorMessage = makeErrorMessageFromException(e, queryId);
-          _sendPhysical(instanceId, errorMessage);
+          _sendPhysical(instanceId, errorMessage); // if possible
           LOG4CXX_DEBUG(logger, "Error returned to sender")
        }
    }
@@ -335,7 +360,7 @@ void NetworkManager::handleControlMessage(const std::shared_ptr<MessageDesc>& ms
     if (instanceId == CLIENT_INSTANCE) {
         return;
     }
-    //XXX TODO: change asserts to connection->close()
+    //XXX TODO: convert assert()s to connection->close()
     if(!record->has_local_gen_id()) {
         assert(false);
         return;
@@ -419,7 +444,8 @@ uint64_t NetworkManager::getAvailable(MessageQueueType mqt, InstanceID forInstan
 }
 
 uint64_t NetworkManager::getAvailableRepSlots()
-{ // mutex must be locked
+{
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
 
     const uint64_t messageCount = _repMessageCount;
     const uint64_t maxReceiveQSize = _maxRepReceiveQSize;
@@ -438,20 +464,21 @@ uint64_t NetworkManager::getAvailableRepSlots()
 
 bool NetworkManager::isBufferSpaceLow()
 {
-    // mutex must be locked
-    getInstances(false);
-    const uint64_t numInst = _instances->size();
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
+    fetchInstances();
+    const uint64_t numInst = _instanceMembership->getNumInstances();
     const uint64_t availableSlots = getAvailableRepSlots();
     return (availableSlots < numInst);
 }
 
 uint64_t NetworkManager::_getAvailable(MessageQueueType mqt, InstanceID forInstanceID)
-{ // mutex must be locked
+{
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
 
     assert(mqt==mqtReplication);
 
-    getInstances(false);
-    const uint64_t numInst = _instances->size();
+    fetchInstances();
+    const uint64_t numInst = _instanceMembership->getNumInstances();
 
     const uint64_t availableSlots = getAvailableRepSlots();
     uint64_t available = 0;
@@ -469,10 +496,19 @@ uint64_t NetworkManager::_getAvailable(MessageQueueType mqt, InstanceID forInsta
             // a control message typically is broadcast resulting in #instances requests at once.
             // Empiracally, it seems to work as expected. If an overflow does occur, the query will abort.
             if ((_aliveRequestCount++ % numInst) == 0) {
-                _randInstanceId  = uint64_t(Query::getRandom()) % numInst;
+                _randInstanceIndx  = uint64_t(Query::getRandom()) % numInst;
             }
-            const uint64_t distLeft  = _randInstanceId > forInstanceID ?
-            _randInstanceId - forInstanceID : forInstanceID - _randInstanceId;
+            uint64_t forInstanceIndx(0);
+            try {
+                forInstanceIndx = _instanceMembership->getIndex(forInstanceID);
+            } catch (scidb::InstanceMembership::NotFoundException& e) {
+                LOG4CXX_WARN(logger, "Available queue size=" << available
+                             << " for queue "<< mqt
+                             << " for non-existent instanceID="<<forInstanceID);
+                return available;
+            }
+            const uint64_t distLeft  = _randInstanceIndx > forInstanceIndx ?
+                                       _randInstanceIndx - forInstanceIndx : forInstanceIndx - _randInstanceIndx;
             const uint64_t distRight = numInst - distLeft;
             if ( distLeft <= availableSlots/2 ||
                  distRight < availableSlots/2 ) {
@@ -533,6 +569,35 @@ void NetworkManager::unregisterMessage(const std::shared_ptr<MessageDesc>& messa
     scheduleAliveNoLater(CONTROL_MSG_TIMEOUT_MICRO);
 }
 
+/// internal
+uint64_t
+NetworkManager::getSendQueueLimit(MessageQueueType mqt)
+{
+    // mqtRplication is the only supported type for now
+    if (mqt == mqtReplication) {
+        ScopedMutexLock mutexLock(_mutex);
+        fetchInstances();
+        SCIDB_ASSERT(_instanceMembership->getNumInstances()>0);
+        return (_maxRepSendQSize / _instanceMembership->getNumInstances());
+    }
+    SCIDB_ASSERT(mqt==mqtNone);
+    return MAX_QUEUE_SIZE;
+}
+
+uint64_t
+NetworkManager::getReceiveQueueHint(MessageQueueType mqt)
+{
+    // mqtRplication is the only supported type for now
+    if (mqt == mqtReplication) {
+        ScopedMutexLock mutexLock(_mutex);
+        fetchInstances();
+        SCIDB_ASSERT(_instanceMembership->getNumInstances()>0);
+        return (_maxRepReceiveQSize / _instanceMembership->getNumInstances());
+    }
+    SCIDB_ASSERT(mqt==mqtNone);
+    return MAX_QUEUE_SIZE;
+}
+
 void
 NetworkManager::scheduleAliveNoLater(const time_t timeoutMicro)
 {
@@ -572,6 +637,8 @@ void NetworkManager::dispatchMessageToListener(const std::shared_ptr<Connection>
                                                NetworkMessageFactory::MessageHandler& handler)
 {
     // no locks must be held
+    SCIDB_ASSERT(!_mutex.isLockedByThisThread());
+
     std::shared_ptr<MessageDescription> msgDesc;
 
     if (messageDesc->getSourceInstanceID() == CLIENT_INSTANCE) {
@@ -609,18 +676,30 @@ NetworkManager::_sendPhysical(InstanceID targetInstanceID,
 
     assert(_selfInstanceID != INVALID_INSTANCE);
     assert(targetInstanceID != _selfInstanceID);
-    assert(targetInstanceID < _instances->size());
 
     // Opening connection if it's not opened yet
     std::shared_ptr<Connection> connection = _outConnections[targetInstanceID];
     if (!connection)
     {
-        getInstances(false);
-        connection = std::shared_ptr<Connection>(new Connection(*this, _selfInstanceID, targetInstanceID));
-        assert((*_instances)[targetInstanceID].getInstanceId() == targetInstanceID);
-        _outConnections[targetInstanceID] = connection;
-        connection->connectAsync((*_instances)[targetInstanceID].getHost(), (*_instances)[targetInstanceID].getPort());
+        fetchInstances();
+        try {
+            const InstanceDesc& instanceDesc = _instanceMembership->getConfig(targetInstanceID);
+            connection = std::make_shared<Connection>(*this, _selfInstanceID, targetInstanceID);
+            _outConnections[targetInstanceID] = connection;
+            connection->connectAsync(instanceDesc.getHost(), instanceDesc.getPort());
+        } catch (const scidb::InstanceMembership::NotFoundException& e) {
+            if (isDebug()) {
+                std::shared_ptr<Query> query(Query::getQueryByID(messageDesc->getQueryID(), false));
+                if (query) {
+                    SCIDB_ASSERT(_instanceMembership->getId() >
+                                 query->getCoordinatorLiveness()->getMembershipId());
+                }
+            }
+            handleConnectionError(messageDesc->getQueryID());
+            return;
+        }
     }
+
     // Sending message through connection
     connection->sendMessage(messageDesc, mqt);
 
@@ -634,31 +713,40 @@ NetworkManager::sendPhysical(InstanceID targetInstanceID,
                             std::shared_ptr<MessageDesc>& messageDesc,
                             MessageQueueType mqt)
 {
-    getInstances(false);
+    fetchInstances();
     _sendPhysical(targetInstanceID, messageDesc, mqt);
 }
 
 void NetworkManager::broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc)
 {
    ScopedMutexLock mutexLock(_mutex);
-   getInstances(false);
    _broadcastPhysical(messageDesc);
+}
+
+void NetworkManager::MessageSender::operator() (const InstanceDesc& i)
+{
+    const InstanceID targetInstanceID = i.getInstanceId();
+    if (targetInstanceID != _selfInstanceID) {
+        _nm._sendPhysical(targetInstanceID, _messageDesc);
+    }
 }
 
 void NetworkManager::_broadcastPhysical(std::shared_ptr<MessageDesc>& messageDesc)
 {
-   for (Instances::const_iterator i = _instances->begin();
-        i != _instances->end(); ++i) {
-      InstanceID targetInstanceID = i->getInstanceId();
-      if (targetInstanceID != _selfInstanceID) {
-        _sendPhysical(targetInstanceID, messageDesc);
-      }
-   }
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
+
+    // We are broadcasting to the instances IN THE CURRENT membership,
+    // which may be different from the query (of the message) membership.
+    // Those who did not participate in the query will drop the message.
+    // Those who are no longer in the membership are gone anyway.
+    fetchInstances();
+    MessageSender ms(*this, messageDesc, _selfInstanceID);
+    _instanceMembership->visitInstances(ms);
 }
 
 void NetworkManager::broadcastLogical(std::shared_ptr<MessageDesc>& messageDesc)
 {
-    if (!messageDesc->getQueryID()) {
+    if (!messageDesc->getQueryID().isValid()) {
         throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MESSAGE_MISSED_QUERY_ID);
     }
    std::shared_ptr<Query> query = Query::getQueryByID(messageDesc->getQueryID());
@@ -676,31 +764,23 @@ void NetworkManager::broadcastLogical(std::shared_ptr<MessageDesc>& messageDesc)
     }
 }
 
-void NetworkManager::getInstances(bool force)
+void NetworkManager::fetchInstances()
 {
     ScopedMutexLock mutexLock(_mutex);
 
-    // The instance membership does not change in RQ
-    // when it does we may need to change this logic
-    if (force || _instances->size() == 0)
-    {
-        _instances->clear();
-        SystemCatalog::getInstance()->getInstances((*_instances));
+    if (!_instanceMembership) {
+        _instanceMembership = Cluster::getInstance()->getInstanceMembership(0);
+        _randInstanceIndx = 0;
     }
 }
 
-size_t NetworkManager::getPhysicalInstances(std::vector<InstanceID>& instances)
+void NetworkManager::fetchLatestInstances()
 {
-   instances.clear();
-   ScopedMutexLock mutexLock(_mutex);
-   getInstances(false);
-   instances.reserve(_instances->size());
-   for (Instances::const_iterator i = _instances->begin();
-        i != _instances->end(); ++i) {
-      instances.push_back(i->getInstanceId());
-   }
-   return instances.size();
+    ScopedMutexLock mutexLock(_mutex);
+    _instanceMembership = Cluster::getInstance()->getInstanceMembership(0);
+    _randInstanceIndx = 0;
 }
+
 
 void
 NetworkManager::sendLocal(const std::shared_ptr<Query>& query,
@@ -725,11 +805,13 @@ NetworkManager::send(InstanceID targetInstanceID,
                      std::shared_ptr<MessageDesc>& msg)
 {
    assert(msg);
-   if (!msg->getQueryID()) {
+   if (!msg->getQueryID().isValid()) {
        throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_MESSAGE_MISSED_QUERY_ID);
    }
    std::shared_ptr<Query> query = Query::getQueryByID(msg->getQueryID());
    InstanceID target = query->mapLogicalToPhysical(targetInstanceID);
+
+   ScopedWaitTimer timer(PTCW_NET_SND);
    sendPhysical(target, msg);
 }
 
@@ -739,6 +821,7 @@ NetworkManager::receive(InstanceID sourceInstanceID,
                         std::shared_ptr<Query>& query)
 {
     Semaphore::ErrorChecker ec = bind(&Query::validate, query);
+    ScopedWaitTimer timer(PTCW_NET_RCV);
     query->_receiveSemaphores[sourceInstanceID].enter(ec);
     ScopedMutexLock mutexLock(query->_receiveMutex);
     if (query->_receiveMessages[sourceInstanceID].empty()) {
@@ -754,12 +837,15 @@ void NetworkManager::send(InstanceID targetInstanceID, std::shared_ptr<SharedBuf
     std::shared_ptr<MessageDesc> msg = make_shared<MessageDesc>(mtBufferSend, data);
     msg->setQueryID(query->getQueryID());
     InstanceID target = query->mapLogicalToPhysical(targetInstanceID);
+
+    ScopedWaitTimer timer(PTCW_NET_SND);
     sendPhysical(target, msg);
 }
 
 std::shared_ptr<SharedBuffer> NetworkManager::receive(InstanceID sourceInstanceID, std::shared_ptr< Query> & query)
 {
     std::shared_ptr<MessageDesc> msg;
+    ScopedWaitTimer timer(PTCW_NET_RCV);
     receive(sourceInstanceID, msg, query);
     return msg->getBinary();
 }
@@ -767,21 +853,21 @@ std::shared_ptr<SharedBuffer> NetworkManager::receive(InstanceID sourceInstanceI
 void NetworkManager::_handleLivenessNotification(std::shared_ptr<const InstanceLiveness>& liveInfo)
 {
     if (logger->isDebugEnabled()) {
-        ViewID viewId = liveInfo->getViewId();
+        MembershipID membId = liveInfo->getMembershipId();
         const InstanceLiveness::LiveInstances& liveInstances = liveInfo->getLiveInstances();
         const InstanceLiveness::DeadInstances& deadInstances = liveInfo->getDeadInstances();
         uint64_t ver = liveInfo->getVersion();
 
-        LOG4CXX_DEBUG(logger, "New liveness information, viewID=" << viewId<<", ver="<<ver);
+        LOG4CXX_DEBUG(logger, "New liveness information, membershipID=" << membId<<", ver="<<ver);
         for ( InstanceLiveness::DeadInstances::const_iterator i = deadInstances.begin();
              i != deadInstances.end(); ++i) {
-           LOG4CXX_DEBUG(logger, "Dead instanceID=" << (*i)->getInstanceId());
-           LOG4CXX_DEBUG(logger, "Dead genID=" << (*i)->getGenerationId());
+           LOG4CXX_DEBUG(logger, "Dead instanceID=" << i->getInstanceId());
+           LOG4CXX_DEBUG(logger, "Dead genID=" << i->getGenerationId());
         }
         for ( InstanceLiveness::LiveInstances::const_iterator i = liveInstances.begin();
              i != liveInstances.end(); ++i) {
-           LOG4CXX_DEBUG(logger, "Live instanceID=" << (*i)->getInstanceId());
-           LOG4CXX_DEBUG(logger, "Live genID=" << (*i)->getGenerationId());
+           LOG4CXX_DEBUG(logger, "Live instanceID=" << i->getInstanceId());
+           LOG4CXX_DEBUG(logger, "Live genID=" << i->getGenerationId());
         }
     }
     ScopedMutexLock mutexLock(_mutex);
@@ -799,33 +885,45 @@ void NetworkManager::_handleLivenessNotification(std::shared_ptr<const InstanceL
            _instanceLiveness->getVersion() < liveInfo->getVersion());
     _instanceLiveness = liveInfo;
 
+    if (!_instanceMembership ||
+        _instanceMembership->getId() != _instanceLiveness->getMembershipId()) {
+        SCIDB_ASSERT(_instanceLiveness->getMembershipId() >= _instanceMembership->getId());
+        fetchLatestInstances();
+    }
+
     _handleLiveness();
 }
 
 void NetworkManager::_handleLiveness()
 {
    ScopedMutexLock mutexLock(_mutex);
-   assert(_instanceLiveness);
-   assert(_instanceLiveness->getNumInstances() == _instances->size());
-   const InstanceLiveness::DeadInstances& deadInstances = _instanceLiveness->getDeadInstances();
 
-   for (InstanceLiveness::DeadInstances::const_iterator iter = deadInstances.begin();
-        iter != deadInstances.end(); ++iter) {
-      InstanceID instanceID = (*iter)->getInstanceId();
-      ConnectionMap::iterator connIter = _outConnections.find(instanceID);
+   SCIDB_ASSERT(_instanceLiveness);
+   SCIDB_ASSERT(_instanceMembership);
+   SCIDB_ASSERT(_instanceMembership->getId() >= _instanceLiveness->getMembershipId());
 
-      if (connIter == _outConnections.end()) {
-         continue;
-      }
+   for (ConnectionMap::iterator connIter = _outConnections.begin();
+        connIter != _outConnections.end(); ) {
 
-      std::shared_ptr<Connection>& connection = (*connIter).second;
-      if (connection) {
-         connection->disconnect();
-         connection.reset();
-      }
-      _outConnections.erase(connIter);
+       const InstanceID id = (*connIter).first;
+
+       if (!isDead(id)) {
+           ++connIter;
+           continue;
+       }
+       std::shared_ptr<Connection>& connection = (*connIter).second;
+       if (connection) {
+           LOG4CXX_DEBUG(logger, "NetworkManager::_handleLiveness: disconnecting from"
+                         << " dead instance "<<id);
+           connection->disconnect();
+           connection.reset();
+       }
+       _outConnections.erase(connIter++);
    }
-   if (deadInstances.size() > 0) {
+
+   if (_instanceLiveness->getMembershipId() != _instanceMembership->getId() ||
+       _instanceLiveness->getNumDead() > 0) {
+       SCIDB_ASSERT(_instanceLiveness->getMembershipId() <= _instanceMembership->getId());
       _livenessHandleScheduler->schedule();
    }
 }
@@ -840,12 +938,12 @@ void NetworkManager::_handleAlive(const boost::system::error_code& error)
     std::shared_ptr<MessageDesc> messageDesc = make_shared<MessageDesc>(mtAlive);
 
     ScopedMutexLock mutexLock(_mutex);
+
     if (_shutdown) {
        handleShutdown();
        LOG4CXX_WARN(logger, "NetworkManager::_handleAlive: shutdown");
        return;
     }
-
     _broadcastPhysical(messageDesc);
 
     LOG4CXX_TRACE(logger, "NetworkManager::_handleAlive: last timeout="<<_aliveTimeout<<" microsecs"
@@ -868,17 +966,67 @@ void NetworkManager::_handleAlive(const boost::system::error_code& error)
     _aliveTimer.async_wait(NetworkManager::handleAlive);
 }
 
+static void abortQueryOnConnError(const std::shared_ptr<Query>& query)
+{
+    query->handleError(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
+}
+
 void NetworkManager::reconnect(InstanceID instanceID)
 {
       ScopedMutexLock mutexLock(_mutex);
-      _outConnections.erase(instanceID);
+
+      ConnectionMap::iterator connIter = _outConnections.find(instanceID);
+      if (connIter != _outConnections.end()) {
+
+          SCIDB_ASSERT((*connIter).first == instanceID);
+
+          std::shared_ptr<Connection>& connection = (*connIter).second;
+
+          if (connection) {
+              SCIDB_ASSERT(isValidPhysicalInstance(instanceID));
+
+              LOG4CXX_DEBUG(logger, "NetworkManager::reconnect: disconnecting from "
+                            << instanceID);
+              connection->disconnect();
+              connection.reset();
+
+              // When a TCP connection error occurs, there might be some messages
+              // in flight which have already left our queues, so there is no
+              // reliable way to detect which queries are affected without some
+              // registration mechanism. Such a mechanism seems an overkill
+              // at this point, so just abort all the queries with the following
+              // two exceptions:
+              // 1. For a client connection it does not matter because
+              // all the queries attached to that connection will be aborted.
+              // This method is not invoked for the client connections.
+              // 2. For a "dead" instance, we should not abort all the queries
+              // because the failed attempts to connect to that instance may
+              // abort the queries not using the dead instance.
+              // The queries which include remoteInstanceId in their live sets
+              // are supposed to be notified via the liveness mechanism.
+
+              if (!isDead(instanceID)) { //XXX need to release the mutex ?
+
+                  LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
+                                "Connection error - aborting ALL queries");
+
+                  size_t qNum = Query::visitQueries(
+                                       Query::Visitor(
+                                              boost::bind(&abortQueryOnConnError,_1)));
+
+                  LOG4CXX_TRACE(logger, "NetworkManager::handleConnectionError: "
+                                "Aborted " << qNum << " queries");
+              }
+          }
+          _outConnections.erase(connIter);
+      }
       // the connection will be restarted on-demand
 }
 
 void NetworkManager::handleClientDisconnect(const QueryID& queryId,
                                             const ClientContext::DisconnectHandler& dh)
 {
-   if (!queryId) {
+    if (!queryId.isValid()) {
       return;
    }
 
@@ -898,6 +1046,7 @@ void NetworkManager::handleClientDisconnect(const QueryID& queryId,
                          " it must be no longer active");
            return;
        }
+
        WorkQueue::WorkItem item = boost::bind(&Query::handleCancel, query);
        boost::function<void()> work = boost::bind(&WorkQueue::enqueue, errorQ, item);
        item.clear();
@@ -921,7 +1070,7 @@ void NetworkManager::handleClientDisconnect(const QueryID& queryId,
 
 void NetworkManager::handleConnectionError(const QueryID& queryID)
 {
-   if (!queryID) {
+    if (!queryID.isValid()) {
       return;
    }
    LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
@@ -935,53 +1084,35 @@ void NetworkManager::handleConnectionError(const QueryID& queryID)
    query->handleError(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
 }
 
-static void abortQueryOnConnError(const std::shared_ptr<Query>& query)
+bool NetworkManager::isDead(InstanceID remoteInstanceId)
 {
-    query->handleError(SYSTEM_EXCEPTION_SPTR(SCIDB_SE_NETWORK, SCIDB_LE_CONNECTION_ERROR2));
-}
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
 
-bool NetworkManager::isDead(InstanceID remoteInstanceId) const
-{
     SCIDB_ASSERT(remoteInstanceId != _selfInstanceID);
 
+    fetchInstances();
+
     if (_instanceLiveness) {
-        SCIDB_ASSERT(_instanceLiveness->getNumInstances() == _instances->size());
-        return _instanceLiveness->isDead(remoteInstanceId);
+
+        SCIDB_ASSERT(_instanceLiveness->getMembershipId() <= _instanceMembership->getId());
+        // if remoteInstanceId is no longer in the membership,
+        // we treat it as dead
+
+        return  (_instanceLiveness->isDead(remoteInstanceId) ||
+                (_instanceMembership->getId() != _instanceLiveness->getMembershipId() &&
+                 !_instanceMembership->isMember(remoteInstanceId)));
     }
-    return false;
+    return (!_instanceMembership->isMember(remoteInstanceId));
 }
 
 void
 NetworkManager::handleConnectionError(InstanceID remoteInstanceId,
                                       const set<QueryID>& queries)
 {
-    if (remoteInstanceId == CLIENT_INSTANCE ||
-        isDead(remoteInstanceId)) {
-        for (std::set<QueryID>::const_iterator iter = queries.begin();
-             iter != queries.end(); ++iter) {
-            handleConnectionError(*iter);
-        }
-        return;
+    for (QueryID const& qid : queries) {
+        handleConnectionError(qid);
     }
-
-    LOG4CXX_ERROR(logger, "NetworkManager::handleConnectionError: "
-                         "Conection error - aborting ALL queries");
-    // When a TCP connection error occurs, there might be some messages
-    // in flight which have already left our queues, so there is no
-    // reliable way to detect which queries are affected without some
-    // registration mechnism. Such a mecahinsm seems an overkill
-    // at this point, so just abort all the queries.
-    // However, for a client connection it does not matter because all queries
-    // attached to that connection will be aborted.
-    // For a "dead" instance, we should not abort all the queries because
-    // the queries which use remoteInstanceId must be notified via the liveness mechanism.
-    size_t qNum = Query::visitQueries(
-                    Query::Visitor(
-                        boost::bind(
-                           &abortQueryOnConnError,_1)));
-
-    LOG4CXX_TRACE(logger, "NetworkManager::handleConnectionError: "
-                  "Aborted " << qNum << " queries");
+    return;
 }
 
 void Send(void* ctx, InstanceID instance, void const* data, size_t size)

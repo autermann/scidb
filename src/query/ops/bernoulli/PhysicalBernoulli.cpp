@@ -200,7 +200,7 @@ class BernoulliArray : public DelegateArray
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const
     {
-        return new BernoulliArrayIterator(*this, id, inputArray->getConstIterator(id < nAttrs ? id : 0), probability, seed);
+        return new BernoulliArrayIterator(*this, id, inputArray->getConstIterator(id < nAttrs ? id : AttributeID(0)), probability, seed);
     }
 
     BernoulliArray(ArrayDesc const& desc, std::shared_ptr<Array> input, double prob, int rndGenSeed)
@@ -238,9 +238,10 @@ public:
 	 */
 	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 1);
+        assert(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
-		std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
+        std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
 
         int seed = (_parameters.size() == 2)
             ? (int)((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[1])->getExpression()->evaluate().getInt64()

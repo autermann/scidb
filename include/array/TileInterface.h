@@ -183,7 +183,7 @@ namespace scidb
                                               const BaseTile::Context* ctx=NULL);
     private:
 
-        template<typename T, template<typename T> class E>
+        template<typename T, template<typename> class E>
         void registerBuiltin(scidb::TypeId typeId, BaseEncoding::EncodingID encodingId);
         void registerBuiltinTypes();
 

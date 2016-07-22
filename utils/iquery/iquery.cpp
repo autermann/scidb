@@ -61,6 +61,7 @@
 #include <smgr/io/ArrayWriter.h>
 #include <util/ConfigUser.h>
 #include <util/PluginManager.h>
+#include <util/Utility.h>
 #include <network/BaseConnection.h>
 
 #include "commands.h"
@@ -106,7 +107,7 @@ public:
     bool interactive;
 
     void* connection;
-    uint64_t currentQueryID;
+    scidb::QueryID currentQueryID;
 
     bool firstSaving; //For clearing result file for the first time and appending next times
 
@@ -117,9 +118,7 @@ public:
     bool ignoreErrors;
 
     std::string format;
-    std::string userName;
-    std::string userPassword;
-
+    std::string authenticationFile;
     friend std::ostream &operator<<(
         std::ostream &out,
         const IQueryState &state)
@@ -140,8 +139,7 @@ public:
         out << "  verbose=" << (state.verbose?"true":"false") << std::endl;
         out << "  ignoreErrors=" << (state.ignoreErrors?"true":"false") << std::endl;
         out << "  format=" << state.format << std::endl;
-        out << "  userName=" << state.userName<< std::endl;
-        out << "  userPassword=********" << std::endl;
+        out << "  authenticationFile=" << state.authenticationFile<< std::endl;
 
         return out;
     }
@@ -251,7 +249,7 @@ void executePreparedSciDBQuery(const string &queryString, scidb::QueryResult& qu
                     cout<< " chunks: " << numChunks
                         << " cells: " << numCells
                         << " cells/chunk: "
-                        << static_cast<double>(numCells) / numChunks << endl;
+                        << static_cast<double>(numCells) / static_cast<double>(numChunks) << endl;
                 }
                 else
                 {
@@ -320,9 +318,11 @@ void executeSciDBQuery(const string &queryString)
 
     executePreparedSciDBQuery(queryString, queryResult, format);
 
-    iqueryState.currentQueryID = 0;
+    iqueryState.currentQueryID = scidb::QueryID();
 
-    if (queryResult.queryID && iqueryState.connection)
+    if (queryResult.queryID.isValid() &&
+        !queryResult.autoCommit &&
+        iqueryState.connection)
     {
         sciDB.completeQuery(queryResult.queryID, iqueryState.connection);
     }
@@ -383,7 +383,7 @@ void executeCommandOrQuery(const string &query)
                     "set no timer   - Stop reporting query setup time\n"
                     "set verbose    - Start reporting details from engine\n"
                     "set no verbose - Stop reporting details from engine\n"
-                    "set format auto|csv|dense|csv+|lcsv+|tsv|tsv+|ltsv+|"
+                    "set format auto|csv|dense|csv+|tsv|tsv+|"
                         "text|sparse|lsparse|store|text|opaque|dcsv"
                         " - Switch output format.\n"
                     "quit or exit   - End iquery session"
@@ -450,7 +450,7 @@ void executeCommandOrQuery(const string &query)
         const scidb::SciDB& sciDB = scidb::getSciDB();
 
         //Don't try to cancel query if we have connection problems!
-        if (iqueryState.currentQueryID && iqueryState.connection
+        if (iqueryState.currentQueryID.isValid() && iqueryState.connection
             && !(e.getShortErrorCode() == scidb::SCIDB_SE_NETWORK))
         {
             try
@@ -466,7 +466,7 @@ void executeCommandOrQuery(const string &query)
             }
         }
 
-        iqueryState.currentQueryID = 0;
+        iqueryState.currentQueryID = scidb::QueryID();
 
         if (scidb::Config::getInstance()->getOption<string>(CONFIG_QUERY_FILE) != "")
         {
@@ -538,7 +538,7 @@ int main(int argc, char* argv[])
     iqueryState.line = 1;
     iqueryState.connection = NULL;
     iqueryState.interactive = false;
-    iqueryState.currentQueryID = 0;
+    iqueryState.currentQueryID = scidb::QueryID();
 
     iqueryState.firstSaving = true;
 
@@ -577,8 +577,8 @@ int main(int argc, char* argv[])
             (CONFIG_NO_FETCH, 'n', "no-fetch", "", "", scidb::Config::BOOLEAN,
                 "Skip data fetching. Disabled by default'", false, false)
             (CONFIG_RESULT_FORMAT, 'o', "format", "format", "", scidb::Config::STRING,
-                "Output format: auto, csv, dense, csv+, lcsv+, text, sparse,"
-                " lsparse, store, text, opaque, tsv, tsv+, ltsv+, dcsv."
+                "Output format: auto, csv, dense, csv+, text, sparse,"
+                " lsparse, store, text, opaque, tsv, tsv+, dcsv."
                 " Default is 'dcsv'.",
                  string("dcsv"), false)
             (CONFIG_PLUGINSDIR, 'u', "pluginsdir", "plugins", "", scidb::Config::STRING,
@@ -591,18 +591,15 @@ int main(int argc, char* argv[])
                 "Show version info", false, false)
             (CONFIG_IGNORE_ERRORS, 0, "ignore-errors", "", "", scidb::Config::BOOLEAN,
                 "Ignore execution errors in batch mode", false, false)
-            (CONFIG_USER_NAME, 'U', "user-name", "", "user-name", scidb::Config::STRING,
-                "User name", string(""), false)
-            (CONFIG_USER_PASSWORD, 'P', "user-password", "", "user-password", scidb::Config::STRING,
-                "User password file name", string(""), false)
+            (CONFIG_AUTHENTICATION_FILE, 'A', "auth-file", "auth-file", "",
+                scidb::Config::STRING, "User authentication file", string(""), false)
             ;
 
-
-      cfg->addHook(configHook);
-      cfg->parse(argc, argv, cfgPath.c_str());
+        cfg->addHook(configHook);
+        cfg->parse(argc, argv, cfgPath.c_str());
 
         const std::string& connectionString = cfg->getOption<string>(CONFIG_HOST);
-        uint16_t port = cfg->getOption<int>(CONFIG_PORT);
+        uint16_t port = scidb::safe_static_cast<uint16_t>(cfg->getOption<int>(CONFIG_PORT));
         const std::string& queryFile = cfg->getOption<string>(CONFIG_QUERY_FILE);
         std::string queryString = cfg->getOption<string>(CONFIG_QUERY_STRING);
 
@@ -616,47 +613,31 @@ int main(int argc, char* argv[])
         iqueryState.timer        = cfg->getOption<bool>(CONFIG_TIMER);
         iqueryState.ignoreErrors = cfg->getOption<bool>(CONFIG_IGNORE_ERRORS);
         iqueryState.format       = cfg->getOption<string>(CONFIG_RESULT_FORMAT);
-        iqueryState.userName     = cfg->getOption<string>(CONFIG_USER_NAME);
-        iqueryState.userPassword = cfg->getOption<string>(CONFIG_USER_PASSWORD);
+        iqueryState.authenticationFile = cfg->getOption<string>(CONFIG_AUTHENTICATION_FILE);
 
-
-        try
+        if(iqueryState.authenticationFile.length() == 0)
         {
-            // The environment variable "SCIDB_CONFIG_USER" points to
-            // a file that allows setting the username and password if
-            // they are not specified on the command line.  This
-            // segement of code handles that functionality.
-
-            std::string scidbConfigUserFilename =
-                getEnvironmentVariable("SCIDB_CONFIG_USER");
-            if(scidbConfigUserFilename.length() != 0)
+            try
             {
-                LOG4CXX_DEBUG(logger, "SCIDB_CONFIG_USER="
-                    << scidbConfigUserFilename);
+                // The environment variable "SCIDB_CONFIG_USER" points to
+                // a file that allows setting the username and password if
+                // they are not specified on the command line.  This
+                // segement of code handles that functionality.
 
-                scidb::ConfigUser *cfgUser = scidb::ConfigUser::getInstance();
-                cfgUser->addOptions();
-
-                scidb::ConfigUser::verifySafeFile(scidbConfigUserFilename);
-                cfgUser->parse(0, NULL, scidbConfigUserFilename.c_str());
-
-                if(iqueryState.userName.empty())
+                std::string scidbConfigUserFilename =
+                    getEnvironmentVariable("SCIDB_CONFIG_USER");
+                if(scidbConfigUserFilename.length() != 0)
                 {
-                    iqueryState.userName =
-                        cfgUser->getUserName();
-                }
+                    LOG4CXX_DEBUG(logger, "SCIDB_CONFIG_USER="
+                        << scidbConfigUserFilename);
 
-                if(iqueryState.userPassword.empty())
-                {
-                    iqueryState.userPassword =
-                        cfgUser->getUserPassword();
+                    iqueryState.authenticationFile = scidbConfigUserFilename;
                 }
+            } catch (const scidb::Exception& e) {
+                // Assume we are in 'trust' mode but log the exception
+                LOG4CXX_ERROR(logger, "Exception:  iquery - " << e.what());
             }
-        } catch (const scidb::Exception& e) {
-            // Assume we are in 'trust' mode but log the exception
-            LOG4CXX_ERROR(logger, "Exception:  - " << e.what());
         }
-
 
         if (!queryString.empty())
         {
@@ -687,12 +668,12 @@ int main(int argc, char* argv[])
                     readStdin = true;
             }
 
-            char ch;
+            int ch;
             if (readStdin)
             {
                 while ((ch = fgetc (stdin)) != EOF)
                 {
-                    queries += ch;
+                    queries += static_cast<char>(ch);
                 }
             }
             else
@@ -715,19 +696,17 @@ int main(int argc, char* argv[])
             connectionString,
             port);
 
-        LOG4CXX_DEBUG(logger, "userName=" << iqueryState.userName);
         sciDB.newClientStart(
             iqueryState.connection,
-            iqueryState.userName,
-            iqueryState.userPassword);
+            iqueryState.authenticationFile);
 
         string query = ""; // separated query from overall set of queries
 
-        // Whenever '{' is encountered, the count is increased by 1.
-        // Whenever '}' is encountered, the count is reduced by 1.
+        // Whenever '{' or '[' is encountered, the count is increased by 1.
+        // Whenever '}' or ']' is encountered, the count is reduced by 1.
         // The usage: do NOT terminate a query at ';' if the count is greater than 0.
         // TO-DO: negative count should be reported as an exception but omit this error checking for now.
-        int nLevelsInsideCurlyBrackets = 0;
+        int nLevelsInsideBrackets = 0;
 
         do
         {
@@ -795,18 +774,32 @@ int main(int argc, char* argv[])
                 }
                 // Checking query separator, if not in string and comment, execute this query
                 else if (currC == ';' && !iqueryState.insideComment && !iqueryState.insideString
-                        && nLevelsInsideCurlyBrackets==0)
+                        && nLevelsInsideBrackets==0)
                 {
                     executeCommandOrQuery(query);
                     query = "";
                     eoq = true;
                     ++iqueryState.col;
                 }
-                // Maintain nLevelsInsideCurlyBrackets
-                else if ((currC == '{' || currC == '}') && !iqueryState.insideComment && !iqueryState.insideString)
-                {
-                    nLevelsInsideCurlyBrackets += (currC == '{' ? 1 : -1);
-                    query += currC;
+                else if (!iqueryState.insideComment && !iqueryState.insideString) {
+                    // Maintain nLevelsInsideBrackets.  Allows mispairings "{]",
+                    // but if you do that you have bigger problems.
+                    switch (currC) {
+                    case '{':
+                    case '[':
+                        ++nLevelsInsideBrackets;
+                        query += currC;
+                        break;
+                    case '}':
+                    case ']':
+                        --nLevelsInsideBrackets;
+                        query += currC;
+                        break;
+                    default:
+                        query += currC;
+                        ++iqueryState.col;
+                        break;
+                    }
                 }
                 // All other just added to query
                 else

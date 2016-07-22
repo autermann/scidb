@@ -13,19 +13,19 @@ create array catalogue3 <code:int64 null, type:string, price:double, review:stri
 
 --test
 
---shell --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue )' "
+--shell --store --command " iquery  -o csv+:l -aq 'scan ( catalogue )' "
 
 --shell --store --command " iquery  -o lsparse -aq 'scan ( catalogue )' "
 
---shell --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue1 )' "
+--shell --store --command " iquery  -o csv+:l -aq 'scan ( catalogue1 )' "
 
 --shell --store --command " iquery  -o lsparse -aq 'scan ( catalogue1 )' "
 
---shell --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue2 )' "
+--shell --store --command " iquery  -o csv+:l -aq 'scan ( catalogue2 )' "
 
 --shell --store --command " iquery  -o lsparse -aq 'scan ( catalogue2 )' "
 
---shell --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue3 )' "
+--shell --store --command " iquery  -o csv+:l -aq 'scan ( catalogue3 )' "
 
 --shell --store --command " iquery  -o lsparse -aq 'scan ( catalogue3 )' "
 

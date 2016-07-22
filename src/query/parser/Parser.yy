@@ -160,7 +160,8 @@
 %type<node>         afl_expression
 %type<node>         afl_module
 %type<node>         attribute
-%type<node>         dimension dexp cells
+%type<node>         cells
+%type<node>         dimension dexp dhigh dimsep
 %type<node>         nullable
 %type<node>         default
 %type<node>         default_value
@@ -169,6 +170,7 @@
 %type<node>         temp
 %type<node>         schema
 %type<node>         asterisk
+%type<node>         question_mark
 %type<node>         order
 %type<node>         exp
 %type<node>         binding where_group
@@ -258,8 +260,9 @@ namespace scidb {namespace parser {
 %code top                                                // Head of Parser.cpp
 {
 #include <query/ParsingContext.h>                        // For parsing context
-#include "query/parser/Lexer.h"                          // For lexical analyzer
-#include "query/parser/AST.h"                            // For abstract syntax
+#include <query/parser/Lexer.h>                          // For lexical analyzer
+#include <query/parser/AST.h>                            // For abstract syntax
+#include <system/Config.h>                               // For CONFIG_* options
 }
 /****************************************************************************/
 %%
@@ -418,6 +421,10 @@ asterisk:
     '*'                                                  {$$ = _fac.newNode(asterisk,@$);}
     ;
 
+question_mark:
+    '?'                                                  {$$ = _fac.newNode(questionMark,@$);}
+    ;
+
 /**
  *  For locating the approximate position of an optional token.
  */
@@ -503,7 +510,8 @@ create_array_statement:
     ;
 
 schema:
-      '<' attributes '>' '[' dimensions ']'              {$$ = _fac.newNode(schema,@$,_fac.newList(@2,$2),_fac.newList(@5,$5),0);}
+      '<' attributes '>' '[' dimensions ']'              {$$ = _fac.newNode(schema,@$,_fac.newList(@2,$2),
+                                                                            _fac.newList(@5,$5),0);}
     ;
 
 attribute:
@@ -511,14 +519,23 @@ attribute:
     ;
 
 dimension:
-      identifier '=' dexp ':' dexp     ',' dexp ',' dexp {$$ = _fac.newNode(dimension,@$,$1,$3,$5,$7,$9);}
-    | identifier '=' dexp ':' asterisk ',' dexp ',' dexp {$$ = _fac.newNode(dimension,@$,$1,$3,$5,$7,$9);}
+      identifier '=' dexp ':' dhigh ',' dhigh ',' dexp   {$$ = _fac.newNode(dimension,@$,$1,$3,$5,$7,$9);}
     | identifier                                         {$$ = _fac.newNode(dimension,@$,$1,0,0,0,0);}
     ;
 
 dexp:
       exp                                                {$$ = $1;}
-    | '?'                                                {$$ = 0;}
+    | question_mark                                      {$$ = $1;}
+    ;
+
+dhigh:
+      dexp                                               {$$ = $1;}
+    | asterisk                                           {$$ = $1;}
+    ;
+
+dimsep:
+      ','                                                {$$ = 0;}
+    | ';'                                                {$$ = 0;}
     ;
 
 default_value:
@@ -534,7 +551,7 @@ default_value:
 nullable:
           NULL_VALUE                                     {$$ = _fac.newBoolean(@$,true);}
     | NOT NULL_VALUE                                     {$$ = _fac.newBoolean(@$,false);}
-    | blank                                              {$$ = _fac.newBoolean(@$,false);}
+    | blank                                              {$$ = _fac.newBoolean(@$,true);}
     ;
 
 default:
@@ -557,8 +574,8 @@ temp:
     ;
     
 cells:
-      '[' exp ']'                                        {$$ = $2;}
-    | blank                                              {$$ = _fac.newInteger(@$,1000000);}
+      '[' exp ']'                                    {$$ = $2;}
+    | blank                                          {$$ = _fac.newCfgParm(@$,CONFIG_REDIM_TARGET_CELLS_PER_CHUNK);}
     ;
     
 /****************************************************************************/
@@ -833,7 +850,7 @@ attributes:
 
 dimensions:
       dimension                                          {$$ = 1;   _fac.push($1);}
-    | dimensions ',' dimension                           {$$ = $1+1;_fac.push($3);}
+    | dimensions dimsep dimension                        {$$ = $1+1;_fac.push($3);}
     ;
 
 updates:

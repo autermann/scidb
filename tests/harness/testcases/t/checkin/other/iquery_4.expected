@@ -13,11 +13,11 @@ Query was executed successfully
 SCIDB QUERY : <iquery -c $IQUERY_HOST $IQUERY_PORT -aq "load(catalogue,'${TEST_DATA_DIR}/iquery_4.txt')">
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
-{3} 0,'coffee',0,'CCD'
-{5} 61,'',10,'nice'
-{6} 0,'true',0,''
-{8} 91,'',90.1,''
-{9} 0,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{5} 61,null,10,'nice'
+{6} null,'true',null,null
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST $IQUERY_PORT -aq "load(catalogue1,'${TEST_DATA_DIR}/iquery_4.txt')">
 {id} code,type,price,review
@@ -31,34 +31,34 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST $IQUERY_PORT -aq "load(catalogue1,'${TEST_
 SCIDB QUERY : <iquery -c $IQUERY_HOST $IQUERY_PORT -aq "load(catalogue2,'${TEST_DATA_DIR}/iquery_4.txt')">
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
-{3} 0,'coffee',null,'CCD'
+{3} null,'coffee',null,'CCD'
 {5} 61,null,10,'nice'
-{6} 0,'true',null,''
-{8} 91,null,90.1,''
-{9} 0,null,100,'Lays'
+{6} null,'true',null,null
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST $IQUERY_PORT -aq "load(catalogue3,'${TEST_DATA_DIR}/iquery_4.txt')">
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
-{3} null,'coffee',0,'CCD'
-{5} 61,'',10,'nice'
-{6} null,'true',0,null
-{8} 91,'',90.1,null
-{9} null,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{5} 61,null,10,'nice'
+{6} null,'true',null,null
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
-3,0,'coffee',0,'CCD'
-5,61,'',10,'nice'
-6,0,'true',0,''
-8,91,'',90.1,''
-9,0,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+5,61,null,10,'nice'
+6,null,'true',null,null
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue )'>
-{1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(0,'coffee',0,'CCD')];[{5}(61,'',10,'nice')];{6}[{6}(0,'true',0,'')];[{8}(91,'',90.1,'')];{9}[{9}(0,'',100,'Lays')]
+{1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(null,'coffee',null,'CCD')];[{5}(61,null,10,'nice')];{6}[{6}(null,'true',null,null)];[{8}(91,null,90.1,null)];{9}[{9}(null,null,100,'Lays')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue1 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue1 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 3,null,'coffee',null,'CCD'
@@ -70,29 +70,29 @@ id,code,type,price,review
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue1 )'>
 {1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(null,'coffee',null,'CCD')];[{5}(61,null,10,'nice')];{6}[{6}(null,'true',null,null)];[{8}(91,null,90.1,null)];{9}[{9}(null,null,100,'Lays')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue2 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue2 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
-3,0,'coffee',null,'CCD'
+3,null,'coffee',null,'CCD'
 5,61,null,10,'nice'
-6,0,'true',null,''
-8,91,null,90.1,''
-9,0,null,100,'Lays'
+6,null,'true',null,null
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue2 )'>
-{1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(0,'coffee',null,'CCD')];[{5}(61,null,10,'nice')];{6}[{6}(0,'true',null,'')];[{8}(91,null,90.1,'')];{9}[{9}(0,null,100,'Lays')]
+{1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(null,'coffee',null,'CCD')];[{5}(61,null,10,'nice')];{6}[{6}(null,'true',null,null)];[{8}(91,null,90.1,null)];{9}[{9}(null,null,100,'Lays')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue3 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue3 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
-3,null,'coffee',0,'CCD'
-5,61,'',10,'nice'
-6,null,'true',0,null
-8,91,'',90.1,null
-9,null,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+5,61,null,10,'nice'
+6,null,'true',null,null
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue3 )'>
-{1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(null,'coffee',0,'CCD')];[{5}(61,'',10,'nice')];{6}[{6}(null,'true',0,null)];[{8}(91,'',90.1,null)];{9}[{9}(null,'',100,'Lays')]
+{1}[{1}(21,'ice cream',50.5,'mango')];{3}[{3}(null,'coffee',null,'CCD')];[{5}(61,null,10,'nice')];{6}[{6}(null,'true',null,null)];[{8}(91,null,90.1,null)];{9}[{9}(null,null,100,'Lays')]
 
 SCIDB QUERY : <remove(catalogue)>
 Query was executed successfully

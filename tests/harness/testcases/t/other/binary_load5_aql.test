@@ -3,12 +3,12 @@
 # Ticket number : 1688
 # Tests for the binary load-save on 2D sparse arrays
 
-create array B <val:double> [x=-10:100,10,0,y=0:100,20,0]
+create array B <val:double NOT NULL> [x=-10:100,10,0,y=0:100,20,0]
 store(filter(build(B, x+100*y), (x=-10 and y=0) or (x=100 and y=100)),B)
-create array B1 <val:double> [x=-10:100,10,0,y=0:100,20,0]
-create array B2 <val:double> [x=0:110,10,0,y=0:100,20,0]
-create array M1 <val:double> [x=0:110,10,0,y=0:100,20,0]
-create array M2 <val:double> [x=0:110,10,0,y=0:100,20,0]
+create array B1 <val:double NOT NULL> [x=-10:100,10,0,y=0:100,20,0]
+create array B2 <val:double NOT NULL> [x=0:110,10,0,y=0:100,20,0]
+create array M1 <val:double NOT NULL> [x=0:110,10,0,y=0:100,20,0]
+create array M2 <val:double NOT NULL> [x=0:110,10,0,y=0:100,20,0]
 
 --test
 

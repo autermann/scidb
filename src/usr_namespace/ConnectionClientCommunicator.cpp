@@ -23,12 +23,9 @@
 /*
  * ConnectionClientCommunicator.cpp
  *
- *  Modified on: Mayn 18, 2015
+ *  Modified on: May 18, 2015
  *      Author: mcorbett@paradigm.com
  *      Purpose:  Basic Security enhancements
- *
- *  Created on: Jan 12, 2010
- *      Author: roman.simakov@gmail.com
  */
 
 #include <usr_namespace/ConnectionClientCommunicator.h>
@@ -55,7 +52,7 @@ using namespace boost;
 namespace scidb
 {
 
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.network"));
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.securityPluginComm"));
 
 
 ConnectionClientCommunicator::ConnectionClientCommunicator(
@@ -182,11 +179,16 @@ void ConnectionClientCommunicator::waitForClientResponse(
 
     // Enter times out after 10 seconds.  So, try 20 times
     // to enter.  I.E.  try for 200 seconds.
-    const int maxTries = 20;
+    const size_t maxTries = 20;
     if(!_waitForClientSemaphore.enter(maxTries, errorChecker))
     {
-        LOG4CXX_DEBUG(logger, funcName
-            << " _waitForClientSemaphore.enter(10, errorChecker) failed");
+        // The response could have arrived before we waited
+        // for the semaphore above
+        if(!receivedResponse())
+        {
+            LOG4CXX_DEBUG(logger, funcName
+                << " _waitForClientSemaphore.enter(10, errorChecker) failed");
+        }
     }
 
 

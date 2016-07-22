@@ -30,6 +30,7 @@
 #include <boost/foreach.hpp>
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <util/Network.h>
 #include <array/Metadata.h>
 #include <log4cxx/logger.h>
@@ -48,8 +49,8 @@ namespace scidb
 
 double getPercentage(Coordinate quantileIndex, DimensionDesc const& quantileDimension)
 {
-    double numPositions = quantileDimension.getEndMax() - quantileDimension.getStartMin();
-    return (quantileIndex - quantileDimension.getStartMin()) * 1.0 / numPositions;
+    double numPositions = static_cast<double>(quantileDimension.getEndMax() - quantileDimension.getStartMin());
+    return static_cast<double>(quantileIndex - quantileDimension.getStartMin()) / static_cast<double>(numPositions);
 }
 
 struct QuantileBucket
@@ -130,7 +131,7 @@ public:
     {
         if (!_hasCurrent)
             throw USER_EXCEPTION(SCIDB_SE_UDO, SCIDB_LE_NO_CURRENT_ELEMENT);
-        for (int i = _currPos.size(); --i >= 0;)
+        for (int i = safe_static_cast<int>(_currPos.size()); --i >= 0;)
         {
             if (++_currPos[i] > _lastPos[i])
             {
@@ -363,7 +364,7 @@ private:
     {
         Dimensions const& dims = _desc.getDimensions();
         size_t chunkNo = _currChunkNo;
-        for (int i = dims.size(); --i >= 0;)
+        for (int i = safe_static_cast<int>(dims.size()); --i >= 0;)
         {
             size_t chunkInterval = dims[i].getChunkInterval();
             size_t nChunks = (dims[i].getLength() + chunkInterval - 1) / chunkInterval;
@@ -490,7 +491,7 @@ public:
         assert(_numQuantilesPlusOne>1);
 
         if (_attrID == 0) {  // percent
-            double pctValue = static_cast<double>(_indexInCurrentGroup) / (_numQuantilesPlusOne-1);
+            double pctValue = static_cast<double>(_indexInCurrentGroup) / static_cast<double>(_numQuantilesPlusOne - 1);
             _value.setDouble(pctValue);
             return _value;
         } else if (_quantilesInCurrentGroup){ // quantiles exist
@@ -745,6 +746,8 @@ private:
     // A temporary position, to be returned in getPosition().
     Coordinates _tmpPos;
 
+    RegionCoordinatesIteratorParam _regionCoordinatesIteratorParam;
+
     // An iterator that iterates over all the groups, regardless to what instance the group should belong to.
     unique_ptr<RegionCoordinatesIterator> _regionCoordinatesIterator;
 
@@ -790,7 +793,8 @@ public:
         : _chunk(array, attrID, numQuantilesPlusOne, pRowCollectionGroup),
           _instanceID(instanceID),
           _numInstances(numInstances),
-          _tmpPos(array.getArrayDesc().getDimensions().size())
+          _tmpPos(array.getArrayDesc().getDimensions().size()),
+          _regionCoordinatesIteratorParam(array.getArrayDesc().getDimensions().size()-1)
     {
         assert(numQuantilesPlusOne>1);
 
@@ -800,19 +804,18 @@ public:
         bool valid = true;
         assert(dims.size()>1);
         size_t nGroupDims = dims.size()-1;
-        RegionCoordinatesIteratorParam param(nGroupDims);
         for (size_t i=0; i<nGroupDims; ++i) {
-            param._low[i] = dims[i].getStartMin();
-            param._high[i] = dims[i].getEndMax();
-            if (param._low[i] > param._high[i]) {
+            _regionCoordinatesIteratorParam._low[i] = dims[i].getStartMin();
+            _regionCoordinatesIteratorParam._high[i] = dims[i].getEndMax();
+            if (_regionCoordinatesIteratorParam._low[i] > _regionCoordinatesIteratorParam._high[i]) {
                 valid = false;
                 break;
             }
-            param._intervals[i] = dims[i].getChunkInterval();
+            _regionCoordinatesIteratorParam._intervals[i] = dims[i].getChunkInterval();
         }
 
         if (valid) {
-            _regionCoordinatesIterator.reset(new RegionCoordinatesIterator(param));
+            _regionCoordinatesIterator.reset(new RegionCoordinatesIterator(_regionCoordinatesIteratorParam));
         }
 
         reset();
@@ -940,7 +943,7 @@ public:
 void GroupbyQuantileChunk::setPosition(Coordinates const& pos)
 {
     // Different threads need to be synchronized in calling chunk.setPosition(), because the shared _pRowCollectionGroup is modified.
-    ScopedMutexLock lock(((GroupbyQuantileArray*)&_array)->_mutexChunkSetPosition);
+    ScopedMutexLock lock(((GroupbyQuantileArray*)&_array)->_mutexChunkSetPosition, PTCW_MUT_OTHER);
 
     if (materializedChunk) {
         delete materializedChunk;
@@ -999,7 +1002,9 @@ void GroupbyQuantileChunk::setPosition(Coordinates const& pos)
 
             // Get the quantile values.
             for (size_t i=0; i<_numQuantilesPlusOne; ++i) {
-                size_t index = ceil( i * 1.0 * items.size() / (_numQuantilesPlusOne - 1) );
+                size_t index = static_cast<size_t>(
+                    ceil( static_cast<double>(i) * static_cast<double>(items.size())
+                          / static_cast<double>(_numQuantilesPlusOne-1)));
                 index = index < 1 ? 1 : index;
 
                 quantileOneGroup[i] = items[index-1][0];
@@ -1029,9 +1034,10 @@ class PhysicalQuantile: public PhysicalOperator
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /**
@@ -1040,7 +1046,8 @@ class PhysicalQuantile: public PhysicalOperator
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
         vector<RedistributeContext> requiredDistribution;
-        requiredDistribution.push_back(RedistributeContext(psHashPartitioned));
+        requiredDistribution.push_back(RedistributeContext(createDistribution(psHashPartitioned),
+                                                           _schema.getResidency()));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -1066,14 +1073,15 @@ class PhysicalQuantile: public PhysicalOperator
                     QuantileBucket &bucket = (*buckets)[reduced];
                     if (bucket.values.size() == 0)  // have a brand new bucket
                     {
-                        size_t count = bucket.indeces[0];
+                        double count = bucket.indeces[0];
                         bucket.indeces=vector<double>(numQuantilesPlusOne);
                         bucket.maxIndeces=vector<double>(numQuantilesPlusOne);
                         bucket.values=vector<Value>(numQuantilesPlusOne);
 
                         for (size_t i =0; i<numQuantilesPlusOne; i++)
                         {
-                            double index = ceil( i * 1.0 * count / (numQuantilesPlusOne - 1) );
+                            double index = ceil(static_cast<double>(i) * count
+                                                / (static_cast<double>(numQuantilesPlusOne - 1)));
                             index = index < 1 ? 1 : index;
                             bucket.indeces[i] = index;
                             bucket.maxIndeces[i] = 0;
@@ -1101,12 +1109,21 @@ class PhysicalQuantile: public PhysicalOperator
         }
     }
 
-  public:
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see LogicalQuantile::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
+    }
+
     /**
      * execute().
      */
     std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
+        AutochunkFixer af(getControlCookie());
+        af.fix(_schema, inputArrays);
+
         std::shared_ptr<Array> inputArray = inputArrays[0];
         if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
         {   //if input supports MULTI_PASS, don't bother converting it
@@ -1120,6 +1137,9 @@ class PhysicalQuantile: public PhysicalOperator
         const ArrayDesc& inputSchema = inputArray->getArrayDesc();
         const Attributes& inputAttributes = inputSchema.getAttributes();
         const Dimensions& inputDims = inputSchema.getDimensions();
+
+        SCIDB_ASSERT(inputSchema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
 
         // _parameters[0] is numQuantilesPlusOne.
         // _parameters[1], if exists, is the value to compute quantile on.
@@ -1161,8 +1181,8 @@ class PhysicalQuantile: public PhysicalOperator
         }
 
         // For every dimension, determine whether it is a groupby dimension
-        std::shared_ptr<PartitioningSchemaDataGroupby> psdGroupby = make_shared<PartitioningSchemaDataGroupby>();
-        psdGroupby->_arrIsGroupbyDim.reserve(inputDims.size());
+        vector<bool> psdGroupby;
+        psdGroupby.reserve(inputDims.size());
         for (size_t i=0; i<inputDims.size(); ++i)
         {
             bool isGroupbyDim = false;
@@ -1173,7 +1193,7 @@ class PhysicalQuantile: public PhysicalOperator
                 }
             }
 
-            psdGroupby->_arrIsGroupbyDim.push_back(isGroupbyDim);
+            psdGroupby.push_back(isGroupbyDim);
         }
 
         // If this is not a groupby quantile, use the original code.
@@ -1188,14 +1208,14 @@ class PhysicalQuantile: public PhysicalOperator
             const size_t nInstances = query->getInstancesCount();
             InstanceID myInstance = query->getInstanceID();
 
+            ArrayDistPtr hashedDist = createDistribution(psHashPartitioned);
+
             if (nInstances > 1)
             {
-                rankArray = redistributeToRandomAccess(rankArray,query,psHashPartitioned,
-                                                       ALL_INSTANCE_MASK,
-                                                       std::shared_ptr<CoordinateTranslator>(),
-                                                       0,
-                                                       std::shared_ptr<PartitioningSchemaData>());
-
+                rankArray = redistributeToRandomAccess(rankArray,
+                                                       hashedDist,
+                                                       ArrayResPtr(), // default query residency
+                                                       query);
             }
             else
             {
@@ -1220,7 +1240,7 @@ class PhysicalQuantile: public PhysicalOperator
             BOOST_FOREACH (CountsMap::value_type bucket, rStats->counts)
             {
                 Coordinates const& pos = bucket.first;
-                double count = bucket.second;
+                double count = static_cast<double>(bucket.second);
 
                 if (pos.size())
                 {
@@ -1236,8 +1256,10 @@ class PhysicalQuantile: public PhysicalOperator
                 {
                     chunkCoords.push_back(0);
                 }
-                std::shared_ptr<CoordinateTranslator> distMapper;
-                InstanceID instanceForChunk = getInstanceForChunk(query, chunkCoords, _schema, psHashPartitioned, distMapper, 0, 0);
+                InstanceID instanceForChunk = getInstanceForChunk(chunkCoords,
+                                                                  _schema.getDimensions(),
+                                                                  hashedDist,
+                                                                  query);
                 if(instanceForChunk == myInstance)
                 {
                     LOG4CXX_DEBUG(logger, "Initializing bucket with "<<chunkCoords.size()<<" coords; count "<<count);
@@ -1245,8 +1267,11 @@ class PhysicalQuantile: public PhysicalOperator
                     (*buckets)[chunkCoords].maxIndeces = vector<double> ();
                     (*buckets)[chunkCoords].values = vector<Value> ();
 
-                    SCIDB_ASSERT(_schema.getPartitioningSchema() == psHashPartitioned);
-                    size_t chunkNo = _schema.getPrimaryInstanceId(chunkCoords, nInstances);
+                    // XXX this is a BUG!!!
+                    // XXX ticket #4930
+                    // XXX chunkNo is supposed to be row-major ordered chunk number, something like line 303 above.
+                    size_t chunkNo =
+                       hashedDist->getPrimaryChunkLocation(chunkCoords, _schema.getDimensions(), nInstances);
                     liveChunks->insert(chunkNo);
                 }
             }
@@ -1255,11 +1280,15 @@ class PhysicalQuantile: public PhysicalOperator
             fillQuantiles(rankArray, buckets, *grouping);
             for(size_t i =1 ; i < nInstances ; i++)
             {
-                rankArray = redistributeToRandomAccess(rankArray,query,psHashPartitioned,
-                                                       ALL_INSTANCE_MASK,
-                                                       std::shared_ptr<CoordinateTranslator>(),
-                                                       i,
-                                                       std::shared_ptr<PartitioningSchemaData>());
+                ArrayDistPtr psHashShiftedDist = ArrayDistributionFactory::getInstance()->construct(psHashPartitioned,
+                                                                                                    DEFAULT_REDUNDANCY,
+                                                                                                    std::string(),
+                                                                                                    std::shared_ptr<CoordinateTranslator>(),
+                                                                                                    i);
+                rankArray = redistributeToRandomAccess(rankArray,
+                                                       psHashShiftedDist,
+                                                       ArrayResPtr(), // default query residency
+                                                       query);
                 fillQuantiles(rankArray, buckets, *grouping);
             }
             rankArray.reset();
@@ -1304,7 +1333,9 @@ class PhysicalQuantile: public PhysicalOperator
                                        0);
         }
 
-        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims, defaultPartitioning());
+        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims,
+                                inputSchema.getDistribution(),
+                                inputSchema.getResidency());
 
         vector<AttributeID> projection(1);
         projection[0] = rankedAttributeID;
@@ -1312,12 +1343,11 @@ class PhysicalQuantile: public PhysicalOperator
         std::shared_ptr<Array> projected(make_shared<SimpleProjectArray>(projectSchema, inputArray, projection));
 
         // Redistribute, s.t. all records in the same group go to the same instance.
-        std::shared_ptr<CoordinateTranslator> distMapper;
-        std::shared_ptr<Array> redistributed = redistributeToRandomAccess(projected, query, psGroupby,
-                                                                     ALL_INSTANCE_MASK,
-                                                                     distMapper,
-                                                                     0,
-                                                                     psdGroupby);
+        ArrayDistPtr groupByDist = std::make_shared<GroupByArrayDistribution>(DEFAULT_REDUNDANCY, psdGroupby);
+        std::shared_ptr<Array> redistributed = redistributeToRandomAccess(projected,
+                                                                          groupByDist,
+                                                                          ArrayResPtr(), // default query residency
+                                                                          query);
 
         // timing
         timing.logTiming(logger, "[Quantile] redistribute()");
@@ -1326,7 +1356,10 @@ class PhysicalQuantile: public PhysicalOperator
         // Build a RowCollection, where each row is a group.
         // There is a single attribute: the ranked attribute.
         Attributes rcGroupAttrs;
-        rcGroupAttrs.push_back(AttributeDesc(0, rankedAttribute.getName(), rankedAttribute.getType(), rankedAttribute.getFlags(), rankedAttribute.getDefaultCompressionMethod()));
+        rcGroupAttrs.push_back(AttributeDesc(0, rankedAttribute.getName(),
+                                             rankedAttribute.getType(),
+                                             rankedAttribute.getFlags(),
+                                             rankedAttribute.getDefaultCompressionMethod()));
         std::shared_ptr<RowCollectionGroup> rcGroup = make_shared<RowCollectionGroup>(query, "", rcGroupAttrs);
 
         std::shared_ptr<ConstArrayIterator> srcArrayIterValue = redistributed->getConstIterator(0);

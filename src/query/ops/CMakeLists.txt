@@ -24,6 +24,7 @@ set(ops_lib_src
     BuildInOps.inc
     create_array/LogicalCreateArray.cpp
     create_array/PhysicalCreateArray.cpp
+    create_array/ChunkEstimator.cpp
     project/LogicalProject.cpp
     project/PhysicalProject.cpp
     scan/LogicalScan.cpp
@@ -49,10 +50,15 @@ set(ops_lib_src
     sg/PhysicalSG.cpp
     store/LogicalStore.cpp
     store/PhysicalStore.cpp
+    store/UniqueNameAssigner.cpp
     redimension/LogicalRedimension.cpp
     redimension/PhysicalRedimension.cpp
     redimension/RedimensionCommon.cpp
     redimension/SyntheticDimChunkMerger.cpp
+    redimension/ChunkIdMap.cpp
+    redimension/CoordMetrics.cpp
+    redimension/RemapperArray.cpp
+    redimension/OverlapRemapperArray.cpp
     reshape/LogicalReshape.cpp
     reshape/PhysicalReshape.cpp
     reshape/ReshapeArray.cpp
@@ -159,6 +165,9 @@ set(ops_lib_src
     unfold/UnfoldArray.cpp
     variable_window/LogicalVariableWindow.cpp
     variable_window/PhysicalVariableWindow.cpp
+    variable_window/WindowEdge.cpp
+    variable_window/ChunkEdge.cpp
+    variable_window/VariableWindowMessage.cpp
     insert/LogicalInsert.cpp
     insert/PhysicalInsert.cpp
     test/splitarray/LogicalSplitArrayTest.cpp

@@ -91,11 +91,14 @@ public:
         }
         else
         {
+            stringstream ss;
+            ss << sourceInstanceID;
+            ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                        DEFAULT_REDUNDANCY,
+                                                                                        ss.str());
             vector<RedistributeContext> requiredDistribution(1);
-            requiredDistribution[0] = RedistributeContext(
-                psLocalInstance,
-                std::shared_ptr<CoordinateTranslator>(),
-                sourceInstanceID);
+            requiredDistribution[0] = RedistributeContext(localDist,  inputSchemas[0].getResidency());
+
             return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
         }
     }

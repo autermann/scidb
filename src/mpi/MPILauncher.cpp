@@ -348,7 +348,7 @@ static void validateLauncherArg(const std::string& arg)
 void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
                                 vector<string>& args,
                                 const vector<string>& slaveArgs,
-                                const std::shared_ptr<const InstanceMembership>& membership,
+                                const InstMembershipPtr& membership,
                                 const std::shared_ptr<Query>& query,
                                 const size_t maxSlaves)
 {
@@ -357,10 +357,8 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
         validateLauncherArg(*iter);
     }
 
-    const Instances& instances = membership->getInstanceConfigs();
-
     map<InstanceID,const InstanceDesc*> sortedInstances;
-    getSortedInstances(sortedInstances, instances, query);
+    getSortedInstances(sortedInstances, membership, query);
 
     ostringstream buf;
     const string clusterUuid = Cluster::getInstance()->getUuid();
@@ -390,11 +388,10 @@ void MpiLauncherOMPI::buildArgs(vector<string>& envVars,
     for (map<InstanceID,const InstanceDesc*>::const_iterator i = sortedInstances.begin();
          i !=  sortedInstances.end(); ++i) {
 
-        assert(i->first<sortedInstances.size());
         const InstanceDesc* desc = i->second;
         assert(desc);
         InstanceID currId = desc->getInstanceId();
-        assert(currId < instances.size());
+        SCIDB_ASSERT(membership->isMember(currId));
 
         if (currId != myId) {
             continue;
@@ -540,22 +537,26 @@ void MpiLauncherOMPI::addPerInstanceArgsOMPI(const InstanceID myId, const Instan
 }
 
 void MpiLauncher::getSortedInstances(map<InstanceID,const InstanceDesc*>& sortedInstances,
-                                     const Instances& instances,
+                                     const InstMembershipPtr& membership,
                                      const std::shared_ptr<Query>& query)
 {
-    for (Instances::const_iterator i = instances.begin(); i != instances.end(); ++i) {
-        InstanceID id = i->getInstanceId();
-        try {
-            // lid should be equal mpi rank
-            InstanceID lid = query->mapPhysicalToLogical(id);
-            sortedInstances[lid] = &(*i);
-        } catch(SystemException& e) {
-            if (e.getLongErrorCode() != SCIDB_LE_INSTANCE_OFFLINE) {
-                throw;
-            }
-        }
+    // query liveness should have a matching membership at this point
+    ASSERT_EXCEPTION(query->getCoordinatorLiveness()->getMembershipId() ==
+                     membership->getId(),
+                     "Unexpected liveness mismatch");
+
+    // Notice that we include all the instances from the default array residency (i.e. the live set)
+    // because this is the behavior of all the MPI-based operators, i.e. they redistribute the data
+    // to all the available instances. The ScaLAPACKArrayDistribution may choose only a subset of
+    // the live instances but that distribution is treated as a black box from the point of view
+    // of sg/pullRedistribute().
+    ArrayResPtr defaultArrayRes = query->getDefaultArrayResidency();
+    for (InstanceID lid = 0; lid < defaultArrayRes->size(); ++lid) {
+        const InstanceID phid = defaultArrayRes->getPhysicalInstanceAt(lid);
+        // the order of phys IDs is what is expected
+        sortedInstances[phid] = &membership->getConfig(phid);
     }
-    assert(sortedInstances.size() == query->getInstancesCount());
+    SCIDB_ASSERT(sortedInstances.size() == query->getInstancesCount());
 }
 
 void MpiLauncher::closeFds()
@@ -570,7 +571,7 @@ void MpiLauncher::closeFds()
 
     // close all fds except for stdin,stderr,stdout
     for (long fd=3; fd <= maxfd ; ++fd) {
-        int rc = scidb::File::closeFd(fd);
+        int rc = scidb::File::closeFd(safe_static_cast<int>(fd));
         rc=rc; // avoid compiler warning
     }
 }
@@ -618,7 +619,7 @@ void MpiLauncher::scheduleKillTimer()
     assert (_pid > 1);
     assert(!_killTimer);
     _killTimer = std::shared_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(getIOService()));
-    int rc = _killTimer->expires_from_now(boost::posix_time::seconds(_MPI_LAUNCHER_KILL_TIMEOUT));
+    size_t rc = _killTimer->expires_from_now(boost::posix_time::seconds(_MPI_LAUNCHER_KILL_TIMEOUT));
     if (rc != 0) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
                << "boost::asio::expires_from_now" << rc << rc << _MPI_LAUNCHER_KILL_TIMEOUT);
@@ -659,7 +660,7 @@ bool MpiLauncher::waitForExit(pid_t pid, int *status, bool noWait)
 void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
                                  vector<string>& args,
                                  const vector<string>& slaveArgs,
-                                 const std::shared_ptr<const InstanceMembership>& membership,
+                                 const InstMembershipPtr& membership,
                                  const std::shared_ptr<Query>& query,
                                  const size_t maxSlaves)
 {
@@ -668,10 +669,8 @@ void MpiLauncherMPICH::buildArgs(vector<string>& envVars,
         validateLauncherArg(*iter);
     }
 
-    const Instances& instances = membership->getInstanceConfigs();
-
     map<InstanceID,const InstanceDesc*> sortedInstances;
-    getSortedInstances(sortedInstances, instances, query);
+    getSortedInstances(sortedInstances, membership, query);
 
     ostringstream buf;
     const string clusterUuid = Cluster::getInstance()->getUuid();
@@ -1050,7 +1049,7 @@ char* MpiLauncher::initIpcForWrite(SharedMemoryIpc* shmIpc, uint64_t shmSize)
 void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
                                  vector<string>& args,
                                  const vector<string>& slaveArgs,
-                                 const std::shared_ptr<const InstanceMembership>& membership,
+                                 const InstMembershipPtr& membership,
                                  const std::shared_ptr<Query>& query,
                                  const size_t maxSlaves)
 {
@@ -1059,10 +1058,8 @@ void MpiLauncherMPICH12::buildArgs(vector<string>& envVars,
         validateLauncherArg(*iter);
     }
 
-    const Instances& instances = membership->getInstanceConfigs();
-
     map<InstanceID,const InstanceDesc*> sortedInstances;
-    getSortedInstances(sortedInstances, instances, query);
+    getSortedInstances(sortedInstances, membership, query);
 
     ostringstream buf;
     const string clusterUuid = Cluster::getInstance()->getUuid();

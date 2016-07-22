@@ -32,6 +32,7 @@
 #include "DistributedSort.h"
 #include "ArrayBreaker.h"
 
+#include <query/RemoteArray.h>
 namespace scidb
 {
 using namespace std;

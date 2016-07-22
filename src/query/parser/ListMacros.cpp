@@ -40,7 +40,7 @@ using namespace parser;                                  // ALl of parser
 /**
  *  Implements the 'inferSchema' method for the "list('macros')" operator.
  */
-ArrayDesc logicalListMacros()
+ArrayDesc logicalListMacros(const std::shared_ptr<Query>& query)
 {
     size_t const n = max(getTable()->size(),1LU);        // Elements to emit
 
@@ -48,7 +48,8 @@ ArrayDesc logicalListMacros()
         list_of(AttributeDesc(0,"name",TID_STRING,0,0))  // ...name attribute
                (AttributeDesc(1,"type",TID_STRING,0,0)), // ...type attribute
         list_of(DimensionDesc("No",0,n-1,n,0)),          // Has one dimension
-        defaultPartitioning());
+        defaultPartitioning(),
+        query->getDefaultArrayResidency());
 }
 
 /**
@@ -57,12 +58,15 @@ ArrayDesc logicalListMacros()
  *  We define a local visitor subclass that formats each binding it visits and
  *  pushes another tuple onto the end of the vector it carries along with it.
  */
-std::shared_ptr<Array> physicalListMacros(const ArenaPtr& arena)
+std::shared_ptr<Array> physicalListMacros(const ArenaPtr& arena,
+                                          const std::shared_ptr<Query>& query)
 {
     struct Lister : Visitor
     {
-        Lister(const Table& t,const ArenaPtr& arena)
-         : tuples(make_shared<TupleArray>(logicalListMacros(),arena))
+        Lister(const Table& t,const ArenaPtr& arena,
+               const std::shared_ptr<Query>& query)
+        :
+        tuples(make_shared<TupleArray>(logicalListMacros(query),arena))
         {
             t.accept(*this);                             // Visit the bindings
         }
@@ -107,7 +111,7 @@ std::shared_ptr<Array> physicalListMacros(const ArenaPtr& arena)
         std::shared_ptr<TupleArray> tuples;                   // The result array
     };
 
-    return Lister(*getTable(),arena).tuples;             // Run the lister
+    return Lister(*getTable(),arena, query).tuples;             // Run the lister
 }
 
 /****************************************************************************/

@@ -28,10 +28,12 @@
  * Get list of updatable array versions
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "array/Metadata.h"
-#include "system/SystemCatalog.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <array/Metadata.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 namespace scidb
 {
@@ -79,17 +81,33 @@ public:
     	ADD_PARAM_IN_ARRAY_NAME()
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to read the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ReadArray);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas, std::shared_ptr<Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 1);
 
-        const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string &arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         ArrayDesc arrayDesc;
-        const ArrayID catalogVersion = query->getCatalogVersion(arrayName);
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, catalogVersion, arrayDesc);
-        std::vector<VersionDesc> versions = SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId());
+        const ArrayID catalogVersion = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, catalogVersion, arrayDesc);
+
+        std::vector<VersionDesc> versions =
+            SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId());
 
         size_t nVersions = versions.size();
         for (size_t i = 0; i < versions.size(); ++i) {
@@ -114,7 +132,14 @@ public:
         }
 
         dimensions[0] = DimensionDesc("VersionNo", 1, 1, nVersions, nVersions, nVersions, 0);
-        return ArrayDesc("Versions", attributes, dimensions, defaultPartitioning());
+
+        stringstream ss;
+        ss << query->getInstanceID();
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(
+            psLocalInstance, DEFAULT_REDUNDANCY, ss.str());
+        return ArrayDesc("Versions", attributes, dimensions,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

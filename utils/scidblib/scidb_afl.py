@@ -48,6 +48,8 @@ def get_iquery_cmd(args = None, base_iquery_cmd = 'iquery -o dcsv'):
         iquery_cmd += '-c ' + args.host + ' '
     if args and args.port:
         iquery_cmd += '-p ' + args.port + ' '
+    if args and hasattr(args, 'auth_file') and args.auth_file:
+        iquery_cmd += "-A " + args.auth_file + ' '
     return iquery_cmd
 
 # ----------------------------------------------------------------------
@@ -97,7 +99,7 @@ def afl(iquery_cmd, query, want_output=False, tolerate_error=False, verbose=Fals
     full_command += "aq \"" + query + "\""
     out_data, err_data = execute_it_return_out_err(full_command)
     if not tolerate_error and len(err_data)>0:
-        raise scidblib.AppError('The AFL query, ' + query + ', failed with the following error:\n' +
+        raise scidblib.AppError('The AFL query, [' + query + '], failed with the following error:\n' +
                         err_data)
     if verbose:
         print verbose_afl_result_line_start() + '%s.' % query
@@ -301,11 +303,11 @@ def find_operator(operators, name, library):
 # ----------------------------------------------------------------------
 # set_namespace_cmd
 # ----------------------------------------------------------------------
-def make_set_namespace_cmd(namespace):
+def make_set_namespace_cmd(namespace, iquery_cmd = None):
     set_namespace_cmd=''
 
     op_set_namespace = find_operator(
-        get_operators(),
+        get_operators(iquery_cmd),
         name='set_namespace',
         library='namespaces')
 
@@ -315,7 +317,7 @@ def make_set_namespace_cmd(namespace):
     return set_namespace_cmd
 
 # ----------------------------------------------------------------------
-# get_array_names
+# remove_array
 # ----------------------------------------------------------------------
 def remove_array(arrayName, namespace=None, iquery_cmd = None):
     """Remove an array from scidb
@@ -329,7 +331,7 @@ def remove_array(arrayName, namespace=None, iquery_cmd = None):
 
 
     if namespace and (namespace != 'public'):
-        query = ';'.join((make_set_namespace_cmd(namespace),
+        query = ';'.join((make_set_namespace_cmd(namespace, iquery_cmd),
                           'remove(%s)' % arrayName))
         expected='Query was executed successfully\nQuery was executed successfully\n'
     else:
@@ -350,10 +352,11 @@ def remove_array(arrayName, namespace=None, iquery_cmd = None):
 # ----------------------------------------------------------------------
 # get_array_names
 # ----------------------------------------------------------------------
-def get_array_names(iquery_cmd = None, temp_only = False, namespace=None):
+def get_array_names(iquery_cmd = None, temp_only=False, versions=False, namespace=None):
     """Get a list of array names.
     @param iquery_cmd  the iquery command to use.
     @param temp_only   only get the names of temporary arrays.
+    @param versions    set to true if interested in getting all array names and their versions
     @param namespace used to specify a namespace prior to getting the arrays
     @return a list of array names that are in SciDB, returned by AFL query project(list(), name).
     @exception AppError if SciDB is not running or if the AFL query failed.
@@ -362,12 +365,18 @@ def get_array_names(iquery_cmd = None, temp_only = False, namespace=None):
         iquery_cmd = get_iquery_cmd()
 
 
-    set_namespace_cmd=make_set_namespace_cmd(namespace) if namespace else ''
+    set_namespace_cmd=''
+    if namespace and (namespace != 'public'):
+        set_namespace_cmd=make_set_namespace_cmd(namespace, iquery_cmd)
+
+    query_arrays="list('arrays')"
+    if versions:
+        query_arrays="list('arrays', true)"
 
     if temp_only:
-        query = set_namespace_cmd + 'project(filter(list(), temporary=true), name);' 
-    else:
-        query = set_namespace_cmd + 'project(list(), name);'
+        query_arrays="filter({0}, temporary=true)".format(query_arrays)
+
+    query = set_namespace_cmd + 'project({0}, name);'.format(query_arrays)
 
     out_data, err_data = afl(iquery_cmd, query, want_output=True)
     lines = out_data.strip().splitlines()
@@ -375,13 +384,13 @@ def get_array_names(iquery_cmd = None, temp_only = False, namespace=None):
         raise scidblib.AppError(query + ' is expected to return at least one line.')
     ret = []
 
-    if not namespace or (namespace == 'public'):
+    if set_namespace_cmd == '':
         start = 1
     else:
         start = 2
-        if lines[0] != 'Query was executed successfully\n':
+        if not lines[0].startswith('Query was executed successfully'):
             raise scidblib.AppError(
-                'set_namespace', namespace, ') failed - result=', lines[0])
+                iquery_cmd, ' ',  query, ' failed - result=', lines[0])
 
     for line in lines[start:]:  # Skip the header line.
         re_name = r'^\{\d+\}\s\'(.+)\'$'  # e.g.: {4} 'MyArray'
@@ -390,7 +399,7 @@ def get_array_names(iquery_cmd = None, temp_only = False, namespace=None):
             raise scidblib.AppError(
                 'get_array_names() failed to parse: ['
                 + line
-                + "] the expected format is {#} 'name'")
+                + "] the expected format is {No} 'name'\nquery=",iquery_cmd, " ", query, " -- start=",str(start))
 
         ret.append(match_name.group(1))
     return ret
@@ -399,7 +408,7 @@ def get_array_names(iquery_cmd = None, temp_only = False, namespace=None):
 # get_namespace_names
 # ----------------------------------------------------------------------
 def get_namespace_names(iquery_cmd = None):
-    """Get a list of array names.
+    """Get a list of namespace names.
 
     @param iquery_cmd  the iquery command to use.
     @return a list of namespace names that are in SciDB, returned by AFL query project(list('namespaces'), name).
@@ -420,3 +429,187 @@ def get_namespace_names(iquery_cmd = None):
             raise scidblib.AppError('I don\'t understand the result line ' + str(i+1) + ': ' + line)
         ret.append(match_name.group(1))
     return ret
+
+# ----------------------------------------------------------------------
+# get_role_names
+# ----------------------------------------------------------------------
+def get_role_names(iquery_cmd = None):
+    """Get a list of role names.
+
+    @param iquery_cmd  the iquery command to use.
+    @return a list of namespace names that are in SciDB, returned by AFL query project(list('namespaces'), name).
+    @exception AppError if SciDB is not running or if the AFL query failed.
+    """
+    if not iquery_cmd:
+        iquery_cmd = get_iquery_cmd()
+    query = 'project(list(\'roles\'), name)'
+    out_data, err_data = afl(iquery_cmd, query, want_output=True)
+    lines = out_data.strip().splitlines()
+    if not lines:
+        raise scidblib.AppError(query + ' is expected to return at least one line.')
+    ret = []
+    for line in lines[1:]:  # Skip the header line.
+        re_name = r'^\{\d+\}\s\'(.+)\'$'  # e.g.: {4} 'MyNamespace'
+        match_name = re.match(re_name, line)
+        if not match_name:
+            raise scidblib.AppError('I don\'t understand the result line ' + str(i+1) + ': ' + line)
+        ret.append(match_name.group(1))
+    return ret
+
+# ----------------------------------------------------------------------
+# get_user_names
+# ----------------------------------------------------------------------
+def get_user_names(iquery_cmd = None):
+    """Get a list of user names.
+
+    @param iquery_cmd  the iquery command to use.
+    @return a list of namespace names that are in SciDB, returned by AFL query project(list('namespaces'), name).
+    @exception AppError if SciDB is not running or if the AFL query failed.
+    """
+    if not iquery_cmd:
+        iquery_cmd = get_iquery_cmd()
+    query = 'project(list(\'users\'), name)'
+    out_data, err_data = afl(iquery_cmd, query, want_output=True)
+    lines = out_data.strip().splitlines()
+    if not lines:
+        raise scidblib.AppError(query + ' is expected to return at least one line.')
+    ret = []
+    i=1
+    for line in lines[1:]:  # Skip the header line.
+        re_name = r'^\{\d+\}\s\'(.+)\'$'  # e.g.: {4} 'username'
+        match_name = re.match(re_name, line)
+        if not match_name:
+            raise scidblib.AppError('I don\'t understand the result line ' + str(i+1) + ': ' + line)
+        ret.append(match_name.group(1))
+        i += 1
+    return ret
+
+class LibraryInfo(object):
+    """A class for storing the library information for an individual SciDb library"""
+    def __init__(self):
+        self._is_valid = False
+
+    def __init__(self, inst, n, name, major, minor, patch, build, build_type="null"):
+        self._inst          = inst
+        self._n             = n
+        self._name          = name
+        self._major         = major
+        self._minor         = minor
+        self._patch         = patch
+        self._build         = build
+        self._build_type    = build_type
+        self._is_valid      = True
+
+    def get_inst(self):
+        return self._inst
+
+    def get_n(self):
+        return self._n
+
+    def get_name(self):
+        return self._name
+
+    def get_major(self):
+        return self._major
+
+    def get_minor(self):
+        return self._minor
+
+    def get_patch(self):
+        return self._patch
+
+    def get_build(self):
+        return self._build
+
+    def get_build_type(self):
+        return self._build_type
+
+    def is_valid(self):
+        return self._is_valid
+
+    def __str__(self):
+        if True == self.is_valid():
+            result= "inst={0} n={1} name={2} major={3} minor={4} patch={5} build={6} build_type={7}".format(
+                self._inst, self._n, self._name, self._major, self._minor,
+                self._patch, self._build, self._build_type)
+        else:
+            result= "Uninitialized library"
+
+        return result
+
+
+# ----------------------------------------------------------------------
+# get_libraries
+# ----------------------------------------------------------------------
+def get_libraries(iquery_cmd = None):
+    """Get a list of user names.
+
+    @param iquery_cmd  the iquery command to use.
+    @return a tuple containing a list of library info objects (found in SciDb) and err_data
+        ([LibraryInfo(...)], err_data)
+    @exception AppError if SciDB is not running or if the AFL query failed.
+    """
+    if not iquery_cmd:
+        iquery_cmd = get_iquery_cmd()
+    query = "list('libraries')"
+    out_data, err_data = afl(iquery_cmd, query, want_output=True)
+    if len(err_data) > 0:
+        raise scidblib.AppError("Failed to list('libraries')\nerr={0}".format(err_data))
+
+    # Successful query execution - out_data format
+    # {inst,n} name,major,minor,patch,build,build_type
+    # {0,0} 'SciDB',15,12,0,1,'Debug'
+    # {1,0} 'SciDB',15,12,0,1,'Debug'
+    # {2,0} 'SciDB',15,12,0,1,'Debug'
+    # {3,0} 'SciDB',15,12,0,1,'Debug'
+
+    lines = out_data.strip().splitlines()
+    if not lines:
+        raise scidblib.AppError(query + ' is expected to return at least one line.')
+
+    ret = []
+    i=1
+    regex1 = re.compile(r'^\{(\d+)\,(\d+)\}\s\'(.+)\',(\d+),(\d+),(\d+),(\d+),\s*\'(.+)\'$')
+    regex2 = re.compile(r'^\{(\d+)\,(\d+)\}\s\'(.+)\',(\d+),(\d+),(\d+),(\d+),\s*null$')
+    for line in lines[1:]:  # Skip the header line.
+        match1 = regex1.match(line)
+        if match1:
+            inst, n, name, major, minor, patch, build, build_type = match1.groups()
+            libInfo = LibraryInfo(inst, n, name, major, minor, patch, build, build_type)
+            ret.append(libInfo)
+        else:
+            match2 = regex2.match(line)
+            if match2:
+                inst, n, name, major, minor, patch, build = match2.groups()
+                libInfo = LibraryInfo(inst, n, name, major, minor, patch, build)
+                ret.append(libInfo)
+            else:
+                raise scidblib.AppError(
+                    "I don\'t understand the result line {0} :\n{1}".format(i+1, line))
+
+        i += 1
+    return ret
+
+# ----------------------------------------------------------------------
+# is_library_loaded
+# ----------------------------------------------------------------------
+def is_library_loaded(name, iquery_cmd = None):
+    """Determine whether a SciDb library is loaded
+
+    @param name The name of the library
+    @param iquery_cmd The iquery command to use to submit the query
+    """
+    if not iquery_cmd:
+        iquery_cmd = get_iquery_cmd()
+
+    libraries = get_libraries(iquery_cmd)
+    print "libraries:"
+    for lib in libraries:
+        print str(lib)
+
+    lib_name = "lib{0}.so".format(name)
+    for lib in libraries:
+        if (name == lib.get_name()) or (lib_name == lib.get_name()):
+            return True
+
+    return False

@@ -142,7 +142,7 @@ SCIDB QUERY : <CREATE ARRAY intensityFlat_NoTime_NoMeasurement < exposure:string
 
 SCIDB QUERY : <show(intensity)>
 {i} schema
-{0} 'intensity<measuredIntensity:int64 NULL DEFAULT null> [elapsedTime=0:40000,10000,0,exposure_id=0:2,3,0]'
+{0} 'intensity<measuredIntensity:int64> [elapsedTime=0:40000,10000,0,exposure_id=0:2,3,0]'
 
 SCIDB QUERY : <CREATE ARRAY intensityCopy < measuredIntensity:int64 NULL > [duration=0:40000,10000,0, exposure_id=0:3,3,0]>
 [Query was executed successfully, ignoring data output by this query.]
@@ -155,7 +155,7 @@ SCIDB QUERY : <CREATE ARRAY v4 <val1:int8,val2:int8>[i=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -olcsv -q "LOAD v4 FROM '${TEST_DATA_DIR}/doc/v4.scidb'">
-[(0,100),(1,99),(2,0),(3,97)]
+[(0,100),(1,99),(2,null),(3,97)]
 
 SCIDB QUERY : <CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0]>
 [Query was executed successfully, ignoring data output by this query.]
@@ -206,31 +206,31 @@ SCIDB QUERY : <cat $DOC_DATA/int4error.scidb>
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD intensityFlat FROM '${TEST_DATA_DIR}/doc/int4error.scidb' AS 'text' ERRORS 99 SHADOW ARRAY intensityFlatShadow">
 {i} exposure,elapsedTime,measuredIntensity
 {0} 'High',777,100
-{1} 'High',0,99
+{1} 'High',null,99
 {2} 'Medium',777,100
 {3} 'Medium',888,95
-{4} 'Medium',0,null
-{5} 'Low',0,null
+{4} 'Medium',null,null
+{5} 'Low',null,null
 {6} 'Low',1888,null
 
 SCIDB QUERY : <show(intensityFlatShadow)>
 {i} schema
-{0} 'intensityFlatShadow<exposure:string NULL DEFAULT null,elapsedTime:string NULL DEFAULT null,measuredIntensity:string NULL DEFAULT null,row_offset:int64> [i=0:6,1000000,0]'
+{0} 'intensityFlatShadow<exposure:string,elapsedTime:string,measuredIntensity:string,row_offset:int64 NOT NULL> [i=0:6,1000000,0]'
 
 SCIDB QUERY : <SELECT * FROM intensityFlatShadow>
 {i} exposure,elapsedTime,measuredIntensity,row_offset
 {1} null,'Failed to parse string \'Jack\' as int64 (non-digits)',null,35
 {4} null,'Failed to parse string \'Jess\' as int64 (non-digits)','Failed to parse string \'Jill\' as int64 (non-digits)',94
-{5} null,'Assigning NULL to non-nullable attribute','Failed to parse string \'Josh\' as int64 (non-digits)',110
+{5} null,null,'Failed to parse string \'Josh\' as int64 (non-digits)',115
 
 SCIDB QUERY : <SELECT * FROM intensityFlat>
 {i} exposure,elapsedTime,measuredIntensity
 {0} 'High',777,100
-{1} 'High',0,99
+{1} 'High',null,99
 {2} 'Medium',777,100
 {3} 'Medium',888,95
-{4} 'Medium',0,null
-{5} 'Low',0,null
+{4} 'Medium',null,null
+{5} 'Low',null,null
 {6} 'Low',1888,null
 
 SCIDB QUERY : <SELECT intensityFlat.exposure AS exp, intensityFlatShadow.exposure AS expMSG, intensityFlat.elapsedTime AS elTime, intensityFlatShadow.elapsedTime AS elTimeMSG, intensityFlat.measuredIntensity AS Intensity, intensityFlatShadow.measuredIntensity AS IntensityMSG, row_offset INTO intensityFlatBadCells FROM intensityFlat, intensityFlatShadow>
@@ -238,9 +238,9 @@ SCIDB QUERY : <SELECT intensityFlat.exposure AS exp, intensityFlatShadow.exposur
 
 SCIDB QUERY : <SELECT * FROM intensityFlatBadCells>
 {i} exp,expMSG,elTime,elTimeMSG,Intensity,IntensityMSG,row_offset
-{1} 'High',null,0,'Failed to parse string \'Jack\' as int64 (non-digits)',99,null,35
-{4} 'Medium',null,0,'Failed to parse string \'Jess\' as int64 (non-digits)',null,'Failed to parse string \'Jill\' as int64 (non-digits)',94
-{5} 'Low',null,0,'Assigning NULL to non-nullable attribute',null,'Failed to parse string \'Josh\' as int64 (non-digits)',110
+{1} 'High',null,null,'Failed to parse string \'Jack\' as int64 (non-digits)',99,null,35
+{4} 'Medium',null,null,'Failed to parse string \'Jess\' as int64 (non-digits)',null,'Failed to parse string \'Jill\' as int64 (non-digits)',94
+{5} 'Low',null,null,null,null,'Failed to parse string \'Josh\' as int64 (non-digits)',115
 
 Query was executed successfully
 

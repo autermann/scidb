@@ -83,13 +83,8 @@ class PhysicalMpiTest: public MPIPhysical
         MpiManager::getInstance()->cleanup();
 
         assert(_ctx);
-        const std::shared_ptr<const InstanceMembership> membership =
-            Cluster::getInstance()->getInstanceMembership();
-
-        if (membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) {
-            throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-        }
-
+        const InstMembershipPtr membership =
+           Cluster::getInstance()->getInstanceMembership(query->getCoordinatorLiveness()->getMembershipId());
         const string& installPath = MpiManager::getInstallPath(membership);
 
         syncBarrier(0, query);
@@ -115,7 +110,7 @@ class PhysicalMpiTest: public MPIPhysical
                       std::vector<std::string>& args,
                       const std::shared_ptr<const InstanceMembership>& membership,
                       const std::shared_ptr<Query>& query,
-                      const int maxSlaves)
+                      const size_t maxSlaves)
     {
         launcher->launch(args, membership, maxSlaves);
 

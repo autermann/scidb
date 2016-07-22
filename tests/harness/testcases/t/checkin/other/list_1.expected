@@ -44,7 +44,6 @@ name,library
 'reshape','scidb'
 'save','scidb'
 'scan','scidb'
-'setopt','scidb'
 'show','scidb'
 'slice','scidb'
 'sort','scidb'
@@ -272,6 +271,7 @@ name,profile,deterministic,library
 'regex','bool regex(string,string)',true,'scidb'
 'sin','double sin(double)',true,'scidb'
 'sin','float sin(float)',true,'scidb'
+'sizeof','uint64 sizeof(<any>)',true,'scidb'
 'sqrt','double sqrt(double)',true,'scidb'
 'sqrt','float sqrt(float)',true,'scidb'
 'strchar','char strchar(string)',true,'scidb'
@@ -289,7 +289,7 @@ SCIDB QUERY : <store(list('queries'),query_array)>
 
 SCIDB QUERY : <attributes(query_array)>
 name,type_id,nullable
-'query_id','uint64',false
+'query_id','string',false
 'coordinator','uint64',false
 'query_string','string',false
 'creation_time','datetime',false
@@ -403,7 +403,7 @@ SCIDB QUERY : <store(list('chunk map'),chunk_map_array)>
 SCIDB QUERY : <attributes(chunk_map_array)>
 name,type_id,nullable
 'svrsn','uint32',false
-'instn','uint32',false
+'instn','uint64',false
 'dguid','uint64',false
 'dhdrp','uint64',false
 'doffs','uint64',false
@@ -439,7 +439,7 @@ SCIDB QUERY : <store(list('chunk descriptors'),chunk_desc_array)>
 SCIDB QUERY : <attributes(chunk_desc_array)>
 name,type_id,nullable
 'svrsn','uint32',false
-'insn','uint32',false
+'insn','uint64',false
 'dguid','uint64',false
 'dhdrp','uint64',false
 'doffs','uint64',false

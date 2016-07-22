@@ -30,14 +30,13 @@
 #ifndef QUERYPLAN_H_
 #define QUERYPLAN_H_
 
-#include <memory>
-#include <boost/archive/text_iarchive.hpp>
+#include "QueryPlanFwd.h"
 
-#include <array/Metadata.h>
 #include <query/Operator.h>
 #include <query/OperatorLibrary.h>
-#include <system/SystemCatalog.h>
 #include <util/SerializedPtrConverter.h>
+
+#include <boost/archive/text_iarchive.hpp>
 
 namespace scidb
 {
@@ -88,6 +87,7 @@ public:
 
     const ArrayDesc& inferTypes      (std::shared_ptr<Query>);
     void             inferArrayAccess(std::shared_ptr<Query>&);
+    std::string      inferPermissions(std::shared_ptr<Query>&);
 
     /**
      * Retrieve a human-readable description.
@@ -106,9 +106,7 @@ public:
     std::shared_ptr<ParsingContext>                     _parsingContext;
 };
 
-class PhysicalQueryPlanNode;
 typedef std::shared_ptr<PhysicalOperator>      PhysOpPtr;
-typedef std::shared_ptr<PhysicalQueryPlanNode> PhysNodePtr;
 
 /*
  *  Currently LogicalQueryPlanNode and PhysicalQueryPlanNode have similar structure.
@@ -160,7 +158,23 @@ class PhysicalQueryPlanNode
     }
 
     /**
-     * Replaces targetChild with newChild in children.
+     * Replace @c targetChild with @c newChild in QueryPlan Tree.
+     *
+     * The @c newChild (and its children) completely replaces the @c targetChild
+     * (and any of its children) in the QueryPlan.
+     *
+     * NOTE: The @c targetChild and any of its children nodes are removed from
+     * the query Plan tree, although the references between the @c targetChild
+     * and its children remain.
+     *
+     * @verbatim
+     *    a                                  a
+     *   / \                                / \
+     *  b  targetChild    newChild  ==>    b   newChild    targetChild
+     *     /  \           /  \                 /  \        / \
+     *    c    d         e    f               e    f      c   d
+     * @endverbatim
+     *
      * @param targetChild node to remove. Must be in children.
      * @param newChild node to insert. Must be in children.
      */
@@ -182,8 +196,39 @@ class PhysicalQueryPlanNode
             }
         }
         _childNodes = newChildren;
-        assert(removed); removed = removed; // Eliminate warnings
+        SCIDB_ASSERT(removed==1);
     }
+
+    /**
+     * Supplant the @c targetChild with the @c newChild in the QueryPlan tree.
+     *
+     * The children of the original child are assigned to the newChild, and
+     * the newChild is assigned as the child of original child's parent.
+     *
+     * @note Any children nodes of the @c newChild Node are removed from the
+     * query Plan tree, and the references are removed between @c newChild and
+     * any of its original children. Each node is a @c std::shared_ptr so any
+     * object (@c targetChild, or original children of @c newChild) where the
+     * refcount drops to 0 will be deleted.
+     *
+     * @verbatim
+     *    a                                   a
+     *   / \                                 / \
+     *  b   targetChild    newChild  ==>    b   newChild       targetChild
+     *        /  \          /   \                /  \
+     *       c    d        e     f              c    d           e     f
+     * @endverbatim
+     *
+     * @note Make certain to avoid creating cyclic graphs. @c newChild must @b
+     * not be a child or descendant of @c targetChild. The main purpose of this
+     * function is to insert a newChild (with no children) in the place of
+     * targetChild.
+     *
+     *
+     * @param targetChild node to remove. Must be in _childNodes.
+     * @param newChild node to supplant the original.
+     */
+    void supplantChild(const PhysNodePtr& targetChild, const PhysNodePtr& newChild);
 
     PhysOpPtr getPhysicalOperator()
     {
@@ -530,11 +575,13 @@ void PhysicalQueryPlanNode::serialize(Archive& ar, const unsigned int version)
         TextIArchiveQueryPlan::SerializationHelper& helper = dynamic_cast<TextIArchiveQueryPlan&>(ar)._helper;
         std::string logicalName;
         std::string physicalName;
+        std::string controlCookie;
         PhysicalOperator::Parameters parameters;
         ArrayDesc schema;
 
         ar & logicalName;
         ar & physicalName;
+        ar & controlCookie;
 
         // ar & parameters;
         size_t size = 0;
@@ -550,16 +597,19 @@ void PhysicalQueryPlanNode::serialize(Archive& ar, const unsigned int version)
         _physicalOperator = OperatorLibrary::getInstance()->createPhysicalOperator(
                     logicalName, physicalName, parameters, schema);
         _physicalOperator->setTileMode(_tile);
+        _physicalOperator->setControlCookie(controlCookie);
     }
     else
     {
         std::string logicalName = _physicalOperator->getLogicalName();
         std::string physicalName = _physicalOperator->getPhysicalName();
+        std::string controlCookie = _physicalOperator->getControlCookie();
         PhysicalOperator::Parameters parameters = _physicalOperator->getParameters();
         ArrayDesc schema = _physicalOperator->getSchema();
 
         ar & logicalName;
         ar & physicalName;
+        ar & controlCookie;
 
         //ar & parameters;
         size_t size = parameters.size();
@@ -600,6 +650,11 @@ public:
     void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         return _root->inferArrayAccess(query);
+    }
+
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        return _root->inferPermissions(query);
     }
 
 	/**
@@ -667,8 +722,6 @@ public:
 private:
     std::shared_ptr<PhysicalQueryPlanNode> _root;
 };
-
-typedef std::shared_ptr<PhysicalPlan> PhysPlanPtr;
 
 } // namespace
 

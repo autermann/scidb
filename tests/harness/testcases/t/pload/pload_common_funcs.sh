@@ -99,7 +99,7 @@ setup_array_info()
     done
 }
 
-MY_PID=$$
+MY_PID=${HPID}
 IQUERY_CMD="iquery -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239}"
 
 # Seed the random number generator.

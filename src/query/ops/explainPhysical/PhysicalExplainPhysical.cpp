@@ -38,8 +38,9 @@
 #include <util/Thread.h>
 #include "SciDBAPI.h"
 
+#include <query/QueryPlan.h>
+
 using namespace std;
-using namespace boost;
 
 namespace scidb
 {
@@ -52,9 +53,10 @@ public:
     {}
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)

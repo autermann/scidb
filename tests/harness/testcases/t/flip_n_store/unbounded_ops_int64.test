@@ -44,7 +44,7 @@ dimensions(unbounded2)
 cast(unbounded2,unbounded3)
 dimensions(unbounded2)
 store(unbounded2,unbounded2_new)
-substitute(unbounded2,build(<a:bool>[x=0:30,2,0],true))
+substitute(unbounded2,build(<a:int64>[x=0:30,2,0],8))
 aggregate(unbounded2,var(x))
 project(versions(unbounded2), version_id)
 

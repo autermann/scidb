@@ -154,10 +154,10 @@ public:
                 _properties.tile = false;
                 expr.compile(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[k+1])->getExpression(), query, _properties.tile, TID_VOID, schemas);
             }
-            int flags = 0;
+            int16_t flags = 0;
             if (expr.isNullable())
             {
-                flags = (int)AttributeDesc::IS_NULLABLE;
+                flags = AttributeDesc::IS_NULLABLE;
             }
 
             for (size_t j = 0; j < nextAttrId; j++) {
@@ -199,7 +199,11 @@ public:
                                               emptyTag->getVarSize()));
         }
 
-        return ArrayDesc(schemas[0].getName(), outAttrs, schemas[0].getDimensions(), defaultPartitioning());
+        return ArrayDesc(schemas[0].getName(),
+                         outAttrs,
+                         schemas[0].getDimensions(),
+                         schemas[0].getDistribution(),
+                         schemas[0].getResidency());
     }
 };
 

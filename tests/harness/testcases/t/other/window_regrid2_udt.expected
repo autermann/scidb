@@ -21,7 +21,7 @@ SCIDB QUERY : <store(apply(A,b,str2point('(1,1)')),B)>
 
 SCIDB QUERY : <show(B)>
 {i} schema
-{0} 'B<a:int32,b:point> [x=0:2,3,0]'
+{0} 'B<a:int32,b:point NOT NULL> [x=0:2,3,0]'
 
 SCIDB QUERY : <store(apply(A,b,rational('(1/2)')),C)>
 {x} a,b
@@ -31,7 +31,7 @@ SCIDB QUERY : <store(apply(A,b,rational('(1/2)')),C)>
 
 SCIDB QUERY : <show(C)>
 {i} schema
-{0} 'C<a:int32,b:rational> [x=0:2,3,0]'
+{0} 'C<a:int32,b:rational NOT NULL> [x=0:2,3,0]'
 
 SCIDB QUERY : <select * from A>
 {x} a

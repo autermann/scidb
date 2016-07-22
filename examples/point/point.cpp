@@ -38,6 +38,8 @@
 #include "query/TypeSystem.h"
 #include "system/ErrorsLibrary.h"
 
+#include <SciDBAPI.h> // for #define EXPORTED_FUNCTION
+
 using namespace std;
 using namespace scidb;
 using namespace boost::assign;

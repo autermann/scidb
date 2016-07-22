@@ -42,8 +42,11 @@ namespace scidb
 class PhysicalAverageRank: public PhysicalOperator
 {
   public:
-    PhysicalAverageRank(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalAverageRank(const std::string& logicalName,
+                        const std::string& physicalName,
+                        const Parameters& parameters,
+                        const ArrayDesc& schema)
+    : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
 
@@ -57,7 +60,8 @@ class PhysicalAverageRank: public PhysicalOperator
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
         vector<RedistributeContext> requiredDistribution;
-        requiredDistribution.push_back(RedistributeContext(defaultPartitioning()));
+        requiredDistribution.push_back(RedistributeContext(createDistribution(psHashPartitioned),
+                                                           _schema.getResidency()));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -67,21 +71,19 @@ class PhysicalAverageRank: public PhysicalOperator
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                    const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
-        const size_t nInstances = query->getInstancesCount();
-        const size_t nDims = _schema.getDimensions().size();
-
-        DimensionVector offset(nDims);
-
-        offset[nDims-1] += (nInstances-1)*_schema.getDimensions()[nDims-1].getChunkInterval();
-        return RedistributeContext(defaultPartitioning(), CoordinateTranslator::createOffsetMapper(offset));
+        SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema() == psUndefined);
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(Query::getValidQueryPtr(_query)->getDefaultArrayResidency()));
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         std::shared_ptr<Array> inputArray = inputArrays[0];
+        checkOrUpdateIntervals(_schema, inputArray);
+
         if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
         {   //if input supports MULTI_PASS, don't bother converting it
             inputArray = ensureRandomAccess(inputArray, query);

@@ -3,7 +3,7 @@
 import re
 import sys
 import ast
-from .util import superTuple
+from collections import namedtuple
 
 # BEGIN_COPYRIGHT
 #
@@ -28,11 +28,11 @@ from .util import superTuple
 MAX_COORDINATE = (2 ** 62) - 1
 MIN_COORDINATE = - MAX_COORDINATE
 
-def parse(schema):
+def parse(schema, strict=True, default_nullable=True):
     """Parse a SciDB schema into lists of attributes and dimensions.
 
     @description
-    Returned attribute and dimension lists are "supertuples" whose
+    Returned attribute and dimension lists are namedtuples whose
     elements can be accessed by Python attribute name.  For an
     attr_list element 'attr', you can access:
 
@@ -54,16 +54,31 @@ def parse(schema):
 
     IF the value for chunk size is '?', then dim.chunk will be '?'.
 
+    Attributes became nullable by default in 15.12.  When parsing
+    schema strings written by pre-15.12 software, set default_nullable
+    to False to preserve the intended semantics.
+
     @param schema array schema to parse
+    @param strict input string must be schema only, no extra cruft
+    @param default_nullable default nullability of attributes
     @throws ValueError on malformed schema
     @return attr_list, dim_list
+
+    @note The default value for 'strict' should be flipped to False,
+          but right now there is no time to thoroughly test the effect
+          on calling scripts.  Setting strict=False will let you parse
+          the raw output of a show() operator, which is what you
+          typically want to do.
     """
     # Start by cracking schema into attributes and dimensions parts.
-    m = re.match(r'\s*<([^>]+)>\s*\[([^\]]+)\]\s*$', schema)
+    if strict:
+        m = re.match(r'\s*<([^>]+)>\s*\[([^\]]+)\]\s*$', schema)
+    else:
+        m = re.search(r'<([^>]+)>\s*\[([^\]]+)\]', schema)
     if not m:
         raise ValueError("bad schema: '%s'" % schema)
     # Parse attributes...
-    Attribute = superTuple('Attribute', 'name', 'type', 'nullable', 'default')
+    Attribute = namedtuple('Attribute', ('name', 'type', 'nullable', 'default'))
     attr_descs = map(str.strip, m.group(1).split(','))
     attr_list = []
     rgx_default = '(default)\s+(.+)$'
@@ -76,15 +91,21 @@ def parse(schema):
         if not match:
             raise ValueError("missing attribute type: '%s'" % desc)
         attr_type = match.group().lower()
-        ty = ty[len(attr_type):]
+        ty = ty[len(attr_type):] # ty is now qualifiers only
         match = re.search(rgx_default,ty,re.MULTILINE | re.DOTALL | re.IGNORECASE)
         default_value = match.group(2) if match else None
-        attr_list.append(Attribute(nm, attr_type, 'null' in ty.lower(), default_value))
+        saw_null = 'null' in ty.lower()
+        saw_notnull = 'not null' in ' '.join(ty.lower().split())
+        if default_nullable:
+            nullable = not saw_notnull
+        else:
+            nullable = saw_null and not saw_notnull
+        attr_list.append(Attribute(nm, attr_type, nullable, default_value))
     # Parse dimensions.  Each regex match peels off a full dimension
     # spec from the left of the dimensions part.
     dim_list = []
-    Dimension = superTuple('Dimension', 'name', 'lo', 'hi', 'chunk', 'overlap')
-    rgx = r'\s*([^=\s]+)\s*=\s*(\-{,1}\d+)\s*:\s*(\*|\-{,1}\d+)\s*,\s*(\?|\d+)\s*,\s*(\d+)\s*'
+    Dimension = namedtuple('Dimension', ('name', 'lo', 'hi', 'chunk', 'overlap'))
+    rgx = r'\s*([^=\s]+)\s*=\s*(\-{,1}\d+)\s*:\s*(\*|\-{,1}\d+)\s*,\s*(\?|\*|\d+)\s*,\s*(\d+)\s*'
     dims = m.group(2)
     if not dims:
         raise ValueError("schema has no dimensions: '%s'" % schema)
@@ -93,7 +114,7 @@ def parse(schema):
         if not m:
             raise ValueError("bad dimension(s): '%s'" % dims)
         high = MAX_COORDINATE if m.group(3) == '*' else long(m.group(3))
-        chunk = m.group(4) if m.group(4) == '?' else long(m.group(4))
+        chunk = m.group(4) if m.group(4) in ('?','*') else long(m.group(4))
         dim_list.append(Dimension(m.group(1), long(m.group(2)), high,
                                   chunk, long(m.group(5))))
         if rgx[0] != ',':
@@ -101,19 +122,25 @@ def parse(schema):
         dims = dims[len(m.group(0)):]
     return attr_list, dim_list
 
-def unparse(attrs, dims):
+def unparse(attrs, dims, default_nullable=True):
     """Inverse of parse: turn attributes and dimensions into a schema string.
 
-    @param attrs list of attribute "supertuples" as returned by #parse
-    @param dims list of dimension "supertuples" as returned by #parse
+    @param attrs list of Attribute namedtuples as returned by #parse
+    @param dims list of Dimension namedtuples as returned by #parse
+    @param default_nullable default nullability of attributes
     @returns schema string constructed from given attributes and dimensions
     """
-
+    if default_nullable:
+        null = ''
+        notnull = ' NOT NULL'
+    else:
+        null = ' NULL'
+        notnull = ''
     return "<{0}>[{1}]".format(
         ','.join(["%s:%s%s%s" % (
                     x.name,
                     x.type,
-                    (' NULL' if x.nullable else ''),
+                    (null if x.nullable else notnull),
                     (' DEFAULT ' + x.default if x.default is not None else '')
                     ) for x in attrs]),
         ','.join(["%s=%s:%s,%s,%s" % (

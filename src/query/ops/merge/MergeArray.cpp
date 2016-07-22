@@ -103,7 +103,7 @@ namespace scidb
             iterators[i]->reset();
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
             }
         }
     }
@@ -117,7 +117,7 @@ namespace scidb
         {
             if (iterators[i]->setPosition(pos))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
                 return true;
             }
             else
@@ -154,7 +154,7 @@ namespace scidb
             }
             if(!iterators[i]->end() && (currIterator<0 || precede(iterators[i], iterators[currIterator])))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
             }
         }
     }
@@ -175,7 +175,7 @@ namespace scidb
             iterators[i] = inputChunks[i]->getConstIterator(iterationMode & ~INTENDED_TILE_MODE);
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
             }
         }
     }
@@ -193,7 +193,7 @@ namespace scidb
             if (iterators[i]->setPosition(pos))
             {
                 if (currIterator < 0) {
-                    currIterator = i;
+                    currIterator = safe_static_cast<int>(i);
                 }
             }
             else
@@ -212,7 +212,7 @@ namespace scidb
             iterators[i]->reset();
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
             }
         }
     }
@@ -240,7 +240,7 @@ namespace scidb
             }
             if(!iterators[i]->end() && (currIterator<0 || precede(iterators[i], iterators[currIterator])))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
             }
         }
     }
@@ -299,7 +299,7 @@ namespace scidb
             iterators[i] = array.inputArrays[i]->getConstIterator(attrID);
             if (!iterators[i]->end() && (currIterator < 0 || precede(iterators[i], iterators[currIterator])))
             {
-                currIterator = i;
+                currIterator = safe_static_cast<int>(i);
             }
         }
     }

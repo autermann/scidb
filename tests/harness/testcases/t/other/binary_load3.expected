@@ -174,7 +174,7 @@ SCIDB QUERY : <load(MAT_UB2, 'matrix.bin', 0, '(float,string,float)')>
 
 SCIDB QUERY : <load(MAT_UB2, 'matrix.bin', 0, '(float,string,float)',10,UB_shadow)>
 {x,y} val,name,sal
-{0,0} 0,'',0
+{0,0} 0,null,null
 
 SCIDB QUERY : <load(MAT_UB2, 'matrix.bin', 0, '(double,string,double)',10,UB_shadow)>
 {x,y} val,name,sal

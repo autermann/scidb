@@ -30,9 +30,11 @@
 
 #include <string.h>
 
-#include "query/Operator.h"
-#include "array/TupleArray.h"
-#include "system/SystemCatalog.h"
+#include <array/TupleArray.h>
+#include <query/Operator.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+
 
 using namespace std;
 using namespace boost;
@@ -43,27 +45,38 @@ namespace scidb
 class PhysicalVersions: public PhysicalOperator
 {
 public:
-    PhysicalVersions(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalVersions(
+        const string& logicalName, const string& physicalName,
+        const Parameters& parameters, const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)
     {
         assert(_parameters.size() == 1);
 
-        const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string &arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         ArrayDesc arrayDesc;
-        const ArrayID catalogVersion = query->getCatalogVersion(arrayName);
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, catalogVersion, arrayDesc);
-        std::vector<VersionDesc> versions = SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId());
+        const ArrayID catalogVersion = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, catalogVersion, arrayDesc);
+
+        std::vector<VersionDesc> versions =
+            SystemCatalog::getInstance()->getArrayVersions(arrayDesc.getId());
 
         std::shared_ptr<TupleArray> tuples(std::make_shared<TupleArray>(_schema, _arena));
         for (size_t i = 0; i < versions.size(); ++i) {

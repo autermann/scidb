@@ -209,69 +209,69 @@
 [An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(archINFamy),(5),(5)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
 (e) NULL (or any capitalization other than null) does not work.
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NULL),(6),(1)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NULL),(6),(1)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nULL),(6),(2)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nULL),(6),(2)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NuLL),(6),(3)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NuLL),(6),(3)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NUlL),(6),(4)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NUlL),(6),(4)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NULl),(6),(5)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NULl),(6),(5)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NUll),(6),(6)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NUll),(6),(6)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nULl),(6),(7)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nULl),(6),(7)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nuLL),(6),(8)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nuLL),(6),(8)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NulL),(6),(9)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NulL),(6),(9)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(NuLl),(6),(10)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(NuLl),(6),(10)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nUlL),(6),(11)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nUlL),(6),(11)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(Null),(6),(12)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(Null),(6),(12)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nUll),(6),(13)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nUll),(6),(13)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nuLl),(6),(14)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nuLl),(6),(14)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(nulL),(6),(15)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(nulL),(6),(15)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:float>[i=0:2,3,0], '[(null),(6),(16)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:float NOT NULL>[i=0:2,3,0], '[(null),(6),(16)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NULL),(7),(1)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NULL),(7),(1)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nULL),(7),(2)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nULL),(7),(2)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NuLL),(7),(3)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NuLL),(7),(3)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NUlL),(7),(4)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NUlL),(7),(4)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NULl),(7),(5)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NULl),(7),(5)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NUll),(7),(6)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NUll),(7),(6)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nULl),(7),(7)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nULl),(7),(7)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nuLL),(7),(8)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nuLL),(7),(8)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NulL),(7),(9)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NulL),(7),(9)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(NuLl),(7),(10)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(NuLl),(7),(10)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nUlL),(7),(11)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nUlL),(7),(11)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(Null),(7),(12)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(Null),(7),(12)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nUll),(7),(13)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nUll),(7),(13)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nuLl),(7),(14)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nuLl),(7),(14)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(nulL),(7),(15)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(nulL),(7),(15)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
-[An error expected at this place for the query "build(<v:double>[i=0:2,3,0], '[(null),(7),(16)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
+[An error expected at this place for the query "build(<v:double NOT NULL>[i=0:2,3,0], '[(null),(7),(16)]', true)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
 
 (f) null works only for nullable attributes.
 {i} v

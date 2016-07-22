@@ -87,7 +87,7 @@ public:
 	}
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
-	{
+    {
         //As far as chunk sizes, they can be a pain! So we allow the user to specify an optional chunk size
         //as part of the sort op.
 
@@ -111,11 +111,15 @@ public:
         // Use a SortArray object to build the schema.
         // Note: even though PhysicalSort::execute() uses an expanded schema, with chunk_pos and cell_pos,
         //       these additional attributes are projected off before returning the final sort result.
+        // Note: SortArray gives us a schema with one non-autochunked dimension, so there is no need
+        //       to fix up autochunked intervals later on.
         const bool preservePositions = false;
         SortArray sorter(schema, arena::getArena(), preservePositions, chunkSize);
 
-        return sorter.getOutputArrayDesc();
-	}
+        // the residency (of the input) is not quite right,
+        // but it will get corrected in PhysicalSort::getOutputDistribution()
+        return sorter.getOutputSchema(false);  // false = not use expanded schema.
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSort, "sort")

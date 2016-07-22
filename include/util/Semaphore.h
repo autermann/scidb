@@ -35,7 +35,7 @@
 #include <boost/function.hpp>
 #include <string>
 
-#define POSIX_SEMAPHORES
+#include <util/PerfTime.h>
 
 #include <semaphore.h>
 #include <time.h>
@@ -62,14 +62,14 @@ public:
      * @brief Try to enter semaphore
      * @throws scidb::SCIDB_SE_INTERNAL::SCIDB_LE_SEMAPHORE_ERROR
      */
-    void enter();
+    void enter(perfTimeCategory_t tc = PTCW_SEM_OTHER);
 
     /**
      * @brief Try to enter semaphore count times
      * @param[in] count - how many times should we attempt to enter
      * @throws scidb::SCIDB_SE_INTERNAL::SCIDB_LE_SEMAPHORE_ERROR
      */
-    void enter(int count);
+    void enter(size_t count, perfTimeCategory_t tc = PTCW_SEM_OTHER);
 
     /**
      * @brief Try to enter semaphore with time out and check error state.
@@ -80,7 +80,8 @@ public:
      */
     bool enter(
         ErrorChecker& errorChecker,
-        time_t timeoutSeconds = 10);
+        time_t timeoutSeconds = 10,
+        perfTimeCategory_t tc = PTCW_SEM_OTHER);
 
     /**
      * @brief Try to enter semaphore with time out and check error state.
@@ -95,9 +96,10 @@ public:
      * @parampin] timeoutSeconds - when should sem_timedwait expire
      */
     bool enter(
-        int count,
+        size_t count,
         ErrorChecker& errorChecker,
-        time_t timeoutSeconds = 10);
+        time_t timeoutSeconds = 10,
+        perfTimeCategory_t tc = PTCW_SEM_OTHER);
 
     /**
      * @brief Attempt to release the semaphore count times.

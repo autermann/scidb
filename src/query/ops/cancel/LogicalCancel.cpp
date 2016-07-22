@@ -26,12 +26,10 @@
  * \author roman.simakov@gmail.com
  * \brief Cancel operator cancels query with given ID
  */
-
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
-#include "query/executor/SciDBExecutor.h"
-
+#include <iostream>
+#include <query/QueryID.h>
+#include <query/Operator.h>
+#include <system/Exceptions.h>
 
 using namespace std;
 
@@ -61,22 +59,26 @@ namespace scidb {
  * @par Notes:
  *   - This operator is designed for internal use.
  *
- */class LogicalCancel: public LogicalOperator
+ */
+class LogicalCancel: public LogicalOperator
 {
 public:
     LogicalCancel(const string& logicalName, const std::string& alias):
 	    LogicalOperator(logicalName, alias)
-	{
-        ADD_PARAM_CONSTANT(TID_INT64)
+    {
+        ADD_PARAM_CONSTANT(TID_STRING)
         _properties.ddl = true;
-	}
+    }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
-	{
-        int64_t queryID = evaluate(dynamic_pointer_cast<OperatorParamLogicalExpression>(
-            _parameters[0])->getExpression(), query, TID_INT64).getInt64();
+    {
+        std::stringstream queryIdS (evaluate(dynamic_pointer_cast<OperatorParamLogicalExpression>(
+                                             _parameters[0])->getExpression(), query, TID_STRING).getString());
         try
         {
+            QueryID queryID;
+            queryIdS >> queryID;
+
             query->getQueryByID(queryID, true);
         }
         catch(const Exception& e)
@@ -91,9 +93,11 @@ public:
             }
         }
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
+
         return arrDesc;
-	}
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalCancel, "cancel")

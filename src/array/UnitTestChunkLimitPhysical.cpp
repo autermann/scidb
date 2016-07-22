@@ -64,7 +64,7 @@ public:
      * @param[in]    percentNull a number from 0 to 100, where 0 means never generate null, and 100 means always generate null
      * @return       the value from the parameter
      */
-    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, int nullReason)
+    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, Value::reason nullReason)
     {
         assert(percentNull>=0 && percentNull<=100);
 
@@ -152,7 +152,7 @@ public:
         {
             Value v;
 
-            genRandomValue(type, v, 0, 0);
+            genRandomValue(type, v, 0, static_cast<Value::reason>(0));
             chunkIter->writeItem(v);
             ++(*chunkIter);
         }
@@ -197,7 +197,9 @@ public:
 
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), 0, count, count, 0);
-        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
+        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
 
         // Test array
         std::shared_ptr<MemArray> array(new MemArray(schema, query));
@@ -269,7 +271,7 @@ public:
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
                                      std::shared_ptr<Query> query)
     {
-        srand(time(NULL));
+        srand(static_cast<unsigned int>(time(NULL)));
 
         testOnce_ChunkLimit(query, "2", TID_INT64, 100000, 0, false);
         testOnce_ChunkLimit(query, "2", TID_INT64, 100000, ChunkIterator::SEQUENTIAL_WRITE, false);

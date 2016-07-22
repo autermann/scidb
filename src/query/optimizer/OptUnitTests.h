@@ -48,7 +48,6 @@
 
 #include "smgr/compression/BuiltinCompressors.h"
 #include "query/optimizer/HabilisOptimizer.h"
-#include <usr_namespace/NamespaceDesc.h>
 
 namespace scidb
 {
@@ -114,7 +113,7 @@ public:
 
 #define ASSERT_OPERATOR(instance, opName) (CPPUNIT_ASSERT( instance ->getPhysicalOperator()->getPhysicalName() == opName ))
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, PartitioningSchema ps)
+    inline static ArrayID s_addArray (const ArrayDesc & desc)
     {
         SystemCatalog* systemCat = SystemCatalog::getInstance();
         if (systemCat->containsArray(desc.getName()))
@@ -124,22 +123,42 @@ public:
         ArrayDesc d2 = desc;
 
         ArrayID uAId = systemCat->getNextArrayId();
-        d2.setPartitioningSchema(ps);
+
         d2.setIds(uAId, uAId, VersionID(0));
-        systemCat->addArray(NamespaceDesc("public"), d2);
+        systemCat->addArray(d2);
         return d2.getId();
     }
 
-    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end, PartitioningSchema ps)
+    inline static ArrayID s_addArray (const ArrayDesc & desc, const Coordinates & start, const Coordinates & end)
     {
-        ArrayID id = s_addArray(desc, ps);
+        ArrayID id = s_addArray(desc);
         SystemCatalog::getInstance()->updateArrayBoundaries(desc, PhysicalBoundaries(start, end));
         return id;
+    }
+
+    Coordinates getOffsetVector(const RedistributeContext& dist)
+    {
+        size_t instanceShift;
+        static Coordinates offset; // static to avoid mallocs, not thread-safe
+        ArrayDistributionFactory::getTranslationInfo(dist.getArrayDistribution().get(), offset, instanceShift);
+        CPPUNIT_ASSERT(instanceShift == 0);
+        return offset;
     }
 
     void setUp()
     {
         _queryProcessor = QueryProcessor::create();
+
+
+        std::shared_ptr<const InstanceLiveness> liveness(Cluster::getInstance()->getInstanceLiveness());
+        std::vector<InstanceID> instances(liveness->getNumLive());
+
+        const scidb::InstanceLiveness::LiveInstances& liveInstances = liveness->getLiveInstances();
+        size_t i=0;
+        for (InstanceLivenessEntry const& entry : liveInstances) {
+            instances[i++] = entry.getInstanceId();
+        }
+        ArrayResPtr residency = createDefaultResidency(PointerRange<InstanceID>(instances));
 
         //DUMMY
         Attributes dummyArrayAttributes;
@@ -150,57 +169,67 @@ public:
         dummyArrayDimensions.push_back(DimensionDesc("x", 0, 0, 8, 9, 1, 0));
         dummyArrayDimensions.push_back(DimensionDesc("y", 0, 1, 9, 9, 1, 0));
 
-        _dummyArray = ArrayDesc("opttest_dummy_array", dummyArrayAttributes, dummyArrayDimensions, defaultPartitioning());
+        _dummyArray = ArrayDesc("opttest_dummy_array", dummyArrayAttributes, dummyArrayDimensions,
+                                defaultPartitioning(),
+                                residency);
         _dummyArrayStart.push_back(0);
         _dummyArrayStart.push_back(1);
         _dummyArrayEnd.push_back(8);
         _dummyArrayEnd.push_back(9);
-        _dummyArrayId = s_addArray(_dummyArray, _dummyArrayStart, _dummyArrayEnd, defaultPartitioning());
+        _dummyArrayId = s_addArray(_dummyArray, _dummyArrayStart, _dummyArrayEnd);
 
         //DUMMY_SHIFTED
         Dimensions dummyShiftedArrayDimensions;
         dummyShiftedArrayDimensions.push_back(DimensionDesc("x", 5, 5, 12, 14, 1, 0));
         dummyShiftedArrayDimensions.push_back(DimensionDesc("y", 5, 6, 13, 14, 1, 0));
 
-        _dummyShiftedArray = ArrayDesc("opttest_dummy_shifted_array", dummyArrayAttributes, dummyShiftedArrayDimensions, defaultPartitioning());
+        _dummyShiftedArray = ArrayDesc("opttest_dummy_shifted_array", dummyArrayAttributes, dummyShiftedArrayDimensions,
+                                       defaultPartitioning(),
+                                       residency);
         _dummyShiftedArrayStart.push_back(5);
         _dummyShiftedArrayStart.push_back(6);
         _dummyShiftedArrayEnd.push_back(12);
         _dummyShiftedArrayEnd.push_back(13);
-        _dummyShiftedArrayId = s_addArray(_dummyShiftedArray, _dummyShiftedArrayStart, _dummyShiftedArrayEnd, defaultPartitioning());
+        _dummyShiftedArrayId = s_addArray(_dummyShiftedArray, _dummyShiftedArrayStart, _dummyShiftedArrayEnd);
 
         //SMALL
         Dimensions smallArrayDimensions;
         smallArrayDimensions.push_back(DimensionDesc("x", 0, 0, 0, 2, 1, 0));
         smallArrayDimensions.push_back(DimensionDesc("y", 0, 1, 2, 2, 1, 0));
 
-        _smallArray = ArrayDesc("opttest_small_array", dummyArrayAttributes, smallArrayDimensions, defaultPartitioning());
+        _smallArray = ArrayDesc("opttest_small_array", dummyArrayAttributes, smallArrayDimensions,
+                                defaultPartitioning(),
+                                residency);
         _smallArrayStart.push_back(0);
         _smallArrayStart.push_back(1);
         _smallArrayEnd.push_back(0);
         _smallArrayEnd.push_back(2);
-        _smallArrayId = s_addArray(_smallArray, _smallArrayStart, _smallArrayEnd, defaultPartitioning());
+        _smallArrayId = s_addArray(_smallArray, _smallArrayStart, _smallArrayEnd);
 
         //SINGLEDIM
         Dimensions singleDimDimensions;
         singleDimDimensions.push_back(DimensionDesc("x", 0, 0, 3, 3, 1, 0));
 
-        _singleDim = ArrayDesc("opttest_single_dim", dummyArrayAttributes, singleDimDimensions, defaultPartitioning());
+        _singleDim = ArrayDesc("opttest_single_dim", dummyArrayAttributes, singleDimDimensions,
+                               defaultPartitioning(),
+                               residency);
         _singleDimStart.push_back(0);
         _singleDimEnd.push_back(3);
-        _singleDimId = s_addArray(_singleDim, _singleDimStart, _singleDimEnd, defaultPartitioning());
+        _singleDimId = s_addArray(_singleDim, _singleDimStart, _singleDimEnd);
 
         //PARTIALLYFILLED
         Dimensions partiallyFilledDimensions;
         partiallyFilledDimensions.push_back(DimensionDesc("x", 0, 0, 9, 9, 3, 0));
         partiallyFilledDimensions.push_back(DimensionDesc("y", 0, 0, 9, 9, 3, 0));
 
-        _partiallyFilledArray = ArrayDesc("opttest_partially_filled", dummyArrayAttributes, partiallyFilledDimensions, defaultPartitioning());
+        _partiallyFilledArray = ArrayDesc("opttest_partially_filled", dummyArrayAttributes, partiallyFilledDimensions,
+                                          defaultPartitioning(),
+                                          residency);
         _partiallyFilledStart.push_back(0);
         _partiallyFilledStart.push_back(0);
         _partiallyFilledEnd.push_back(9);
         _partiallyFilledEnd.push_back(9);
-        _partiallyFilledId = s_addArray(_partiallyFilledArray, _partiallyFilledStart, _partiallyFilledEnd, defaultPartitioning());
+        _partiallyFilledId = s_addArray(_partiallyFilledArray, _partiallyFilledStart, _partiallyFilledEnd);
 
         //DUMMYFLIPPED
         Dimensions dummyFlippedDimensions;
@@ -212,11 +241,15 @@ public:
         dummyFlippedAttributes.push_back(AttributeDesc(1, "y", TID_INT64, 0, (uint16_t) CompressorFactory::NO_COMPRESSION));
         dummyFlippedAttributes.push_back(AttributeDesc(2, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
-        _dummyFlippedArray = ArrayDesc("opttest_dummy_flipped", dummyFlippedAttributes, dummyFlippedDimensions, defaultPartitioning());
-        _dummyFlippedId = s_addArray(_dummyFlippedArray, defaultPartitioning());
+        _dummyFlippedArray = ArrayDesc("opttest_dummy_flipped", dummyFlippedAttributes, dummyFlippedDimensions, defaultPartitioning(), residency);
+        _dummyFlippedId = s_addArray(_dummyFlippedArray);
 
-        _dummyReplicatedArray = ArrayDesc("opttest_dummy_replicated_array", dummyArrayAttributes, dummyArrayDimensions, defaultPartitioning());
-        _dummyReplicatedArrayId = s_addArray(_dummyReplicatedArray,_dummyArrayStart, _dummyArrayEnd, psReplication);
+        ArrayDistPtr replicatedDist = scidb::createDistribution(psReplication);
+
+        _dummyReplicatedArray = ArrayDesc("opttest_dummy_replicated_array", dummyArrayAttributes, dummyArrayDimensions,
+                                          replicatedDist,
+                                          residency);
+        _dummyReplicatedArrayId = s_addArray(_dummyReplicatedArray,_dummyArrayStart, _dummyArrayEnd);
 
         ////////////////
 
@@ -398,8 +431,16 @@ public:
 
         PhysicalBoundaries bounds(start, end);
         uint64_t numCells = bounds.getNumCells();
-        uint64_t numChunks = bounds.getNumChunks(dummyArrayDimensions);
+        uint64_t numChunks = 0;
+        bool thrown = false;
+        try {
+            numChunks = bounds.getNumChunks(dummyArrayDimensions);
+        }
+        catch (PhysicalBoundaries::UnknownChunkIntervalException&) {
+            thrown = true;
+        }
 
+        CPPUNIT_ASSERT(!thrown);
         CPPUNIT_ASSERT(numCells == expectedNumCells);
         CPPUNIT_ASSERT(numChunks == expectedNumChunks);
     }
@@ -533,12 +574,18 @@ public:
         CPPUNIT_ASSERT(reshapedBounds.getStartCoords()[0] == 5050);
         CPPUNIT_ASSERT(reshapedBounds.getEndCoords()[0] == 45150);
 
-        CPPUNIT_ASSERT(reshapedBounds.getNumCells() * reshapedBounds.getDensity() == bounds1.getNumCells() * bounds1.getDensity());
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            static_cast<double>(reshapedBounds.getNumCells()) * reshapedBounds.getDensity(),
+            static_cast<double>(bounds1.getNumCells()) * bounds1.getDensity(),
+            std::numeric_limits<double>::epsilon());
 
         CPPUNIT_ASSERT(reshapedBack.getStartCoords()[0] == bounds1.getStartCoords()[0] );
         CPPUNIT_ASSERT(reshapedBack.getEndCoords()[0] == bounds1.getEndCoords()[0] );
 
-        CPPUNIT_ASSERT(reshapedBack.getNumCells() * reshapedBack.getDensity() == bounds1.getNumCells() * bounds1.getDensity());
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            static_cast<double>(reshapedBack.getNumCells()) * reshapedBack.getDensity(),
+            static_cast<double>(bounds1.getNumCells()) * bounds1.getDensity(),
+            std::numeric_limits<double>::epsilon());
     }
 
     void testBasic()
@@ -653,13 +700,13 @@ public:
 
         root = pp->getRoot();
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 7 && dist.getMapper()->getOffsetVector()[1]==8);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0] == 7 && getOffsetVector(dist)[1]==8);
         ASSERT_OPERATOR(root,"physicalSubArray");
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 5 && dist.getMapper()->getOffsetVector()[1]==5);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0] == 5 && getOffsetVector(dist)[1]==5);
         ASSERT_OPERATOR(root,"physicalSubArray");
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
@@ -678,20 +725,20 @@ public:
         root = pp->getRoot();
         ASSERT_OPERATOR(root,"physicalSubArray");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] ==4 && dist.getMapper()->getOffsetVector()[1]==4);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0] ==4 && getOffsetVector(dist)[1]==4);
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
         ASSERT_OPERATOR(root,"physicalJoin");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 3 && dist.getMapper()->getOffsetVector()[1]==3);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0] == 3 && getOffsetVector(dist)[1]==3);
         CPPUNIT_ASSERT(root->getChildren().size() == 2);
 
         leftChild = root->getChildren()[0];
         ASSERT_OPERATOR(leftChild,"physicalSubArray");
         CPPUNIT_ASSERT(leftChild->getDataWidth() == leftChild->getChildren()[0]->getDataWidth() * 4.0 / 81.0);
         dist = leftChild->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==3 && dist.getMapper()->getOffsetVector()[1]==3);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0]==3 && getOffsetVector(dist)[1]==3);
         CPPUNIT_ASSERT(leftChild->getChildren().size() == 1);
 
         leftChild = leftChild->getChildren()[0];
@@ -703,13 +750,13 @@ public:
         rightChild = root->getChildren()[1];
         ASSERT_OPERATOR(rightChild,"impl_sg");
         dist = rightChild->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==3 && dist.getMapper()->getOffsetVector()[1]==3);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0]==3 && getOffsetVector(dist)[1]==3);
         CPPUNIT_ASSERT(rightChild->getChildren().size() == 1);
 
         rightChild = rightChild->getChildren()[0];
         ASSERT_OPERATOR(rightChild,"physicalSubArray");
         dist = rightChild->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==1 && dist.getMapper()->getOffsetVector()[1]==1);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0]==1 && getOffsetVector(dist)[1]==1);
         CPPUNIT_ASSERT(rightChild->getChildren().size() == 1);
 
         rightChild = rightChild->getChildren()[0];
@@ -723,7 +770,7 @@ public:
         root = pp->getRoot();
         ASSERT_OPERATOR(root,"physicalSubArray");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0] == 1 && dist.getMapper()->getOffsetVector()[1]==1);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0] == 1 && getOffsetVector(dist)[1]==1);
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
@@ -756,7 +803,7 @@ public:
         root = root->getChildren()[0];
         ASSERT_OPERATOR(root,"physicalSubArray");
         dist = root->getDistribution();
-        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && dist.getMapper()->getOffsetVector()[0]==3 && dist.getMapper()->getOffsetVector()[1]==4);
+        CPPUNIT_ASSERT(dist.isViolated() == true && dist.hasMapper() == true && getOffsetVector(dist)[0]==3 && getOffsetVector(dist)[1]==4);
         CPPUNIT_ASSERT(root->getChildren().size() == 1);
 
         root = root->getChildren()[0];
@@ -940,8 +987,7 @@ public:
         ASSERT_OPERATOR(child, "physicalSubArray");
         child = child->getChildren()[0];
 
-        std::vector<InstanceID> instances;
-        size_t nInstances = Cluster::getInstance()->getInstanceMembership()->getInstances().size();
+        size_t nInstances = Cluster::getInstance()->getInstanceMembership(0)->getNumInstances();
 
         if (nInstances == 1)
         {
@@ -1027,7 +1073,7 @@ public:
 
         pp = habilis_generatePPlanFor (" select * into opttest_dummy_flipped from opttest_dummy_array", false);
         root = pp->getRoot();
-        if (Cluster::getInstance()->getInstanceMembership()->getInstances().size() == 1) {
+        if (Cluster::getInstance()->getInstanceMembership(0)->getNumInstances() == 1) {
             ASSERT_OPERATOR(root, "physicalStore");
         } else {
             ASSERT_OPERATOR(root, "impl_sg"); //storing

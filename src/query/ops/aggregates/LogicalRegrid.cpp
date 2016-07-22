@@ -30,6 +30,7 @@
 #include <memory>
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <system/Exceptions.h>
 #include <query/LogicalExpression.h>
 
@@ -83,12 +84,19 @@ using namespace std;
  */
 class LogicalRegrid: public LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
     LogicalRegrid(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_INPUT()
         ADD_PARAM_VARIES()
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
@@ -159,7 +167,7 @@ public:
                                            _parameters[i]->getParsingContext());
             }
             DimensionDesc const& srcDim = inputDesc.getDimensions()[i];
-            int64_t chunkSize = static_cast<int64_t>(srcDim.getChunkInterval());
+            int64_t chunkSize = srcDim.getRawChunkInterval();
             if (numChunkSizes) {
                 size_t index = i + nDims + numAggregateCalls;
                 chunkSize = evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[index])->getExpression(),
@@ -172,13 +180,22 @@ public:
                                         srcDim.getNamesAndAliases(),
                                         srcDim.getStartMin(),
                                         srcDim.getStartMin(),
-                                        srcDim.getEndMax() == CoordinateBounds::getMax() ? CoordinateBounds::getMax() : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
-                                        srcDim.getEndMax() == CoordinateBounds::getMax() ? CoordinateBounds::getMax() : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
-                                        static_cast<size_t>(chunkSize),
+                                        srcDim.getEndMax() == CoordinateBounds::getMax()
+                                            ? CoordinateBounds::getMax()
+                                            : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
+                                        srcDim.getEndMax() == CoordinateBounds::getMax()
+                                            ? CoordinateBounds::getMax()
+                                            : srcDim.getStartMin() + (srcDim.getLength() + blockSize - 1)/blockSize - 1,
+                                        chunkSize,
                                         0  );
         }
 
-        ArrayDesc outSchema(inputDesc.getName(), Attributes(), outDims, defaultPartitioning());
+        // Input and output dimensions are 1-to-1, so...
+        _fixer.takeAllDimensions(inputDesc.getDimensions());
+
+        ArrayDesc outSchema(inputDesc.getName(), Attributes(), outDims,
+                            defaultPartitioning(),
+                            query->getDefaultArrayResidency() );
 
         for (size_t i = nDims, j=nDims+numAggregateCalls; i<j; i++)
         {

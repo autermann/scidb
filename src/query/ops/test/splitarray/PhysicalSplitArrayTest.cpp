@@ -51,6 +51,7 @@ public:
             std::shared_ptr<Query> query)
     {
         std::shared_ptr<Array> input = inputArrays[0];
+        checkOrUpdateIntervals(_schema, input);
 
         Dimensions const& dims = _schema.getDimensions();
         size_t nRow = dims[0].getLength();
@@ -62,11 +63,13 @@ public:
         size_t instanceID = query->getInstanceID();
         const size_t nInstances = query->getInstancesCount();
         if (nInstances > 1) {
-            input = redistributeToRandomAccess(input, query, psByCol,
-                                               ALL_INSTANCE_MASK,
-                                               std::shared_ptr<CoordinateTranslator>(),
-                                               0,
-                                               std::shared_ptr<PartitioningSchemaData>());
+
+            ArrayDistPtr byColDist = ArrayDistributionFactory::getInstance()->construct(psByCol,
+                                                                                        DEFAULT_REDUNDANCY);
+            input = redistributeToRandomAccess(input,
+                                               byColDist,
+                                               ArrayResPtr(), //default query residency
+                                               query);
         }
 
         // the following is somewhat convoluted, and can be cleaned up, if deemed necessary, as a later step
@@ -121,7 +124,7 @@ public:
                 //Tests should output the same data, regardless of the number of instances
                 size_t rowMajorIndexLocal = matRow * nColLocal + matColLocal;
                 size_t val = matRow * nCol + colStartOffset + matColLocal;
-                matrix[rowMajorIndexLocal] = val;
+                matrix[rowMajorIndexLocal] = static_cast<double>(val);
             }
         }
 

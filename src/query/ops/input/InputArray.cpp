@@ -55,20 +55,35 @@ namespace scidb
         shadowChunkIterators.clear();
     }
 
-    ArrayDesc InputArray::generateShadowArraySchema(ArrayDesc const& targetArray, string const& shadowArrayName)
+    ArrayDesc InputArray::generateShadowArraySchema(ArrayDesc const& targetArray,
+                                                    std::string const& shadowArrayName,
+                                                    std::shared_ptr<Query> const& query)
     {
         Attributes const& srcAttrs = targetArray.getAttributes(true);
         size_t nAttrs = srcAttrs.size();
         Attributes dstAttrs(nAttrs+2);
         for (size_t i = 0; i < nAttrs; i++) {
-            dstAttrs[i] = AttributeDesc(i, srcAttrs[i].getName(), TID_STRING,  AttributeDesc::IS_NULLABLE, 0);
+            dstAttrs[i] = AttributeDesc(
+                safe_static_cast<AttributeID>(i),
+                srcAttrs[i].getName(),
+                TID_STRING,  AttributeDesc::IS_NULLABLE, 0);
         }
         // FWIW row_offset is a misnomer.  According to the 14.8 docs and the implementation,
         // this value is really a file offset into the flat load file.
-        dstAttrs[nAttrs] = AttributeDesc(nAttrs, "row_offset", TID_INT64, 0, 0);
-        dstAttrs[nAttrs+1] = AttributeDesc(nAttrs+1, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
-                                           TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
-        return ArrayDesc(shadowArrayName, dstAttrs, targetArray.getDimensions(), defaultPartitioning());
+        dstAttrs[nAttrs] = AttributeDesc(
+            safe_static_cast<AttributeID>(nAttrs), "row_offset", TID_INT64, 0, 0);
+        dstAttrs[nAttrs+1] = AttributeDesc(
+            safe_static_cast<AttributeID>(nAttrs+1), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+            TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
+
+        //Lets store shadow arrays in defaultPartitioning()
+        //TODO: revisit this when we allow users to store arrays with specified distributions
+
+        return ArrayDesc(shadowArrayName,
+                         dstAttrs,
+                         targetArray.getDimensions(),
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidencyForWrite() );
     }
 
 InputArray::InputArray(ArrayDesc const& array,
@@ -101,6 +116,14 @@ InputArray::InputArray(ArrayDesc const& array,
 
         SCIDB_ASSERT(_chunkLoader);   // else inferSchema() messed up
         _chunkLoader->bind(this, query);
+
+        // only after the bind() call the schema can be adjusted
+        // (to match PhysicalInput::getOutputDistribution())
+        // because some chunk loaders use the distribution specified by the target array
+        // See LogicalInput
+        if (getArrayDesc().getDistribution()->getPartitioningSchema() != psLocalInstance) {
+            desc.setDistribution(createDistribution(psUndefined));
+        }
 
         if (!shadowArraySchema.getName().empty()) {
             assert(shadowArraySchema.getId() > 0);
@@ -143,9 +166,6 @@ InputArray::InputArray(ArrayDesc const& array,
     {
         SCIDB_ASSERT(_shadowArray);
 
-        //Lets store shadow arrays in defaultPartitioning()
-        //TODO: revisit this when we allow users to store arrays with specified distributions
-        PartitioningSchema ps = defaultPartitioning();
         const ArrayDesc& shadowArrayDesc = _shadowArray->getArrayDesc();
 
         assert(shadowArrayDesc.getId() > 0);
@@ -182,12 +202,10 @@ InputArray::InputArray(ArrayDesc const& array,
                                                            persistentShadowArray);
 
         set<Coordinates, CoordinatesLess> newChunkCoordinates;
-        redistributeToArray(_shadowArray, persistentShadowArray,  &newChunkCoordinates,
-                            query, ps,
-                            ALL_INSTANCE_MASK,
-                            std::shared_ptr <CoordinateTranslator>(),
-                            0,
-                            std::shared_ptr<PartitioningSchemaData>());
+        redistributeToArray(_shadowArray,
+                            persistentShadowArray,
+                            &newChunkCoordinates,
+                            query);
 
         StorageManager::getInstance().removeDeadChunks(dstArrayDesc, newChunkCoordinates, query);
         PhysicalBoundaries bounds = PhysicalBoundaries::createFromChunkList(persistentShadowArray,
@@ -267,9 +285,11 @@ InputArray::InputArray(ArrayDesc const& array,
                 if (shadowArrayIterators.empty()) {
                     shadowArrayIterators.resize(nAttrs+1);
                     for (size_t j = 0; j < nAttrs; j++) {
-                        shadowArrayIterators[j] = _shadowArray->getIterator(j);
+                        shadowArrayIterators[j] =
+                            _shadowArray->getIterator(safe_static_cast<AttributeID>(j));
                     }
-                    shadowArrayIterators[nAttrs] = _shadowArray->getIterator(nAttrs);
+                    shadowArrayIterators[nAttrs] =
+                        _shadowArray->getIterator(safe_static_cast<AttributeID>(nAttrs));
                 }
                 shadowChunkIterators.resize(nAttrs+1);
                 Coordinates const& chunkPos = _chunkLoader->getChunkPos();
@@ -368,7 +388,6 @@ InputArray::InputArray(ArrayDesc const& array,
         }
         catch(std::exception const& x)
         {
-            SCIDB_ASSERT(false);
             resetShadowChunkIterators();
             throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_FILE_IMPORT_FAILED)
                 << _chunkLoader->filePath()

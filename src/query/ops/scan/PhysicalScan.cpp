@@ -28,16 +28,18 @@
  */
 #include <memory>
 
-#include <query/Operator.h>
-#include <array/TransientCache.h>
 #include <array/DBArray.h>
 #include <array/Metadata.h>
+#include <array/TransientCache.h>
+#include <query/Operator.h>
 #include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 
 namespace scidb
 {
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.physical_scan"));
 
 class PhysicalScan: public  PhysicalOperator
 {
@@ -52,21 +54,32 @@ class PhysicalScan: public  PhysicalOperator
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                    const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        SCIDB_ASSERT(_schema.getPartitioningSchema()!=psUninitialized);
-        SCIDB_ASSERT(_schema.getPartitioningSchema()!=psUndefined);
+        ArrayDistPtr arrDist = _schema.getDistribution();
+        SCIDB_ASSERT(arrDist);
+        SCIDB_ASSERT(arrDist->getPartitioningSchema()!=psUninitialized);
         std::shared_ptr<Query> query(_query);
         SCIDB_ASSERT(query);
-        if (query->isDistributionDegraded(_schema)) {
+        if (query->isDistributionDegradedForRead(_schema)) {
             // make sure PhysicalScan informs the optimizer that the distribution is unknown
-            return RedistributeContext(psUndefined);
+            SCIDB_ASSERT(arrDist->getPartitioningSchema()!=psUndefined);
+            //XXX TODO: psReplication declared as psUndefined would confuse SG because most of the data would collide.
+            //XXX TODO: One option is to take the intersection between the array residency and the query live set
+            //XXX TODO: (i.e. the default array residency) and advertize that as the new residency (with psReplicated)...
+            ASSERT_EXCEPTION((arrDist->getPartitioningSchema()!=psReplication),
+                             "Arrays with replicated distribution in degraded mode are not supported");
+
+            // not  updating the schema, so that DBArray can succeed
+            return RedistributeContext(createDistribution(psUndefined),
+                                       _schema.getResidency());
         }
-        return RedistributeContext(_schema.getPartitioningSchema());
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                   const std::vector< ArrayDesc> & inputSchemas) const
+                                                   const std::vector<ArrayDesc> & inputSchemas) const
     {
         Coordinates lowBoundary = _schema.getLowBoundary();
         Coordinates highBoundary = _schema.getHighBoundary();
@@ -78,14 +91,8 @@ class PhysicalScan: public  PhysicalOperator
     {
         if (_schema.isTransient())
         {
-            std::shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-
-            if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-                (membership->getInstances().size() != query->getInstancesCount()))
-            {
-                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-            }
-         }
+            query->isDistributionDegradedForWrite(_schema);
+        }
     }
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
@@ -94,13 +101,20 @@ class PhysicalScan: public  PhysicalOperator
         SCIDB_ASSERT(!_arrayName.empty());
         if (_schema.isTransient())
         {
-            if (!query->isCoordinator()) {
+            if (!query->isCoordinator())
+            {
+                std::string arrayName;
+                std::string namespaceName;
+                query->getNamespaceArrayNames(_arrayName, namespaceName, arrayName);
 
-                std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(_arrayName,
-                                                                                              query->getQueryID(),
-                                                                                              Cluster::getInstance()->getLocalInstanceId(),
-                                                                                              SystemCatalog::LockDesc::WORKER,
-                                                                                              SystemCatalog::LockDesc::XCL));
+                std::shared_ptr<SystemCatalog::LockDesc> lock(
+                    make_shared<SystemCatalog::LockDesc>(
+                        namespaceName,
+                        arrayName,
+                        query->getQueryID(),
+                        Cluster::getInstance()->getLocalInstanceId(),
+                        SystemCatalog::LockDesc::WORKER,
+                        SystemCatalog::LockDesc::XCL));
 
                 Query::Finalizer f = bind(&UpdateErrorHandler::releaseLock, lock,_1);
                 query->pushFinalizer(f);

@@ -170,7 +170,8 @@ TupleArray::TupleArray(ArrayDesc const& outputSchema,
                        size_t sizeHint,
                        size_t pageSize,
                        ArenaPtr const& parentArena,
-                       bool preservePositions)
+                       bool preservePositions,
+                       TupleSkipper* skipper)
     : _arena(newArena(Options("TupleArrayValues").scoped(parentArena,pageSize).threading(0))),
       _desc(outputSchema),
       _start(_desc.getDimensions()[0].getStartMin()),
@@ -182,7 +183,7 @@ TupleArray::TupleArray(ArrayDesc const& outputSchema,
     _tuples.reserve(sizeHint);
     if (_desc.getDimensions().size() != 1)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_MULTIDIMENSIONAL_ARRAY_NOT_ALLOWED);
-    append(inputSchema, arrayIterators, nChunks);
+    append(inputSchema, arrayIterators, nChunks, skipper);
     if (_start == CoordinateBounds::getMin() || _end == CoordinateBounds::getMax()) {
         _start = 0;
         _end = _tuples.size()-1;
@@ -213,7 +214,11 @@ void TupleArray::truncate()
                                oldDim.getStartMin() + _tuples.size() - 1,
                                oldDim.getChunkInterval(),
                                0);
-    _desc = ArrayDesc(_desc.getName(), _desc.getAttributes(), newDims, defaultPartitioning());
+    _desc = ArrayDesc(_desc.getName(),
+                      _desc.getAttributes(),
+                      newDims,
+                      _desc.getDistribution(),
+                      _desc.getResidency());
     _start = newDims[0].getStartMin();
     _end = newDims[0].getEndMax();
 }
@@ -234,19 +239,27 @@ size_t TupleArray::getTupleFootprint(Attributes const& attrs)
    return res + sizeof(Value*);
 }
 
-void TupleArray::append(std::shared_ptr<Array> const& inputArray)
+void TupleArray::append(
+        std::shared_ptr<Array> const& inputArray,
+        TupleSkipper* skipper
+        )
 {
     ArrayDesc const& inputSchema = inputArray->getArrayDesc();
     const bool excludingEmptyBitmap = true;
     const size_t nAttrs = inputSchema.getAttributes(excludingEmptyBitmap).size();
     vector< std::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
-    for (size_t i = 0; i < nAttrs; i++) {
+    for (AttributeID i = 0; i < nAttrs; i++) {
         arrayIterators[i] = inputArray->getConstIterator(i);
     }
-    append(inputArray->getArrayDesc(), arrayIterators, (size_t)-1);
+    append(inputArray->getArrayDesc(), arrayIterators, (size_t)-1, skipper);
 }
 
-void TupleArray::append(ArrayDesc const& inputSchema, PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators, size_t nChunks)
+void TupleArray::append(
+        ArrayDesc const& inputSchema,
+        PointerRange< std::shared_ptr<ConstArrayIterator> const> arrayIterators,
+        size_t nChunks,
+        TupleSkipper* skipper
+        )
 {
     size_t nAttrsOut = getTupleArity();
     size_t nAttrsIn = arrayIterators.size();
@@ -260,7 +273,7 @@ void TupleArray::append(ArrayDesc const& inputSchema, PointerRange< std::shared_
 
     // The AttributeKind of each attribute.
     vector<AttributeKind> attrKinds(nAttrsOut);
-    for (size_t i=0; i<nAttrsOut; ++i) {
+    for (AttributeID i=0; i<nAttrsOut; ++i) {
         attrKinds[i] = getAttributeKind(i);
     }
 
@@ -287,7 +300,6 @@ void TupleArray::append(ArrayDesc const& inputSchema, PointerRange< std::shared_
 
             CoordinateCRange cellPos = chunkIterators[0]->getPosition();
             Value* tuple = newVector<Value>(*_arena, nAttrsOut, manual);
-            _tuples.push_back(tuple);
             for (size_t i = 0; i < nAttrsOut; i++) {
                 switch (attrKinds[i]) {
                 case FROM_INPUT_ARRAY:
@@ -308,6 +320,12 @@ void TupleArray::append(ArrayDesc const& inputSchema, PointerRange< std::shared_
                     break;
                 }
             }
+
+            if (! (skipper && skipper->_skipperFunc(tuple, skipper->_additionalInfo)) ) {
+                _tuples.push_back(tuple);
+            } else {
+                arena::destroy(*_arena, tuple, nAttrsOut);
+            }
         }
         for (size_t i = 0; i < nAttrsIn; i++) {
             ++(*arrayIterators[i]);
@@ -318,7 +336,10 @@ void TupleArray::append(ArrayDesc const& inputSchema, PointerRange< std::shared_
 /**
  *  Append a single tuple to the array...
  */
-void TupleArray::appendTuple(PointerRange<const Value> tuple)
+void TupleArray::appendTuple(
+        PointerRange<const Value> tuple,
+        TupleSkipper* skipper
+        )
 {
     if (getTupleArity() != tuple.size())
     {
@@ -326,9 +347,14 @@ void TupleArray::appendTuple(PointerRange<const Value> tuple)
     }
 
     Value* t = newVector<Value>(*_arena, tuple.size(), manual);
-    _tuples.push_back(t);
     std::copy(tuple.begin(), tuple.end(), t);
-    ++_end;
+
+    if (! (skipper && skipper->_skipperFunc(t, skipper->_additionalInfo)) ) {
+        _tuples.push_back(t);
+        ++_end;
+    } else {
+        arena::destroy(*_arena, t, tuple.size());
+    }
 }
 
 TupleArray::AttributeKind TupleArray::getAttributeKind(AttributeID attrID) const

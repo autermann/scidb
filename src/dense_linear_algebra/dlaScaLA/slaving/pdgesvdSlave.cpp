@@ -130,8 +130,10 @@ slpp::int_t pdgesvdSlave(void* bufs[], size_t sizes[], unsigned count, bool debu
         getSlInfo(ICTXT/*in*/, NPROW/*in*/, NPCOL/*in*/, MYPROW/*out*/, MYPCOL/*out*/, MYPNUM/*out*/);
 
         size_t matrixCells = sizes[1]/sizeof(double);
-        size_t matrixOrder = floor(sqrt(matrixCells));  // TODO: should be multiplied by NPROW*NPCOL
-        args = pdgesvdGenTestArgs(ICTXT, NPROW, NPCOL, MYPROW, MYPCOL, MYPNUM, matrixOrder);
+        size_t matrixOrder = static_cast<size_t>(floor(sqrt(matrixCells)));  // TODO: should be multiplied by NPROW*NPCOL
+        args = pdgesvdGenTestArgs(ICTXT, NPROW, NPCOL,
+                                  MYPROW, MYPCOL, MYPNUM,
+                                  slpp::int_cast(matrixOrder));
     }
 
     return pdgesvdSlave2(ICTXT, args, bufs, sizes, count);

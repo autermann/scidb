@@ -24,5 +24,20 @@ set -u
 
 database=${1}
 SCIDB_VER="${2}"
-/opt/scidb/${SCIDB_VER}/bin/scidb.py startall ${database} &&
-until /opt/scidb/${SCIDB_VER}/bin/iquery -aq "list()" > /dev/null 2>&1; do sleep 1; done
+shift 2
+
+if [ $# -ne 0 ]; then
+    /opt/scidb/${SCIDB_VER}/bin/scidb.py startall ${database} --auth-file ${1}
+    rc=$?
+else
+    /opt/scidb/${SCIDB_VER}/bin/scidb.py startall ${database}
+    rc=$?
+fi
+if [ $rc -eq 0 ]; then
+    if [ $# -ne 0 ]; then
+        until /opt/scidb/${SCIDB_VER}/bin/iquery --auth-file ${1} -aq "list()" > /dev/null 2>&1; do sleep 1; done
+    else
+        until /opt/scidb/${SCIDB_VER}/bin/iquery -aq "list()" > /dev/null 2>&1; do sleep 1; done
+    fi
+fi
+

@@ -46,20 +46,6 @@ Test tsv+:N format
 Test tsv+:? format
 [Query was executed successfully, ignoring data output by this query.]
 
-Test ltsv+ format-
-[Query was executed successfully, ignoring data output by this query.]
-
-
-Test ltsv+:E format
-[Query was executed successfully, ignoring data output by this query.]
-
-
-Test ltsv+:N format
-[Query was executed successfully, ignoring data output by this query.]
-
-Test ltsv+:? format
-[Query was executed successfully, ignoring data output by this query.]
-
 Test TSV string field encoding
 [Query was executed successfully, ignoring data output by this query.]
 

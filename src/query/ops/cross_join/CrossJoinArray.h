@@ -222,10 +222,10 @@ class CrossJoinArray : public Array
     std::shared_ptr<Array> left;
     std::shared_ptr<Array> right;
 
-    const size_t nLeftDims;
-    const size_t nRightDims;
-    const size_t nLeftAttrs;
-    const size_t nRightAttrs;
+    const AttributeID nLeftDims;
+    const AttributeID nRightDims;
+    const AttributeID nLeftAttrs;
+    const AttributeID nRightAttrs;
 
     //Hash key has right coordinates in the order they appear in right array
 

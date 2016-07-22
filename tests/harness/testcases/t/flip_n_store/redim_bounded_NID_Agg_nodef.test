@@ -9,7 +9,7 @@ CREATE array Raw_Test_Data < I : int64, J : int64, V : double NULL, W : string >
 
 CREATE ARRAY Data < AV : double NULL > [ I=0:999,10,0, J=0:999,10,0, W_dim=0:999,4,0 ]
 
---set-format csv+
+--set-format csv+:l
 store(redimension(project(index_lookup(Raw_Test_Data,w_indices,Raw_Test_Data.W,W_dim),W_dim,V,I,J),Data, avg(V) as AV),Data)
 
 scan (Raw_Test_Data)

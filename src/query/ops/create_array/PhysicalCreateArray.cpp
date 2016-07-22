@@ -20,27 +20,35 @@
 * END_COPYRIGHT
 */
 
+#include "ChunkEstimator.h"
+
+#include <array/Metadata.h>
 #include <boost/array.hpp>
-#include <boost/foreach.hpp>
 #include <system/SystemCatalog.h>
 #include <query/Operator.h>
+#include <log4cxx/logger.h>
 #include <array/TransientCache.h>
 #include <util/session/Session.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
 using namespace std;
 
 /****************************************************************************/
 namespace scidb {
 /****************************************************************************/
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.physcial_create_array"));
 
 struct PhysicalCreateArray : PhysicalOperator
 {
-    PhysicalCreateArray(const string& logicalName,const string& physicalName,const Parameters& parameters,const ArrayDesc& schema)
+    PhysicalCreateArray(const string& logicalName,
+                        const string& physicalName,
+                        const Parameters& parameters,
+                        const ArrayDesc& schema)
      : PhysicalOperator(logicalName,physicalName,parameters,schema)
     {}
 
     virtual void
-    fixDimensions(PointerRange<std::shared_ptr<Array> >,PointerRange<DimensionDesc>)
+    fixDimensions(PointerRange<std::shared_ptr<Array> >, Dimensions&)
     {}
 
     virtual std::shared_ptr<Array>
@@ -52,33 +60,53 @@ struct PhysicalCreateArray : PhysicalOperator
 
         if (query->isCoordinator())
         {
-            string    arrName(param<OperatorParamArrayReference>(0)->getObjectName());
-            ArrayDesc arrSchema(param<OperatorParamSchema>        (1)->getSchema());
-            assert(ArrayDesc::isNameUnversioned(arrName));
+            string arrayNameOrg(param<OperatorParamArrayReference>(0)->getObjectName());
 
-            arrSchema.setName(arrName);
+            std::string arrayName;
+            std::string namespaceName;
+            query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+            ArrayDesc arrSchema(param<OperatorParamSchema>(1)->getSchema());
+            assert(ArrayDesc::isNameUnversioned(arrayName));
+
+            arrSchema.setName(arrayName);
+            arrSchema.setNamespaceName(namespaceName);
             arrSchema.setTransient(temp);
 
          /* Give our subclass a chance to compute missing dimension details
             such as a wild-carded chunk interval, for example...*/
 
             this->fixDimensions(in,arrSchema.getDimensions());
-            arrSchema.setPartitioningSchema(defaultPartitioning());
+            const size_t redundancy = Config::getInstance()->getOption<size_t> (CONFIG_REDUNDANCY);
+            arrSchema.setDistribution(defaultPartitioning(redundancy));
+            arrSchema.setResidency(query->getDefaultArrayResidencyForWrite());
             ArrayID uAId = SystemCatalog::getInstance()->getNextArrayId();
             arrSchema.setIds(uAId, uAId, VersionID(0));
-            SystemCatalog::getInstance()->addArray(
-                query->getSession()->getNamespace(),
-                arrSchema);
-        }
+            if (!temp) {
+                query->setAutoCommit();
+            }
 
-        syncBarrier(0,query);                            // Workers wait here
+            LOG4CXX_TRACE(logger, "PhysicalCreateArray::execute("
+                << "namespaceName=" << namespaceName
+                << ",arrayName=" << arrSchema.getName() << ")");
+
+            SystemCatalog::getInstance()->addArray(arrSchema);
+        }
 
         if (temp)                                        // 'temp' flag given?
         {
-            string    arrName(param<OperatorParamArrayReference>(0)->getObjectName());
+            syncBarrier(0,query);                        // Workers wait here
+
+            string arrayNameOrg(param<OperatorParamArrayReference>(0)->getObjectName());
+
+            std::string arrayName;
+            std::string namespaceName;
+            query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
             ArrayDesc arrSchema;
             // XXX TODO: this needs to change to eliminate worker catalog access
-            SystemCatalog::getInstance()->getArrayDesc(arrName,SystemCatalog::ANY_VERSION,arrSchema);
+            scidb::namespaces::Communicator::getArrayDesc(
+                namespaceName, arrayName,SystemCatalog::ANY_VERSION,arrSchema);
 
             transient::record(make_shared<MemArray>(arrSchema,query));
         }
@@ -115,18 +143,7 @@ struct PhysicalCreateArray : PhysicalOperator
  */
 struct PhysicalCreateArrayUsing : PhysicalCreateArray
 {
-    enum statistic
-    {
-        loBound,
-        hiBound,
-        interval,
-        overlap,
-        minimum,
-        maximum,
-        distinct
-    };
-
-    typedef boost::array<Value,distinct+1> statistics;
+    typedef ChunkEstimator::Statistics statistics;
 
     PhysicalCreateArrayUsing(const string& logicalName,
                              const string& physicalName,
@@ -135,92 +152,22 @@ struct PhysicalCreateArrayUsing : PhysicalCreateArray
       : PhysicalCreateArray(logicalName,physicalName,parameters,schema)
     {}
 
-    /**
-     *
-     */
     virtual void fixDimensions(PointerRange<std::shared_ptr<Array> > in,
-                               PointerRange<DimensionDesc>      dims)
+                               Dimensions&                           dims)
     {
         assert(in.size()==2 && !dims.empty());           // Validate arguments
 
-        size_t const desiredValuesPerChunk(getDesiredValuesPerChunk(*in[1]));
-        size_t const  overallDistinctCount(getOverallDistinctCount (*in[1]));
-        size_t              numChunksFromN(max(overallDistinctCount / desiredValuesPerChunk,1UL));
-        size_t                           N(0);           // Inferred intervals
-        vector<statistics>               S(dims.size()); // Array of statistics
-        DimensionDesc*                   d(dims.begin());// Dimension iterator
-        int64_t                  remain(CoordinateBounds::getMaxLength());// Cells to play with
+        size_t const   desiredValuesPerChunk(getDesiredValuesPerChunk(*in[1]));
+        size_t const    overallDistinctCount(getOverallDistinctCount (*in[1]));
+        vector<ChunkEstimator::Statistics> S(dims.size()); // Array of statistics
 
         getStatistics(S,*in[0]);                         // Read in statistics
 
-        BOOST_FOREACH(statistics& s,S)                   // For each dimension
-        {
-            if (!s[interval].getBool())                  // ...infer interval?
-            {
-                N += 1;                                  // ....seen another
-            }
-            else                                         // ...user specified
-            {
-                numChunksFromN *= d->getChunkInterval();
-                numChunksFromN /= s[distinct].getInt64();
-
-                remain /= (d->getChunkInterval() + d->getChunkOverlap());
-            }
-
-            ++d;
-        }
-
-        double const chunksPerDim = max(pow(numChunksFromN,1.0/N),1.0);
-
-        d = dims.begin();                                // Reset dim iterator
-
-        BOOST_FOREACH(statistics& s,S)                   // For each dimension
-        {
-            if (!s[loBound].getBool())                   // ...infer loBound?
-            {
-                d->setStartMin(s[minimum].getInt64());   // ....assign default
-            }
-
-            if (!s[hiBound].getBool())                   // ...infer hiBound?
-            {
-                d->setEndMax(s[maximum].getInt64());     // ....assign default
-            }
-
-            if (!s[overlap].getBool())                   // ...infer overlap?
-            {
-                d->setChunkOverlap(0);                   // ....assign default
-            }
-
-            if (!s[interval].getBool())                   // ...infer interval?
-            {
-                int64_t hi = s[maximum].getInt64();      // ....highest actual
-                int64_t lo = s[minimum].getInt64();      // ....lowest  actual
-                int64_t ci  = (hi - lo + 1)/chunksPerDim;// ....chunk interval
-
-                ci = max(ci,1L);                         // ....clamp at one
-                ci = roundLog2(ci);                      // ....nearest power
-                ci = min(ci,remain);                     // ....clamp between
-                ci = max(ci,1L);                         // ....one and remain
-
-                d->setChunkInterval(ci);                 // ....update schema
-
-                remain /= (d->getChunkInterval() + d->getChunkOverlap());
-            }
-
-            ++d;                                         // ...next dimension
-        }
-    }
-
-    /**
-     *  Round the proposed chunk interval to the nearest power of two,  where
-     *  'nearest' means that the base two logarithm is rounded to the nearest
-     *  integer.
-     */
-    static int64_t roundLog2(int64_t ci)
-    {
-        assert(ci != 0);                                 // Validate argument
-
-        return pow(2,round(log2(ci)));                   // Nearest power of 2
+        ChunkEstimator estimator(dims);
+        estimator.setTargetCellCount(desiredValuesPerChunk)
+            .setOverallDistinct(overallDistinctCount)
+            .setAllStatistics(S)
+            .go();
     }
 
     /**
@@ -231,9 +178,11 @@ struct PhysicalCreateArrayUsing : PhysicalCreateArray
      */
     void getStatistics(vector<statistics>& v,Array& A)
     {
-        for (size_t a=0; a!=statistics::size(); ++a)     // For each attribute
+        size_t constexpr statisticsSize = std::tuple_size<statistics>::value;
+        for (size_t a=0; a!=statisticsSize; ++a)     // For each attribute
         {
-            std::shared_ptr<ConstChunkIterator> i(A.getConstIterator(a)->getChunk().getConstIterator());
+            std::shared_ptr<ConstChunkIterator> i(
+                A.getConstIterator(safe_static_cast<AttributeID>(a))->getChunk().getConstIterator());
 
             for (size_t d=0; d!=v.size(); ++d)           // ...for each dimension
             {

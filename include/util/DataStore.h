@@ -176,7 +176,7 @@ private:
     /* Read free lists from disk file
        @returns number of buckets successfully read
      */
-    int readFreelistFromFile();
+    size_t readFreelistFromFile();
 
     /* Invalidate the free-list file on disk
        @pre caller has locked the DataStore

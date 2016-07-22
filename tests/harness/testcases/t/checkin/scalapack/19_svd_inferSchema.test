@@ -14,7 +14,7 @@ store(build(A_21c32, 1 + r*2+c), A_21c32)
 
 --test
 # make it easier for a human to see the matrix location of differing values
---set-format csv+
+--set-format csv+:l
 
 load_library('dense_linear_algebra')
 

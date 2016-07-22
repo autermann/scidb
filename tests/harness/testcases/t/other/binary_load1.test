@@ -7,21 +7,21 @@ create array AB <a:int32,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]
 create array ABC <a:int32,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]
 create array ABC_null <a: int32 null ,b:string null,c: double null> [x=0:3,4,0,y=0:3,4,0]
 create array ABC2_null <a: int32 null ,b:string null,c: double null> [x=0:3,4,0,y=0:3,4,0]
-create array AB1 <a:int32,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]
-create array AB2 <a:int32,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]
+create array AB1 <a:int32 NOT NULL, b:string NOT NULL, c:double NOT NULL> [x=0:3,4,0,y=0:3,4,0]
+create array AB2 <a:int32 NOT NULL, b:string NOT NULL, c:double NOT NULL> [x=0:3,4,0,y=0:3,4,0]
 create array PQR <a:int64,b:string,c:double> [x=0:3,4,0,y=0:3,4,0]
 create array PQR1 <a:int64,b:string> [x=0:3,4,0,y=0:3,4,0]
 
 
 
 --test
---set-format csv+
+--set-format csv+:l
 
---shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+ -aq "load(AB, '${TEST_DATA_DIR}/abc.txt')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+:l -aq "load(AB, '${TEST_DATA_DIR}/abc.txt')""
 save(AB, 'abc.out', 0, '(int32,string,double)')
 load(AB, 'abc.out', 0, '(int32,string,double)')
 load(ABC, 'abc.out', 0, '(int32,string,double)')
---shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+ -aq "load(ABC_null, '${TEST_DATA_DIR}/abc_null.txt')""
+--shell --store-all --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -ocsv+:l -aq "load(ABC_null, '${TEST_DATA_DIR}/abc_null.txt')""
 save(ABC_null, 'abc_null.out', 0, '(int32 null,string null,double null)')
 save(ABC_null, 'abc_null.txt')
 load(ABC2_null, 'abc_null.txt')

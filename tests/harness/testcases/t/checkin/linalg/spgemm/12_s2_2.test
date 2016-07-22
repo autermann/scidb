@@ -4,20 +4,20 @@ load_library('linear_algebra')
 --start-query-logging
 
 # csize 2x2 - easiest, single node
-create array sp0_c2_2  <a:double>[x=0:1,2,0, y=0:1,2,0]
-create array sp1_c2_2  <a:double>[x=0:1,2,0, y=0:1,2,0]
-create array spI_c2_2   <a:double>[x=0:1,2,0, y=0:1,2,0]
+create array sp0_c2_2  <a:double NOT NULL>[x=0:1,2,0, y=0:1,2,0]
+create array sp1_c2_2  <a:double NOT NULL>[x=0:1,2,0, y=0:1,2,0]
+create array spI_c2_2   <a:double NOT NULL>[x=0:1,2,0, y=0:1,2,0]
 # for debugging, make one where the digits indicate the row or column value
-create array spRCDebugA_c2_2   <a:double>[x=0:1,2,0, y=0:1,2,0]
-create array spRCDebugB_c2_2   <a:double>[x=0:1,2,0, y=0:1,2,0]
+create array spRCDebugA_c2_2   <a:double NOT NULL>[x=0:1,2,0, y=0:1,2,0]
+create array spRCDebugB_c2_2   <a:double NOT NULL>[x=0:1,2,0, y=0:1,2,0]
 
 # csize 1x2 - distribute rows and cols
-create array sp0_c1_1  <a:double>[x=0:1,1,0, y=0:1,1,0]
-create array sp1_c1_1  <a:double>[x=0:1,1,0, y=0:1,1,0]
-create array spI_c1_1   <a:double>[x=0:1,1,0, y=0:1,1,0]
+create array sp0_c1_1  <a:double NOT NULL>[x=0:1,1,0, y=0:1,1,0]
+create array sp1_c1_1  <a:double NOT NULL>[x=0:1,1,0, y=0:1,1,0]
+create array spI_c1_1   <a:double NOT NULL>[x=0:1,1,0, y=0:1,1,0]
 # for debugging, make one where the digits indicate the row or column value
-create array spRCDebugA_c1_1   <a:double>[x=0:1,1,0, y=0:1,1,0]
-create array spRCDebugB_c1_1   <a:double>[x=0:1,1,0, y=0:1,1,0]
+create array spRCDebugA_c1_1   <a:double NOT NULL>[x=0:1,1,0, y=0:1,1,0]
+create array spRCDebugB_c1_1   <a:double NOT NULL>[x=0:1,1,0, y=0:1,1,0]
 
 --test
 # here, its ordered by what fills it, to make sure its the identical

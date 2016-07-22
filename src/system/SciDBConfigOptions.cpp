@@ -63,11 +63,14 @@ void initConfig(int argc, char* argv[])
     // rather than Config::INTEGER.  Otherwise at runtime you'll get a
     // boost::bad_any_cast exception when reading the option value
     // (cannot extract 64-bit unsigned size_t into 32-bit signed int).
-    // If you dont use the EIC multipliers but do use Config::SIZE,
-    // make sure to use the UL suffix after your constants
-    // (or indicate somehow else to the compiler that the constants are not of type int).
 
-    // ANOTHER WARNING: Until my advice in ticket #3533 comment:10 is
+    // ANOTHER WARNING: If you don't use the EIC multipliers but do
+    // use Config::SIZE, make sure to use the UL suffix after your
+    // constants (or indicate somehow else to the compiler that the
+    // constants are not of type int).  Failure to do so can prevent
+    // scidb from starting.
+
+    // YET ANOTHER WARNING: Until my advice in ticket #3533 comment:10 is
     // heeded, you'll have to also add your new option to the
     // scidb.py.in script template.  And if your boolean option's
     // default is 0/off/false, yet another scidb.py hoop: see
@@ -89,6 +92,8 @@ void initConfig(int argc, char* argv[])
                 string("0.0.0.0"), false)
         (CONFIG_REGISTER, 'r', "register", "", "", Config::BOOLEAN,
             "Register instance in system catalog.", false, false)
+        (CONFIG_ONLINE, 'o', "online", "ONLINE", "", Config::STRING, "Time when instance is put on-line",
+                string("now"), false)
         (CONFIG_ASYNC_REPLICATION, 0, "async-replication", "", "", Config::BOOLEAN,
             "Asynchronous replication.", true, false)
         (CONFIG_RECOVER, 0, "recover", "", "", Config::INTEGER,
@@ -129,6 +134,8 @@ void initConfig(int argc, char* argv[])
          "REDIM_CHUNK_OVERHEAD_LIMIT", "", Config::SIZE,
          "Redimension memory usage for chunk headers will be limited to this "
          "value in MiB (0 disables check)", 0*MiB, false)
+        (CONFIG_REDIM_TARGET_CELLS_PER_CHUNK, 0, "redim-target-cell-count", "REDIM_TARGET_CELL_COUNT", "", Config::SIZE,
+         "Desired number of cells per chunk when autochunking", 1000000UL, false)
         (CONFIG_CHUNK_SIZE_LIMIT, 0, "chunk-size-limit-mb",
          "CHUNK_SIZE_LIMIT", "", Config::SIZE,
          "Maximum allowable chunk size in MiB (0 disables check)", 0*MiB, false)
@@ -208,6 +215,10 @@ void initConfig(int argc, char* argv[])
                 "Security mode.", string("trust"), false)
         (CONFIG_ENABLE_CHUNKMAP_RECOVERY, 0, "enable-chunkmap-recovery", "ENABLE_CHUNKMAP_RECOVERY", "", Config::BOOLEAN, "Set to true to enable recovery of corrupt chunk-map entires on startup.", false, false)
         (CONFIG_SKIP_CHUNKMAP_INTEGRITY_CHECK, 0, "skip-chunkmap-integrity-check", "SKIP_CHUNKMAP_INTEGRITY_CHECK", "", Config::BOOLEAN, "Set to true to skip all chunkmap integrity checks on startup.", false, false)
+        (CONFIG_OLD_OR_NEW_WINDOW, 0, "window-old-or-new", "OLD_OR_NEW_WINDOW", "", Config::BOOLEAN, "Set to true to have OLD window algorithm, false to get the NEW window algorithm.", false, false)
+        (CONFIG_AUTOCHUNK_MAX_SYNTHETIC_INTERVAL, '\0', "autochunk-max-synthetic-interval",
+         "AUTOCHUNK_MAX_SYNTHETIC_INTERVAL", "", Config::SIZE,
+         "Largest chunk interval to allow for the synthetic dimension if that dimension is autochunked.", 20UL, false)
         ;
 
     cfg->addHook(configHook);

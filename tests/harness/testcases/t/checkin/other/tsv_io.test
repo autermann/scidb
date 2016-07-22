@@ -7,7 +7,7 @@ CREATE ARRAY funky <Last:string,First:string,Middle:string null>[i=0:*,8,0]
 
 --test
 
---set-format tsv
+--set-format tsv:l
 
 # No need for csv2scidb any longer.  Strip nameline and load 'er up.
 --shell --store --command " sed 1d ${TEST_DATA_DIR}/grades.tsv > /tmp/tsv_io.load "
@@ -34,56 +34,37 @@ load(gradebook, '/tmp/tsv_io.load', -2, 'tsv')
 # call it null, \N, or ?n (0<=n<127).
 
 --echo Test plain tsv format
---igdata "save(gradebook, '/tmp/tsv_io_plain.out', -2, 'tsv')"
+--igdata "save(gradebook, '/tmp/tsv_io_plain.out', -2, 'tsv:l')"
 --shell --store --command "sed -e 's/\tnull\t/\t\\N\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' ${TEST_DATA_DIR}/grades.tsv | diff - /tmp/tsv_io_plain.out"
 
 --echo Test tsv:E format
---igdata "save(gradebook, '/tmp/tsv_io_E.out', -2, 'tsv:E')"
+--igdata "save(gradebook, '/tmp/tsv_io_E.out', -2, 'tsv:El')"
 --shell --store --command "sed -e 's/\t\\N\t/\t\t/g' -e 's/\tnull\t/\t\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' ${TEST_DATA_DIR}/grades.tsv | diff - /tmp/tsv_io_E.out"
 
 # \N is now the default for tsv output nulls
 --echo Test tsv:N format
---igdata "save(gradebook, '/tmp/tsv_io_N.out', -2, 'tsv:N')"
+--igdata "save(gradebook, '/tmp/tsv_io_N.out', -2, 'tsv:Nl')"
 --shell --store --command "sed -e 's/\tnull\t/\t\\N\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' ${TEST_DATA_DIR}/grades.tsv | diff - /tmp/tsv_io_N.out"
 
 --echo Test tsv:? format
---igdata "save(gradebook, '/tmp/tsv_io_qmark.out', -2, 'tsv:?')"
+--igdata "save(gradebook, '/tmp/tsv_io_qmark.out', -2, 'tsv:?l')"
 --shell --store --command "sed -e 's/\tnull\t/\t?0\t/g' -e 's/\t\\N\t/\t\?0\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' ${TEST_DATA_DIR}/grades.tsv | diff - /tmp/tsv_io_qmark.out"
 
 --echo Test tsv+ format
---igdata "save(gradebook, '/tmp/tsv_io_plus.out', -2, 'tsv+')"
+--igdata "save(gradebook, '/tmp/tsv_io_plus.out', -2, 'tsv+:l')"
 --shell --store --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\tnull\t/\t\\N\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_plus.out"
 
 --echo Test tsv+:E format
---igdata "save(gradebook, '/tmp/tsv_io_plusE.out', -2, 'tsv+:E')"
+--igdata "save(gradebook, '/tmp/tsv_io_plusE.out', -2, 'tsv+:El')"
 --shell --store --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\tnull\t/\t\t/g' -e 's/\t\\N\t/\t\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_plusE.out"
 
 --echo Test tsv+:N format
---igdata "save(gradebook, '/tmp/tsv_io_plusN.out', -2, 'tsv+:N')"
+--igdata "save(gradebook, '/tmp/tsv_io_plusN.out', -2, 'tsv+:Nl')"
 --shell --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\tnull\t/\t\\N\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_plusN.out"
 
 --echo Test tsv+:? format
---igdata "save(gradebook, '/tmp/tsv_io_plusQ.out', -2, 'tsv+:?')"
+--igdata "save(gradebook, '/tmp/tsv_io_plusQ.out', -2, 'tsv+:?l')"
 --shell --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\t\\N\t/\t\?0\t/g' -e 's/\tnull\t/\t\?0\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_plusQ.out"
-
-# On this tiny data set, ltsv+ output looks pretty much like tsv+
-# output, so use basically the same tests.
-
---echo Test ltsv+ format-
---igdata "save(gradebook, '/tmp/tsv_io_L.out', -2, 'ltsv+')"
---shell --store --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\tnull\t/\t\\N\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_L.out"
-
---echo Test ltsv+:E format
---igdata "save(gradebook, '/tmp/tsv_io_LE.out', -2, 'ltsv+:E')"
---shell --store --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\tnull\t/\t\t/g' -e 's/\t\\N\t/\t\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_LE.out"
-
---echo Test ltsv+:N format
---igdata "save(gradebook, '/tmp/tsv_io_LN.out', -2, 'ltsv+:N')"
---shell --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\tnull\t/\t\\N\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_LN.out"
-
---echo Test ltsv+:? format
---igdata "save(gradebook, '/tmp/tsv_io_LQ.out', -2, 'ltsv+:?')"
---shell --command "awk 'NR == 1 {printf "i\t%s\n", $0} NR != 1 {printf "%d\t%s\n", NR - 2, $0}' ${TEST_DATA_DIR}/grades.tsv | sed -e 's/\t\\N\t/\t\?0\t/g' -e 's/\tnull\t/\t\?0\t/g' -e 's/\(Kif.*101\)\t\t/\1\t0\t/' | diff - /tmp/tsv_io_LQ.out"
 
 --echo Test TSV string field encoding
 
@@ -91,7 +72,7 @@ load(gradebook, '/tmp/tsv_io.load', -2, 'tsv')
 --shell --command "echo 'Hunter,	,Q' > /tmp/tabby.csv"
 --shell --command "echo 'Get it? It is a 	 joke.,Ha,ha' >> /tmp/tabby.csv"
 --igdata "load(funky, '/tmp/tabby.csv', -2, 'csv')"
---igdata "save(funky, '/tmp/tabby.tsv', -2, 'tsv')"
+--igdata "save(funky, '/tmp/tabby.tsv', -2, 'tsv:l')"
 --shell --store --command "cat /tmp/tabby.tsv"
 --shell --command "rm /tmp/tabby.*"
 

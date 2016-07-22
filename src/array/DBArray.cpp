@@ -44,12 +44,12 @@ namespace scidb
     {
         LOG4CXX_DEBUG(logger, "DBArray::DBArray ID="<<_desc.getId()
                       <<", UAID="<<_desc.getUAId()
-                      <<", ps="<<_desc.getPartitioningSchema()
+                      <<", ps="<<_desc.getDistribution()->getPartitioningSchema()
                       << ", desc="<< desc);
         _query = query;
         SCIDB_ASSERT(query);
-        SCIDB_ASSERT(_desc.getPartitioningSchema() != psUninitialized);
-        SCIDB_ASSERT(_desc.getPartitioningSchema() != psUndefined);
+        SCIDB_ASSERT(_desc.getDistribution()->getPartitioningSchema() != psUninitialized);
+        SCIDB_ASSERT(_desc.getDistribution()->getPartitioningSchema() != psUndefined); // important for degraded mode, used by smgr
     }
     std::string const& DBArray::getName() const
     {

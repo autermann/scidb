@@ -112,7 +112,8 @@ public:
         // Add the chunk & cell positions.
         SortingAttributeInfo k;
         const bool excludingEmptyBitmap = true;
-        k.columnNo = _schema.getAttributes(excludingEmptyBitmap).size();  // The attribute at nAttr is chunk_pos.
+        k.columnNo = safe_static_cast<int>(
+            _schema.getAttributes(excludingEmptyBitmap).size());  // The attribute at nAttr is chunk_pos.
         k.ascent = true;
         sortingAttributeInfos.push_back(k);
 
@@ -131,9 +132,16 @@ public:
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&,
+                                                      std::vector<ArrayDesc> const&) const
     {
-        return RedistributeContext(psUndefined);
+        std::shared_ptr<Query> query(Query::getValidQueryPtr(_query));
+        SCIDB_ASSERT(query);
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(query->getDefaultArrayResidency());
+        SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema() == psUndefined);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /***
@@ -154,9 +162,10 @@ public:
         //
         // LocalSorting.
         //
-        const bool preservePositions = true;
-        SortArray sorter(inputArrays[0]->getArrayDesc(), _arena, preservePositions, _schema.getDimensions()[0].getChunkInterval());
-        ArrayDesc const& expandedSchema = sorter.getOutputArrayDesc();
+        const bool PRESERVE_POSITIONS = true;
+        const bool EXPANDED = true;
+        SortArray sorter(inputArrays[0]->getArrayDesc(), _arena, PRESERVE_POSITIONS, _schema.getDimensions()[0].getChunkInterval());
+        ArrayDesc const& expandedSchema = sorter.getOutputSchema(EXPANDED);
         std::shared_ptr<TupleComparator> tcomp(make_shared<TupleComparator>(sortingAttributeInfos, expandedSchema));
         std::shared_ptr<MemArray> sortedLocalData = sorter.getSortedArray(inputArrays[0], query, tcomp);
 
@@ -175,7 +184,7 @@ public:
 
         // Project off the chunk_pos and cell_pos attributes.
         const bool excludeEmptyBitmap = true;
-        size_t nAttrs = _schema.getAttributes(excludeEmptyBitmap).size();
+        AttributeID nAttrs = safe_static_cast<AttributeID>(_schema.getAttributes(excludeEmptyBitmap).size());
         vector<AttributeID> projection(nAttrs+1);
         for (AttributeID i=0; i<nAttrs; ++i) {
             projection[i] = i;

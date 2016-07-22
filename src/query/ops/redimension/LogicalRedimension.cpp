@@ -27,11 +27,9 @@
  *      Author: Knizhnik
  */
 
-#include <boost/foreach.hpp>
 #include <map>
 
 #include "query/Operator.h"
-#include "system/SystemCatalog.h"
 #include "system/Exceptions.h"
 
 using namespace std;
@@ -118,7 +116,9 @@ public:
         ArrayDesc dstDesc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
 
         //Compile a desc of all possible attributes (aggregate calls first) and source dimensions
-        ArrayDesc aggregationDesc (srcDesc.getName(), Attributes(), srcDesc.getDimensions(), defaultPartitioning());
+        ArrayDesc aggregationDesc (srcDesc.getName(), Attributes(), srcDesc.getDimensions(),
+                                   defaultPartitioning(),
+                                   srcDesc.getResidency());
         vector<string> aggregatedNames;
         bool isStrictSet = false;
         bool isStrict=true;
@@ -137,12 +137,12 @@ public:
                 continue;
             }
 
-            bool isInOrderAggregation = false;
+            const bool isInOrderAggregation = false; // We can't guarantee any ordering when computing aggregates.
             addAggregatedAttribute( (std::shared_ptr <OperatorParamAggregateCall>&) _parameters[i], srcDesc, aggregationDesc,
                                     isInOrderAggregation);
-            string aggName =  aggregationDesc.getAttributes()[aggregationDesc.getAttributes().size()-1].getName();
+            string aggName =  aggregationDesc.getAttributes().back().getName();
             bool aggFound = false;
-            BOOST_FOREACH(const AttributeDesc &dstAttr, dstDesc.getAttributes()) {
+            for (const AttributeDesc &dstAttr : dstDesc.getAttributes()) {
                 if (dstAttr.getName() == aggName) {
                     aggFound = true;
                     break;
@@ -155,41 +155,44 @@ public:
         }
 
         //add other attributes
-        BOOST_FOREACH(const AttributeDesc &srcAttr, srcDesc.getAttributes())
+        for (const AttributeDesc &srcAttr : srcDesc.getAttributes())
         {
             //if there's an attribute with same name as an aggregate call - skip the attribute
             bool found = false;
-            BOOST_FOREACH(const AttributeDesc &aggAttr, aggregationDesc.getAttributes())
+            for (const AttributeDesc &aggAttr : aggregationDesc.getAttributes())
             {
                 if( aggAttr.getName() == srcAttr.getName())
                 {
                     found = true;
+                    break;
                 }
             }
 
             if (!found)
             {
-                aggregationDesc.addAttribute(AttributeDesc( aggregationDesc.getAttributes().size(),
-                                                            srcAttr.getName(),
-                                                            srcAttr.getType(),
-                                                            srcAttr.getFlags(),
-                                                            srcAttr.getDefaultCompressionMethod(),
-                                                            srcAttr.getAliases(),
-                                                            &srcAttr.getDefaultValue(),
-                                                            srcAttr.getDefaultValueExpr(),
-                                                            srcAttr.getVarSize()));
+                aggregationDesc.addAttribute(
+                    AttributeDesc(safe_static_cast<AttributeID>(aggregationDesc.getAttributes().size()),
+                                  srcAttr.getName(),
+                                  srcAttr.getType(),
+                                  srcAttr.getFlags(),
+                                  srcAttr.getDefaultCompressionMethod(),
+                                  srcAttr.getAliases(),
+                                  &srcAttr.getDefaultValue(),
+                                  srcAttr.getDefaultValueExpr(),
+                                  srcAttr.getVarSize()));
             }
         }
 
-        //Ensure attributes names uniqueness.
         if (!dstDesc.getEmptyBitmapAttribute()) {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_ERROR1);
         }
 
+        //Ensure attributes names uniqueness.
         size_t numPreservedAttributes = 0;
-        BOOST_FOREACH(const AttributeDesc &dstAttr, dstDesc.getAttributes())
+        for (const AttributeDesc &dstAttr : dstDesc.getAttributes())
         {
-            BOOST_FOREACH(const AttributeDesc &srcAttr, aggregationDesc.getAttributes())
+            // Look for dstAttr among the source and aggregate attributes.
+            for (const AttributeDesc &srcAttr : aggregationDesc.getAttributes())
             {
                 if (srcAttr.getName() == dstAttr.getName())
                 {
@@ -203,11 +206,17 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_ATTRIBUTE_FLAGS)
                         << srcAttr.getName();
                     }
-                    if (!srcAttr.isEmptyIndicator()) { ++numPreservedAttributes; }
+                    if (!srcAttr.isEmptyIndicator())
+                    {
+                        ++numPreservedAttributes;
+                    }
                     goto NextAttr;
                 }
             }
-            BOOST_FOREACH(const DimensionDesc &srcDim, aggregationDesc.getDimensions())
+
+            // Not among the source attributes, look for it among source dimensions (copied to
+            // aggregationDesc above).
+            for (const DimensionDesc &srcDim : aggregationDesc.getDimensions())
             {
                 if (srcDim.hasNameAndAlias(dstAttr.getName()))
                 {
@@ -216,16 +225,13 @@ public:
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_TYPE)
                         << dstAttr.getName() << TID_INT64;
                     }
-                    if (dstAttr.getFlags() != 0)
-                    {
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_DESTINATION_ATTRIBUTE_FLAGS)
-                        << dstAttr.getName();
-                    }
 
                     goto NextAttr;
                 }
             }
 
+            // This dstAttr should now be accounted for (i.e. we know where it's derived from), so
+            // if we get here then this one better be the emptyBitmap.
             if (dstAttr.isEmptyIndicator() == false)
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_ATTRIBUTE)
@@ -234,25 +240,28 @@ public:
         NextAttr:;
         }
 
+        // Similarly, make sure we know how each dstDim is derived.
         Dimensions outputDims;
         size_t nNewDims = 0;
-        BOOST_FOREACH(const DimensionDesc &dstDim, dstDesc.getDimensions())
+        for (const DimensionDesc &dstDim : dstDesc.getDimensions())
         {
-            if (dstDim.getChunkOverlap() > dstDim.getChunkInterval())
+            int64_t interval = dstDim.getChunkIntervalIfAutoUse(std::max(1L, dstDim.getChunkOverlap()));
+            if (dstDim.getChunkOverlap() > interval)
             {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OVERLAP_CANT_BE_LARGER_CHUNK);
             }
-            BOOST_FOREACH(const AttributeDesc &srcAttr, aggregationDesc.getAttributes())
+            for (const AttributeDesc &srcAttr : aggregationDesc.getAttributes())
             {
                 if (dstDim.hasNameAndAlias(srcAttr.getName()))
                 {
                     for (size_t i = 0; i< aggregatedNames.size(); i++)
                     {
                         if (srcAttr.getName() == aggregatedNames[i])
-                        throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_ERROR2);
+                            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REDIMENSION_ERROR2);
                     }
                     if ( !IS_INTEGRAL(srcAttr.getType())  || srcAttr.getType() == TID_UINT64 )
                     {
+                        // (TID_UINT64 is the only integral type that won't safely convert to TID_INT64.)
                         throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_SOURCE_ATTRIBUTE_TYPE)
                             << srcAttr.getName();
                     }
@@ -260,7 +269,7 @@ public:
                     goto NextDim;
                 }
             }
-            BOOST_FOREACH(const DimensionDesc &srcDim, aggregationDesc.getDimensions())
+            for (const DimensionDesc &srcDim : aggregationDesc.getDimensions())
             {
                 if (srcDim.hasNameAndAlias(dstDim.getBaseName()))
                 {
@@ -269,10 +278,13 @@ public:
                     goto NextDim;
                 }
             }
-            //one synthetic dimension allowed
+            // One synthetic dimension allowed.  Can't have both synthetic dimension *and*
+            // aggregates (because both rely on cell collisions in the output schema's
+            // coordinate system).
             if (nNewDims++ != 0 || !aggregatedNames.empty() )
             {
-                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION) << dstDim.getBaseName();
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_UNEXPECTED_DESTINATION_DIMENSION)
+                    << dstDim.getBaseName();
             }
             outputDims.push_back(dstDim);
         NextDim:;
@@ -287,7 +299,12 @@ public:
                   << "redimension" << ss.str();
         }
 
-        return ArrayDesc(srcDesc.getName(), dstDesc.getAttributes(), outputDims, defaultPartitioning(), dstDesc.getFlags());
+        return ArrayDesc(srcDesc.getName(),
+                         dstDesc.getAttributes(),
+                         outputDims,
+                         createDistribution(psUndefined),
+                         query->getDefaultArrayResidency(),
+                         dstDesc.getFlags());
     }
 };
 

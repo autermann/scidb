@@ -20,21 +20,23 @@
 * END_COPYRIGHT
 */
 
-/*
- * PhysicalApply.cpp
- *
- *  Created on: Apr 20, 2010
- *      Author: Knizhnik
+/**
+ * @file PhysicalCrossJoin.cpp
+ * @author Knizhnik, created on: Apr 20, 2010
  */
 
-#include "query/Operator.h"
-#include "array/Metadata.h"
 #include "CrossJoinArray.h"
+
+#include <query/Operator.h>
+#include <query/AutochunkFixer.h>
+#include <array/Metadata.h>
 
 using namespace std;
 using namespace boost;
 
 namespace scidb {
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.cross_join"));
 
 inline OperatorParamDimensionReference* dimref_cast( const std::shared_ptr<OperatorParam>& ptr )
 {
@@ -137,7 +139,16 @@ public:
             std::vector<RedistributeContext> const& inputDistributions,
             std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+        assertConsistency(inputSchemas[1], inputDistributions[1]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
+
+        RedistributeContext distro(_schema.getDistribution(),
+                                   _schema.getResidency());
+        LOG4CXX_TRACE(logger, "cross_join() output distro: "<< distro);
+        return distro;
     }
 
     /**
@@ -150,16 +161,29 @@ public:
         assert(inputSchemas.size() == 2);
         assert(modifiedPtrs.size() == 2);
 
-        // We don't expect to be called twice, but that may change later on: wipe any previous result.
+        // Only one input, at most, can be autochunked.
+        if (inputSchemas[0].isAutochunked() && inputSchemas[1].isAutochunked()) {
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ALL_INPUTS_AUTOCHUNKED)
+                << getLogicalName();
+        }
+
+        // We don't expect to be called twice, but that may change later on:
+        // wipe any previous result.
         _redimRepartSchemas.clear();
 
-        Dimensions const& leftDims = inputSchemas[0].getDimensions();
+        Dimensions leftDims = inputSchemas[0].getDimensions();
         Dimensions rightDims = inputSchemas[1].getDimensions();
-
-        // For each pair of join dimensions, make sure rightArray's chunks and overlaps
-        // match... else we need to build a repartSchema to make them match.
+        // For each pair of join dimensions, make certain the chunkInterval and
+        // chunkOverlap match the exemplar (left most non-autochunked array).
+        // If these aspects do not match, then we need to build a repartSchema
+        // for the non-exemplar schema to make them match.
         //
+        // Only one schema, at most, can be autochunked. See check above.  If
+        // the left is autochunked, then any required repartSchema will be built
+        // for the left schema, otherwise, any required repartSchema will be for
+        // the right schema.
         bool needRepart = false;
+        bool leftIsAutochunked = inputSchemas[0].isAutochunked();
         for (size_t p = 0, np = _parameters.size(); p < np; p += 2)
         {
             const OperatorParamDimensionReference *lDim = dimref_cast(_parameters[p]);
@@ -169,38 +193,73 @@ public:
             assert(l >= 0); // was already checked in Logical...::inferSchema()
             assert(r >= 0); // ditto
 
-            if (rightDims[r].getChunkInterval() != leftDims[l].getChunkInterval()) {
-                rightDims[r].setChunkInterval(leftDims[l].getChunkInterval());
+            // Only one of the inputs (at most) can be autochunked. See previous check.
+            if (rightDims[r].getRawChunkInterval() != leftDims[l].getRawChunkInterval()) {
+                if (leftIsAutochunked) {
+                    leftDims[l].setChunkInterval(rightDims[r].getChunkInterval());
+                }
+                else {
+                    rightDims[r].setChunkInterval(leftDims[l].getChunkInterval());
+                }
                 needRepart = true;
             }
             if (rightDims[r].getChunkOverlap() != leftDims[l].getChunkOverlap()) {
-                rightDims[r].setChunkOverlap(min(leftDims[l].getChunkOverlap(),
-                                                 rightDims[r].getChunkOverlap()));
+                int64_t newOverlap = min(leftDims[l].getChunkOverlap(),
+                                         rightDims[r].getChunkOverlap());
+                if (leftIsAutochunked) {
+                    leftDims[l].setChunkOverlap(newOverlap);
+                }
+                else {
+                    rightDims[r].setChunkOverlap(newOverlap);
+                }
                 needRepart = true;
             }
         }
 
         if (needRepart) {
-            // If right array was manually repartitioned, it was done wrong!
-            if (modifiedPtrs[1]) {
-                throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_BAD_EXPLICIT_REPART)
-                    << getLogicalName() << inputSchemas[1].getDimensions() << rightDims;
+            // Some of the input dimensions may not have obtained an exemplar
+            // chunkOverlap if that dimension is not part of a joining pair.
+            // Any such dimensions which are specified as "autochunked" need to
+            // have the chunkinterval set to DimensionDesc::PASSTHRU. This is
+            // done via setPassThroughChunkIntervals().
+            if (leftIsAutochunked) {
+                setPassthruIfAutochunked(leftDims);
+                // Create copy of left array schema, with newly tweaked dimens ions.
+                _redimRepartSchemas.push_back(make_shared<ArrayDesc>(inputSchemas[0]));
+                _redimRepartSchemas.back()->setDimensions(leftDims);
             }
-
-            // Copy of right array schema, with newly tweaked dimensions.
-            _redimRepartSchemas.push_back(make_shared<ArrayDesc>(inputSchemas[1]));
-            _redimRepartSchemas.back()->setDimensions(rightDims);
-
-            // Leave left array alone, repartition right array.
-            modifiedPtrs[0] = 0;
-            modifiedPtrs[1] = _redimRepartSchemas.back().get();
-        } else {
-            // The preferred way of saying "no repartitioning needed".
+            else {
+                setPassthruIfAutochunked(rightDims); // if necessary.
+                // Create copy of right array schema, with newly tweaked dimensions.
+                _redimRepartSchemas.push_back(make_shared<ArrayDesc>(inputSchemas[1]));
+                _redimRepartSchemas.back()->setDimensions(rightDims);
+            }
+            // Leave "left-most non-autochunked" array alone, and repartition other
+            // array.
+            size_t unchangedIndex = 0;
+            size_t needsRepartIndex = 1;
+            if (leftIsAutochunked) {
+                needsRepartIndex = 0;
+                unchangedIndex = 1;
+            }
+            modifiedPtrs[unchangedIndex] = nullptr;
+            modifiedPtrs[needsRepartIndex] = _redimRepartSchemas.back().get();
+        }
+        else {
+            // The preferred way of saying "no repartitioning needed" is to
+            // clear the modifiedPtrs.
             modifiedPtrs.clear();
         }
     }
 
-    /***
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see LogicalCrossJoin::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
+    }
+
+    /**
      * Join is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
@@ -209,6 +268,9 @@ public:
             std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 2);
+
+        AutochunkFixer af(getControlCookie());
+        af.fix(_schema, inputArrays);
 
         std::shared_ptr<Array> input1 = inputArrays[1];
         if (query->getInstancesCount() == 1 )
@@ -237,18 +299,36 @@ public:
         {
             if (rjd[i] != -1)
             {
-                ljd [ rjd[i] ] = k;
+                ljd [ rjd[i] ] = safe_static_cast<int>(k);
                 k++;
             }
         }
-        std::shared_ptr<Array> replicated = redistributeToRandomAccess(input1, query, psReplication,
-                                                                  ALL_INSTANCE_MASK,
-                                                                  std::shared_ptr<CoordinateTranslator>(),
-                                                                  0,
-                                                                  std::shared_ptr<PartitioningSchemaData>());
+
+        SCIDB_ASSERT(inputArrays[0]->getArrayDesc().getResidency()->isEqual(_schema.getResidency()));
+
+        std::shared_ptr<Array> replicated = redistributeToRandomAccess(input1,
+                                                                       createDistribution(psReplication),
+                                                                       _schema.getResidency(),
+                                                                       query);
         return make_shared<CrossJoinArray>(_schema, inputArrays[0],
                                            replicated,
                                            ljd, rjd);
+    }
+
+private:
+    /**
+     * Set ChunkIntervals of dimensions which are autochunked to be PASSTHRU.
+     *
+     * @param[in,out] the dimensions to set as PASSTHRU
+     *
+     */
+    void setPassthruIfAutochunked(Dimensions& dims) const
+    {
+        for (DimensionDesc& dim : dims) {
+            if (dim.isAutochunked()) {
+                dim.setRawChunkInterval(DimensionDesc::PASSTHRU);
+            }
+        }
     }
 };
 

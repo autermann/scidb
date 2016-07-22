@@ -37,6 +37,8 @@
 #include "query/TypeSystem.h"
 #include "system/ErrorsLibrary.h"
 
+#include <SciDBAPI.h> // for #define EXPORTED_FUNCTION
+
 using namespace std;
 using namespace scidb;
 using namespace boost::assign;
@@ -65,16 +67,18 @@ struct Complex
     Complex operator*(uint64_t v) const
     {
         Complex r;
-        r.re = re * v;
-        r.im = im * v;
+        double dv = static_cast<double>(v);
+        r.re = re * dv;
+        r.im = im * dv;
         return r;
     }
 
     Complex operator/(uint64_t v) const
     {
         Complex c;
-        c.re = (re * v) / (v * v);
-        c.im = (im * v) / (v * v);
+        double dv = static_cast<double>(v);
+        c.re = (re * dv) / (dv * dv);
+        c.im = (im * dv) / (dv * dv);
         return c;
     }
 
@@ -182,7 +186,7 @@ static void double2complex(const Value** args, Value* res, void*)
 static void integer2complex(const Value** args, Value* res, void*)
 {
     Complex& c = *(Complex*)res->data();
-    c.re = args[0]->getInt64();
+    c.re = static_cast<double>(args[0]->getInt64());
     c.im = 0;
 }
 

@@ -28,12 +28,16 @@
  */
 
 #include <boost/format.hpp>
+#include <log4cxx/logger.h>
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
-
-namespace scidb {
+namespace scidb
+{
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.logical_rename"));
 
 using namespace std;
 using namespace boost;
@@ -76,21 +80,52 @@ public:
 		ADD_PARAM_OUT_ARRAY_NAME()
 	}
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have the proper permissions
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::CreateArray);
+        permissions.push_back(scidb::permissions::namespaces::DeleteArray);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         assert(schemas.size() == 0);
         assert(_parameters.size() == 2);
+        assert(((std::shared_ptr<OperatorParam>&)_parameters[0])->getParamType() == PARAM_ARRAY_REF);
         assert(((std::shared_ptr<OperatorParam>&)_parameters[1])->getParamType() == PARAM_ARRAY_REF);
 
-        const string &newArrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
+        std::string oldArrayName;
+        std::string oldNamespaceName;
+        std::string newArrayName;
+        std::string newNamespaceName;
 
-        if (SystemCatalog::getInstance()->containsArray(newArrayName))
+        const string &oldArrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        query->getNamespaceArrayNames(oldArrayNameOrg, oldNamespaceName, oldArrayName);
+
+        const string &newArrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
+        query->getNamespaceArrayNames(newArrayNameOrg, newNamespaceName, newArrayName);
+
+        if(newNamespaceName != oldNamespaceName)
+        {
+            throw USER_QUERY_EXCEPTION(
+                SCIDB_SE_INFER_SCHEMA, SCIDB_LE_CANNOT_RENAME_ACROSS_NAMESPACES,
+                _parameters[1]->getParsingContext())
+                << ArrayDesc::makeQualifiedArrayName(oldNamespaceName, oldArrayName)
+                << ArrayDesc::makeQualifiedArrayName(newNamespaceName, newArrayName);
+        }
+
+        if (scidb::namespaces::Communicator::containsArray(newNamespaceName, newArrayName))
         {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_ARRAY_ALREADY_EXIST,
                 _parameters[1]->getParsingContext()) << newArrayName;
         }
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
         return arrDesc;
     }
 
@@ -98,18 +133,46 @@ public:
     void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
-        assert(_parameters.size() > 0);
-        assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& oldArrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        assert(oldArrayName.find('@') == std::string::npos);
-        std::shared_ptr<SystemCatalog::LockDesc> lock(new SystemCatalog::LockDesc(oldArrayName,
-                                                                                    query->getQueryID(),
-                                                                                    Cluster::getInstance()->getLocalInstanceId(),
-                                                                                    SystemCatalog::LockDesc::COORD,
-                                                                                    SystemCatalog::LockDesc::RNF));
+        SCIDB_ASSERT(_parameters.size() > 1);
+
+        // from
+        SCIDB_ASSERT(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
+        const string& oldArrayNameOrg = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(oldArrayNameOrg.find('@') == std::string::npos);
+
+        std::string oldArrayName;
+        std::string oldNamespaceName;
+        query->getNamespaceArrayNames(oldArrayNameOrg, oldNamespaceName, oldArrayName);
+
+        std::shared_ptr<SystemCatalog::LockDesc> lock(
+            new SystemCatalog::LockDesc(
+                oldNamespaceName,
+                oldArrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::RNF));
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
-        assert(resLock);
-        assert(resLock->getLockMode() >= SystemCatalog::LockDesc::RNF);
+        SCIDB_ASSERT(resLock);
+        SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::RNF);
+
+        // to
+        SCIDB_ASSERT(_parameters[1]->getParamType() == PARAM_ARRAY_REF);
+        const string &newArrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
+        SCIDB_ASSERT(newArrayNameOrg.find('@') == std::string::npos);
+
+        std::string newArrayName;
+        std::string newNamespaceName;
+        query->getNamespaceArrayNames(newArrayNameOrg, newNamespaceName, newArrayName);
+        lock.reset(new SystemCatalog::LockDesc(newArrayName,
+                                               query->getQueryID(),
+                                               Cluster::getInstance()->getLocalInstanceId(),
+                                               SystemCatalog::LockDesc::COORD,
+                                               SystemCatalog::LockDesc::XCL));
+        resLock = query->requestLock(lock);
+        SCIDB_ASSERT(resLock);
+        SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::XCL);
     }
 };
 

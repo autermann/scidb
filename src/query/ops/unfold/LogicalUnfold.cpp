@@ -28,6 +28,7 @@
  */
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 
 using namespace std;
 
@@ -71,6 +72,8 @@ namespace scidb
    */
   class LogicalUnfold : public LogicalOperator
   {
+    AutochunkFixer _fixer;
+
   public:
     LogicalUnfold(const string& logicalName,
 		  const string& alias)
@@ -85,6 +88,10 @@ namespace scidb
 	"to the input array, and column chunk size equal to the number of columns.\n\n"
 	"EXAMPLE:\n\n"
 	"unfold(apply(build(<v:double>[i=0:9,3,0],i),w,i+0.5))";
+    }
+
+    std::string getInspectable() const override {
+        return _fixer.str();
     }
 
     /**
@@ -137,10 +144,18 @@ namespace scidb
 					       nAttrs-1,
 					       nAttrs,
 					       0));
+
+      // Only difference is one extra non-autochunked dimension... but
+      // we have to (trivially) set up the fixer for the first N-1
+      // anyway.  (Had the dimension counts matched, execute() could
+      // have just used checkOrUpdateIntervals().)
+      _fixer.takeAllDimensions(inputSchema);
+
       return ArrayDesc(inputSchema.getName(),
 		       outputAttributes,
 		       outputDimensions,
-                       defaultPartitioning());
+                       createDistribution(psUndefined),
+                       inputSchema.getResidency());
 
     }
   };

@@ -20,6 +20,7 @@
 ########################################
 
 set (catalog_src
+	GetNamespaceIdFromArrayUAId.cpp
 	SystemCatalog.cpp
 )
 

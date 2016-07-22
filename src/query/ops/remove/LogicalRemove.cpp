@@ -30,7 +30,8 @@
 #include <query/Operator.h>
 #include <system/Exceptions.h>
 #include <system/SystemCatalog.h>
-
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 
@@ -72,11 +73,22 @@ public:
         _properties.ddl = true;
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to read the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::DeleteArray);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 0);
+
+
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
         return arrDesc;
     }
 
@@ -85,13 +97,23 @@ public:
         LogicalOperator::inferArrayAccess(query);
         assert(_parameters.size() == 1);
         assert(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        assert(arrayName.find('@') == std::string::npos);
-        std::shared_ptr<SystemCatalog::LockDesc>  lock(new SystemCatalog::LockDesc(arrayName,
-                                                                                     query->getQueryID(),
-                                                                                     Cluster::getInstance()->getLocalInstanceId(),
-                                                                                     SystemCatalog::LockDesc::COORD,
-                                                                                     SystemCatalog::LockDesc::RM));
+
+        std::string arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        assert(arrayNameOrg.find('@') == std::string::npos);
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(
+            new SystemCatalog::LockDesc(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::RM));
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         assert(resLock);
         assert(resLock->getLockMode() >= SystemCatalog::LockDesc::RM);

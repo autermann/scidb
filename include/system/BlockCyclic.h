@@ -32,8 +32,11 @@
 ///        to do the same thing. (Though not as efficiently as MPI can)
 ///
 
+#include <memory>
+#include <sstream>
 #include <stdint.h>
 
+#include <array/ArrayDistribution.h>
 #include <array/Metadata.h>
 
 namespace scidb
@@ -108,57 +111,96 @@ private:
     static procNum_t    procNumLimit();
     static procRowCol_t findFactorization(procNum_t numProc);
 
+    friend class ScaLAPACKArrayDistribution;
     procRowCol_t _maxGridSize;
 };
 
-
 /**
- * This class implements the PartitioningSchemaData API, which is to say that it
- * contains parameterization of a psScaLAPACK distribution which isn't computable from
- * the Array (matrix) alone, but depends on the ScaLAPACK operator and other matrices
- * participating in that operator, and has to be supplied explicitly by the operator
- * calling the redistribute() function.
- * One can consider this class to be an adaptor to (or wrapper around) the pre-existing
- * (and somewhat evolving) methods of the ProcGrid class and its associated types
- * and functions which define the ScaLAPACK block-cyclic distribution in
- * ScaLAPACK's terms separately as much as possible to avoid confusing it with the
- * SciDB terminology.
+ * An array distribution suitable for ScaLAPACK-based operations (e.g. GEMM, GESVD)
  */
-class PartitioningSchemaDataForScaLAPACK: public PartitioningSchemaData {
+class ScaLAPACKArrayDistribution : public ArrayDistribution
+{
 public:
+
+    ScaLAPACKArrayDistribution(size_t redundancy,
+                               const procRowCol_t& blacsGridSize,
+                               const RowCol<procNum_t>& blacsBlockSize)
+    : ArrayDistribution(psScaLAPACK, redundancy),
+    _repartInfo(new PartitioningSchemaDataForScaLAPACK(blacsGridSize, blacsBlockSize))
+    {
+        SCIDB_ASSERT(redundancy==0);
+    }
+
+    ScaLAPACKArrayDistribution(size_t redundancy, const std::string& ctx) ;
+
+private:
     /**
-     * @param blacsGridSize contains the first two arguments to set_fake_blacs_gridinfo_(),
-     * @param blacsBlockSize contains the common blocksize of all ScaLAPACK matrices as
-     *        participating in the ScaLAPACK operator
+     * This class contains parameterization of a psScaLAPACK distribution which isn't computable from
+     * the Array (matrix) alone, but depends on the ScaLAPACK operator and other matrices
+     * participating in that operator, and has to be supplied explicitly by the operator
+     * calling the redistribute() function.
+     * One can consider this class to be an adaptor to (or wrapper around) the pre-existing
+     * (and somewhat evolving) methods of the ProcGrid class and its associated types
+     * and functions which define the ScaLAPACK block-cyclic distribution in
+     * ScaLAPACK's terms separately as much as possible to avoid confusing it with the
+     * SciDB terminology.
      */
-    PartitioningSchemaDataForScaLAPACK(procRowCol_t blacsGridSize, RowCol<procNum_t> blacsBlockSize)
+    class PartitioningSchemaDataForScaLAPACK
+    {
+    public:
+        /**
+         * @param blacsGridSize contains the first two arguments to set_fake_blacs_gridinfo_(),
+         * @param blacsBlockSize contains the common blocksize of all ScaLAPACK matrices as
+         *        participating in the ScaLAPACK operator
+         */
+        PartitioningSchemaDataForScaLAPACK(procRowCol_t blacsGridSize, RowCol<procNum_t> blacsBlockSize)
         : _blacsGridSize(blacsGridSize), _blacsBlockSize(blacsBlockSize){}
 
-    /**
-     * @see PartitioningSchemaData::getID
-     */
-    virtual PartitioningSchema getID() { return psScaLAPACK; }
+        /**
+         * @see PartitioningSchemaData::getID
+         */
+        PartitioningSchema getID() { return psScaLAPACK; }
 
-    /**
-     * map a scidb chunk to a particular instance where it must be located to be
-     * accessed by memory-mapped ScaLAPACK slave operators (in Fortran) which
-     * expect/require them to be located in particular SciDB processes where the
-     * corresponding MPI/ScaLAPACK processes require them to be.
-     *
-     * @param  chunkPos coordinates of the upper-left corner of the chunk
-     * @param  query    current query
-     * @return the InstanceID where that chunk must go according to ScaLAPACK rules
-     * @see    redistribute() and getInstanceForChunk() (Operator.cpp)
-     *
-     */
-    virtual InstanceID getInstanceID(const Coordinates& chunkPos, const Query& query) const ;
+        /**
+         * map a scidb chunk to a particular instance where it must be located to be
+         * accessed by memory-mapped ScaLAPACK slave operators (in Fortran) which
+         * expect/require them to be located in particular SciDB processes where the
+         * corresponding MPI/ScaLAPACK processes require them to be.
+         *
+         * @param  chunkPos coordinates of the upper-left corner of the chunk
+         * @param  procGrid the processor grid describing the instances participating in the computation
+         *         (derived from the instances participating in the current query)
+         * @return the InstanceID where that chunk must go according to ScaLAPACK rules
+         * @see    ArrayDistributionInterface.h
+         *
+         */
+        InstanceID getInstanceID(const Coordinates& chunkPos, const ProcGrid* const procGrid ) const ;
+
+        const procRowCol_t&       getBlacsGridSize() const { return _blacsGridSize; }
+        const RowCol<procNum_t>&  getBlacsBlockSize() const { return _blacsBlockSize; }
+    private:
+
+        procRowCol_t        _blacsGridSize;     // size of the ScaLAPACK compute grid for the operation in question
+        // as used in the BLACS function
+        RowCol<procNum_t>   _blacsBlockSize;    // ScaLAPACK block size
+    };
+
+public:
+
+    virtual std::string getContext() const ;
+
+    virtual bool checkCompatibility(const ArrayDistPtr& otherArrDist) const ;
+
+    virtual InstanceID
+    getPrimaryChunkLocation(Coordinates const& chunkPosition,
+                            Dimensions const& dims,
+                            size_t nInstances) const ;
 private:
 
-    procRowCol_t        _blacsGridSize;     // size of the ScaLAPACK compute grid for the operation in question
-                                            // as used in the BLACS function
-    RowCol<procNum_t>   _blacsBlockSize;    // ScaLAPACK block size
-};
+    std::unique_ptr<PartitioningSchemaDataForScaLAPACK> _repartInfo;
+    mutable std::unique_ptr<const ProcGrid> _procGrid;
 
+};
 
 } // end namespace scidb
 

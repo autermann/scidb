@@ -41,7 +41,9 @@ namespace scidb
  * Constructs a new array descriptor with the appropriate dimensions.
  ***/
 ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos,
-        Coordinates& highPos, std::shared_ptr<Query> const& query) {
+                        Coordinates& highPos,
+                        std::shared_ptr<Query> const& query)
+{
     Dimensions dims = desc.getDimensions();
     Dimensions newDims(dims.size());
 
@@ -50,14 +52,18 @@ ArrayDesc setDimensions(ArrayDesc desc, Coordinates& lowPos,
         size_t end = std::max(highPos[i] - lowPos[i],0L);
         newDims[i] = DimensionDesc(srcDim.getBaseName(),
                 srcDim.getNamesAndAliases(), 0, 0, end,
-                end, srcDim.getChunkInterval(),
+                end, srcDim.getRawChunkInterval(),
                 srcDim.getChunkOverlap());
     }
 
     /***
      * FIXME: Don't really know what are the number of cells and the size of the array
      **/
-    return ArrayDesc(desc.getName(), desc.getAttributes(), newDims, defaultPartitioning());
+    return ArrayDesc(desc.getName(),
+                     desc.getAttributes(),
+                     newDims,
+                     createDistribution(psUndefined),
+                     desc.getResidency());
 }
 
 /**
@@ -127,7 +133,8 @@ public:
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> inputSchemas,
-            std::shared_ptr<Query> query) {
+                          std::shared_ptr<Query> query)
+    {
         assert(inputSchemas.size() == 1);
         assert(
                 _parameters.size() == 0 || _parameters.size() == inputSchemas[0].getDimensions().size() * 2);

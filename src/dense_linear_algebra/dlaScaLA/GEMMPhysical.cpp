@@ -42,6 +42,7 @@
 #include <mpi/MPILauncher.h>
 #include <mpi/MPIManager.h>
 #include <util/Network.h>
+#include <query/AutochunkFixer.h>
 #include <query/Query.h>
 #include <system/BlockCyclic.h>
 #include <system/Cluster.h>
@@ -53,6 +54,7 @@
 // MPI/ScaLAPACK
 #include <scalapackUtil/reformat.hpp>
 #include <scalapackUtil/scalapackFromCpp.hpp>
+#include <scalapackUtil/ScaLAPACKLogical.hpp> // for checkScaLAPACKPhysicalInputs()
 #include <scalapackUtil/ScaLAPACKPhysical.hpp>
 #include <dlaScaLA/scalapackEmulation/scalapackEmulation.hpp>
 #include <dlaScaLA/slaving/pdgemmMaster.hpp>
@@ -97,6 +99,13 @@ public:
     std::shared_ptr<Array> invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays,
                                 const GEMMOptions options, std::shared_ptr<Query>& query,
                                 ArrayDesc& outSchema);
+
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see GEMMLogical::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
+    }
 
     virtual std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query);
 private:
@@ -177,14 +186,12 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
         // redistribute to psScaLAPACK
         // NOTE: this must be kept in sync with the particpatingInMPI version of the redistribute, below
         // NOTE: this redistribution must be kept in sync with the particpatingInMPI redistributeInputArrays, above
-        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-           make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "GEMMPhysical"), firstChunkSize);
-
         for(size_t mat=0; mat < numArray; mat++ ) {
             std::stringstream labelStream;
             labelStream << "GEMMPhysical input[" << mat << "]";
-            std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[mat], schemeData, query, labelStream.str());
+            std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[mat],
+                                                                             outSchema.getDistribution(),
+                                                                             query, labelStream.str());
             bool wasConverted = (tmpRedistedInput != inputArrays[mat]) ;  // only when redistribute was actually done (sometimes optimize away)
             if (wasConverted) {
                 SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
@@ -201,7 +208,7 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
             tmpRedistedInput.reset();
         }
         unlaunchMPISlavesNonParticipating();
-        return std::shared_ptr<Array>(new MemArray(_schema,query)); // NOTE: must not happen before redistribute is done.
+        return std::shared_ptr<Array>(new MemArray(outSchema,query)); // NOTE: must not happen before redistribute is done.
     }
 
     //
@@ -263,8 +270,16 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
                               << " M["<<i<<"][R]"<<size[i][R] <<" MB["<<i<<"][R]:"<<MB_NB[i][R]
                               << " N["<<i<<"][R]"<<size[i][C] <<" NB["<<i<<"][R]:"<<MB_NB[i][C]
                               << " MYPROW:"<<MYPROW << " NPROW:"<< NPROW);
-        LLD[i] = std::max(one, scidb_numroc_( size[i][R], MB_NB[i][R], MYPROW, RSRC, NPROW ));
-        LTD[i] = std::max(one, scidb_numroc_( size[i][C], MB_NB[i][C], MYPCOL, RSRC, NPCOL ));
+        LLD[i] = std::max(one, scidb_numroc_(slpp::int_cast(size[i][R]),
+                                              slpp::int_cast(MB_NB[i][R]),
+                                              MYPROW,
+                                              RSRC,
+                                              NPROW));
+        LTD[i] = std::max(one, scidb_numroc_( slpp::int_cast(size[i][C]),
+                                              slpp::int_cast(MB_NB[i][C]),
+                                              MYPCOL,
+                                              RSRC,
+                                              NPCOL));
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI():"
                               << " LLD["<<i<<"] = " << LLD[i]
                               << " LTD["<<i<<"] = " << LTD[i]);
@@ -281,7 +296,12 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
                               << ", LLD=" << LLD[i]);
 
         slpp::int_t descinitINFO = 0; // an output implemented as non-const ref (due to Fortran calling conventions)
-        scidb_descinit_(DESC[i], size[i][R], size[i][C], MB_NB[i][R], MB_NB[i][C], 0, 0, blacsContext, LLD[i], descinitINFO);
+        scidb_descinit_(DESC[i],
+                        slpp::int_cast(size[i][R]),
+                        slpp::int_cast(size[i][C]),
+                        slpp::int_cast(MB_NB[i][R]),
+                        slpp::int_cast(MB_NB[i][C]),
+                        0, 0, blacsContext, LLD[i], descinitINFO);
         if (descinitINFO != 0) {
             LOG4CXX_ERROR(logger, "GEMMPhysical::invokeMPI(): scidb_descinit(DESC) failed, INFO " << descinitINFO
                                                                                     << " DESC " << DESC);
@@ -342,7 +362,7 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     // Comments on PDGEMM input "K", taken from the netlib PDGEMM argument header:
     // If transa = 'T' or 'C'(true), it is the number of rows in submatrix A."
     // If transa = 'N'(false), it is the number of columns in submatrix A."
-    slpp::int_t K = nCol(inputArrays[AA], options.transposeA);
+    slpp::int_t K = slpp::int_cast(nCol(inputArrays[AA], options.transposeA));
 
     // the following also used to be done just prior to pdgemm,
     // but now must be done before inputArrays[CC] is .reset() in the following loop.
@@ -363,15 +383,13 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     // redistribute to psScaLAPACK, and convert to ScaLAPACK format.
     // NOTE: this redistribution must be kept in sync with the particpatingInMPI redistributeInputArrays, above
 
-    procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-       make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "GEMMPhysical"), firstChunkSize);
-
     double* asDoubles[NUM_MATRICES];
     for(size_t mat=0; mat < numArray; mat++ ) {
         std::stringstream labelStream;
         labelStream << "GEMMPhysical input[" << mat << "]";
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[mat], schemeData, query, labelStream.str());
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[mat],
+                                                                         outSchema.getDistribution(),
+                                                                         query, labelStream.str());
 
         bool wasConverted = (tmpRedistedInput != inputArrays[mat]) ;  // only when redistribute was actually done (sometimes optimize away)
 
@@ -417,12 +435,13 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
     if(DBG_CERR) std::cerr << "GEMMPhysical::invokeMPI(): calling pdgemm to compute" << std:: endl;
     std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
 
-    slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-to-1 between instanceID and MPI rank
+    slpp::int_t MYPE = slpp::int_cast(query->getInstanceID()) ;  // we map 1-to-1 between instanceID and MPI rank
     slpp::int_t INFO = DEFAULT_BAD_INFO ;
     pdgemmMaster(query.get(), _ctx, slave, _ipcName, shmIpc[BUF_ARGS]->get(),
                   NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
                   getTransposeCode(options.transposeA), getTransposeCode(options.transposeB),
-                  size[CC][R], size[CC][C], K,
+                 slpp::int_cast(size[CC][R]),
+                 slpp::int_cast(size[CC][C]), K,
                   &options.alpha,
                   asDoubles[AA], one, one, DESC[AA],
                   asDoubles[BB], one, one, DESC[BB],
@@ -477,7 +496,7 @@ std::shared_ptr<Array> GEMMPhysical::invokeMPI(std::vector< std::shared_ptr<Arra
         assert(resultShmIpcIndx == BUF_MAT_CC);
     } else {
         LOG4CXX_DEBUG(logger, "GEMMPhysical::invokeMPI(): instance participated, but does not output: creating empty MemArray: first ("<<first[R]<<","<<first[C]<<"), last(" << last[R] <<"," <<last[C]<<")");
-        result = std::shared_ptr<Array>(new MemArray(_schema,query));  // same as when we don't participate at all
+        result = std::shared_ptr<Array>(new MemArray(outSchema,query));  // same as when we don't participate at all
         resultShmIpcIndx = shmIpc.size();                   // indicate we don't want to hold on to buffer BUF_MAT_CC after all
     }
 
@@ -500,7 +519,14 @@ std::shared_ptr<Array> GEMMPhysical::execute(std::vector< std::shared_ptr<Array>
     //
     LOG4CXX_DEBUG(logger, "GEMMPhysical::execute(): begin.");
 
+    AutochunkFixer af(getControlCookie());
+    af.fix(_schema, inputArrays);
+
     // TODO: make a GEMMLogical checkArgs(inputArrays, query); which asserts two or three arrays
+
+    // Need to re-check intervals due to autochunking.  Too bad preSingleExecute doesn't let us see schemas.
+    enum dummy2 {AA=0, BB, CC, NUM_MATRICES};  // which matrix: f(AA,BB,CC) = alpha AA BB + beta CC
+    checkScaLAPACKPhysicalInputs(inputArrays, query, NUM_MATRICES, NUM_MATRICES);
 
     // get string of parameters from the optional 4th argument:
     // (TRANSA, TRANSB, ALPHA, BETA)
@@ -519,10 +545,17 @@ std::shared_ptr<Array> GEMMPhysical::execute(std::vector< std::shared_ptr<Array>
     // invokeMPI()
     //
 
+    assert(query->getDefaultArrayResidency()->isEqual(_schema.getResidency()));
+    assert(_schema.getDistribution()->getPartitioningSchema() == psScaLAPACK);
+
     // invokeMPI does not manage an empty bitmap yet, but it is specified in _schema.
     // so to make it compatible, we first create a copy of _schema without the empty tag attribute
     Attributes attrsNoEmptyTag = _schema.getAttributes(true /*exclude empty bitmap*/);
-    ArrayDesc schemaNoEmptyTag(_schema.getName(), attrsNoEmptyTag, _schema.getDimensions(), defaultPartitioning());
+    ArrayDesc schemaNoEmptyTag(_schema.getName(),
+                               attrsNoEmptyTag,
+                               _schema.getDimensions(),
+                               _schema.getDistribution(),
+                               _schema.getResidency() );
 
     // and now invokeMPI produces an array without empty bitmap except when it is not participating
     std::shared_ptr<Array> arrayNoEmptyTag = invokeMPI(inputArrays, options, query, schemaNoEmptyTag);
@@ -537,6 +570,9 @@ std::shared_ptr<Array> GEMMPhysical::execute(std::vector< std::shared_ptr<Array>
     } else {
         result = arrayNoEmptyTag;
     }
+
+    assert(query->getDefaultArrayResidency()->isEqual(result->getArrayDesc().getResidency()));
+    assert(result->getArrayDesc().getDistribution()->getPartitioningSchema() == psScaLAPACK);
 
     // return the scidb array
     LOG4CXX_DEBUG(logger, "GEMMPhysical::execute(): (successful) end");

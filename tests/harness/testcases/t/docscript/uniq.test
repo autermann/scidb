@@ -22,7 +22,7 @@ store(build(year,1996+(i%4 * 4)),year)
 store(build(person,'[Bailey,Greene,Gatlin,Bolt,Keter,Kosgei, Kemboi,Kipruto,Thugwane,Abera,Baldini,Wanjiru]',true),person)  
 store(build(country,'[Canada,USA,USA,Jamaica,Kenya,Kenya, Kenya,Kenya,USA,Ethiopia,Italy,Kenya]',true),country)  
 store(build(time,'[(9.84),(9.87),(9.85),(9.69),(487.12), (503.17),(485.81),(490.34),(7956),(7811),(7855),(7596)]',true),time)  
---set-format lcsv+
+--set-format csv+:l
 --stop-igdata
 store(join(event,join(person,join(year,join(country,time)))),winnersFlat)  
 --set-format auto

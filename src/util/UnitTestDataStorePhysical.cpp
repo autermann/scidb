@@ -197,7 +197,7 @@ public:
                  p < reinterpret_cast<uint32_t*>(buf + it->first);
                  ++p)
             {
-                *p = it->first;
+                *p = safe_static_cast<uint32_t>(it->first);
             }
             ds->writeData(it->second, buf, it->first, it->first*2);
             delete [] buf;

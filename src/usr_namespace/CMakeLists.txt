@@ -25,6 +25,7 @@ if (NOT WITHOUT_SERVER)
         NamespaceDesc.cpp
         NamespaceObject.cpp
         NamespacesCommunicator.cpp
+        RoleDesc.cpp
         SecurityCommunicator.cpp
         UserDesc.cpp
     )

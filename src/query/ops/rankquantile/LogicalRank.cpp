@@ -150,7 +150,7 @@ public:
             }
         }
 
-        return getRankingSchema(input, inputAttributeID);
+       return getRankingSchema(input, query, inputAttributeID);
     }
 };
 

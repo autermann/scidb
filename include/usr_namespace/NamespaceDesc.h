@@ -42,10 +42,11 @@ namespace scidb
     class NamespaceDesc
     {
     public:
-        typedef int64_t ID;
-
+        typedef uint64_t ID;  // Note:  0 is an uninitialized ID
+        static const ID UNINITIALIZED_NS_ID = 0;
 
     private:
+        static const ID PUBLIC_NS_ID        = 1;
         std::string     _name;
         ID              _id;
 
@@ -71,7 +72,15 @@ namespace scidb
             const std::string &     rName,
             ID                      id);
 
-		/**
+        /**
+         * Determine if the namespace Id is initialized
+         */
+        inline bool isIdInitialized() const
+        {
+            return (_id!=UNINITIALIZED_NS_ID);
+        }
+
+        /**
          * @brief Retrieve the name of the namespace
          * @returns - the name of the namespace
          */
@@ -89,7 +98,7 @@ namespace scidb
             _name = name;
         }
 
-		/**
+        /**
          * @brief Get the id for the namespace
          * @returns - Positive value=namespaceId, -1=Not initialized
          */
@@ -98,7 +107,7 @@ namespace scidb
             return _id;
         }
 
-		/**
+        /**
          * @brief Set the id for the namespace
          * @param[in] - The id for the namespace
          */
@@ -107,9 +116,17 @@ namespace scidb
             _id = id;
         }
 
+		/**
+		 * Retrieve the id for the public namespace
+		 * @return the value of the id for the public namespace
+		 */
+		static ID getPublicNamespaceId()
+		{
+			return PUBLIC_NS_ID;
+		}
     };
 
-	/**
+    /**
      * @brief Comparison operator - "less than"
      *
      * @param[in] lhs - left hand side of the operator
@@ -123,7 +140,7 @@ namespace scidb
         return (lhs.getName() < rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "greater than"
      *
      * @param[in] lhs - left hand side of the operator
@@ -135,10 +152,10 @@ namespace scidb
         const NamespaceDesc& lhs,
         const NamespaceDesc& rhs)
     {
-        return lhs > rhs;
+        return (lhs.getName() > rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "less than or equal to"
      *
      * @param[in] lhs - left hand side of the operator
@@ -152,7 +169,7 @@ namespace scidb
         return !(lhs > rhs);
     }
 
-	/**
+    /**
      * @brief Comparison operator - "greater than or equal to"
      *
      * @param[in] lhs - left hand side of the operator
@@ -166,7 +183,7 @@ namespace scidb
         return !(lhs < rhs);
     }
 
-	/**
+    /**
      * @brief Comparison operator - "equality"
      *
      * @param[in] lhs - left hand side of the operator
@@ -180,7 +197,7 @@ namespace scidb
         return (lhs.getName() == rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "inequality"
      *
      * @param[in] lhs - left hand side of the operator

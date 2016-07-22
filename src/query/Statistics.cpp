@@ -23,22 +23,20 @@
 /**
  * @file Statistic.cpp
  *
- * @author roman.simakov@gmail.com
- *
  * @brief Implementation of statistic gatharing class
+ *
+ * NOTE: For performance timing, see PerfTiming.{h,cpp}
+ *       Timing aspects of this code are not currently maintained
+ *       and are being considered for removal.
  */
 
 #include <memory>
 #include <log4cxx/logger.h>
 
-#include <pqxx/connection>
-#include <pqxx/transaction>
-#include <pqxx/prepared_statement>
-#include <pqxx/except>
-#include <libpq-fe.h>
-
 #include "query/Statistics.h"
 #include "query/Query.h"
+
+#include <util/Pqxx.h>
 
 using namespace std;
 using namespace boost;
@@ -91,103 +89,6 @@ std::ostream& writeStatistics(std::ostream& os, const Statistics& s, size_t tab)
 
 // S T A T I S T I C S   M O N I T O R
 
-class PostgresStatisticsMonitor: public StatisticsMonitor
-{
-public:
-    virtual ~PostgresStatisticsMonitor() {}
-    PostgresStatisticsMonitor(const string& connectionString)
-    {
-        if (!PQisthreadsafe())
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_LIBPQ_NOT_THREADSAFE);
-
-        try
-        {
-            _connection = new pqxx::connection(connectionString);
-
-            work tr(*_connection);
-            result query_res = tr.exec("select count(*) from pg_tables where tablename = 'scidb_stat'");
-            const bool _initialized = query_res[0].at("count").as(bool());
-
-            if (!_initialized) {
-                tr.exec("create table \"scidb_stat\" (query_id bigint, ts timestamp, query_str varchar, query_stat varchar)");
-                tr.commit();
-            }
-        }
-        catch (const sql_error &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query()
-                << e.what();
-        }
-        catch (const PGSTD::runtime_error &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_CONNECT_PG) << e.what();
-        }
-        catch (const Exception &e)
-        {
-            throw;
-        }
-        catch (const std::exception &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-        }
-        catch (...)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
-                "Unknown exception when connecting to system catalog";
-        }
-    }
-
-    void pushStatistics(const Query& query)
-    {
-        try
-        {
-            work tr(*_connection);
-            string sql = "insert into \"scidb_stat\"(query_id, ts, query_str, query_stat)"
-                    " values ($1, now(), $2, $3)";
-            _connection->prepare("append_stat", sql)
-                    ("bigint", treat_direct)
-                    ("varchar", treat_string)
-                    ("varchar", treat_string);
-
-            stringstream ss;
-            query.writeStatistics(ss);
-
-            tr.prepared("append_stat")
-                    (query.getQueryID())
-                    (query.queryString)
-                    (ss.str()).exec();
-            _connection->unprepare("append_stat");
-            tr.commit();
-        }
-        catch (const sql_error &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_PG_QUERY_EXECUTION_FAILED) << e.query()
-                << e.what();
-        }
-        catch (const PGSTD::runtime_error &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_CANT_CONNECT_PG) << e.what();
-        }
-        catch (const Exception &e)
-        {
-            throw;
-        }
-        catch (const std::exception &e)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) << e.what();
-        }
-        catch (...)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_SYSCAT, SCIDB_LE_UNKNOWN_ERROR) <<
-                "Unknown exception when connecting to system catalog";
-        }
-    }
-
-private:
-    pqxx::connection *_connection;
-
-};
-
 class LoggerStatisticsMonitor: public StatisticsMonitor
 {
 public:
@@ -212,8 +113,6 @@ std::shared_ptr<StatisticsMonitor> StatisticsMonitor::create(size_t type, const 
 {
     switch (type)
     {
-    case smPostgres:
-        return std::shared_ptr<StatisticsMonitor>(new PostgresStatisticsMonitor(params));
     case smLogger:
     default:
         return std::shared_ptr<StatisticsMonitor>(new LoggerStatisticsMonitor(params));

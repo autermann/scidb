@@ -25,19 +25,20 @@
  *
  * @author roman.simakov@gmail.com
  *
- * Physical implementation of SAVE operator for saveing data from text file
+ * Physical implementation of SAVE operator for saving data from text file
  * which is located on coordinator
  */
 
-#include <string.h>
 
-#include "query/Operator.h"
-#include "array/Array.h"
-#include "smgr/io/ArrayWriter.h"
-#include "array/DBArray.h"
-#include "query/QueryProcessor.h"
-#include "system/Config.h"
-#include "system/SciDBConfigOptions.h"
+#include <array/Array.h>
+#include <array/DBArray.h>
+#include <log4cxx/logger.h>
+#include <query/Operator.h>
+#include <query/QueryProcessor.h>
+#include <smgr/io/ArrayWriter.h>
+#include <string.h>
+#include <system/Config.h>
+#include <system/SciDBConfigOptions.h>
 
 using namespace std;
 using namespace boost;
@@ -50,6 +51,7 @@ using namespace scidb;
 
 namespace scidb
 {
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.physical_save"));
 
 class PhysicalSave: public PhysicalOperator
 {
@@ -89,10 +91,11 @@ public:
 
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays,
-                                     std::shared_ptr<Query> query)
+                                   std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size() >= 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
         assert(_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
         const string fileName = ParmExpr(0)->evaluate().getString();
@@ -100,13 +103,18 @@ public:
         if (_parameters.size() >= 3) {
             format = ParmExpr(2)->evaluate().getString();
         }
+        bool parallel = false;
         const bool isOpaque = (format == "opaque");
         InstanceID sourceInstanceID = getSourceInstanceID();
         if (sourceInstanceID == COORDINATOR_INSTANCE_MASK) {
             sourceInstanceID = (query->isCoordinator() ? query->getInstanceID() : query->getCoordinatorID());
+        } else if (sourceInstanceID == ALL_INSTANCE_MASK) {
+            parallel = true;
+        } else {
+            // convert from physical to logical
+            sourceInstanceID = query->mapPhysicalToLogical(sourceInstanceID);
         }
         const ArrayDesc& inputArrayDesc = inputArrays[0]->getArrayDesc();
-        bool parallel = (sourceInstanceID == ALL_INSTANCE_MASK);
         std::shared_ptr<Array> tmpRedistedInput;
 
         if (!parallel) {
@@ -123,14 +131,17 @@ public:
                     attributeOrdering.insert(a->getId());
                 }
             }
+
+            stringstream ss;
+            ss << sourceInstanceID;
+            ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                        DEFAULT_REDUNDANCY,
+                                                                                        ss.str());
             tmpRedistedInput = pullRedistributeInAttributeOrder(inputArrays[0],
                                                                 attributeOrdering,
-                                                                query,
-                                                                psLocalInstance,
-                                                                sourceInstanceID,
-                                                                std::shared_ptr<CoordinateTranslator>(),
-                                                                0,
-                                                                std::shared_ptr<PartitioningSchemaData>());
+                                                                localDist,
+                                                                ArrayResPtr(), //default query residency
+                                                                query);
         } else {
             tmpRedistedInput = inputArrays[0];
         }

@@ -31,7 +31,9 @@
 #include <system/ErrorCodes.h>
 #include <system/Exceptions.h>
 #include <system/Utils.h>
+#include <util/FileIO.h>
 #include <util/Platform.h>
+#include <util/Utility.h>
 
 #include <iostream>
 #include <stdint.h>
@@ -134,7 +136,7 @@ CsvParser& CsvParser::setStrict(bool enable)
     } else {
         opts &= ~CSV_STRICT;
     }
-    csv_set_opts(&_parser, opts);
+    csv_set_opts(&_parser, static_cast<unsigned char>(opts));
     return *this;
 }
 
@@ -161,7 +163,7 @@ void CsvParser::reset()
     csv_set_space_func(&_parser, spaceFunc);
     csv_set_quote(&_parser, _quote);
     csv_set_delim(&_parser, _delim);
-    csv_set_opts(&_parser, opts);
+    csv_set_opts(&_parser, static_cast<unsigned char>(opts));
 
     // Very simple-minded error recovery: scan forward, starting with
     // last successfully parsed position in the _inbuf, to get beyond
@@ -250,7 +252,7 @@ void CsvParser::readNextBuffer()
 {
     // Read next input buffer.
     _bufOffset += _nread;
-    _nread = ::fread(&_inbuf[0], 1, BUF_SIZE, _fp);
+    _nread = scidb::fread_unlocked(&_inbuf[0], 1, BUF_SIZE, _fp);
     if (_nread == 0) {
         if (::ferror(_fp)) {
             int err = errno ? errno : EIO;
@@ -381,7 +383,8 @@ void CsvParser::putField(void* s, size_t n)
     if ((_datalen + n + 1) >= _data.size()) {
         _data.resize(_data.size() + ::getpagesize());
     }
-    _fields.push_back(Field(_datalen, _numRecords, _numFields, _bufOffset + _datalen));
+    _fields.push_back(Field(safe_static_cast<int>(_datalen),
+                            _numRecords, _numFields, _bufOffset + _datalen));
 
     // Un-escape quotes and backslashes on the way in, or we'll never get rid of
     // \\\\\'em.  Libcsv turns "foo""bar" into foo"bar but does not

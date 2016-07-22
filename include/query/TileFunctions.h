@@ -83,10 +83,11 @@ void setPayloadValue(RLEPayload* p, size_t index, T value) {
 template <> inline
 void setPayloadValue<bool>(RLEPayload* p, size_t index, bool value) {
     char* data = p->getFixData();
+    char mask = static_cast<char>(1 << (index & 7));
     if (value) {
-        data[index >> 3] |= 1 << (index & 7);
+        data[index >> 3] |= mask;
     } else {
-        data[index >> 3] &= ~(1 << (index & 7));
+        data[index >> 3] &= static_cast<char>(~mask);
     }
 }
 

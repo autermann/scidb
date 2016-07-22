@@ -45,11 +45,11 @@ def my_call(q, expected_error=''):
     # Print the query string.
     print q
 
+    env_scidb_config_user = os.environ["SCIDB_CONFIG_USER"]
+
     # Choose between Java or C++ version of iquery.
     cmd_list = [
-               os.environ['SCIDB_INSTALL_PATH']+"/bin/iquery",
-               "-aq",
-               q
+               os.environ['SCIDB_INSTALL_PATH']+"/bin/iquery"
                ]
 
     if using_java_iquery:
@@ -58,10 +58,13 @@ def my_call(q, expected_error=''):
               "-ea",
               "-cp",
               os.environ['SCIDB_INSTALL_PATH']+"/jdbc/scidb4j.jar",
-              "org.scidb.iquery.Iquery",
-              "-aq",
-              q
+              "org.scidb.iquery.Iquery"
               ]
+
+    if len(env_scidb_config_user) > 0:
+        cmd_list.extend(["--auth-file", env_scidb_config_user])
+
+    cmd_list.extend(["-aq", q])
 
     # Execute the query.
     p = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, stdout=subprocess.PIPE)

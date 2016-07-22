@@ -22,6 +22,7 @@
 # Add subfolder of every utility
 add_executable(gen_matrix gen_matrix.cpp) 
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "gen_matrix" gen_matrix)
-add_executable(dgenerator dgenerator.cpp) 
+add_executable(dgenerator dgenerator.cpp)
 set_target_properties(gen_matrix PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GENERAL_OUTPUT_DIRECTORY})
+set_target_properties(gen_matrix dgenerator PROPERTIES COMPILE_FLAGS "-Wno-conversion")
 

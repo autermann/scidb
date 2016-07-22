@@ -255,9 +255,9 @@ void FITSInputArray::readChunk()
     for (size_t i = 0; i < nOuter; i++) {
 
         // Calculate cell number from 'pos' and move to it
-        int cell = 0;
-        int k = 1;
-        for (int j = nDims - 1; j >= 0; j--) {
+        int64_t cell = 0;
+        int64_t k = 1;
+        for (int64_t j = nDims - 1; j >= 0; j--) {
             cell += k * (pos[j] + chunkPos[j] - dims[j].getStartMin());
             k *= dims[j].getLength();
         }
@@ -286,8 +286,7 @@ void FITSInputArray::readChunk()
         }
 
         // Advance position in chunk
-        int j;
-        for (j = nDims - 2; j >= 0; j--) {
+        for (int64_t j = nDims - 2; j >= 0; j--) {
             ++pos[j];
             if (pos[j] < dims[j].getChunkInterval()) {
                 break;
@@ -305,7 +304,11 @@ void FITSInputArray::readChunk()
  */
 void FITSInputArray::initMemChunks(std::shared_ptr<Query>& query)
 {
-    for (size_t i = 0; i < nAttrs; i++) {
+    // nAttrs is const so it cannot change during iteration.
+    // Do not call safe_static_cast<> more than is necessary
+    for (AttributeID i = 0, iterCount = safe_static_cast<AttributeID>(nAttrs);
+         i < iterCount;
+         i++) {
         Address addr(i, chunkPos);
 
         MemChunk& chunk = chunks[i].chunks[chunkIndex % kWindowSize];
@@ -358,7 +361,7 @@ void FITSInputArray::readInts(size_t n)
 void FITSInputArray::readIntsAndScale(size_t n)
 {
     for (size_t i = 0; i < n; i++) {
-        values[0].setFloat( parser.getBZero() + parser.getBScale() * parser.readInt32() );
+        values[0].setFloat( parser.getBZero() + (parser.getBScale() * static_cast<float>(parser.readInt32())));
         chunkIterators[0]->writeItem(values[0]);
         ++(*chunkIterators[0]);
     }

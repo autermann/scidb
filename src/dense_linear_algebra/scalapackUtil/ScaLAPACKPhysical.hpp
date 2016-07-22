@@ -137,10 +137,10 @@ public:
     virtual bool                    changesDistribution(const std::vector<ArrayDesc> & inputSchemas) const
                                     { return true; }
 
-    virtual RedistributeContext       getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                          const std::vector< ArrayDesc> & inputSchemas) const
-                                    { return RedistributeContext(psScaLAPACK); }
+    virtual RedistributeContext     getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
+                                                          const std::vector< ArrayDesc> & inputSchemas) const;
 
+    // XXX Beware: wrong type signature, this is *not* overriding anything!  Awaiting reimplementation....
     virtual bool                    requiresRedimensionOrRepartition(ArrayDesc const& inputSchema) const;
     virtual ArrayDesc               getRedimensionOrRepartitionSchema(ArrayDesc const& inputSchema) const;
 
@@ -204,8 +204,9 @@ public:
      * @return              transformed or passed-through inputArray, as appropriate
      */
     std::shared_ptr<Array> redistributeInputArray(std::shared_ptr<Array>& inputArray,
-                                             const std::shared_ptr<PartitioningSchemaDataForScaLAPACK>& schemeData,
-                                             std::shared_ptr<Query>& query, const std::string& callerLabel);
+                                                  const ArrayDistPtr& schemeData,
+                                                  std::shared_ptr<Query>& query,
+                                                  const std::string& callerLabel);
 
     /**
      * Initialize the ScaLAPACK BLACS (Basic Linear Algebra Communications Systems).
@@ -222,7 +223,16 @@ public:
      * @param callerLabel           identify the context of the call, essential for nested operator debugging
      * @return                      the BLACS grid size
      */
-    virtual procRowCol_t            getBlacsGridSize(std::vector< std::shared_ptr<Array> >& redistributedInputs, std::shared_ptr<Query>& query, const std::string& callerLabel);
+    virtual procRowCol_t            getBlacsGridSize(std::vector< std::shared_ptr<Array> >& redistributedInputs, std::shared_ptr<Query>& query, const std::string& callerLabel) const;
+
+    /**
+     * compute the correct ScaLAPACK BLACS process grid size for a particular set of input Arrays (Matrices) based on their descriptors
+     * @param redistributedInputs   the matrices' array descriptors
+     * @param query                 current query
+     * @param callerLabel           identify the context of the call, essential for nested operator debugging
+     * @return                      the BLACS grid size
+     */
+    virtual procRowCol_t            getBlacsGridSize(std::vector< const ArrayDesc* >& redistributedInputs, std::shared_ptr<Query>& query, const std::string& callerLabel) const;
 
     /**
      * a standard way to test INFO returned by a slave,
@@ -240,7 +250,11 @@ protected:
     /// very handy for the operators
     typedef std::tr1::array<size_t, 2 > matSize_t;
     /// get matrix size as vector
-    matSize_t getMatSize(std::shared_ptr<Array>& array) const;
+    matSize_t getMatSize(const ArrayDesc& array) const ;
+    matSize_t getMatSize(std::shared_ptr<Array>& array) const
+    {
+        return getMatSize(array->getArrayDesc());
+    }
     /// get matrix chunk size as vector
     matSize_t getMatChunkSize(std::shared_ptr<Array>& array) const;
 
@@ -252,13 +266,13 @@ private:
 };
 
 
-inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(std::shared_ptr<Array>& array) const
+inline ScaLAPACKPhysical::matSize_t ScaLAPACKPhysical::getMatSize(const ArrayDesc& array) const
 {
-    assert(array->getArrayDesc().getDimensions().size() == 2);
+    assert(array.getDimensions().size() == 2);
 
     matSize_t result;
-    result.at(0) = array->getArrayDesc().getDimensions()[0].getLength();
-    result.at(1) = array->getArrayDesc().getDimensions()[1].getLength();
+    result.at(0) = array.getDimensions()[0].getLength();
+    result.at(1) = array.getDimensions()[1].getLength();
     return result;
 }
 

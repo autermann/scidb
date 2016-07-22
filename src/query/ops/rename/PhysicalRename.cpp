@@ -27,25 +27,31 @@
  *      Author: Knizhnik
  */
 
-#include <boost/foreach.hpp>
-#include <memory>
+#include <array/DBArray.h>
+#include <array/Metadata.h>
 #include <boost/bind.hpp>
-#include "query/Operator.h"
-#include "array/DBArray.h"
-#include "system/SystemCatalog.h"
-#include "smgr/io/Storage.h"
+#include <boost/foreach.hpp>
+#include <log4cxx/logger.h>
+#include <memory>
+#include <query/Operator.h>
+#include <smgr/io/Storage.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
 
-
-namespace scidb {
+namespace scidb
+{
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.physical_rename"));
 
 using namespace std;
 using namespace boost;
 
 class PhysicalRename: public PhysicalOperator
 {
-    public:
-    PhysicalRename(const string& logicalName, const string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-    PhysicalOperator(logicalName, physicalName, parameters, schema)
+public:
+    PhysicalRename(
+        const string& logicalName, const string& physicalName,
+        const Parameters& parameters, const ArrayDesc& schema)
+        : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
@@ -56,22 +62,45 @@ class PhysicalRename: public PhysicalOperator
 
     void preSingleExecute(std::shared_ptr<Query> query)
     {
-        std::shared_ptr<const InstanceMembership> membership(Cluster::getInstance()->getInstanceMembership());
-        assert(membership);
-        if (((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-             (membership->getInstances().size() != query->getInstancesCount()))) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-        }
-        const string& oldArrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string& oldArrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        ASSERT_EXCEPTION(!oldArrayNameOrg.empty(), "Array name cannot be empty");
+
+        std::string oldArrayName;
+        std::string oldNamespaceName;
+        query->getNamespaceArrayNames(oldArrayNameOrg, oldNamespaceName, oldArrayName);
         _oldArrayName = oldArrayName;
-        assert(!_oldArrayName.empty());
+        ASSERT_EXCEPTION(!_oldArrayName.empty(), "Array name cannot be empty");
+
+        // From this point on _schema is used to describe the array to be removed rather than the
+        // output array somewhat hacky ... but getOutputDistribution() and other optimizer
+        // manipulations should be done by now
+        ArrayID arrayId = query->getCatalogVersion(oldNamespaceName, oldArrayName);
+        bool arrayExists = scidb::namespaces::Communicator::getArrayDesc(
+            oldNamespaceName, oldArrayName, arrayId, _schema, true);
+        SCIDB_ASSERT(arrayExists);
+        assert(_schema.getName() == _oldArrayName);
+
+        //XXX TODO: for now just check that all the instances in the residency are alive
+        //XXX TODO: once we allow writes in a degraded mode, this call might have more semantics
+        query->isDistributionDegradedForWrite(_schema);
     }
 
     void postSingleExecute(std::shared_ptr<Query> query)
     {
         assert(!_oldArrayName.empty());
-        const string& newArrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
-        SystemCatalog::getInstance()->renameArray(_oldArrayName, newArrayName);
+        const string& newArrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[1])->getObjectName();
+        ASSERT_EXCEPTION(!newArrayNameOrg.empty(), "Array name cannot be empty");
+
+        std::string newArrayName;
+        std::string newNamespaceName;
+        query->getNamespaceArrayNames(newArrayNameOrg, newNamespaceName, newArrayName);
+
+        query->setAutoCommit();
+
+        scidb::namespaces::Communicator::renameArray(
+            newNamespaceName, _oldArrayName, newArrayName);
     }
 
     private:

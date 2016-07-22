@@ -52,10 +52,15 @@ SciDB control on remote machines:
   deploy.sh scidb_remove     {<packages_path>|<ScidbVersion>} <coordinator-host> [host ...]
   deploy.sh scidb_prepare    <scidb_os_user> <scidb_os_passwd> <db_user> <db_passwd>
                              <database> <base_path>
-                             <instance_count> <no_watchdog> <redundancy>
+                             <instance_count> <no_watchdog> <redundancy> <security>
                              <coordinator-dns-host/IP> [host ...]
-  deploy.sh scidb_start      <scidb_os_user> <database> <coordinator-host>
+  deploy.sh scidb_start      <scidb_os_user> <database> <coordinator-host> [<auth_file>]
   deploy.sh scidb_stop       <scidb_os_user> <database> <coordinator-host>
+  deploy.sh scidb_restart_with_security
+                             <scidb_os_user> <scidb_os_passwd> <db_user> <db_passwd>
+                             <database> <base_path>
+                             <instance_count> <no_watchdog> <redundancy> <security> [<auth_file>]
+                             <coordinator-dns-host/IP> [host ...]
 
 EOF
 }
@@ -107,7 +112,7 @@ make
 7) Configure SciDB cluster on localhost with 4 instances redundancy=1
    and data directory root at ~/scidb-data
 
-./deploy.sh scidb_prepare my_username "" mydb mydb mydb ~/scidb-data 4 1 default 127.0.0.1
+./deploy.sh scidb_prepare my_username "" mydb mydb mydb ~/scidb-data 4 1 default default 127.0.0.1
 
 8) Start SciDB:
 
@@ -188,15 +193,35 @@ Commands:
                        <instance_count> - number of instances per host
                        <no_watchdog> - do not start watchdog process (default: 'false')
                        <redundancy> - the number of data replicas (distributed among the instances)
-                       Use 'default' for either <redundancy> to keep SciDB defaults.
+                       <security> = trust - anyone can connect without a password (default: 'trust')
+                                  = password - user supplies a password
+                       Use 'default' for either <redundancy>, <no_watchdog>, or <security> to keep SciDB defaults.
                        Consult a detailed description of config.ini in the user guide or elsewhere.
                        It will also setup a password-less ssh from <coordinator-host>
                        to *all* hosts using <scidb_os_user> and <scidb_os_passwd>
                        and update <scidb_os_user>'s default PATH in ~<scidb_os_user>/.bashrc
 
   scidb_start          Start SciDB cluster  <database> as <scidb_os_user> using <coordinator-host>
+                       Optional <auth_file> if running with security=password
+
   scidb_stop           Start SciDB cluster  <database> as <scidb_os_user> using <coordinator-host>
 
+  scidb_restart_with_security
+                       Restart the SciDB cluster <database> with security=<security>.
+                       * Stops the SciDB cluster <database>
+                       * Regenerates a config.ini file describing a SciDB database as follows:
+                       <database> - SciDB database name
+                       <db_user> - PostgreSQL user/role to associated with the SciDB database
+                       <db_passwd>  - PostgreSQL user password
+                       <base_path> - directory root for SciDB instance data directories
+                       <instance_count> - number of instances per host
+                       <no_watchdog> - do not start watchdog process (default: 'false')
+                       <redundancy> - the number of data replicas (distributed among the instances)
+                       <security> = trust - anyone can connect without a password (default: 'trust')
+                                  = password - user supplies a password
+                       Optional <auth_file> if running with security=password
+                       Use 'default' for <security> to keep SciDB defaults.
+                       * Starts the SciDB cluster <database> with the new config.ini file
 EOF
 print_example
 }
@@ -296,11 +321,11 @@ function revision ()
 {
     pushd ${1}
     if [ -d .git ]; then
-	echo "Extracting revision from git."
-	git svn find-rev master > revision
+        echo "Extracting revision from git."
+        git rev-list --abbrev-commit -1 HEAD > revision
     elif [ -d .svn ]; then
-	echo "Extracting revision from svn."
-	svn info|grep Revision|awk '{print $2}'|perl -p -e 's/\n//' > revision
+        echo "Extracting revision from svn."
+        svn info|grep Revision|awk '{print $2}'|perl -p -e 's/\n//' > revision
     fi
     popd
 }
@@ -316,7 +341,6 @@ function push_source ()
     local remote_name=`basename ${remote_path}`
     echo "Archive the ${source_path} to ${source_path}.tar.gz"
     rm -f ${source_path}.tar.gz
-    revision ${source_path}
     (cd ${source_path}/.. && tar -czpf ${source_path}.tar.gz --exclude-vcs ${source_name})
     echo "Remove ${username}@${hostname}:${remote_path}"
     remote_no_password "${username}" "" "${hostname}" "${SSH} ${username}@${hostname} \"rm -rf ${remote_path} && rm -rf ${remote_path}.tar.gz\""
@@ -339,7 +363,7 @@ function configure_rpm ()
     # get package name from filename
     function package_info ()
     {
-	rpm -qip ${1} | grep Name | awk '{print $3}'
+        rpm -qip ${1} | grep Name | awk '{print $3}'
     }
     # command for remove packages
     remove="yum remove -y"
@@ -355,7 +379,7 @@ function configure_deb_1204 ()
     # get package name from filename
     function package_info ()
     {
-	dpkg -I ${1} | grep Package | awk '{print $2}'
+        dpkg -I ${1} | grep Package | awk '{print $2}'
     }
     # command for remove packages
     remove="apt-get remove -y"
@@ -369,7 +393,7 @@ function configure_deb_1404 ()
     # get package name from filename
     function package_info ()
     {
-	dpkg -I ${1} | grep Package | awk '{print $2}'
+        dpkg -I ${1} | grep Package | awk '{print $2}'
     }
     # command for remove packages
     remove="apt-get remove -y"
@@ -384,38 +408,38 @@ function configure_package_manager ()
     # Get file for detect OS
     FILE=/etc/issue
     if [ "${hostname}" != "localhost" -a "${hostname}" != "127.0.0.1" ]; then
-	# grab remote /etc/issue to local file
-	remote_no_password root "" "${hostname}" "${SCP} root@${hostname}:/etc/issue ./issue"
-	FILE=./issue
+        # grab remote /etc/issue to local file
+        remote_no_password root "" "${hostname}" "${SCP} root@${hostname}:/etc/issue ./issue"
+        FILE=./issue
     fi;
     # Detech OS
     local OS=`${bin_path}/os_detect.sh ${FILE}`
     if [ "${hostname}" != "localhost" -a "${hostname}" != "127.0.0.1" ]; then
-	rm -f ./issue
+        rm -f ./issue
     fi;
     # Match OS
     case "${OS}" in
-	"CentOS 6")
-	    configure_rpm
-	    ;;
-	"RedHat 6")
-	    if [ ${with_redhat} == 1 ]; then
-		configure_rpm
-	    else
-		echo "We do not support build SciDB under RedHat 6. Please use CentOS 6 instead"
-		exit 1
-	    fi;
-	    ;;
-	"Ubuntu 12.04")
-	    configure_deb_1204
-	    ;;
-	"Ubuntu 14.04")
-	    configure_deb_1404
-	    ;;
-	*)
-	    echo "Not supported OS"
-	    exit 1;
-	    ;;
+        "CentOS 6")
+            configure_rpm
+            ;;
+        "RedHat 6")
+            if [ ${with_redhat} == 1 ]; then
+                configure_rpm
+            else
+                echo "We do not support build SciDB under RedHat 6. Please use CentOS 6 instead"
+                exit 1
+            fi;
+            ;;
+        "Ubuntu 12.04")
+            configure_deb_1204
+            ;;
+        "Ubuntu 14.04")
+            configure_deb_1404
+            ;;
+        *)
+            echo "Not supported OS"
+            exit 1;
+            ;;
     esac
 }
 
@@ -430,13 +454,13 @@ function push_and_pull_packages ()
     local path_remote="${4}"
     local scp_args_remote="${username}@${hostname}:${path_remote}/*"
     if [ $push == 1 ]; then
-	remote_no_password "${username}" "" "${hostname}" "rm -rf ${path_remote}"
-	remote_no_password "${username}" "" "${hostname}" "mkdir -p ${path_remote}"
-	remote_no_password "${username}" "" "${hostname}" "${SCP} ${path_local} ${scp_args_remote}"
+        remote_no_password "${username}" "" "${hostname}" "rm -rf ${path_remote}"
+        remote_no_password "${username}" "" "${hostname}" "mkdir -p ${path_remote}"
+        remote_no_password "${username}" "" "${hostname}" "${SCP} ${path_local} ${scp_args_remote}"
     else
-	rm -rf ${path_local}
-	mkdir -p ${path_local}
-	remote_no_password "${username}" "" "${hostname}" "${SCP} ${scp_args_remote} ${path_local}"
+        rm -rf ${path_local}
+        mkdir -p ${path_local}
+        remote_no_password "${username}" "" "${hostname}" "${SCP} ${scp_args_remote} ${path_local}"
     fi;
 }
 
@@ -531,7 +555,7 @@ function package_names()
 {
     local filename
     for filename in $@; do
-	package_info ${filename}
+        package_info ${filename}
     done;
 }
 
@@ -539,9 +563,23 @@ function package_names()
 function scidb_remove()
 {
     local hostname=${2}
+    local with_coordinator=${3}
     configure_package_manager ${hostname} 1
     local packages_path=`readlink -f ${1}`
-    local packages=`ls ${packages_path}/*.${kind} | xargs`
+    if [ "1" == "${with_coordinator}" ]; then
+        if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
+            # scidb-XXX or paradigm4-XXX
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | xargs)"
+        else
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | grep ${SCIDB_BUILD_REVISION} | xargs)"
+        fi
+    else
+        if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | grep -v coord | xargs)"
+        else
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | grep ${SCIDB_BUILD_REVISION} | grep -v coord | xargs)"
+        fi
+    fi;
     remote root "" "${hostname}" "${remove} `package_names ${packages} | xargs`"
 }
 
@@ -565,17 +603,18 @@ function scidb_install()
     local packages_path=`readlink -f ${1}`
     local packages
     if [ "1" == "${with_coordinator}" ]; then
-	if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
-	    packages="$(ls ${packages_path}/scidb-*.${kind} | xargs)"
-	else
-	    packages="$(ls ${packages_path}/scidb-*.${kind} | grep ${SCIDB_BUILD_REVISION} | xargs)"
-	fi
+        if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
+            # scidb-XXX or paradigm4-XXX
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | xargs)"
+        else
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | grep ${SCIDB_BUILD_REVISION} | xargs)"
+        fi
     else
-	if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
-	    packages="$(ls ${packages_path}/scidb-*.${kind} | grep -v coord | xargs)"
-	else
-	    packages="$(ls ${packages_path}/scidb-*.${kind} | grep ${SCIDB_BUILD_REVISION} | grep -v coord | xargs)"
-	fi
+        if [ -z ${SCIDB_BUILD_REVISION+x} ]; then
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | grep -v coord | xargs)"
+        else
+            packages="$(ls ${packages_path}/[sp]*-*.${kind} | grep ${SCIDB_BUILD_REVISION} | grep -v coord | xargs)"
+        fi
     fi;
     remote root "" "${hostname}" "./scidb_install.sh" "${packages}"
 }
@@ -599,8 +638,9 @@ local base_path="${3}"
 local instance_count="${4}"
 local no_watchdog="${5}"
 local redundancy="${6}"
-local coordinator="${7}"
-shift 7
+local security="${7}"
+local coordinator="${8}"
+shift 8
 echo "[${database}]"
 local coordinator_instance_count=${instance_count}
 let coordinator_instance_count--
@@ -608,7 +648,7 @@ echo "server-0=${coordinator},${coordinator_instance_count}"
 node_number=1
 local hostname
 for hostname in $@; do
-    echo "server-${node_number}=${hostname},${instance_count}"
+    echo "server-${node_number}=${hostname},${coordinator_instance_count}"
     let node_number++
 done;
 echo "db_user=${username}"
@@ -624,6 +664,11 @@ echo "logconf=/opt/scidb/${SCIDB_VER}/share/scidb/log4cxx.properties"
 echo "base-path=${base_path}"
 echo "base-port=1239"
 echo "interface=eth0"
+if [ "${security}" = "default" ]; then
+    echo "security=trust"
+else
+    echo "security=${security}"
+fi
 }
 
 # Prepare machine for run SciDB (setup environment, generate config file, etc)
@@ -657,27 +702,56 @@ function scidb_prepare ()
     local instance_count=${7}
     local no_watchdog=${8}
     local redundancy=${9}
-    local coordinator=${10}
-    shift 10
+    local security=${10}
+    local coordinator=${11}
+    shift 11
 
     # grab coordinator public key
     local coordinator_key=`remote_no_password "${username}" "${password}" "${coordinator}" "${SSH} ${username}@${coordinator}  \"cat ~/.ssh/id_rsa.pub\"" | tail -1`
 
     # generate config.ini locally
     scidb_config ${db_user} ${database} ${base_path} ${instance_count} \
-        ${no_watchdog} ${redundancy} ${coordinator} "$@" | tee ./config.ini
+        ${no_watchdog} ${redundancy} ${security} ${coordinator} "$@" | tee ./config.ini
 
     # deposit config.ini to coordinator
 
     local hostname
     for hostname in ${coordinator} $@; do
         # generate scidb environment for username
-	scidb_prepare_node "${username}" "${password}" ${hostname} \
+        scidb_prepare_node "${username}" "${password}" ${hostname} \
             "${coordinator}" "${database}" "${db_user}" "${db_passwd}"
-	provide_password_less_ssh_access ${username} "${password}" "${coordinator_key}" ${hostname}
+        provide_password_less_ssh_access ${username} "${password}" "${coordinator_key}" ${hostname}
     done;
     rm -f ./config.ini
     remote root "" ${coordinator} "./scidb_prepare_coordinator.sh ${username} ${database} ${SCIDB_VER} ${db_passwd}"
+}
+
+# Regenerate config.ini and push it out to nodes
+function scidb_reconfig ()
+{
+    local username="${1}"
+    local password="${2}"
+    local db_user=${3}
+    local db_passwd="${4}"
+    local database=${5}
+    local base_path=${6}
+    local instance_count=${7}
+    local no_watchdog=${8}
+    local redundancy=${9}
+    local security=${10}
+    local coordinator=${11}
+    shift 11
+
+    # generate config.ini locally
+    scidb_config ${db_user} ${database} ${base_path} ${instance_count} \
+        ${no_watchdog} ${redundancy} ${security} ${coordinator} "$@" | tee ./config.ini
+
+    # deposit new config.ini to all nodes
+    local hostname
+    for hostname in ${coordinator} $@; do
+        remote root "" ${hostname} "cat config.ini > /opt/scidb/${SCIDB_VER}/etc/config.ini && chown ${username} /opt/scidb/${SCIDB_VER}/etc/config.ini" `readlink -f ./config.ini`
+    done;
+    rm -f ./config.ini
 }
 
 # Start SciDB
@@ -687,7 +761,12 @@ function scidb_start ()
     local password="${2}"
     local database=${3}
     local coordinator=${4}
-    remote "${username}" "${password}" ${coordinator} "./scidb_start.sh ${database} ${SCIDB_VER}"
+    shift 4
+    if [ $# -ne 0 ]; then
+       remote "${username}" "${password}" ${coordinator} "./scidb_start.sh ${database} ${SCIDB_VER} ${1}"
+    else
+       remote "${username}" "${password}" ${coordinator} "./scidb_start.sh ${database} ${SCIDB_VER}"
+    fi
 }
 
 # Stop SciDB
@@ -729,193 +808,193 @@ case ${1} in
         print_usage
         ;;
     access)
-	if [ $# -lt 5 ]; then
-	    print_usage_exit 1
-	fi
-	username="${2}"
-	password="${3}"
-	key="${4}"
-	shift 4
-	if [ "${key}" == "" ]; then
-	    key="`cat ~/.ssh/id_rsa.pub`"
-	fi
+        if [ $# -lt 5 ]; then
+            print_usage_exit 1
+        fi
+        username="${2}"
+        password="${3}"
+        key="${4}"
+        shift 4
+        if [ "${key}" == "" ]; then
+            key="`cat ~/.ssh/id_rsa.pub`"
+        fi
         if [ "${password}" == "" ]; then
            get_password "${username}"
         fi
-	for hostname in $@; do
-	    provide_password_less_ssh_access "${username}" "${password}" "${key}" "${hostname}"
-	done;
-	;;
-    push_source)
-	if [ $# -lt 4 ]; then
-	    print_usage_exit 1
-	fi
-	username=${2}
-	remote_path=${3}
-	shift 3
-	for hostname in $@; do
-	    push_source ${username} ${hostname} ${source_path} ${remote_path}
+        for hostname in $@; do
+            provide_password_less_ssh_access "${username}" "${password}" "${key}" "${hostname}"
         done;
-	;;
+        ;;
+    push_source)
+        if [ $# -lt 4 ]; then
+            print_usage_exit 1
+        fi
+        username=${2}
+        remote_path=${3}
+        shift 3
+        for hostname in $@; do
+            push_source ${username} ${hostname} ${source_path} ${remote_path}
+        done;
+        ;;
     pull_packages)
-	if [ $# -lt 5 ]; then
-	    print_usage_exit 1
-	fi
-	path_local=`readlink -f ${2}`
-	username=${3}
-	path_remote="${4}"
-	shift 4
-	for hostname in $@; do
-	    push_and_pull_packages ${path_local} ${username} ${hostname} ${path_remote} 0
-	done;
-	;;
+        if [ $# -lt 5 ]; then
+            print_usage_exit 1
+        fi
+        path_local=`readlink -f ${2}`
+        username=${3}
+        path_remote="${4}"
+        shift 4
+        for hostname in $@; do
+            push_and_pull_packages ${path_local} ${username} ${hostname} ${path_remote} 0
+        done;
+        ;;
     push_packages)
-	if [ $# -lt 5 ]; then
-	    print_usage_exit 1
-	fi
-	path_local=`readlink -f ${2}`
-	username=${3}
-	path_remote="${4}"
-	shift 4
-	for hostname in $@; do
-	    push_and_pull_packages ${path_local} ${username} ${hostname} ${path_remote} 1
-	done;
-	;;
+        if [ $# -lt 5 ]; then
+            print_usage_exit 1
+        fi
+        path_local=`readlink -f ${2}`
+        username=${3}
+        path_remote="${4}"
+        shift 4
+        for hostname in $@; do
+            push_and_pull_packages ${path_local} ${username} ${hostname} ${path_remote} 1
+        done;
+        ;;
     prepare_toolchain)
-	if [ $# -lt 2 ]; then
-	    print_usage_exit 1
-	fi
-	shift 1
+        if [ $# -lt 2 ]; then
+            print_usage_exit 1
+        fi
+        shift 1
 
-	for hostname in $@; do
-	    prepare_toolchain "${hostname}"
-	done;
-	;;
+        for hostname in $@; do
+            prepare_toolchain "${hostname}"
+        done;
+        ;;
     prepare_coordinator)
-	if [ $# -lt 2 ]; then
-	    print_usage_exit 1
-	fi
-	shift 1
+        if [ $# -lt 2 ]; then
+            print_usage_exit 1
+        fi
+        shift 1
 
-	for hostname in $@; do
-	    prepare_coordinator "${hostname}"
-	done;
-	;;
+        for hostname in $@; do
+            prepare_coordinator "${hostname}"
+        done;
+        ;;
     setup_ccache)
-	if [ $# -lt 3 ]; then
-	    print_usage_exit 1
-	fi
-	username="${2}"
-	shift 2
+        if [ $# -lt 3 ]; then
+            print_usage_exit 1
+        fi
+        username="${2}"
+        shift 2
 
         # get password from stdin
         get_password "${username}"
 
-	for hostname in $@; do
-	    setup_ccache "${username}" "${password}" ${hostname}
-	done;
-	;;
+        for hostname in $@; do
+            setup_ccache "${username}" "${password}" ${hostname}
+        done;
+        ;;
     prepare_chroot)
-	if [ $# -lt 3 ]; then
-	    print_usage_exit 1
-	fi
-	username="${2}"
-	shift 2
+        if [ $# -lt 3 ]; then
+            print_usage_exit 1
+        fi
+        username="${2}"
+        shift 2
 
         # get password from stdin
         get_password "${username}"
 
-	for hostname in $@; do
-	    prepare_chroot "${username}" "${password}"  "${hostname}"
-	done;
-	;;
+        for hostname in $@; do
+            prepare_chroot "${username}" "${password}"  "${hostname}"
+        done;
+        ;;
     prepare_postgresql)
-	if [ $# -ne 5 ]; then
-	    print_usage_exit 1
-	fi
-	username=${2}
-	password="${3}"
-	network=${4}
-	hostname=${5}
-	install_and_configure_postgresql ${username} "${password}" ${network} ${hostname}
-	;;
+        if [ $# -ne 5 ]; then
+            print_usage_exit 1
+        fi
+        username=${2}
+        password="${3}"
+        network=${4}
+        hostname=${5}
+        install_and_configure_postgresql ${username} "${password}" ${network} ${hostname}
+        ;;
     build)
-	if [ $# -lt 3 ]; then
-	    print_usage_exit 1
-	fi
-	package_build_type=${2}
-	packages_path=${3}
-	package_name=${4:-"scidb"}
-	build_scidb_packages "${packages_path}" "chroot ${package_build_type}" "${package_name}"
-	;;
+        if [ $# -lt 3 ]; then
+            print_usage_exit 1
+        fi
+        package_build_type=${2}
+        packages_path=${3}
+        package_name=${4:-"scidb"}
+        build_scidb_packages "${packages_path}" "chroot ${package_build_type}" "${package_name}"
+        ;;
     build_fast)
-	if [ $# -lt 2 ]; then
-	    print_usage_exit 1
-	fi
-	packages_path=${2}
-	package_name=${3:-"scidb"}
-	build_scidb_packages "${packages_path}" "insource" "${package_name}"
-	;;
+        if [ $# -lt 2 ]; then
+            print_usage_exit 1
+        fi
+        packages_path=${2}
+        package_name=${3:-"scidb"}
+        build_scidb_packages "${packages_path}" "insource" "${package_name}"
+        ;;
     build_deps)
-	if [ $# -lt 2 ]; then
-	    print_usage_exit 1
-	fi
-	packages_path=${2}
-	package_name=${3:-"scidb"}
-	echo "TODO build SciDB dependencies packages"
-	;;
+        if [ $# -lt 2 ]; then
+            print_usage_exit 1
+        fi
+        packages_path=${2}
+        package_name=${3:-"scidb"}
+        echo "TODO build SciDB dependencies packages"
+        ;;
     scidb_install)
-	if [ $# -lt 3 ]; then
-	    print_usage_exit 1
-	fi
-	path_or_ver=${2}
-	coordinator=${3}
-	echo "Coordinator IP: ${coordinator}"
-	shift 3
-	if [[ ${path_or_ver} =~ ^[0-9\.]+$ ]]; then
-	    # Its an install from release:
-	    releaseNum=${path_or_ver}
-	    scidb_install_release ${releaseNum} ${coordinator} 1
-	    for hostname in $@; do
-		scidb_install_release ${releaseNum} ${hostname} 0
-	    done;
-	else
-	    # Its an install from a package directory
-	    packages_path=${path_or_ver}
-	    scidb_install ${packages_path} ${coordinator} 1
-	    for hostname in $@; do
-		scidb_install ${packages_path} ${hostname} 0
-	    done;
-	fi
-	;;
+        if [ $# -lt 3 ]; then
+            print_usage_exit 1
+        fi
+        path_or_ver=${2}
+        coordinator=${3}
+        echo "Coordinator IP: ${coordinator}"
+        shift 3
+        if [[ ${path_or_ver} =~ ^[0-9\.]+$ ]]; then
+            # Its an install from release:
+            releaseNum=${path_or_ver}
+            scidb_install_release ${releaseNum} ${coordinator} 1
+            for hostname in $@; do
+                scidb_install_release ${releaseNum} ${hostname} 0
+            done;
+        else
+            # Its an install from a package directory
+            packages_path=${path_or_ver}
+            scidb_install ${packages_path} ${coordinator} 1
+            for hostname in $@; do
+                scidb_install ${packages_path} ${hostname} 0
+            done;
+        fi
+        ;;
     scidb_remove)
-	if [ $# -lt 3 ]; then
-	    print_usage_exit 1
-	fi
-	path_or_ver=${2}
-	coordinator=${3}
-	echo "Coordinator IP: ${coordinator}"
-	shift 3
-	if [[ ${path_or_ver} =~ ^[0-9\.]+$ ]]; then
-	    # Its remove a release:
-	    releaseNum=${path_or_ver}
-	    scidb_remove_release ${releaseNum} ${coordinator} 1
-	    for hostname in $@; do
-		scidb_remove_release ${releaseNum} ${hostname} 0
-	    done;
-	else
-	    # Its package remove packages in package directory
-	    packages_path=${path_or_ver}
-	    scidb_remove ${packages_path} ${coordinator}
-	    for hostname in $@; do
-		scidb_remove ${packages_path} ${hostname}
-	    done;
-	fi
-	;;
+        if [ $# -lt 3 ]; then
+            print_usage_exit 1
+        fi
+        path_or_ver=${2}
+        coordinator=${3}
+        echo "Coordinator IP: ${coordinator}"
+        shift 3
+        if [[ ${path_or_ver} =~ ^[0-9\.]+$ ]]; then
+            # Its remove a release:
+            releaseNum=${path_or_ver}
+            scidb_remove_release ${releaseNum} ${coordinator} 1
+            for hostname in $@; do
+                scidb_remove_release ${releaseNum} ${hostname} 0
+            done;
+        else
+            # Its package remove packages in package directory
+            packages_path=${path_or_ver}
+            scidb_remove ${packages_path} ${coordinator} 1
+            for hostname in $@; do
+                scidb_remove ${packages_path} ${hostname} 0
+            done;
+        fi
+        ;;
     scidb_prepare)
-	if [ $# -lt 11 ]; then
-	    print_usage_exit 1
-	fi
+        if [ $# -lt 11 ]; then
+            print_usage_exit 1
+        fi
         username=${2}
         password="${3}"
         db_user=${4}
@@ -925,55 +1004,106 @@ case ${1} in
         instance_count=${8}
         no_watchdog=${9}
         redundancy=${10}
-        coordinator=${11}
-        shift 11
+        security=${11}
+        coordinator=${12}
+        shift 12
 
         # get password from stdin if not given on cmd
         if [ "${password}" == "" ]; then
            get_password "${username}"
         fi
-	scidb_prepare ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${coordinator} $@
-	;;
+        scidb_prepare ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${security} ${coordinator} $@
+        ;;
     scidb_start)
-	if [ $# -lt 4 ]; then
-	    print_usage_exit 1
-	fi
-	username="${2}"
-	database=${3}
-	coordinator="${4}"
+        if [ $# -lt 4 ]; then
+            print_usage_exit 1
+        fi
+        username="${2}"
+        database=${3}
+        coordinator="${4}"
         shift 4
 
         # get password from stdin
         get_password "${username}"
 
-        scidb_start "${username}" "${password}" ${database} ${coordinator}
-	;;
+        if [ $# -ne 0 ]; then
+            scidb_start "${username}" "${password}" ${database} ${coordinator} "${1}"
+        else
+            scidb_start "${username}" "${password}" ${database} ${coordinator}
+        fi
+        ;;
+    scidb_restart_with_security)
+        if [ $# -lt 11 ]; then
+            print_usage_exit 1
+        fi
+        username=${2}
+        password="${3}"
+        db_user=${4}
+        db_passwd="${5}"
+        database=${6}
+        base_path=${7}
+        instance_count=${8}
+        no_watchdog=${9}
+        redundancy=${10}
+        security=${11}
+        coordinator=${12}
+        shift 12
+
+        case ${security} in
+            default)
+                security="trust"
+                ;;
+            trust)
+                ;;
+            password)
+                auth_file="${coordinator}"
+                coordinator="${1}"
+                shift 1
+                ;;
+            *)
+            print_usage_exit 1
+            ;;
+        esac
+
+        # get password from stdin
+        get_password "${username}"
+
+        scidb_stop "${username}" "${password}" ${database} ${coordinator}
+
+        scidb_reconfig ${username} "${password}" ${db_user} "${db_passwd}" ${database} ${base_path} ${instance_count} ${no_watchdog} ${redundancy} ${security} ${coordinator} $@
+
+        if [ "${security}" = "password" ]; then
+            scidb_start "${username}" "${password}" ${database} ${coordinator} "${auth_file}"
+        else
+            scidb_start "${username}" "${password}" ${database} ${coordinator}
+        fi
+        ;;
     scidb_stop)
-	if [ $# -lt 4 ]; then
-	    print_usage_exit 1
-	fi
-	username="${2}"
-	database=${3}
-	coordinator="${4}"
+        if [ $# -lt 4 ]; then
+            print_usage_exit 1
+        fi
+        username="${2}"
+        database=${3}
+        coordinator="${4}"
         shift 4
 
         # get password from stdin
         get_password "${username}"
 
         scidb_stop "${username}" "${password}" ${database} ${coordinator}
-	;;
+        ;;
     prepare_httpd_cdash)
-	if [ $# -lt 3 ]; then
-	    print_usage_exit 1
-	fi;
-	username=${2}
-	shift 2
-	for hostname in $@; do
-	    prepare_httpd_cdash ${username} ${hostname}
-	done;
-	;;
+        if [ $# -lt 3 ]; then
+            print_usage_exit 1
+        fi;
+        username=${2}
+        shift 2
+        for hostname in $@; do
+            prepare_httpd_cdash ${username} ${hostname}
+        done;
+        ;;
     *)
-	print_usage_exit 1
-	;;
+        print_usage_exit 1
+        ;;
 esac
 exit 0

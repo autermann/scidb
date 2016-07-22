@@ -325,10 +325,14 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		{
 			_dbconnection = _scidb.connect (_ie.connectionString, _ie.scidbPort);
 
-            newClientStart(
-                _dbconnection,
-                _ie.userName,
-                _ie.userPassword);
+                        try {
+                            newClientStart(_dbconnection,
+                                           _ie.userName,
+                                           _ie.userPassword);
+                        } catch (...) {
+                            try { disconnectFromSciDB(); } catch (...){}
+                            throw;
+                        }
 		}
 
 
@@ -339,7 +343,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		 **/
 		if (queryResult.selective && _ignoredata_flag == false)
 		{
-            scidb::ArrayWriter::save (*queryResult.array, queryoutput_file, std::shared_ptr<scidb::Query>(), _outputFormat);
+                    scidb::ArrayWriter::save (*queryResult.array, queryoutput_file, std::shared_ptr<scidb::Query>(), _outputFormat);
 		}
 		else if (queryResult.selective && _ignoredata_flag == true)
 		{
@@ -366,7 +370,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			{
 				bfs::remove (queryoutput_file);
 				_errStream << "Error while opening of the file " << queryoutput_file;
-				if(queryResult.queryID && _dbconnection) {
+				if(queryResult.queryID.isValid() && _dbconnection) {
 					_scidb.cancelQuery(queryResult.queryID, _dbconnection);
                                 }
 				throw SystemError (FILE_LINE_FUNCTION, _errStream.str ());
@@ -385,7 +389,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 			{
 				bfs::remove (queryoutput_file);
 				_errStream << "Error while opening of the file " << queryoutput_file;
-				if(queryResult.queryID && _dbconnection) {
+				if(queryResult.queryID.isValid() && _dbconnection) {
 					_scidb.cancelQuery(queryResult.queryID, _dbconnection);
                                }
 				throw SystemError (FILE_LINE_FUNCTION, _errStream.str ());
@@ -412,7 +416,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
             _resultfileStream << endl;
         }
 
-        if(queryResult.queryID && _dbconnection) {
+        if(queryResult.queryID.isValid() && !queryResult.autoCommit && _dbconnection) {
             _scidb.completeQuery(queryResult.queryID, _dbconnection);
 	}
 		/* appending the output stored in the file ".out.queryoutput" to the ".out" file */
@@ -444,7 +448,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 
     catch (harnessexceptions::SystemError &e)
 	{
-        if (queryResult.queryID && _dbconnection) {
+        if (queryResult.queryID.isValid() && _dbconnection) {
             try {
                 _scidb.cancelQuery(queryResult.queryID, _dbconnection);
             } catch (const std::exception& err) {
@@ -533,7 +537,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 				LOG4CXX_INFO (_logger, "Actual Error code (" << e.getErrorId() << " aka "
 				    << e.getStringifiedErrorId() << ") does not match with the Expected Error code ("
 				    << expectedTmp.str() << "). Hence this is a test case failure...");
-				if(queryResult.queryID && _dbconnection) {
+				if(queryResult.queryID.isValid() && _dbconnection) {
 				    _scidb.cancelQuery(queryResult.queryID, _dbconnection);
                                 }
 //				throw ExecutorError (FILE_LINE_FUNCTION, "SciDB query execution failed");
@@ -545,7 +549,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
                             _resultfileStream << ".]" << endl << endl;
                         }
 			LOG4CXX_INFO (_logger, "This was an expected Exception. Hence continuing...");
-			if(queryResult.queryID && _dbconnection) {
+			if(queryResult.queryID.isValid() && _dbconnection) {
                             try {
                                 _scidb.cancelQuery(queryResult.queryID, _dbconnection);
                             } catch (const std::exception& e) {
@@ -559,13 +563,13 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
 		{
 			_resultfileStream << "[SciDB query execution failed. But continuing, as it was intended to just run.]";
 			_resultfileStream << endl << endl;
-			if(queryResult.queryID && _dbconnection) {
+			if(queryResult.queryID.isValid() && _dbconnection) {
                             _scidb.cancelQuery(queryResult.queryID, _dbconnection);
                         }
 			return SUCCESS;
 		}
 
-		if(queryResult.queryID && _dbconnection) {
+		if(queryResult.queryID.isValid() && _dbconnection) {
                     _scidb.cancelQuery(queryResult.queryID, _dbconnection);
                 }
 		/* for all other queries not mentioned under --error */
@@ -576,7 +580,7 @@ int DefaultExecutor :: runSciDBquery (const string &queryString, const ErrorComm
     {
         LOG4CXX_INFO (_logger, "Unhandled exception CAUGHT for SCIDB query...:" << e.what());
         _resultfileStream << "[SciDB query execution failed with unhandled exception:" << e.what() << "]" << endl << endl;
-        if(queryResult.queryID && _dbconnection) {
+        if(queryResult.queryID.isValid() && _dbconnection) {
             try {
                 _scidb.cancelQuery(queryResult.queryID, _dbconnection);
             } catch (const std::exception& err) {
@@ -834,7 +838,7 @@ int DefaultExecutor :: Shell (ShellCommandOptions *sco)
 				_resultfileStream << buf;
 		}
 	}
-	bfs::remove (tmpFileName); // cleanup temporary file
+	bfs::remove (tmpFileName); // cleanup temporary files
 
 
     /* store in the file specified in the --out option */
@@ -1891,6 +1895,7 @@ int DefaultExecutor :: parseErrorCommandOptions (string line, struct ErrorComman
                     if (vm.count ("hideQueryString")) {
                         eco->_hideQueryString = true;
                     }
+
                     if (vm.count ("aql"))
                     {
                         if (afl_given) {

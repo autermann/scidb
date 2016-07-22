@@ -187,11 +187,13 @@ PARAM_AGGREGATE_CALL)
                                        srcDim.getCurrStart(),
                                        srcDim.getCurrEnd(),
                                        srcDim.getEndMax(),
-                                       srcDim.getChunkInterval(),
+                                       srcDim.getRawChunkInterval(),
                                        0);
         }
 
-        ArrayDesc output (desc.getName(), Attributes(), aggDims, defaultPartitioning());
+        ArrayDesc output (desc.getName(), Attributes(), aggDims,
+                          desc.getDistribution(),
+                          desc.getResidency());
 
         //
         //  Process the variadic parameters to the operator. Check
@@ -245,8 +247,10 @@ PARAM_AGGREGATE_CALL)
         if ( desc.getEmptyBitmapAttribute())
         {
             AttributeDesc const* eAtt = desc.getEmptyBitmapAttribute();
-            output.addAttribute(AttributeDesc(output.getAttributes().size(), eAtt->getName(),
-                eAtt->getType(), eAtt->getFlags(), eAtt->getDefaultCompressionMethod()));
+            output.addAttribute(
+                AttributeDesc(safe_static_cast<AttributeID>(output.getAttributes().size()),
+                              eAtt->getName(), eAtt->getType(), eAtt->getFlags(),
+                              eAtt->getDefaultCompressionMethod()));
         }
 
         return output;

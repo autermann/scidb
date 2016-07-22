@@ -2,7 +2,7 @@
 --start-query-logging
 --start-ignore-warnings
 
-create array SortedPrevious <d:int64> [ X=0:*,10000,0]
+create array SortedPrevious <d:int64 NOT NULL> [ X=0:*,10000,0]
 
 --test
 # If the output from the following shell command fails the test (causes a diff), then it is 

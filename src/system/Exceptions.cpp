@@ -47,9 +47,9 @@ namespace scidb
  * Exception
  */
 Exception::Exception(const char* file, const char* function, int32_t line,
-        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
-        const char* stringified_short_error_code, const char* stringified_long_error_code,
-        uint64_t query_id):
+                     const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+                     const char* stringified_short_error_code, const char* stringified_long_error_code,
+                     const QueryID& query_id):
     _file(file),
     _function(function),
     _line(line),
@@ -79,7 +79,7 @@ const string& Exception::getErrorsNamespace() const
 
 const char* Exception::what() const throw()
 {
-	return _what_str.c_str();
+    return getWhatStr().c_str();
 }
 
 const std::string& Exception::getFile() const
@@ -97,9 +97,20 @@ int32_t Exception::getLine() const
 	return _line;
 }
 
+void Exception::setWhatStr(const std::string& whatStr)
+{
+    _what_str = whatStr;
+}
+
 const std::string& Exception::getWhatStr() const
 {
-	return _what_str;
+    if (_what_str.empty()) {
+        try {
+            Exception* self = const_cast<Exception*>(this);
+            self->format();
+        } catch (...) {}
+    }
+    return _what_str;
 }
 
 int32_t Exception::getShortErrorCode() const
@@ -136,25 +147,39 @@ const string Exception::getStringifiedErrorId() const
 
 std::string Exception::getErrorMessage() const
 {
+    if (!_formatted_msg.empty()) {
+        return _formatted_msg;
+    }
     try
     {
-        return boost::str(getMessageFormatter());
+        _formatted_msg = boost::str(getMessageFormatter());
+        return _formatted_msg;
+    }
+    catch(std::exception& e) {
+        string s("!!!Cannot format error message: ");
+        s += e.what();
+        s += "Check argument count for ";
+        s += getErrorId();
+        s += "!!!";
+        assert(false);
+        return s;
     }
     catch(...)
     {
         string s("!!!Cannot format error message. Check argument count for ");
         s += getErrorId();
         s += "!!!";
+        assert(false);
         return s;
     }
 }
 
-uint64_t Exception::getQueryId() const
+const QueryID& Exception::getQueryId() const
 {
     return _query_id;
 }
 
-void Exception::setQueryId(uint64_t queryId)
+void Exception::setQueryId(const QueryID& queryId)
 {
     _query_id = queryId;
 }
@@ -165,21 +190,21 @@ void Exception::setQueryId(uint64_t queryId)
 UserException::UserException(const char* file, const char* function, int32_t line,
     const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
     const char* stringified_short_error_code, const char* stringified_long_error_code,
-    uint64_t query_id):
+    const QueryID& query_id):
         Exception(file, function, line, errors_namespace, short_error_code, long_error_code,
             stringified_short_error_code, stringified_long_error_code, query_id)
 {
-    format();
 }
 
 UserException::UserException(const char* file, const char* function, int32_t line,
-    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
+    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+    const char* formatted_str,
     const char* stringified_short_error_code, const char* stringified_long_error_code,
-    uint64_t query_id):
+    const QueryID& query_id):
         Exception(file, function, line, errors_namespace, short_error_code, long_error_code,
             stringified_short_error_code, stringified_long_error_code, query_id)
 {
-    _what_str = what_str;
+    _formatted_msg = formatted_str;
 }
 
 void UserException::format()
@@ -188,7 +213,9 @@ void UserException::format()
     ss << "UserException in file: " << _file << " function: " << _function << " line: " << _line << endl
        << "Error id: " << _errors_namespace << "::" << _stringified_short_error_code << "::" << _stringified_long_error_code << endl
        << "Error description: " << ErrorsLibrary::getInstance()->getShortErrorMessage(_short_error_code) << ". " << getErrorMessage() << ".";
-    if (_query_id) ss << endl << "Failed query id: " << _query_id;
+    if (_query_id.isValid()) {
+        ss << endl << "Failed query id: " << _query_id;
+    }
 
     _what_str = ss.str();
 }
@@ -201,6 +228,7 @@ Exception::Pointer UserException::copy() const
             _stringified_long_error_code.c_str(), _query_id));
 
     e->_what_str = _what_str;
+    e->_formatted_msg = _formatted_msg;
     e->_formatter = _formatter;
 
     return e;
@@ -217,23 +245,23 @@ void UserException::raise() const
 UserQueryException::UserQueryException(const char* file, const char* function, int32_t line,
     const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
     const char* stringified_short_error_code, const char* stringified_long_error_code,
-    const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id):
+    const std::shared_ptr<ParsingContext>& parsingContext, const QueryID& query_id):
         UserException(file, function, line, errors_namespace, short_error_code, long_error_code,
             stringified_short_error_code, stringified_long_error_code, query_id),
         _parsingContext(parsingContext)
 {
-    format();
 }
 
 UserQueryException::UserQueryException(const char* file, const char* function, int32_t line,
-    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
+    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+    const char* formatted_str,
     const char* stringified_short_error_code, const char* stringified_long_error_code,
-    const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id):
+    const std::shared_ptr<ParsingContext>& parsingContext, const QueryID& query_id):
         UserException(file, function, line, errors_namespace, short_error_code, long_error_code,
             stringified_short_error_code, stringified_long_error_code, query_id),
         _parsingContext(parsingContext)
 {
-    _what_str = what_str;
+    _formatted_msg = formatted_str;
 }
 
 void carrots(string &str, size_t line, size_t start, size_t end)
@@ -265,13 +293,18 @@ void carrots(string &str, size_t line, size_t start, size_t end)
 void UserQueryException::format()
 {
     stringstream ss;
-    string query = _parsingContext->getQueryString();
-    carrots(query, _parsingContext->getLineStart(), _parsingContext->getColStart(), _parsingContext->getColEnd());
+    string query;
+    if (_parsingContext) {
+        query = _parsingContext->getQueryString();
+        carrots(query, _parsingContext->getLineStart(), _parsingContext->getColStart(), _parsingContext->getColEnd());
+    }
     ss << "UserQueryException in file: " << _file << " function: " << _function << " line: " << _line << endl
        << "Error id: " << _errors_namespace << "::" << _stringified_short_error_code << "::" << _stringified_long_error_code << endl
        << "Error description: " << ErrorsLibrary::getInstance()->getShortErrorMessage(_short_error_code) << ". " << getErrorMessage() << "." << endl
        << query;
-    if (_query_id) ss << endl <<  "Failed query id: " << _query_id;
+    if (_query_id.isValid()) {
+        ss << endl <<  "Failed query id: " << _query_id;
+    }
 
     _what_str = ss.str();
 }
@@ -290,6 +323,7 @@ Exception::Pointer UserQueryException::copy() const
             _parsingContext,_query_id));
 
     e->_what_str = _what_str;
+    e->_formatted_msg = _formatted_msg;
     e->_formatter = _formatter;
 
     return e;
@@ -304,25 +338,24 @@ void UserQueryException::raise() const
  * SystemException
  */
 SystemException::SystemException(const char* file, const char* function, int32_t line,
-    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
-    const char* stringified_short_error_code, const char* stringified_long_error_code,
-    uint64_t query_id):
-        Exception(file, function, line, errors_namespace, short_error_code, long_error_code,
-            stringified_short_error_code, stringified_long_error_code, query_id)
+                                 const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+                                 const char* stringified_short_error_code, const char* stringified_long_error_code,
+                                 const QueryID& query_id):
+Exception(file, function, line, errors_namespace, short_error_code, long_error_code,
+          stringified_short_error_code, stringified_long_error_code, query_id)
 {
-    format();
 }
 
 SystemException::SystemException(const char* file, const char* function, int32_t line,
-    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
-    const char* stringified_short_error_code, const char* stringified_long_error_code,
-    uint64_t query_id):
-        Exception(file, function, line, errors_namespace, short_error_code, long_error_code,
-            stringified_short_error_code, stringified_long_error_code, query_id)
+                                 const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+                                 const char* formatted_str,
+                                 const char* stringified_short_error_code, const char* stringified_long_error_code,
+                                 const QueryID& query_id):
+Exception(file, function, line, errors_namespace, short_error_code, long_error_code,
+          stringified_short_error_code, stringified_long_error_code, query_id)
 {
-    _what_str = what_str;
+    _formatted_msg = formatted_str;
 }
-
 
 void SystemException::format()
 {
@@ -330,7 +363,9 @@ void SystemException::format()
     ss << "SystemException in file: " << _file << " function: " << _function << " line: " << _line << endl
        << "Error id: " << _errors_namespace << "::" << _stringified_short_error_code << "::" << _stringified_long_error_code << endl
        << "Error description: " << ErrorsLibrary::getInstance()->getShortErrorMessage(_short_error_code) << ". " << getErrorMessage() << ".";
-    if (_query_id) ss << endl << "Failed query id: " << _query_id ;
+    if (_query_id.isValid()) {
+        ss << endl << "Failed query id: " << _query_id ;
+    }
 
     _what_str = ss.str();
 }
@@ -342,6 +377,7 @@ Exception::Pointer SystemException::copy() const
         _stringified_short_error_code.c_str(), _stringified_long_error_code.c_str(), _query_id));
 
     e->_what_str = _what_str;
+    e->_formatted_msg = _formatted_msg;
     e->_formatter = _formatter;
 
     return e;

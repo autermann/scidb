@@ -31,7 +31,7 @@ import org.scidb.io.network.ScidbMsg;
  */
 public class PrepareResult
 {
-    private long queryId;
+    private QueryID queryId;
     private boolean selective;
     private String explainLogical;
     private boolean exclusiveArrayAccess;
@@ -63,7 +63,7 @@ public class PrepareResult
      * Returns result query ID
      * @return Query ID
      */
-    public long getQueryId()
+    public QueryID getQueryId()
     {
         return queryId;
     }

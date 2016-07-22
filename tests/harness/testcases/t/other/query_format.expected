@@ -37,7 +37,7 @@ SCIDB QUERY : <scan(Q_F)>
 {98} 98
 {99} 99
 
-"output format lcsv+"
+"output format csv+:l"
 SCIDB QUERY : <scan(Q_F)>
 x,a
 0,0

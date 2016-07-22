@@ -10,15 +10,15 @@ store(redimension(A,A3),A3)
 
 --test
 
---shell --store --command " iquery   -o lcsv+ -aq 'scan ( A )' "
+--shell --store --command " iquery   -o csv+:l -aq 'scan ( A )' "
 
 --shell --store --command " iquery   -o lsparse -aq 'scan ( A )' "
 
---shell --store --command " iquery   -o lcsv+ -aq 'scan ( A2 )' "
+--shell --store --command " iquery   -o csv+:l -aq 'scan ( A2 )' "
 
 --shell --store --command " iquery   -o lsparse -aq 'scan ( A2 )' "
 
---shell --store --command " iquery   -o lcsv+ -aq 'scan ( A3 )' "
+--shell --store --command " iquery   -o csv+:l -aq 'scan ( A3 )' "
 
 --shell --store --command " iquery   -o lsparse -aq 'scan ( A3 )' "
 

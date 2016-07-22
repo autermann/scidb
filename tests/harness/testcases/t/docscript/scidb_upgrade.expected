@@ -15,7 +15,7 @@ SCIDB QUERY : <create array notFlat<exposure:string,measuredIntensity:int64 NULL
 
 SCIDB QUERY : <show(notFlat)>
 {i} schema
-{0} 'notFlat<exposure:string,measuredIntensity:int64 NULL DEFAULT null> [elevation=0:999,100,0,elapsedTime=0:15,16,0]'
+{0} 'notFlat<exposure:string,measuredIntensity:int64> [elevation=0:999,100,0,elapsedTime=0:15,16,0]'
 
 SCIDB QUERY : <store(redimension(saveExample, notFlat),notFlat)>
 [Query was executed successfully, ignoring data output by this query.]
@@ -31,7 +31,7 @@ SCIDB QUERY : <store(unpack(notFlat,myDim),notFlat_unpacked)>
 
 SCIDB QUERY : <show(notFlat_unpacked)>
 {i} schema
-{0} 'notFlat_unpacked<elevation:int64,elapsedTime:int64,exposure:string,measuredIntensity:int64 NULL DEFAULT null> [myDim=0:*,16000,0]'
+{0} 'notFlat_unpacked<elevation:int64 NOT NULL,elapsedTime:int64 NOT NULL,exposure:string,measuredIntensity:int64> [myDim=0:*,16000,0]'
 
 SCIDB QUERY : <CREATE ARRAY restored_1D_Array <elevation:int64, elapsedTime:int64,exposure:string,measuredIntensity:int64 NULL DEFAULT null> [myDim=0:*,16000,0]>
 [Query was executed successfully, ignoring data output by this query.]

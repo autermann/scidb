@@ -28,7 +28,7 @@
  * @brief Class for controlling built-in and user defined error codes and messages.
  */
 
-#ifndef ERRORSLIBRARYH_
+#ifndef ERRORSLIBRARY_H_
 #define ERRORSLIBRARY_H_
 
 #include <string>

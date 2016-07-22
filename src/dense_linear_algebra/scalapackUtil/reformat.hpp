@@ -152,8 +152,8 @@ inline void ReformatToScalapack::operator()(double val, size_t scidbRow, size_t 
 
     // the minimum scidb{Row,Col} may not be (0,0). to change to
     // 0-based indices, we subtract (_minrow, _mincol)
-    slpp::int_t globalRow = scidbRow-_minrow ; // ftn: PDELSET().IA-1 = INFOG2L().GRINDX-1 = INFOG2L().GRCPY
-    slpp::int_t globalCol = scidbCol-_mincol ; // ftn: PDELSET().JA-1 = INFOG2L().GCINDX-1 = INFOG2L().GCCPY
+    slpp::int_t globalRow = slpp::int_cast(scidbRow-_minrow) ; // ftn: PDELSET().IA-1 = INFOG2L().GRINDX-1 = INFOG2L().GRCPY
+    slpp::int_t globalCol = slpp::int_cast(scidbCol-_mincol) ; // ftn: PDELSET().JA-1 = INFOG2L().GCINDX-1 = INFOG2L().GCCPY
 
     const bool isUsingPdelset=false;
     if(isUsingPdelset) {
@@ -199,7 +199,12 @@ inline void ReformatToScalapack::operator()(double val, size_t scidbRow, size_t 
             // otherwise infoG2L becomes a significant contributor to the extractArrayToScalapack() bottleneck.
 
             slpp::int_t localRow, localCol; // infoG2L_zero_based() outputs
-            infoG2L_zero_based(globalRow, globalCol, _desc, _NPROW, _NPCOL, _MYPROW, _MYPCOL, localRow, localCol);
+            infoG2L_zero_based(globalRow, globalCol, _desc,
+                               slpp::int_cast(_NPROW),
+                               slpp::int_cast(_NPCOL),
+                               slpp::int_cast(_MYPROW),
+                               slpp::int_cast(_MYPCOL),
+                               localRow, localCol);
 
             // for one chunk and its corresponding ScaLAPACK block,
             // the difference between local{Row,Col} and global{Row,Col} is constant.
@@ -216,14 +221,19 @@ inline void ReformatToScalapack::operator()(double val, size_t scidbRow, size_t 
         }
 
         // fast convert from global to local
-        const slpp::int_t localRow = globalRow + _toLocalRow ;
-        const slpp::int_t localCol = globalCol + _toLocalCol ;
+        const slpp::int_t localRow = globalRow + slpp::int_cast(_toLocalRow) ;
+        const slpp::int_t localCol = globalCol + slpp::int_cast(_toLocalCol) ;
 
         if(false && isDebug()) { // too slow to leave on normally
             // check that the short-cut mapping from global to local is correct during full Debug builds
             // we we will check the memoization against infoG2L for every value
             slpp::int_t localRowCheck, localColCheck; // infoG2L_zero_based() outputs
-            infoG2L_zero_based(globalRow, globalCol, _desc, _NPROW, _NPCOL, _MYPROW, _MYPCOL, localRowCheck, localColCheck);
+            infoG2L_zero_based(globalRow, globalCol, _desc,
+                               slpp::int_cast(_NPROW),
+                               slpp::int_cast(_NPCOL),
+                               slpp::int_cast(_MYPROW),
+                               slpp::int_cast(_MYPCOL),
+                               localRowCheck, localColCheck);
             assert(localRow == localRowCheck);
             assert(localCol == localColCheck);
         }
@@ -359,8 +369,8 @@ inline double ReformatFromScalapack<Data_tt>::operator()(int64_t scidbRow, int64
 {
     // the minimum scidb{Row,Col} may not be (0,0). to change to
     // 0-based indices, we subtract (_minrow, _mincol)
-    slpp::int_t globalRow = scidbRow-_minrow ; // ftn: PDELSET().IA-1 = INFOG2L().GRINDX-1 = INFOG2L().GRCPY
-    slpp::int_t globalCol = scidbCol-_mincol ; // ftn: PDELSET().JA-1 = INFOG2L().GCINDX-1 = INFOG2L().GCCPY
+    slpp::int_t globalRow = slpp::int_cast(scidbRow-_minrow) ; // ftn: PDELSET().IA-1 = INFOG2L().GRINDX-1 = INFOG2L().GRCPY
+    slpp::int_t globalCol = slpp::int_cast(scidbCol-_mincol) ; // ftn: PDELSET().JA-1 = INFOG2L().GCINDX-1 = INFOG2L().GCCPY
 
     // we'll do scidb_pdelget_ functionality here.
     // 1. to amortize the cost of INFOG2L, which real PDELGET() calls every time.
@@ -390,7 +400,12 @@ inline double ReformatFromScalapack<Data_tt>::operator()(int64_t scidbRow, int64
         // otherwise infoG2L becomes a bottleneck during extractArrayFromScalapack().
 
         slpp::int_t localRow, localCol; // infoG2L_zero_based() outputs
-        infoG2L_zero_based(globalRow, globalCol, _desc, _NPROW, _NPCOL, _MYPROW, _MYPCOL, localRow, localCol);
+        infoG2L_zero_based(globalRow, globalCol, _desc,
+                           slpp::int_cast(_NPROW),
+                           slpp::int_cast(_NPCOL),
+                           slpp::int_cast(_MYPROW),
+                           slpp::int_cast(_MYPCOL),
+                           localRow, localCol);
 
         // for one chunk and its corresponding ScaLAPACK block,
         // the difference between local{Row,Col} and global{Row,Col} is constant.
@@ -406,15 +421,20 @@ inline double ReformatFromScalapack<Data_tt>::operator()(int64_t scidbRow, int64
     }
 
     // fast convert from global to local
-    const slpp::int_t localRow = globalRow + _toLocalRow ;
-    const slpp::int_t localCol = globalCol + _toLocalCol ;
+    const slpp::int_t localRow = slpp::int_cast(globalRow + _toLocalRow) ;
+    const slpp::int_t localCol = slpp::int_cast(globalCol + _toLocalCol) ;
 
     if(false && isDebug()) {  // for extra checking if a bug turns up, but too slow to leave on normally
         // this is a very slow check
         // we we will check the memoization against infoG2L for every value
         // which we will not do in a Release build, because its so slow.
         slpp::int_t localRowCheck, localColCheck; // infoG2L_zero_based() outputs
-        infoG2L_zero_based(globalRow, globalCol, _desc, _NPROW, _NPCOL, _MYPROW, _MYPCOL, localRowCheck, localColCheck);
+        infoG2L_zero_based(globalRow, globalCol, _desc,
+                           slpp::int_cast(_NPROW),
+                           slpp::int_cast(_NPCOL),
+                           slpp::int_cast(_MYPROW),
+                           slpp::int_cast(_MYPCOL),
+                           localRowCheck, localColCheck);
         assert(localRow == localRowCheck);
         assert(localCol == localColCheck);
     }
@@ -478,7 +498,7 @@ inline double ReformatFromScalapack<Data_tt>::operator()(int64_t row) {
 
     double val = static_cast<double>(0xbadbeef); // not strictly necessary
 
-    slpp::int_t R = row-_minrow ;
+    slpp::int_t R = slpp::int_cast(row-_minrow) ;
     if(_global) {
 	// like the S vector output by pdgesvd() ... available at every host
 	// so we can just take the value directly from the array
@@ -491,7 +511,8 @@ inline double ReformatFromScalapack<Data_tt>::operator()(int64_t row) {
 	    std::cerr << "    _data.get()[R]="<<R<<"]" << "; val <- " << val << std::endl;
 	#endif
     } else {
-	scidb_pdelget_(' ', ' ', val, _data.get(), row-_minrow+1, 1,  _desc);
+	scidb_pdelget_(' ', ' ', val, _data.get(),
+                       slpp::int_cast(row-_minrow+1), 1,  _desc);
 
 	#if !defined(NDEBUG) && defined(SCALAPACK_DEBUG)
 	    std::cerr << "    scidb_pdelget_(' ', ' ', val, _data.get(), R+1=" << R+1

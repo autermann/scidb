@@ -6,4 +6,9 @@ set (json_src
 
 file(GLOB json_include "*.h")
 
+# Disabling -Wconversion for the JSON library makes it easier to drop
+# in a new version later.
+set_source_files_properties(${json_src}
+                            PROPERTIES COMPILE_FLAGS -Wno-conversion)
+
 add_library(json_lib STATIC ${json_src} ${json_include})

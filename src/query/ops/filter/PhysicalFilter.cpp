@@ -64,6 +64,7 @@ public:
         assert(inputArrays.size() == 1);
         assert(_parameters.size() == 1);
         assert(_parameters[0]->getParamType() == PARAM_PHYSICAL_EXPRESSION);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
         return std::shared_ptr<Array>(new FilterArray(_schema, inputArrays[0],
                                                         ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression(), query, _tileMode));

@@ -17,8 +17,8 @@ export DH_VERBOSE=1
 # Fix Ubuntu 12.04 compile
 CFLAGS+=-Wno-format-security
 
-NAME_PREFIX=scidb-15.3
-PREFIX=/opt/scidb/15.3/3rdparty/mpich2
+NAME_PREFIX=scidb-15.12
+PREFIX=/opt/scidb/15.12/3rdparty/mpich2
 export LD_LIBRARY_PATH := $(PREFIX)/lib:$(LD_LIBRARY_PATH)
 DEB_CONFIGURE_EXTRA_FLAGS := \
 	--enable-sharedlibs=gcc \

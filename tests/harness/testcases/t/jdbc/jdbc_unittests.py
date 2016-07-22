@@ -44,6 +44,10 @@ def main():
         iquery_port
         ]
 
+    env_scidb_config_user = os.environ["SCIDB_CONFIG_USER"]
+    if len(env_scidb_config_user) > 0:
+        cmd.extend([env_scidb_config_user])
+
     proc = subprocess.Popen( # Run the command.
         ' '.join(cmd),
         stdout=subprocess.PIPE,

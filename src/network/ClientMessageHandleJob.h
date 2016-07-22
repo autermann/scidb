@@ -41,7 +41,6 @@
 #include <util/Job.h>
 #include <network/proto/scidb_msg.pb.h>
 #include <array/Metadata.h>
-#include <query/QueryProcessor.h>
 #include "Connection.h"
 #include "MessageHandleJob.h"
 #include <usr_namespace/SecurityCommunicator.h>
@@ -50,6 +49,8 @@ namespace scidb
 {
 
 class Connection;
+class QueryResult;
+class SciDB;
 
 /**
  * The class created by network message handler for adding to queue to be processed
@@ -120,7 +121,8 @@ class ClientMessageHandleJob : public MessageHandleJob
      */
     void retryExecuteQuery(scidb::QueryResult& queryResult);
     /// Helper routine
-    void postExecuteQueryInternal(scidb::QueryResult& queryResult);
+    void postExecuteQueryInternal(scidb::QueryResult& queryResult,
+                                  const std::shared_ptr<Query>& query);
 
     /**
      * This method sends next chunk to the client.
@@ -167,7 +169,8 @@ class ClientMessageHandleJob : public MessageHandleJob
       CancelChunkFetchException(const char* file, const char* function, int32_t line)
       : SystemException(file, function, line, "scidb",
                         SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR,
-                        "SCIDB_E_INTERNAL", "SCIDB_E_UNKNOWN_ERROR", uint64_t(0))
+                        "SCIDB_E_INTERNAL", "SCIDB_E_UNKNOWN_ERROR",
+                        INVALID_QUERY_ID)
       {
           (*this) << "scidb::ClientMessageHandleJob::CancelChunkFetchException";
       }

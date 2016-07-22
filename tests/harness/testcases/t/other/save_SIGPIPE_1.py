@@ -74,7 +74,7 @@ def main(argv=None):
 
         # AFL save() some data into the fifo.
         query = """save(build(<x:double>[i=0:{0},10000,0], sin(i)),
-                        '{1}', -2, 'tsv')""".format(hi, fifo)
+                        '{1}', -2, 'tsv:l')""".format(hi, fifo)
         cmd.extend(['-naq', ' '.join(query.split())])
         iq = subprocess.Popen(cmd,
                               stdout=subprocess.PIPE,

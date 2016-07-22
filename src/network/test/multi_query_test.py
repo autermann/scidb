@@ -192,7 +192,7 @@ def doTests(num, iterations, script):
             else:
                 if res != 0:
                    rc=False
-                   printError("FAILURE")
+                   printError("FAILURE exit code: %d" % res)
                 p = executeIt(cmdList,
                               nocwd=False,
                               cmd=None,
@@ -210,7 +210,7 @@ def doTests(num, iterations, script):
         res=p.wait()
         if res != 0:
            rc=False
-           printError("FAILURE")
+           printError("FAILURE exit code: %d" % res)
     return rc
 ### Globals
 

@@ -28,10 +28,10 @@
  * Save operator for saveing data from external files into array
  */
 
-#include "query/Operator.h"
-#include "smgr/io/ArrayWriter.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
+#include <query/Operator.h>
+#include <smgr/io/ArrayWriter.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
 
 using namespace std;
 using namespace boost;

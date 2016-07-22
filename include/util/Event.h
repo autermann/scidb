@@ -81,7 +81,7 @@ public:
      *       race condition between the timer expiring (in pthread_cond_timedwait) and another thread signalling.
      */
 
-    bool wait(Mutex& cs, ErrorChecker& errorChecker)
+    bool wait(Mutex& cs, ErrorChecker& errorChecker, perfTimeCategory_t tc = PTCW_EVENT_OTHER)
     {
         cs.checkForDeadlock();
         if (errorChecker) {
@@ -97,7 +97,10 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
                 }
                 ts.tv_sec = ts.tv_sec + 10;
-                const int e = pthread_cond_timedwait(&_cond, &cs._mutex, &ts);
+                int e;
+                {   ScopedWaitTimer timer(tc);
+                    e = pthread_cond_timedwait(&_cond, &cs._mutex, &ts);
+                }
                 if (e == 0) {
                     return true;
                 }
@@ -113,7 +116,12 @@ public:
         }
         else
         {
-            if (pthread_cond_wait(&_cond, &cs._mutex)) {
+
+            int e;
+            {   ScopedWaitTimer timer(tc);
+                e = pthread_cond_wait(&_cond, &cs._mutex);
+            }
+            if (e) {
                 assert(false);
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_OPERATION_FAILED) << "pthread_cond_wait";
             }

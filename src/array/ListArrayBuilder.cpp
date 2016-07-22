@@ -44,7 +44,12 @@ ListArrayBuilder::ListArrayBuilder(const std::string &listName)
 
 ArrayDesc ListArrayBuilder::getSchema(std::shared_ptr<Query> const& query) const
 {
-    return ArrayDesc(_listName,getAttributes(),getDimensions(query),defaultPartitioning());
+    ArrayDesc desc(_listName,
+                   getAttributes(),
+                   getDimensions(query),
+                   defaultPartitioning(),
+                   query->getDefaultArrayResidency());
+    return desc;
 }
 
 Dimensions ListArrayBuilder::getDimensions(std::shared_ptr<Query> const& query) const
@@ -74,7 +79,7 @@ void ListArrayBuilder::initialize(std::shared_ptr<Query> const& query)
 
     _outAIters.reserve(_nAttrs);
 
-    for (size_t i =0; i<_nAttrs; ++i)
+    for (AttributeID i =0; i<_nAttrs; ++i)
     {
         _outAIters.push_back(_array->getIterator(i));
     }

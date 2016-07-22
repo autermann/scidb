@@ -19,16 +19,16 @@
 *
 * END_COPYRIGHT
 */
-#include <cerrno>
-
-#include "system/Exceptions.h"
-
-#include "log4cxx/logger.h"
-#include "log4cxx/basicconfigurator.h"
-#include "log4cxx/helpers/exception.h"
-
 #include "FITSParser.h"
 
+#include <cerrno>
+
+#include <log4cxx/logger.h>
+#include <log4cxx/basicconfigurator.h>
+#include <log4cxx/helpers/exception.h>
+
+#include <system/Exceptions.h>
+#include <util/Utility.h>
 /*
  * References:
  *
@@ -191,7 +191,7 @@ bool FITSParser::moveToHDU(uint32_t hdu, string& error)
             }
 
             // Read next block
-            int nread = pbuffer->sgetn(buffer, kBlockSize);
+            std::streamsize nread = pbuffer->sgetn(buffer, kBlockSize);
             if (nread == 0) {
                 LOG4CXX_ERROR(logger, "HDU does not exist");
                 throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_OP_INPUT_ERROR10);
@@ -284,7 +284,7 @@ float FITSParser::getBScale() const
     return bscale;
 }
 
-void FITSParser::moveToCell(int cell)
+void FITSParser::moveToCell(int64_t cell)
 {
     pbuffer->pubseekoff(dataPos + cell * bitpixsize, ios_base::beg);
 }
@@ -299,7 +299,7 @@ short int FITSParser::readInt16()
     if (pbuffer->sgetn((char *) &ubitpix, 2) != 2) {
         throw USER_EXCEPTION(SCIDB_SE_IMPORT_ERROR, SCIDB_LE_OP_INPUT_ERROR10);
     }
-    return (ubitpix >> 8) | (ubitpix << 8);
+    return safe_static_cast<short int>((ubitpix >> 8) | (ubitpix << 8));
 }
 
 /**

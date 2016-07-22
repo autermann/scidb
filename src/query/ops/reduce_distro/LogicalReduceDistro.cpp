@@ -80,7 +80,17 @@ public:
     ArrayDesc inferSchema(vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
         assert(schemas.size() == 1);
-        return schemas[0];
+        SCIDB_ASSERT(_parameters.size()>=1);
+
+        ArrayDesc outSchema(schemas[0]);
+
+        // keep the residency but change distribution
+        OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[0].get());
+        const PartitioningSchema ps = static_cast<PartitioningSchema>( evaluate(lExp->getExpression(), query, TID_INT32).getInt32());
+
+        outSchema.setDistribution(createDistribution(ps));
+
+        return outSchema;
     }
 };
 

@@ -12,14 +12,14 @@
 --
 -- CLEAR
 --
-
 -- ---------------------------------------------------------------------
 -- DROP TABLES
 -- ---------------------------------------------------------------------
 drop table if exists "array" cascade;
+drop table if exists "array_distribution" cascade;
+drop table if exists "array_residency" cascade;
 drop table if exists "array_version" cascade;
 drop table if exists "array_version_lock" cascade;
-drop table if exists "array_partition" cascade;
 drop table if exists "instance" cascade;
 drop table if exists "array_attribute" cascade;
 drop table if exists "array_dimension" cascade;
@@ -28,16 +28,28 @@ drop table if exists "libraries" cascade;
 drop table if exists "users" cascade;
 drop table if exists "namespaces" cascade;
 drop table if exists "namespace_members" cascade;
+drop table if exists "roles" cascade;
+drop table if exists "role_members" cascade;
+drop table if exists "role_namespace_permissions" cascade;
+
+-- ---------------------------------------------------------------------
+-- DROP VIEWS
+-- ---------------------------------------------------------------------
+drop view if exists namespace_arrays cascade;
+drop view if exists public_rrays cascade;
 
 -- ---------------------------------------------------------------------
 -- DROP SEQUENCES
 -- ---------------------------------------------------------------------
 drop sequence if exists "array_id_seq" cascade;
-drop sequence if exists "partition_id_seq" cascade;
+drop sequence if exists "array_distribution_id_seq" cascade;
 drop sequence if exists "instance_id_seq" cascade;
 drop sequence if exists "libraries_id_seq" cascade;
 drop sequence if exists "user_id_seq" cascade;
 drop sequence if exists "namespaces_id_seq" cascade;
+drop sequence if exists "role_id_seq" cascade;
+drop sequence if exists "role_permissions_id_seq" cascade;
+drop sequence if exists "role_namespace_permissions_id_seq" cascade;
 
 -- ---------------------------------------------------------------------
 -- DROP FUNCTIONS
@@ -45,16 +57,23 @@ drop sequence if exists "namespaces_id_seq" cascade;
 drop function if exists uuid_generate_v1();
 drop function if exists get_cluster_uuid();
 drop function if exists get_metadata_version();
+drop function if exists check_uaid_in_array(bigint);
+drop function if exists check_server_id_host(integer,varchar);
+drop function if exists check_base_path(varchar);
+
 
 -- ---------------------------------------------------------------------
 -- CREATE SEQUENCES
 -- ---------------------------------------------------------------------
 create sequence "array_id_seq";
-create sequence "partition_id_seq";
+create sequence "array_distribution_id_seq" minvalue 0 start with 0;
 create sequence "instance_id_seq" minvalue 0 start with 0;
 create sequence "libraries_id_seq";
-create sequence "user_id_seq";
+create sequence "user_id_seq" minvalue 1 start with 2;
 create sequence "namespaces_id_seq" minvalue 1 start with 2;
+create sequence "role_id_seq" minvalue 1 start with 2;
+create sequence "role_permissions_id_seq" minvalue 1 start with 1;
+create sequence "role_namespace_permissions_id_seq";
 
 -- ---------------------------------------------------------------------
 -- CREATE TABLES
@@ -64,6 +83,33 @@ create table "cluster"
   cluster_uuid uuid,
   metadata_version integer
 );
+
+
+--
+--  Table: array_distribution
+--
+-- Description of array distribution for each UNVERSIONED array
+--
+-- array_distribution.id : unique ID for this distribution
+--
+-- array_distribution.partition_function : array partitioning scheme
+-- (for now) one of {psHashPartitioned=0, psLocalInstance=1, psByRow=2, psByCol=3, ...}
+--
+-- array_distribution.partition_state : any additional state required to define the distribution
+-- (e.g. processor grid)
+--
+-- array_distribution.redundancy : number of (additional) data replicas
+-- (the total number of copies == redundancy+1)
+
+create table "array_distribution"
+(
+  id bigint primary key default nextval('array_distribution_id_seq'),
+  partition_function integer,
+  partition_state varchar,
+  redundancy integer
+);
+
+
 --
 --  Table: "array"  (public.array) List of arrays in the SciDB installation.
 --
@@ -102,13 +148,51 @@ create table "cluster"
 -- public.array.flags - records details about the array's status.
 --
 --
+
+
+--
+--  Table: "array"  (array) List of arrays in the SciDB installation.
+--
+--          Information about all persistent arrays in the SciDB installation
+--          are recorded in array.
+--
+--   SciDB arrays recorded in array come in several forms.
+--
+--   1. Unversioned Arrays: Arrays named in CREATE ARRAY statements.
+--
+--   2. Array Versions: SciDB supports data modification by creating new
+--      version of unversioned arrays. Each new version of a Unversioned array gets its
+--      own entry in array.
+--
+--   SciDB creates rows in the array catalog to record the existance
+--  of many things; arrays created by users, each version of these arrays.
+--
+-- array.id : unique int64 identifier for the array. This synthetic
+--            key is used to maintain references within the catalogs, and to
+--            identify the array within the SciDB engine's own metadata:
+--            ArrayDesc._id.
+--
+-- array.name : the array's name. If the array is a Unversioned or persistent
+--            array the array.name reflects the name as it appears in
+--            the CREATE ARRAY statement. If the entry corresponds to a
+--            version of an array, then the contents of this field consist of
+--            the array name plus the version number.
+--
+-- array.flags : records details about the array's status.
+--
+-- array.distribution_id : a reference to an array distribution from the "array_distribution" table.
+--
+--
 create table "array"
 (
   id bigint primary key default nextval('array_id_seq'),
-  name varchar unique,
-  partitioning_schema integer,
-  flags integer
-);
+  name varchar,
+  flags integer,
+  distribution_id bigint references "array_distribution" (id),
+
+  unique ( id, name ));
+
+
 --
 --   Table: public.array_version
 --
@@ -139,23 +223,7 @@ create table "array_version"
    primary key(array_id, time_stamp, version_id),
    unique(array_id, version_id)
 );
---
---  Table: public.array_version_lock
---
---    Information about the locks held by currently running queries.
---
-create table "array_version_lock"
-(
-   array_name varchar,
-   array_id bigint,
-   query_id bigint,
-   instance_id bigint,
-   array_version_id bigint,
-   array_version bigint,
-   instance_role integer, -- 0-invalid, 1-coordinator, 2-worker
-   lock_mode integer, -- {0=invalid, read, write, remove, renameto, renamefrom}
-   unique(array_name, query_id, instance_id)
-);
+
 --
 --  Table: public.instance
 --
@@ -163,26 +231,69 @@ create table "array_version_lock"
 --
 create table "instance"
 (
-  instance_id bigint primary key default nextval('instance_id_seq'),
+  instance_id bigint primary key,
+  membership_id bigint default 0,
   host varchar,
   port integer,
   online_since timestamp,
-  path varchar
+  base_path varchar,
+  server_id integer,
+  server_instance_id integer,
+  unique(host,port),
+  unique(server_id,server_instance_id),
+  unique(host,server_id,server_instance_id)
 );
+
+CREATE FUNCTION check_server_id_host(integer,varchar)
+RETURNS BIGINT AS
+$$
+   SELECT count(*) from (select true from "instance" where server_id=$1 and host<>$2 limit 1) as X;
+$$ LANGUAGE SQL IMMUTABLE;
+
+alter table "instance"
+add constraint instance_server_id_host_unique CHECK (check_server_id_host(server_id,host)=0);
+
+CREATE FUNCTION check_base_path(varchar)
+RETURNS BIGINT AS
+$$
+   SELECT count(*) from (select true from "instance" where base_path<>$1 limit 1) as X;
+$$ LANGUAGE SQL IMMUTABLE;
+
+alter table "instance"
+add constraint instance_base_path_non_unique CHECK (check_base_path(base_path)=0);
+
+
 --
---  Table: public.array_partition
+--  Table: public.array_version_lock
 --
---    Information about the way arrays are mapped to instances.
+--    Information about the locks held by currently running queries.
 --
---    NOTE: Currently unused.
---
-create table "array_partition"
+create table "array_version_lock"
 (
-  partition_id bigint primary key default nextval('partition_id_seq'),
-  array_id bigint references "array" (id) on delete cascade,
-  partition_function varchar,
-  instance_id integer references "instance" (instance_id) on delete cascade
+   namespace_name varchar,
+   array_name varchar,
+   array_id bigint,
+   query_id bigint,
+   instance_id bigint references "instance" (instance_id),
+   array_version_id bigint,
+   array_version bigint,
+   coordinator_id bigint references "instance" (instance_id),
+   lock_mode integer, -- {0=invalid, read, write, remove, renameto, renamefrom}
+   unique(namespace_name, array_name, coordinator_id, query_id, instance_id)
 );
+
+--
+--  Table: public.membership
+--
+--    Single row table to maintain a monotonically increasing membership ID
+--
+drop table if exists "membership" cascade;
+create table "membership"
+(
+  id bigint primary key default 0
+);
+insert into "membership" (id) values (0);
+
 --
 --  Table: public.array_attribute
 --
@@ -382,6 +493,76 @@ create table "namespace_members"
   primary key(namespace_id, array_id)
 );
 
+--
+--  Table: public.roles
+--
+--  Maps a SciDB role to its id.
+--
+--  public.roles.id - The (sequential) number of the role
+--
+--  public.roles.name - The name of the role
+--
+--
+create table "roles"
+(
+  id bigint primary key default nextval('role_id_seq'),
+  name varchar unique
+);
+
+--
+--  Table: public.role_members
+--
+--  Represents which users belong to which roles
+--
+--  public.role_members.role_id - The id that represents the role
+--
+--  public.role_members.user_id - The id that represents the
+--    user that belongs to the role specified by role_id.
+--
+--
+create table "role_members"
+(
+  role_id bigint references "roles" (id) on delete cascade,
+  user_id bigint references "users" (id) on delete cascade,
+
+  primary key(role_id, user_id)
+);
+
+
+--
+--  Table: public.role_namespace_permissions
+--
+--  Maps a SciDB role and a namespace to the corresponding permissions
+--
+--  public.role_namespace_permissions.role_id - The id of the role
+--
+--  public.role_namespace_permissions.namespace_id - The id of the namespace
+--
+--  public.role_namespace_permissions.permissions - The permissions for which the role has on the namespace
+--         c=create array within namespace
+--         r=read array within namespace
+--         u=update (write) array within namespace
+--         d=delete array within namespace
+--         l=list arrays within namespace
+--         a=administer namespace
+--
+--     Example:  Providing all permissions for John(id=2) on namespace NS1(id=5):
+--         role_id=2, namespace_id=5, permissions="crudla"
+--
+--     Example:  Providing only read and list permissions for Jenny(id=4) on namespace NS2(id=7):
+--         role_id=4, namespace_id=7, permissions="rl"
+--
+--
+create table "role_namespace_permissions"
+(
+  id bigint primary key default nextval('role_namespace_permissions_id_seq'),
+  role_id bigint references "roles" (id) on delete cascade,
+  namespace_id bigint references "namespaces" (id) on delete cascade,
+  permissions varchar,
+
+  unique(role_id, namespace_id)
+);
+
 
 create or replace function uuid_generate_v1()
 returns uuid
@@ -399,12 +580,14 @@ volatile strict language C;
 -- Note: there is no downgrade path at the moment.
 insert into "cluster" values (uuid_generate_v1(), 3);
 
-insert into users (name, password, method) values (
+insert into users (id, name, password, method) values (
+    1,
     'root',
-    'eUCUk3B57IVO9ZfJB6CIEHl/0lxrWg/7PV8KytUNY6kPLhTX2db48GHGHoizKyH+\nuGkCfNTYZrJgKzjWOhjuvg==',
+    E'eUCUk3B57IVO9ZfJB6CIEHl/0lxrWg/7PV8KytUNY6kPLhTX2db48GHGHoizKyH+\nuGkCfNTYZrJgKzjWOhjuvg==',
     'raw');
 insert into namespaces (name, id) values ('public', 1);
-
+insert into roles (id, name) values (1, 'root');
+insert into role_members (role_id, user_id) values(1,1);
 
 create function get_cluster_uuid() returns uuid as $$
 declare t uuid;
@@ -422,4 +605,55 @@ begin
 end;
 $$ language plpgsql;
 
+CREATE FUNCTION check_uaid_in_array(bigint)
+RETURNS BIGINT AS
+$$
+   SELECT count(*) from (SELECT true FROM "array" WHERE id = $1 and name not like '%@%' limit 1) as X
+$$ LANGUAGE SQL IMMUTABLE;
 
+
+--
+--  Table: array_residency
+--
+-- Description of array residency for each UNVERSIONED array
+--
+-- array_residency.array_id : unversioned array ID
+-- array_residency.instance_id : instance ID
+
+create table "array_residency"
+(
+  array_id bigint CHECK (check_uaid_in_array(array_id)>0),
+  instance_id bigint references "instance" (instance_id),
+  primary key(array_id, instance_id)
+);
+
+-- ---------------------------------------------------------------------
+-- VIEWS
+-- ---------------------------------------------------------------------
+CREATE VIEW namespace_arrays AS (
+    SELECT
+		CASE WHEN NS.name IS NULL THEN 'public' ELSE NS.name end AS namespace_name,
+		ARR.name AS array_name,
+		CASE when MEM.namespace_id IS null THEN 1 ELSE  MEM.namespace_id END AS namespace_id,
+		ARR.id AS array_id,
+        ARR.flags AS flags,
+        ARR.distribution_id as distribution_id
+	FROM "array" as ARR
+    LEFT JOIN
+        namespace_members as MEM
+    ON
+        MEM.array_id = ARR.id
+    LEFT JOIN
+        namespaces as NS
+    ON
+        NS.id=MEM.namespace_id
+);
+
+CREATE VIEW public_arrays AS (
+    SELECT  NSA.array_name AS name,
+            NSA.array_id AS id,
+            NSA.flags,
+            NSA.distribution_id
+    FROM namespace_arrays AS NSA
+    WHERE NSA.namespace_id=1
+);

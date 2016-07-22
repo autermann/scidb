@@ -897,8 +897,9 @@ int tokenize_commandline (const string str, vector<string> &token_list)
 	char buf[BUFSIZ+1];
 	FILE *pipe = 0;
 	string stored_buf;
-	while ((rbytes = ReadOutputOf (command, &pipe, buf, BUFSIZ, &exit_code)) > 0)
+	while ((rbytes = ReadOutputOf (command, &pipe, buf, BUFSIZ-1, &exit_code)) > 0)
 	{
+            assert(rbytes < BUFSIZ);
 		buf[rbytes] = 0;
 
 		string tmp = stored_buf + buf;
@@ -908,17 +909,16 @@ int tokenize_commandline (const string str, vector<string> &token_list)
 
 			if (nl_index != string::npos)
 			{
-				char *token = new char [nl_index + 1];
-				tmp.copy (token, nl_index, 0);
-				token[nl_index] = 0;
-				token_list.push_back (token);
-				delete token;
-
+				token_list.push_back (string());
+				token_list[token_list.size()-1].reserve(nl_index);
+                                token_list[token_list.size()-1].insert(0, tmp, 0, nl_index);
 				tmp.replace (0, nl_index+1, "");
-				stored_buf = tmp;
 			}
 			else
-				break;
+                        {
+                            stored_buf = tmp;
+                            break;
+                        }
 		}
 	}
 

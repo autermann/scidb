@@ -96,6 +96,6 @@ class PhysicalSetopt: public PhysicalOperator
     }
 };
 
-DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSetopt, "setopt", "physicalSetopt")
+DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalSetopt, "_setopt", "physicalSetopt")
 
 } //namespace

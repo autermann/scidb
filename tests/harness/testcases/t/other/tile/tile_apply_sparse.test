@@ -5,7 +5,7 @@ create array J <j:int64> [n=1:160000,10000,0]
 create array V <v:int64> [n=1:160000,10000,0]
 --start-igdata
 # prime size tile
-setopt('tile-size','9941')
+_setopt('tile-size','9941')
 store(build(V, int64(random())), V)
 create array A <v:int64,i:int64,j:int64> [n=1:160000,10000,0]
 store(join(join(V, build(I, uint64(random())%10000+1 )), build(J, uint64(random())%10000+1)), A)
@@ -69,7 +69,7 @@ aggregate(filter(project(apply(join(C as left , D as right), diff, left.v2_max -
 aggregate(filter(project(apply(join(C as left , D as right), diff, left.v2_min - right.v2_min), diff), diff <>0),count(*))
 --cleanup
 --start-igdata
-setopt('tile-size','10000')
+_setopt('tile-size','10000')
 --stop-igdata
 remove(I)
 remove(J)

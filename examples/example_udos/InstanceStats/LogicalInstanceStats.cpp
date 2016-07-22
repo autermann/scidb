@@ -144,7 +144,9 @@ public:
         {
             outputDimensions.push_back(DimensionDesc("instance_no", 0, query->getInstancesCount(), 1, 0));
         }
-        return ArrayDesc("instance_stats", outputAttributes, outputDimensions, defaultPartitioning());
+        return ArrayDesc("instance_stats", outputAttributes, outputDimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

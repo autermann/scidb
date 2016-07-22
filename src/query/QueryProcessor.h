@@ -36,27 +36,17 @@
 #ifndef QUERY_PROCESSOR_H_
 #define QUERY_PROCESSOR_H_
 
-#include <memory>
-#include <string>
-#include <queue>
-#include <stdio.h>
+#include <query/QueryID.h>
 
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "query/Operator.h"
-#include "query/QueryPlan.h"
-#include "query/optimizer/Optimizer.h"
-#include "util/Semaphore.h"
-#include "util/Event.h"
-#include "array/StreamArray.h"
-#include "util/RWLock.h"
-#include "SciDBAPI.h"
-#include "query/RemoteArray.h"
+#include <memory>
 
 namespace scidb
 {
   class Session;
 
+class Optimizer;
+class Query;
+class ArrayDesc;
 /**
  * The stub for data type
  */
@@ -104,6 +94,11 @@ public:
      * Examine the logical tree and let the operators request array locks
      */
     virtual void inferArrayAccess(std::shared_ptr<Query> query) = 0;
+
+    /**
+     * Examine the logical tree and let the operators specify permissions
+     */
+    virtual std::string inferPermissions(std::shared_ptr<Query> query) = 0;
 
     /**
      * Optimizes current logical tree. It must leave the rest of logical plan in query and assign to physical plan

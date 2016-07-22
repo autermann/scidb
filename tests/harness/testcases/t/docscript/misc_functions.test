@@ -17,7 +17,7 @@ scan(Names)
 filter(apply(Names,first,strlen(firstnames), last,strlen(lastnames)),first=last)  
 --start-igdata
 store(list('functions'),SciDB_functions)  
---set-format csv
+--set-format csv:l
 --stop-igdata
 filter(project(SciDB_functions,name,profile), regex(profile,'(.*)datetimetz(.*)'))  
 

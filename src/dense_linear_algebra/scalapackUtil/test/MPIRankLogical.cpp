@@ -97,16 +97,21 @@ ArrayDesc MPIRankLogical::inferSchema(std::vector<ArrayDesc> schemas, std::share
                             d0.getCurrStart(),
                             d0.getCurrEnd(),
                             d0.getEndMax(),
-                            d0.getChunkInterval(),
+                            d0.getRawChunkInterval(),
                             0);
     outDims[1] = DimensionDesc(d0.getBaseName() + "_2",
                             d1.getStartMin(),
                             d1.getCurrStart(),
                             d1.getCurrEnd(),
                             d1.getEndMax(),
-                            d1.getChunkInterval(),
+                            d1.getRawChunkInterval(),
                             0);
-    return ArrayDesc("SVD", atts, outDims, defaultPartitioning());
+
+    ArrayDistPtr undefDist = ArrayDistributionFactory::getInstance()->construct(psUndefined,
+                                                                                DEFAULT_REDUNDANCY);
+    return ArrayDesc("mpirank", atts, outDims,
+                     undefDist,
+                     query->getDefaultArrayResidency());
 }
 
 REGISTER_LOGICAL_OPERATOR_FACTORY(MPIRankLogical, "_mpirank");

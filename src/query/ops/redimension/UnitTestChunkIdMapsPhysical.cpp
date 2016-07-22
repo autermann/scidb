@@ -27,7 +27,7 @@
  *  @author sfridella
  */
 
-#include <boost/foreach.hpp>
+#include "ChunkIdMap.h"
 #include "RedimensionCommon.h"
 #include <log4cxx/logger.h>
 
@@ -56,6 +56,16 @@ public:
         : RedimensionCommon(logicalName, physicalName, parameters, schema)
         {}
 
+
+
+    virtual RedistributeContext
+    getOutputDistribution(std::vector<RedistributeContext>const&,
+                          std::vector<ArrayDesc>const&) const
+    {
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
+    }
+
     /**
      * @see PhysicalOperator::execute
      */
@@ -72,7 +82,8 @@ public:
         map<size_t, Coordinates> checkingMap;
         map<size_t, Coordinates>::iterator checkingMapIt;
         bool checkingMapInserted;
-        std::shared_ptr<ChunkIdMap> cidMap = createChunkIdMap(srcArrayDesc);
+        ArenaPtr ap = query->getArena();
+        std::shared_ptr<ChunkIdMap> cidMap = createChunkIdMap(srcArrayDesc.getDimensions(), ap);
 
         /* Loop through each chunk, mapping the chunk pos to an id, and
            recording the mapping

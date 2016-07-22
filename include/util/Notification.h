@@ -102,7 +102,7 @@ class Notification
     * Notification constructor
     * @param msgPtr payload message pointer
     */
-   Notification(MessageTypePtr& msgPtr)
+   Notification(const MessageTypePtr& msgPtr)
    : _msgPtr(msgPtr)
    { }
 
@@ -152,7 +152,7 @@ class Notification
 
  private:
 
-   static void notifyOnPublish(MessageTypePtr msgPtr)
+   static void notifyOnPublish(const MessageTypePtr msgPtr)
    {
       PublishListenerVec tmpListeners;
       {

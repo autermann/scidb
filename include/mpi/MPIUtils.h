@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include <query/QueryID.h>
 #include <util/shm/SharedMemoryIpc.h>
 
 namespace scidb
@@ -241,7 +242,7 @@ namespace mpi
     bool parseSharedMemoryIpcName(const std::string& ipcName,
                                   const std::string& clusterUuid,
                                   uint64_t& instanceId,
-                                  uint64_t& queryId,
+                                  QueryID& queryId,
                                   uint64_t& launchId);
 
     /**
@@ -280,7 +281,7 @@ namespace mpi
 
     /**
      * Generate a string in the form NAME=VALUE
-     * which corresponds an environment variable
+     * which corresponds to an environment variable
      * used to identify MPI processes started by SciDB
      * @return the name=value pair string
      */
@@ -303,7 +304,7 @@ namespace mpi
     bool
     parseScidbMPIEnvVar(const std::string& envVarValue,
                         const std::string& clusterUuid,
-                        uint64_t& queryId,
+                        QueryID& queryId,
                         uint64_t& launchId);
 
 
@@ -321,7 +322,7 @@ namespace mpi
     bool
     parseScidbMPIEnvVar(const std::string& envVarValue,
                         uint32_t& shmType,
-                        uint64_t& queryId,
+                        QueryID& queryId,
                         uint64_t& launchId,
                         std::string& clusterUuid);
 

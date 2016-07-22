@@ -365,9 +365,17 @@ public:
      * @return true if input is not emptyable and input chunk size matches output;
      *         false otherwise
      */
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const& inputDistributions,
+                                                      std::vector<ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
+        SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema() == psUndefined);
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /**
@@ -396,7 +404,9 @@ public:
         else
         {
             size_t minAttrSize = static_cast<size_t>(-1);
-            for(AttributeID i = 0, j = desc.getAttributes().size(); i<j; i++)
+            for(AttributeID i = 0, j = safe_static_cast<AttributeID>(desc.getAttributes().size());
+                i<j;
+                i++)
             {
                 AttributeDesc const& attr = desc.getAttributes()[i];
                 if(attr.getSize() > 0 && attr.getSize() < minAttrSize)

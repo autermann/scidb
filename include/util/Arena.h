@@ -78,7 +78,7 @@ enum
 
 /****************************************************************************/
 
-const size_t                  unlimited = ~0 >> 4;       // Maximum allocation
+const size_t                  unlimited = ~0ul >> 4;     // Maximum allocation
 const finalizer_t             allocated = finalizer_t(1);// Special finalizer
 
 /****************************************************************************/
@@ -789,7 +789,7 @@ struct deleter : private Allocator<char>
 template<class type>
 std::shared_ptr<type> attach_shared(Arena& a,type* p)
 {
-    return std::shared_ptr<type>(p,detail::deleter(&a),Allocator<char>(a));
+    return std::shared_ptr<type>(p,detail::deleter(&a),Allocator<char>(&a));
 }
 
 /** @cond ********************************************************************

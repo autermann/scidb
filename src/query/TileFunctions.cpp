@@ -47,7 +47,7 @@ void rle_unary_bool_not(const Value** args,  Value* result, void*)
     const char* end = s + (valuesCount >> 3) + 1;
     // Probably can be optimized by using DWORD instead of char
     while (s < end) {
-        *r++ = ~(*s++);
+        *r++ = static_cast<char>(~(*s++));
     }
 }
 

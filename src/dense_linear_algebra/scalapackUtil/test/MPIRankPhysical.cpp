@@ -122,11 +122,6 @@ public:
         return true;
     }
 
-    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
-    {
-        return RedistributeContext(psScaLAPACK);
-    }
     // if outputting partial blocks that need to be merged, one needs to override
     // another operator called ???
 
@@ -157,6 +152,8 @@ std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Arr
         std::cerr << "MPIRankPhysical::execute() begin ---------------------------------------" << std::endl;
     }
 
+    checkOrUpdateIntervals(_schema, inputArrays[0]);
+
     //
     // repartition and redistribution from SciDB chunks and arbitrary distribution
     // to
@@ -165,7 +162,7 @@ std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Arr
     //   arbitrary chunkSize to one that is efficient for ScaLAPACK
     //
     size_t nInstances = query->getInstancesCount();
-    slpp::int_t instanceID = query->getInstanceID();
+    slpp::int_t instanceID = slpp::int_cast(query->getInstanceID());
 
     std::shared_ptr<Array> input = inputArrays[0];
     Dimensions const& dims = input->getArrayDesc().getDimensions();
@@ -175,11 +172,9 @@ std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Arr
         bool isParticipating = launchMPISlaves(query, 0);
         SCIDB_ASSERT(!isParticipating);
 
-        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query,  "MPIRankPhysical"), firstChunkSize);
-
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPIRankPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0],
+                                                                         _schema.getDistribution(),
+                                                                         query, "MPIRankPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if(wasConverted) {
@@ -228,11 +223,9 @@ std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Arr
         bool isParticipating = launchMPISlaves(query, 0);
         SCIDB_ASSERT(!isParticipating);
 
-        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query,  "MPIRankPhysical"), firstChunkSize);
-
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPIRankPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0],
+                                                                         _schema.getDistribution(),
+                                                                         query, "MPIRankPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if(wasConverted) {
@@ -251,7 +244,7 @@ std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Arr
         }
     }
 
-    slpp::int_t IC = query->getInstancesCount();
+    slpp::int_t IC = slpp::int_cast(query->getInstancesCount());
     slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
     if (DBG) {
         std::cerr << "(execute) NP:"<<NP << " IC:" <<IC << std::endl;
@@ -273,7 +266,7 @@ std::shared_ptr<Array> MPIRankPhysical::execute(std::vector< std::shared_ptr<Arr
         std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }
 
-    int minLen = std::min(nRows, nCols);
+    int minLen = safe_static_cast<int>(std::min(nRows, nCols));
     if(DBG) {
         std::cerr << "-------------------------------------" << std::endl ;
         std::cerr << "MPIRankPhysical::execute(): nInstances=" << nInstances << std::endl ;
@@ -357,7 +350,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inpu
     }
 
     size_t nInstances = query->getInstancesCount();
-    slpp::int_t instanceID = query->getInstanceID();
+    slpp::int_t instanceID = slpp::int_cast(query->getInstanceID());
 
     // MPI_Init(); -- now done in slave processes
     // in SciDB we use query->getInstancesCount() & getInstanceID()
@@ -440,14 +433,13 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inpu
     // taken from PhysicalMpiTest operator code, pre-loop
     //
     const std::shared_ptr<const InstanceMembership> membership =
-        Cluster::getInstance()->getInstanceMembership();
+            Cluster::getInstance()->getMatchingInstanceMembership(query->getCoordinatorLiveness()->getMembershipId());
 
-    if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-        (membership->getInstances().size() != query->getInstancesCount())) {
+    if (membership->getNumInstances() != query->getInstancesCount()) {
         // because we can't yet handle the extra data from
         // replicas that we would be fed in "degraded mode"
 
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
+        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM);
     }
     const string& installPath = MpiManager::getInstallPath(membership);
 
@@ -488,8 +480,8 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inpu
     }
 
     // find M,N from input array
-    slpp::int_t M = nrow(Ain);
-    slpp::int_t N = ncol(Ain);
+    slpp::int_t M = slpp::int_cast(nrow(Ain));
+    slpp::int_t N = slpp::int_cast(ncol(Ain));
     if(DBG) {
         std::cerr << "M " << M << " N " << N << std::endl;
     }
@@ -510,8 +502,8 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inpu
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
                << "chunksize " << brow(Ain) << " x "<< bcol(Ain) << " is too large");
     }
-    const slpp::int_t MB= brow(Ain);
-    const slpp::int_t NB= bcol(Ain);
+    const slpp::int_t MB= slpp::int_cast(brow(Ain));
+    const slpp::int_t NB= slpp::int_cast(bcol(Ain));
 
     if (MB != NB) {
         throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
@@ -585,8 +577,8 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inpu
     const size_t NUM_BUFS=3 ;
     int sizes[NUM_BUFS];
     sizes[0] =          sizeof (scidb::MPIRankArgs) ;
-    sizes[1] = SIZE_IN * sizeof(double) ;
-    sizes[2] = SIZE_OUT* sizeof(double) ;
+    sizes[1] = safe_static_cast<int>(SIZE_IN * sizeof(double)) ;
+    sizes[2] = safe_static_cast<int>(SIZE_OUT* sizeof(double)) ;
 
     if(DBG) {
         std::cerr << "SHM ALLOCATIONS:@@@@@@@@@@@@@@@@@@@" << std::endl ;
@@ -644,11 +636,7 @@ void  MPIRankPhysical::invokeMPIRank(std::vector< std::shared_ptr<Array> >* inpu
     Coordinates coordFirst = getStartMin(Ain);
     Coordinates coordLast = getEndMax(Ain);
 
-    procRowCol_t firstChunkSize = { chunkRow(Ain), chunkCol(Ain) };
-    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-       make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(*inputArrays, query,  "MPIRankPhysical"), firstChunkSize);
-
-    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, schemeData, query, "MPIRankPhysical");
+    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, outSchema.getDistribution(), query, "MPIRankPhysical");
 
     bool wasConverted = (tmpRedistedInput != Ain) ;  // only when redistribute was actually done (sometimes optimized away)
 

@@ -7,23 +7,11 @@ Query was executed successfully
 SCIDB QUERY : <store(build(ARRAY1,I),ARRAY1)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=0),count(*))>
-{i} count
-{0} 51
+SCIDB QUERY : <aggregate(ARRAY1, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 20100,0,200
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=1),count(*))>
-{i} count
-{0} 50
-
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=2),count(*))>
-{i} count
-{0} 50
-
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=3),count(*))>
-{i} count
-{0} 50
-
-SCIDB QUERY : <apply(ARRAY1,zz,injectError(2, 4))>
+SCIDB QUERY : <apply(ARRAY1,zz,injectError(1, 4))>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <insert(project(apply(project(apply(filter(ARRAY1, I <> 0), v1, v*2), v1), v, v1), v), ARRAY1)>

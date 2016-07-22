@@ -72,7 +72,7 @@ public:
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
-        if(schemas.size() > 1) {
+        if(schemas.size() != 1) {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "LogicalSplitArrayTest: no input schema.";
         }
         ArrayDesc& schema = schemas[0]; // hereafter reduced to schemas[0] only
@@ -103,12 +103,14 @@ public:
         Dimensions outDims;
         outDims.push_back(DimensionDesc(d0.getBaseName(), d0.getNamesAndAliases(),
                                         d0.getStartMin(), d0.getCurrStart(), d0.getCurrEnd(), d0.getEndMax(),
-                                        d0.getChunkInterval(), 0));
+                                        d0.getRawChunkInterval(), 0));
         outDims.push_back(DimensionDesc(d1.getBaseName(), d1.getNamesAndAliases(),
                                         d1.getStartMin(), d1.getCurrStart(), d1.getCurrEnd(), d1.getEndMax(),
-                                        d1.getChunkInterval(), 0));
+                                        d1.getRawChunkInterval(), 0));
 
-        return ArrayDesc("Splitarraytest", outAtts, outDims, defaultPartitioning());
+        return ArrayDesc("Splitarraytest", outAtts, outDims,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

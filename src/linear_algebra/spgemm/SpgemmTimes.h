@@ -48,7 +48,7 @@ double getDbgMonotonicrawSecs()
             assert(false);
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
         }
-        return double(ts.tv_sec + 1e-9 * ts.tv_nsec);
+        return (static_cast<double>(ts.tv_sec) + 1e-9 * static_cast<double>(ts.tv_nsec));
     } else {
         return 0.0;
     }
@@ -62,7 +62,7 @@ double getDbgThreadSecs()
             assert(false);
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_CANT_GET_SYSTEM_TIME);
         }
-        return double(ts.tv_sec + 1e-9 * ts.tv_nsec);
+        return (static_cast<double>(ts.tv_sec) + 1e-9 * static_cast<double>(ts.tv_nsec));
     } else {
         return 0.0;
     }

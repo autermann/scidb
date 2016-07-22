@@ -153,14 +153,14 @@ namespace scidb
     void ParallelAccumulatorArray::start(const std::shared_ptr<Query>& query)
     {
         PhysicalOperator::getGlobalQueueForOperators();
-        size_t nAttrs = iterators.size();
+        AttributeID nAttrs = safe_static_cast<AttributeID>(iterators.size());
         assert(nAttrs>0);
-        for (size_t i = 0; i < nAttrs; i++) {
+        for (AttributeID i = 0; i < nAttrs; i++) {
             iterators[i] = pipe->getConstIterator(i);
         }
         int nPrefetchedChunks = Config::getInstance()->getOption<int>(CONFIG_RESULT_PREFETCH_QUEUE_SIZE);
         do {
-            for (size_t i = 0; i < nAttrs; i++) {
+            for (AttributeID i = 0; i < nAttrs; i++) {
                 std::shared_ptr<ChunkPrefetchJob> job = make_shared<ChunkPrefetchJob>(shared_from_this(), i, query);
                 doNewJob(job);
             }
@@ -169,7 +169,8 @@ namespace scidb
 
     ParallelAccumulatorArray::~ParallelAccumulatorArray()
     {
-        LOG4CXX_TRACE(logger, "ParallelAccumulatorArray::~ParallelAccumulatorArray "<<this << ", active jobs #="<<activeJobs.size());
+        LOG4CXX_TRACE(logger, "ParallelAccumulatorArray::~ParallelAccumulatorArray "
+                      << this << ", active jobs #="<<activeJobs.size());
         for (size_t i = 0; i < activeJobs.size(); i++) {
             list< std::shared_ptr<ChunkPrefetchJob> >& jobs = activeJobs[i];
             for (list< std::shared_ptr<ChunkPrefetchJob> >::iterator j = jobs.begin(); j != jobs.end(); ++j) {

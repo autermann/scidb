@@ -9,7 +9,7 @@ CREATE array Raw_Test_Data < I : int64, J : int64, V : double NULL, W : string >
 --igdata "store(redimension(uniq(sort(project(Raw_Test_Data, W))),<W:string>[i=0:*,1000,0]), w_indices)"
 CREATE ARRAY Data < AV : double NULL > [ I=0:*,4,2, J=0:*,6,2, W_dim=0:*,5,1 ]
 
---set-format csv+
+--set-format csv+:l
 store(redimension(project(index_lookup(Raw_Test_Data,w_indices,Raw_Test_Data.W,W_dim),W_dim,V,I,J),Data, avg(V) as AV),Data)
 
 scan (Raw_Test_Data)

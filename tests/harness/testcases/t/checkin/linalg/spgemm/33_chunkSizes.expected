@@ -1,9 +1,9 @@
 Query was executed successfully
 
-SCIDB QUERY : <create array FMT3 <v:double>[i=0:1,2,0, j=0:1,2,0]>
+SCIDB QUERY : <create array FMT3 <v:double NOT NULL>[i=0:1,2,0, j=0:1,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array V_c1 <v:double>[i=0:1,32,0, j=0:1,32,0]>
+SCIDB QUERY : <create array V_c1 <v:double NOT NULL>[i=0:1,32,0, j=0:1,32,0]>
 Query was executed successfully
 
 SCIDB QUERY : <repart(store( filter(build(V_c1, 1+4*i+2*j), true), V_c1 ), FMT3)>

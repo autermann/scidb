@@ -109,8 +109,7 @@ class LogicalSubstitute: public LogicalOperator
         }
         if (substDims[0].getStartMin() != 0)
         {
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_SUBSTITUTE_ERROR4) <<
-                (substDesc.getName() + "." + substDims[0].getBaseName());
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_SUBSTITUTE_ERROR4);
         }
 
         //if no parameters are given, we assume we are substituting all nullable attributes
@@ -132,20 +131,23 @@ class LogicalSubstitute: public LogicalOperator
                     throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_SUBSTITUTE_ERROR5)
                         << inputAttr.getName() << substAttrs[0].getName();
                 }
-                newAttributes[i] = AttributeDesc(i,
-                                                 inputAttr.getName(),
-                                                 inputAttr.getType(),
-                                                 inputAttr.getFlags() & ~AttributeDesc::IS_NULLABLE,
-                                                 inputAttr.getDefaultCompressionMethod(),
-                                                 inputAttr.getAliases(),
-                                                 inputAttr.getDefaultValue().isNull() ? NULL : &inputAttr.getDefaultValue());
+                newAttributes[i] = AttributeDesc(
+                    safe_static_cast<AttributeID>(i),
+                    inputAttr.getName(),
+                    inputAttr.getType(),
+                    inputAttr.getFlags() & ~AttributeDesc::IS_NULLABLE,
+                    inputAttr.getDefaultCompressionMethod(),
+                    inputAttr.getAliases(),
+                    inputAttr.getDefaultValue().isNull() ? NULL : &inputAttr.getDefaultValue());
             }
             else
             {
                 newAttributes[i] = inputAttrs[i];
             }
         }
-        return ArrayDesc(inputDesc.getName() + "_subst", newAttributes, inputDesc.getDimensions(), defaultPartitioning());
+        return ArrayDesc(inputDesc.getName() + "_subst", newAttributes, inputDesc.getDimensions(),
+                         inputDesc.getDistribution(),
+                         inputDesc.getResidency() );
     }
 
 

@@ -39,8 +39,10 @@
 #include <memory>
 #include <boost/format.hpp>
 
+#include <query/QueryID.h>
 #include <system/ErrorCodes.h>
 #include <system/Constants.h>
+#include <util/Platform.h>
 #include <util/StringUtil.h>
 
 #define SYSTEM_EXCEPTION(short_error_code, long_error_code)\
@@ -71,7 +73,7 @@
     scidb::UserQueryException(exception.getFile().c_str(), exception.getFunction().c_str(), exception.getLine(),\
         exception.getErrorsNamespace().c_str(), exception.getShortErrorCode(), exception.getLongErrorCode(),\
         exception.what(), exception.getStringifiedShortErrorCode().c_str(),\
-        exception.getStringifiedLongErrorCode().c_str(), parsing_context)
+        exception.getStringifiedLongErrorCode().c_str(), parsing_context, exception.getQueryId())
 
 #define USER_QUERY_EXCEPTION_SPTR(short_error_code, long_error_code, parsing_context) \
     std::make_shared<scidb::UserQueryException>(                      \
@@ -92,35 +94,31 @@
         long_error_code, #short_error_code, #long_error_code, parsing_context)
 
 /**
- * The macro is equivalent to an assertion in DEBUG build, and an exception in RELEASE build.
- *
- * Usage:
- *
- *   new code:
- *     ASSERT_EXCEPTION( condition, exceptionMsg );
- *
- *   equivalent old code:
- *     assert( condition );
- *     if (!condition) {
- *        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNREACHABLE_CODE) << exceptionMsg;
- *     }
+ * This macro is equivalent to an assertion in DEBUG build, and an
+ * exception in RELEASE build.
  */
-
-#define ASSERT_EXCEPTION(_cond_, _msg_) \
-     do { \
-         bool cond = (_cond_); /* evaluate once */ \
-         assert(cond); \
-         if (!cond) { \
-             throw SYSTEM_EXCEPTION(scidb::SCIDB_SE_INTERNAL, scidb::SCIDB_LE_UNREACHABLE_CODE) << _msg_; \
-         } \
-     } while (0)
+#ifndef NDEBUG
+#   define ASSERT_EXCEPTION(_cond_, _msg_)              \
+    do {                                                \
+        assert(_cond_);                                 \
+        std::string m(_msg_); /* avoid warning */       \
+    } while (0)
+#else
+#   define ASSERT_EXCEPTION(_cond_, _msg_)                              \
+    do {                                                                \
+        if (! static_cast<bool>(_cond_)) {                              \
+            throw SYSTEM_EXCEPTION(scidb::SCIDB_SE_INTERNAL,            \
+                                   scidb::SCIDB_LE_ASSERTION_FAILED)    \
+                << #_cond_ << __FILE__ << __LINE__ << _msg_;            \
+        }                                                               \
+    } while (0)
+#endif
 
 /**
  * The macro is equivalent to ASSERT_EXCEPTION( false, exceptionMsg );  But it is
  * designed so that it will not generate compiler warning messages if it is the
  * only action is a non-void function.
  */
-
 #define ASSERT_EXCEPTION_FALSE(_msg_) \
     assert(false); \
     throw SYSTEM_EXCEPTION(scidb::SCIDB_SE_INTERNAL, scidb::SCIDB_LE_UNREACHABLE_CODE) << _msg_;
@@ -143,9 +141,9 @@ public:
     Exception(){}
 
     Exception(const char* file, const char* function, int32_t line,
-            const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
-            const char* stringified_short_error_code, const char* stringified_long_error_code,
-            uint64_t query_id = 0);
+              const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+              const char* stringified_short_error_code, const char* stringified_long_error_code,
+              const QueryID& query_id = INVALID_QUERY_ID);
 
     virtual ~Exception() throw ()
     {}
@@ -180,9 +178,11 @@ public:
 
     std::string getErrorMessage() const;
 
-    uint64_t getQueryId() const;
+    const QueryID& getQueryId() const;
 
-    void setQueryId(uint64_t queryId);
+    void setQueryId(const QueryID& queryId);
+
+    void setWhatStr(const std::string& whatStr);
 protected:
     virtual void format() = 0;
     boost::format& getMessageFormatter() const;
@@ -195,9 +195,10 @@ protected:
     int32_t _long_error_code;
     std::string _stringified_short_error_code;
     std::string _stringified_long_error_code;
-    uint64_t _query_id;
+    QueryID _query_id;
 
     std::string _what_str;
+    mutable std::string _formatted_msg;
     mutable boost::format _formatter;
 };
 
@@ -214,12 +215,13 @@ public:
     UserException(const char* file, const char* function, int32_t line,
         const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
         const char* stringified_short_error_code, const char* stringified_long_error_code,
-        uint64_t query_id = 0);
+        const QueryID& query_id = INVALID_QUERY_ID);
 
     UserException(const char* file, const char* function, int32_t line,
-        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
+        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+        const char* err_str,
         const char* stringified_short_error_code, const char* stringified_long_error_code,
-        uint64_t query_id = 0);
+        const QueryID& query_id);
 
 	~UserException() throw () {}
 
@@ -230,12 +232,20 @@ public:
         {
             getMessageFormatter() % param;
         }
+        catch (std::exception& e)
+        {
+            if (isDebug()) {
+                const std::string what = e.what();
+                // Generate a core to analyze 'what'
+                assert(false);
+            }
+        }
         catch (...)
         {
-            // Silently ignore errors during adding parameters
+            // Silently ignore errors during adding parameters,
+            // but not in debug builds.
+            assert(false);
         }
-
-        format();
 
         return *this;
     }
@@ -269,12 +279,13 @@ public:
     UserQueryException(const char* file, const char* function, int32_t line,
         const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
         const char* stringified_short_error_code, const char* stringified_long_error_code,
-        const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id = 0);
+        const std::shared_ptr<ParsingContext>& parsingContext, const QueryID& query_id = INVALID_QUERY_ID);
 
     UserQueryException(const char* file, const char* function, int32_t line,
-        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
+        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+        const char* err_str,
         const char* stringified_short_error_code, const char* stringified_long_error_code,
-        const std::shared_ptr<ParsingContext>& parsingContext, uint64_t query_id = 0);
+        const std::shared_ptr<ParsingContext>& parsingContext, const QueryID& query_id);
 
 	~UserQueryException() throw () {}
 
@@ -287,12 +298,20 @@ public:
         {
             getMessageFormatter() % param;
         }
+        catch (std::exception& e)
+        {
+            if (isDebug()) {
+                // Generate a core to analyze 'what'
+                const std::string what = e.what();
+                assert(false);
+            }
+        }
         catch (...)
         {
-            // Silently ignore errors during adding parameters
+            // Silently ignore errors during adding parameters,
+            // but not in debug builds.
+            assert(false);
         }
-
-        format();
 
         return *this;
     }
@@ -324,14 +343,15 @@ public:
     typedef std::shared_ptr<SystemException> Pointer;
 
     SystemException(const char* file, const char* function, int32_t line,
-        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
-        const char* stringified_short_error_code, const char* stringified_long_error_code,
-        uint64_t query_id = 0);
+                    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+                    const char* stringified_short_error_code, const char* stringified_long_error_code,
+                    const QueryID& query_id = INVALID_QUERY_ID);
 
     SystemException(const char* file, const char* function, int32_t line,
-        const char* errors_namespace, int32_t short_error_code, int32_t long_error_code, const char* what_str,
-        const char* stringified_short_error_code, const char* stringified_long_error_code,
-        uint64_t query_id = 0);
+                    const char* errors_namespace, int32_t short_error_code, int32_t long_error_code,
+                    const char* err_str,
+                    const char* stringified_short_error_code, const char* stringified_long_error_code,
+                    const QueryID& query_id);
 
     template <class T>
     SystemException& operator <<(const T &param)
@@ -340,12 +360,20 @@ public:
         {
             getMessageFormatter() % param;
         }
+        catch (std::exception& e)
+        {
+            if (isDebug()) {
+                const std::string what = e.what();
+                // Generate a core to analyze 'what'
+                assert(false);
+            }
+        }
         catch (...)
         {
-            // Silently ignore errors during adding parameters
+            // Silently ignore errors during adding parameters,
+            // but not in debug builds
+            assert(false);
         }
-
-        format();
 
         return *this;
     }

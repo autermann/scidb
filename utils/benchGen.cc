@@ -73,6 +73,14 @@ inline int lcg(int x) {
     return (1103515245 * x + 12345) & 0x3fffffff;
 }
 
+inline int dtoi(double d) {
+    return static_cast<int>(d);
+}
+
+inline double itod(int i) {
+    return static_cast<double>(i);
+}
+
 double benchRand(int t) {
     // Compute a pseudo-random number between 0 and 1 that is always the same
     // for a given value of t.
@@ -238,12 +246,12 @@ std::pair<int, int> Tiles::_llc(int size, int range, int t, int total) {
         t -= total / 2;
     }
     if (benchRand(t * 3 + 0) < 0.8) {
-        x = (WORLD_SIZE - range) / 2 + benchRand(t * 3 + 1) * (range - size);
-        y = (WORLD_SIZE - range) / 2 + benchRand(t * 3 + 2) * (range - size);
+        x = dtoi((WORLD_SIZE - range) / 2 + benchRand(t * 3 + 1) * (range - size));
+        y = dtoi((WORLD_SIZE - range) / 2 + benchRand(t * 3 + 2) * (range - size));
     }
     else {
-        x = 0 + benchRand(t * 3 + 1) * (WORLD_SIZE - size);
-        y = 0 + benchRand(t * 3 + 2) * (WORLD_SIZE - size);
+        x = dtoi(0 + benchRand(t * 3 + 1) * (WORLD_SIZE - size));
+        y = dtoi(0 + benchRand(t * 3 + 2) * (WORLD_SIZE - size));
     }
     return std::pair<int, int>(x, y);
 }
@@ -269,22 +277,22 @@ Pixel const& Tiles::_pixelGen(int x, int y, int t) {
     _p.pix = fudgePix(_p.pix, t);
 
     // Approximate the variance by the sqrt of the pixel value.
-    _p.var = static_cast<int>(sqrt(static_cast<double>(_p.pix)));
+    _p.var = dtoi(sqrt(itod(_p.pix)));
 
     // Simulate a background subtraction and rescaling.
-    _p.v0 = static_cast<int>((_p.pix - 3000) * 65535.0 / (65535 - 3000));
+    _p.v0 = dtoi((_p.pix - 3000) * 65535.0 / (65535 - 3000));
     if (_p.v0 < 0) {
         _p.v0 = 0;
     }
 
     // Add some random outputs.
     int seed = (t * 3141 + x * 592 + y) % 65359;
-    _p.v1 = 0          + 65535   * benchRandNorm(seed * 6 + 1);
-    _p.v2 = 32768      + 32768   * benchRandNorm(seed * 6 + 2);
-    _p.v3 = -500000000 + 1000000 * benchRandNorm(seed * 6 + 3);
-    _p.v4 = 0          + 10      * benchRandNorm(seed * 6 + 4);
-    _p.v5 = 1000       + 100     * benchRandNorm(seed * 6 + 5);
-    _p.v6 = 1          + 0.5     * benchRandNorm(seed * 6 + 6);
+    _p.v1 = dtoi(0          + 65535   * benchRandNorm(seed * 6 + 1));
+    _p.v2 = dtoi(32768      + 32768   * benchRandNorm(seed * 6 + 2));
+    _p.v3 = dtoi(-500000000 + 1000000 * benchRandNorm(seed * 6 + 3));
+    _p.v4 = dtoi(0          + 10      * benchRandNorm(seed * 6 + 4));
+    _p.v5 = dtoi(1000       + 100     * benchRandNorm(seed * 6 + 5));
+    _p.v6 = dtoi(1          + 0.5     * benchRandNorm(seed * 6 + 6));
 
     return _p;
 }

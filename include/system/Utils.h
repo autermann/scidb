@@ -96,10 +96,14 @@ namespace scidb
     pid_t fork();
 
     /**
-     *
      * @return the directory part of the file path without the trailing slash
      */
     std::string getDir(const std::string& filePath);
+
+    /**
+     * @return the file part of the file path
+     */
+    std::string getFile(const std::string& filePath);
 
     /**
      *

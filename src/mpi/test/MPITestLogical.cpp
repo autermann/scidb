@@ -79,7 +79,11 @@ class LogicalMpiTest: public LogicalOperator
         attributes[0] = AttributeDesc((AttributeID)0, "mpi_test_attribute",  TID_STRING, 0, 0);
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("mpi_test_dimension"), Coordinate(0), Coordinate(0), uint32_t(0), uint32_t(0));
-        return ArrayDesc("mpi_test_array", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("mpi_test_array",
+                         attributes,
+                         dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 
 };

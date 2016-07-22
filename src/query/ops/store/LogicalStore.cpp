@@ -27,18 +27,20 @@
  *      Author: Knizhnik
  */
 
-#include <boost/foreach.hpp>
-#include <map>
-
-#include "query/Operator.h"
-#include "system/SystemCatalog.h"
-#include "system/Exceptions.h"
+#include <log4cxx/logger.h>
+#include <query/Operator.h>
+#include <system/SystemCatalog.h>
+#include <system/Exceptions.h>
 #include <smgr/io/Storage.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
+#include "UniqueNameAssigner.h"
 
 using namespace std;
 using namespace boost;
 
 namespace scidb {
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.logical_store"));
 
 /**
  * @brief The operator: store().
@@ -82,29 +84,67 @@ public:
         ADD_PARAM_OUT_ARRAY_NAME()
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to create the array in the namespace
+        std::string permissions;
+
+        SCIDB_ASSERT(_parameters.size() > 0);
+        SCIDB_ASSERT(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
+        const string& arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+        if(scidb::namespaces::Communicator::containsArray(namespaceName, arrayName))
+        {
+            permissions.push_back(scidb::permissions::namespaces::UpdateArray);
+        } else {
+            permissions.push_back(scidb::permissions::namespaces::CreateArray);
+        }
+
+        return permissions;
+    }
+
     void inferArrayAccess(std::shared_ptr<Query>& query)
     {
         LogicalOperator::inferArrayAccess(query);
         SCIDB_ASSERT(_parameters.size() > 0);
         SCIDB_ASSERT(_parameters[0]->getParamType() == PARAM_ARRAY_REF);
-        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string& arrayNameOrg = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
-        SCIDB_ASSERT(arrayName.find('@') == std::string::npos);
+        SCIDB_ASSERT(arrayNameOrg.find('@') == std::string::npos);
 
         ArrayDesc srcDesc;
         SCIDB_ASSERT(!srcDesc.isTransient());
         const bool dontThrow(false);
 
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, SystemCatalog::ANY_VERSION, srcDesc, dontThrow);
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+        // Throw an exception if the namespace does not exist.
+        NamespaceDesc namespaceDesc(namespaceName);
+        NamespaceDesc::ID namespaceID;
+        scidb::namespaces::Communicator::findNamespace(namespaceDesc, namespaceID);
+
+
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, SystemCatalog::ANY_VERSION, srcDesc, dontThrow);
 
         const SystemCatalog::LockDesc::LockMode lockMode =
             srcDesc.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
 
-        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(arrayName,
-                                                                                       query->getQueryID(),
-                                                                                       Cluster::getInstance()->getLocalInstanceId(),
-                                                                                       SystemCatalog::LockDesc::COORD,
-                                                                                       lockMode));
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(
+            make_shared<SystemCatalog::LockDesc>(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                lockMode));
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         SCIDB_ASSERT(resLock);
         SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::WR);
@@ -115,97 +155,77 @@ public:
         SCIDB_ASSERT(schemas.size() == 1);
         SCIDB_ASSERT(_parameters.size() == 1);
 
-        const string& arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
-        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayName));
+        const string& arrayNameOrg = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        SCIDB_ASSERT(ArrayDesc::isNameUnversioned(arrayNameOrg));
 
-        ArrayDesc const& srcDesc = schemas[0];
-        PartitioningSchema ps = srcDesc.getPartitioningSchema();
-        //XXX TODO: at some point we will take the distribution of the input,
-        //XXX TODO: but currently the ps value is not propagated through the pipeline correctly,
-        //XXX TODO: so we are forcing it.
-        //XXX TODO: Another complication is that SGs are inserted before the physical execution,
-        //XXX TODO: Here, we dont know the true distribution coming into the store()
-        ps = defaultPartitioning();
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         //Ensure attributes names uniqueness.
         ArrayDesc dstDesc;
-        if (!SystemCatalog::getInstance()->getArrayDesc(arrayName,
-                                                        query->getCatalogVersion(arrayName),
-                                                        dstDesc, false))
+        ArrayDesc const& srcDesc = schemas[0];
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        bool fArrayDesc = scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, arrayId, dstDesc, false);
+        if (!fArrayDesc)
         {
+            UniqueNameAssigner assigner;
+            for (auto const& attr : srcDesc.getAttributes()) {
+                assigner.insertName(attr.getName());
+            }
+            for (auto const& dim : srcDesc.getDimensions()) {
+                assigner.insertName(dim.getBaseName());
+            }
+
             Attributes outAttrs;
-            map<string, uint64_t> attrsMap;
-            BOOST_FOREACH(const AttributeDesc &attr, srcDesc.getAttributes())
-            {
-                AttributeDesc newAttr;
-                if (!attrsMap.count(attr.getName()))
-                {
-                    attrsMap[attr.getName()] = 1;
-                    newAttr = attr;
-                }
-                else
-                {
-                    while (true) {
-                        stringstream ss;
-                        ss << attr.getName() << "_" << ++attrsMap[attr.getName()];
-                        if (attrsMap.count(ss.str()) == 0) {
-                            newAttr = AttributeDesc(attr.getId(), ss.str(),
-                                                    attr.getType(), attr.getFlags(),
-                                                    attr.getDefaultCompressionMethod(),
-                                                    attr.getAliases(),
-                                                    &attr.getDefaultValue(),
-                                                    attr.getDefaultValueExpr());
-                            attrsMap[ss.str()] = 1;
-                            break;
-                        }
-                    }
-                }
-
-                outAttrs.push_back(newAttr);
+            outAttrs.reserve(srcDesc.getAttributes().size());
+            for (auto const& attr : srcDesc.getAttributes()) {
+                outAttrs.push_back(AttributeDesc(
+                    attr.getId(),
+                    assigner.assignUniqueName(attr.getName()),
+                    attr.getType(),
+                    attr.getFlags(),
+                    attr.getDefaultCompressionMethod(),
+                    attr.getAliases(),
+                    &attr.getDefaultValue(),
+                    attr.getDefaultValueExpr()));
             }
-
             Dimensions outDims;
-            map<string, uint64_t> dimsMap;
-            BOOST_FOREACH(const DimensionDesc &dim, srcDesc.getDimensions())
-            {
-                DimensionDesc newDim;
-                if (!dimsMap.count(dim.getBaseName()))
-                {
-                    dimsMap[dim.getBaseName()] = 1;
-                    newDim = DimensionDesc(dim.getBaseName(),
-                                           dim.getStartMin(),
-                                           dim.getCurrStart(),
-                                           dim.getCurrEnd(),
-                                           dim.getEndMax(),
-                                           dim.getChunkInterval(),
-                                           dim.getChunkOverlap());
-                }
-                else
-                {
-                    while (true) {
-                        stringstream ss;
-                        ss << dim.getBaseName() << "_" << ++dimsMap[dim.getBaseName()];
-                        if (dimsMap.count(ss.str()) == 0) {
-                            newDim = DimensionDesc(ss.str(),
-                                                   dim.getStartMin(),
-                                                   dim.getCurrStart(),
-                                                   dim.getCurrEnd(),
-                                                   dim.getEndMax(),
-                                                   dim.getChunkInterval(),
-                                                   dim.getChunkOverlap());
-                            dimsMap[ss.str()] = 1;
-                            break;
-                        }
-                    }
-                }
-
-                outDims.push_back(newDim);
+            outDims.reserve(srcDesc.getDimensions().size());
+            for (auto const& dim : srcDesc.getDimensions()) {
+                outDims.push_back(DimensionDesc(
+                    assigner.assignUniqueName(dim.getBaseName()),
+                    dim.getStartMin(),
+                    dim.getCurrStart(),
+                    dim.getCurrEnd(),
+                    dim.getEndMax(),
+                    dim.getRawChunkInterval(),
+                    dim.getChunkOverlap()));
             }
 
+            ArrayDistPtr arrDist = srcDesc.getDistribution();
+            ArrayResPtr arrRes   = srcDesc.getResidency();
+            const bool distribution_and_residency_not_propagated(true);
+            if (distribution_and_residency_not_propagated) {
+                //XXX TODO: At some point we will take the distribution of the input,
+                //XXX TODO: but currently the distribution/residency is not propagated
+                //XXX TODO: through the pipeline correctly, so we are forcing it.
+                //XXX TODO: Another complication is that SGs are inserted before the physical execution,
+                //XXX TODO: During the logical phase, we dont yet know the true distribution
+                //XXX TODO: coming into the store() from its children.
+                const size_t redundancy = Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY);
+                arrDist = defaultPartitioning(redundancy);
+                arrRes = query->getDefaultArrayResidencyForWrite();
+            }
             /* Notice that when storing to a non-existant array, we do not propagate the
-               transience of the source array to to the target ...*/
-            ArrayDesc schema(arrayName, outAttrs, outDims, ps,
-                             srcDesc.getFlags() & (~ArrayDesc::TRANSIENT));
+               transience of the source array to the target ...*/
+            ArrayDesc schema(
+                namespaceName, arrayName,
+                outAttrs, outDims,
+                arrDist, arrRes,
+                srcDesc.getFlags() & (~ArrayDesc::TRANSIENT));
+
             return schema;
         }
 
@@ -230,16 +250,14 @@ public:
                                        dim.getNamesAndAliases(),
                                        dim.getStartMin(), dim.getCurrStart(),
                                        dim.getCurrEnd(), dim.getEndMax(),
-                                       dim.getChunkInterval(), dim.getChunkOverlap());
+                                       dim.getRawChunkInterval(), dim.getChunkOverlap());
         }
 
         dstDesc.setDimensions(newDims);
         SCIDB_ASSERT(dstDesc.getId() == dstDesc.getUAId() && dstDesc.getName() == arrayName);
         SCIDB_ASSERT(dstDesc.getUAId() > 0);
-        SCIDB_ASSERT(ps==dstDesc.getPartitioningSchema());
         return dstDesc;
     }
-
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalStore, "store")

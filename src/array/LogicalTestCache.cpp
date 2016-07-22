@@ -69,7 +69,7 @@ public:
         outputAttrs.push_back(AttributeDesc(0, "dummy", TID_DOUBLE, AttributeDesc::IS_NULLABLE, 0));
         Dimensions outputDims;
         outputDims.push_back(DimensionDesc("i",0,0,1,0));
-        return ArrayDesc("test_cache", outputAttrs, outputDims, defaultPartitioning());
+        return ArrayDesc("test_cache", outputAttrs, outputDims, defaultPartitioning(), query->getDefaultArrayResidency());
     }
 };
 

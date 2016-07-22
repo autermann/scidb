@@ -29,21 +29,25 @@ public class JDBCTest
     {
         String iqueryHost;
         String iqueryPort;
+        String authFileName = "";
 
-        switch (args.length)
+        if (args.length >= 1 && args.length <= 3)
         {
-            case 1:
+            if (args.length >= 1)
+            {
                 iqueryHost = args[0];
                 JDBCBasicTestCase.setIqueryHost(iqueryHost);
-                break;
-            case 2:
-                iqueryHost = args[0];
+            }
+            if (args.length >= 2)
+            {
                 iqueryPort = args[1];
-                JDBCBasicTestCase.setIqueryHost(iqueryHost);
                 JDBCBasicTestCase.setIqueryPort(iqueryPort);
-                break;
-            default:
-                break;
+            }
+            if (args.length >= 3)
+            {
+                authFileName = args[2];
+                JDBCBasicTestCase.setAuthFileName(authFileName);
+            }
         }
 
         TestRunner.run(JDBCBasicTestCase.class);

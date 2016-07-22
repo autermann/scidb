@@ -42,6 +42,10 @@ namespace scidb
  * The class describes statistics of query execution for every operator.
  * Every operator will have a field of this type and provides it for
  * operations.
+ *
+ * NOTE: For performance timing, see PerfTiming.{h,cpp}
+ *       Timing aspects of this code are not currently maintained
+ *       and are being considered for removal.
  */
 class Statistics
 {
@@ -115,15 +119,12 @@ protected:
 /**
  * This class is an interface to monitor of statistics.
  * Implementations defines how statistics will be processed.
- * That could be output to log file, append to postgres database, xml, etc
+ * That could be output to log file, xml, etc
  */
 class Query;
 
 /// Output into postgres database. String in create is logger name.
 const size_t smLogger = 1;
-
-/// Output into postgres database. String in create is connection string.
-const size_t smPostgres = 2;
 
 class StatisticsMonitor
 {

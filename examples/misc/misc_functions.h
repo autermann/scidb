@@ -177,8 +177,10 @@ void postWarning(const Value** args, Value* res, void*)
 
     if (Cluster::getInstance()->getLocalInstanceId() == instanceID)
     {
-        scidb::Query::getQueryByID(scidb::Query::getCurrentQueryID())->postWarning(
-                    SCIDB_PLUGIN_WARNING("misc_functions", MISC_FUNCTIONS_WARNING) << instanceID);
+        std::shared_ptr<Query> query = scidb::Query::getQueryPerThread();
+        if(query) {
+            query->postWarning(SCIDB_PLUGIN_WARNING("misc_functions", MISC_FUNCTIONS_WARNING) << instanceID);
+        }
     }
 }
 

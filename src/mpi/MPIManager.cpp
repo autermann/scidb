@@ -165,8 +165,10 @@ void MpiManager::forceInitMpi()
 
 void MpiManager::initMpi()
 {
+    const MembershipID minMembId(0);
     const std::shared_ptr<const InstanceMembership> membership =
-        Cluster::getInstance()->getInstanceMembership();
+       Cluster::getInstance()->getInstanceMembership(minMembId);
+
     const std::string& installPath = MpiManager::getInstallPath(membership);
 
     std::string dir = mpi::getLogDir(installPath);
@@ -631,8 +633,11 @@ void MpiErrorHandler::cleanAll()
 {
     const char *myFuncName = "MpiErrorHandler::cleanAll";
     // read ipc files
+
+    const MembershipID minMembId(0);
     const std::shared_ptr<const InstanceMembership> membership =
-        Cluster::getInstance()->getInstanceMembership();
+       Cluster::getInstance()->getInstanceMembership(minMembId);
+
     const std::string& installPath = MpiManager::getInstallPath(membership);
 
     std::string uuid = Cluster::getInstance()->getUuid();
@@ -679,7 +684,7 @@ void MpiErrorHandler::cleanAll()
          iter != ipcFiles.end(); ++iter) {
         const std::string& fileName = *iter;
         LOG4CXX_DEBUG(logger, myFuncName << ": next SHM object: "<<fileName);
-        uint64_t queryId=INVALID_QUERY_ID;
+        QueryID queryId;
         uint64_t launchId=0;
         uint64_t instanceId=myInstanceId;
 
@@ -712,14 +717,20 @@ void MpiErrorHandler::cleanAll()
          iter != pidFiles.end(); ++iter) {
         const std::string& fileName = *iter;
         LOG4CXX_DEBUG(logger, myFuncName << ": next pid object: "<<fileName);
-        QueryID queryId=INVALID_QUERY_ID;
+        QueryID queryId;
+        uint64_t coordId=0;
+        uint64_t id=0;
         uint64_t launchId=0;
         int n=0;
-        int rc = ::sscanf(fileName.c_str(), "%" PRIu64 ".%" PRIu64 ".%n", &queryId, &launchId, &n);
-        if (rc == EOF || rc < 2) {
+        int rc = ::sscanf(fileName.c_str(), "%" PRIu64 ".%" PRIu64 ".%" PRIu64 ".%n",
+                          &coordId, &id, &launchId, &n);
+        if (rc == EOF || rc < 3) {
             // ignore file with unknown name
             continue;
         }
+
+        queryId = QueryID(coordId,id);
+
         if (queryIds.find(queryId) != queryIds.end()) {
             // ignore live file
             continue;
@@ -739,9 +750,10 @@ void MpiErrorHandler::cleanAll()
 void MpiErrorHandler::killAllMpiProcs()
 {
     const char *myFuncName = "MpiErrorHandler::killAllMpiProcs";
-
+    const MembershipID minMembId(0);
     const std::shared_ptr<const InstanceMembership> membership =
-        Cluster::getInstance()->getInstanceMembership();
+       Cluster::getInstance()->getInstanceMembership(minMembId);
+
     const std::string& installPath = MpiManager::getInstallPath(membership);
 
     std::string clusterUuid = Cluster::getInstance()->getUuid();
@@ -846,10 +858,12 @@ bool MpiManager::canRecognizeProc(const std::string& installPath,
     if (!mpi::readProcEnvVar(pidFileName,
                         mpi::SCIDBMPI_ENV_VAR,
                              procEnvVar)) {
-        LOG4CXX_DEBUG(logger, myFuncName << ": cannot extract " << mpi::SCIDBMPI_ENV_VAR << " from " << pidFileName);
+        LOG4CXX_DEBUG(logger, myFuncName << ": cannot extract " << mpi::SCIDBMPI_ENV_VAR
+                      << " from " << pidFileName);
         return false;
     }
-    uint64_t queryId(INVALID_QUERY_ID);
+
+    QueryID queryId;
     uint64_t launchId(0);
     if (!mpi::parseScidbMPIEnvVar(procEnvVar, clusterUuid, queryId, launchId)) {
         LOG4CXX_DEBUG(logger, myFuncName << ": cannot parse " << procEnvVar << " from " << pidFileName);
@@ -862,32 +876,18 @@ bool MpiManager::canRecognizeProc(const std::string& installPath,
     return (!Query::getQueryByID(queryId, false));
 }
 
-///XXX TODO tigor: find a better place and implementation
-const std::string& MpiManager::getInstallPath(const std::shared_ptr<const InstanceMembership>& membership)
+
+std::string MpiManager::getInstallPath(const InstMembershipPtr& membership)
 {
-    const Instances& instances = membership->getInstanceConfigs();
     InstanceID myId = Cluster::getInstance()->getLocalInstanceId();
+    const InstanceDesc& inst = membership->getConfig(myId);
+    SCIDB_ASSERT(inst.getInstanceId() == myId);
 
-    for (Instances::const_iterator i = instances.begin();
-         i != instances.end(); ++i) {
-
-        InstanceID currId = i->getInstanceId();
-
-        if (currId == myId) {
-            const std::string& path = i->getPath();
-            if (!scidb::isFullyQualified(path)) {
-                throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NON_FQ_PATH_ERROR) << path);
-            }
-            return path;
-        }
+    const std::string& path = inst.getPath();
+    if (!scidb::isFullyQualified(path)) {
+        throw (USER_EXCEPTION(SCIDB_SE_STORAGE, SCIDB_LE_NON_FQ_PATH_ERROR) << path);
     }
-    assert(false);
-    throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_ERROR)
-           << "Cluster membership is missing my instance ID");
-
-    // to make compiler happy
-    std::string* p(NULL);
-    return *p;
+    return path;
 }
 
 MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const std::shared_ptr<scidb::Query>& q)
@@ -904,7 +904,9 @@ MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const std::shared_ptr
   return NULL;
 }
 
-MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const std::shared_ptr<scidb::Query>& q, uint32_t timeout)
+MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId,
+                                        const std::shared_ptr<scidb::Query>& q,
+                                        uint32_t timeout)
 {
   if (_mpiType == mpi::MPICH12 ) {
     return new MpiLauncherMPICH12(launchId, q, timeout);
@@ -917,6 +919,5 @@ MpiLauncher* MpiManager::newMPILauncher(uint64_t launchId, const std::shared_ptr
          << "MpiManager::newMPILauncher");
   return NULL;
 }
-
 
 }

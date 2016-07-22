@@ -65,6 +65,10 @@ public:
 
         getInjectedErrorListener().check(); // testing only, noop in release build
 
+        //XXX This operation is best effort (non-transactional).
+        //XXX The state of the system is known only if this operation is successful.
+        //XXX We are not enforcing any sort of quorum to avoid unrecoverable behavior
+        //XXX in case of instance failures (especially during the query).
         PluginManager::getInstance()->loadLibrary(libraryName, isCoordinator);
 
         // It's DDL command and should not return a value

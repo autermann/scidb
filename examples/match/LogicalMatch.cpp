@@ -71,6 +71,13 @@ class LogicalMatch: public LogicalOperator
                 << "match" << left.str() << right.str();
         }
         for (size_t i = 0, n = catalogDimensions.size(); i < n; i++) {
+
+            // XXX To do: No hope of autochunk support until requiresRedimensionOrRepartition() is
+            // implemented (see below), since we'd need to make an unspecified (autochunked)
+            // interval match some specified one.
+            ASSERT_EXCEPTION(!catalogDimensions[i].isAutochunked(), "Operator does not support autochunked input");
+            ASSERT_EXCEPTION(!resultDimensions[i].isAutochunked(), "Operator does not support autochunked input");
+
             if (!(catalogDimensions[i].getStartMin() == resultDimensions[i].getStartMin()
                   && catalogDimensions[i].getChunkInterval() == resultDimensions[i].getChunkInterval()
                   && catalogDimensions[i].getChunkOverlap() == resultDimensions[i].getChunkOverlap()))
@@ -82,20 +89,20 @@ class LogicalMatch: public LogicalOperator
             }
         }
 
-        size_t j = 0;
-        for (size_t i = 0, n = patternAttributes.size(); i < n; i++, j++) {
+        AttributeID j = 0;
+        for (size_t i = 0, n = patternAttributes.size(); i < n; ++i, ++j) {
             AttributeDesc const& attr = patternAttributes[i];
             matchAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
                                                attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
                                                attr.getDefaultValueExpr());
         }
-        for (size_t i = 0, n = catalogAttributes.size(); i < n; i++, j++) {
+        for (size_t i = 0, n = catalogAttributes.size(); i < n; ++i, ++j) {
             AttributeDesc const& attr = catalogAttributes[i];
             matchAttributes[j] = AttributeDesc(j, "match_" + attr.getName(), attr.getType(), attr.getFlags(),
                                                attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
                                                attr.getDefaultValueExpr());
         }
-        for (size_t i = 0, n = catalogDimensions.size(); i < n; i++, j++) {
+        for (size_t i = 0, n = catalogDimensions.size(); i < n; ++i, ++j) {
             matchAttributes[j] = AttributeDesc(j, "match_" + catalogDimensions[i].getBaseName(), TID_INT64, 0, 0);
         }
         matchAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
@@ -106,7 +113,12 @@ class LogicalMatch: public LogicalOperator
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_OPERATOR_ARGUMENT2) << "positive";
         }
         resultDimensions.push_back(DimensionDesc("collision", 0, 0, maxCollisions-1, maxCollisions-1, (uint32_t)maxCollisions, 0));
-        return ArrayDesc("match", matchAttributes, resultDimensions, defaultPartitioning());
+
+        ArrayDistPtr undefDist = ArrayDistributionFactory::getInstance()->construct(psUndefined,
+                                                                                    DEFAULT_REDUNDANCY);
+        return ArrayDesc("match", matchAttributes, resultDimensions,
+                         undefDist, // not known until getOutputDistribution() time
+                         query->getDefaultArrayResidency() );
     }
 };
 

@@ -728,7 +728,11 @@ def main(argv=None):
     # formats is specified).
     remove_separators_from_strings()
 
-    attrs,dims = scidb_schema.parse(_args.schema)
+    # TODO: Fix for default_nullable=True, see SDB-5138.
+    if 0:
+        attrs,dims = scidb_schema.parse(_args.schema)
+    else:
+        attrs,dims = scidb_schema.parse(_args.schema, default_nullable=False)
 
     if (_args.constant is not None):
         setup_constant_data_generators()

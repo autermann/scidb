@@ -173,20 +173,26 @@ RowCollection<Group,Hash>::RowCollection(
 {
     assert(!attributes.empty());
     assert(chunkSize >= 2);
+    // No need to safe_static_cast<Attributes>(attributes.size())
+    // more than necessary. 
+    ASSERT_EXCEPTION(attributes.size() <= std::numeric_limits<AttributeID>::max(),"Too many attributes");
 
     // Use (CONFIG_MEM_ARRAY_THRESHOLD / 10) as the #bytes the unflushed items may have.
     _maxSizeBuffered = Config::getInstance()->getOption<size_t>(CONFIG_MEM_ARRAY_THRESHOLD) * MiB / 10;
 
     // Push the empty tag
     Attributes attributesWithET(attributes);
-    attributesWithET.push_back(AttributeDesc(attributes.size(), DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
-           TID_BOOL, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+    attributesWithET.push_back(AttributeDesc(static_cast<AttributeID>(attributes.size()),
+           DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_BOOL, AttributeDesc::IS_EMPTY_INDICATOR, 0));
 
     // get the schema
     Dimensions dims(2);
     dims[0] = DimensionDesc("Row", 0, CoordinateBounds::getMax(), 1, 0);
     dims[1] = DimensionDesc("Column", 0, CoordinateBounds::getMax(), _chunkSize, 0);
-    ArrayDesc schema(name, attributesWithET, dims, defaultPartitioning());
+
+    ArrayDesc schema(name, attributesWithET, dims,
+                     createDistribution(psUndefined),
+                     query->getDefaultArrayResidency());
 
     // create a MemArray
     _theArray = std::make_shared<MemArray>(schema,query);
@@ -194,7 +200,8 @@ RowCollection<Group,Hash>::RowCollection(
     // get the array iterators
     _arrayIterators.reserve(attributes.size());
     for (size_t t=0; t<attributes.size(); ++t) {
-        _arrayIterators.push_back(_theArray->getIterator(t));
+        // ASSERT_EXCEPTION was checked earlier. no need to safe_static_cast<AttributeID>
+        _arrayIterators.push_back(_theArray->getIterator(static_cast<AttributeID>(t)));
     }
 }
 

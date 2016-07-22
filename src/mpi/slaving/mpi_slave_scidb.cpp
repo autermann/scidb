@@ -33,11 +33,12 @@
 
 // scidb public (include/)
 #include <mpi/MPIUtils.h>
+#include <query/QueryID.h>
 #include <SciDBAPI.h>
 #include <util/Network.h>
 #include <util/NetworkMessage.h>
 #include <util/shm/SharedMemoryIpc.h>
-
+#include <util/Utility.h>
 
 // scidb internals
 #include <dense_linear_algebra/blas/initMathLibs.h>
@@ -51,18 +52,14 @@
 // usings
 using namespace std;
 
-// types
-typedef uint64_t QueryID;
-typedef uint64_t InstanceID;
-
 // forward decls
 uint64_t str2uint64(const char *str);
 uint32_t str2uint32(const char *str);
 int setupMpi();
-int runScidbCommands(uint32_t port,
+int runScidbCommands(uint16_t port,
                       const std::string& clusterUuid,
-                      QueryID queryId,
-                      InstanceID instanceId,
+                      const scidb::QueryID& queryId,
+                      scidb::InstanceID instanceId,
                       uint64_t rank,
                       uint64_t launchId,
                       int argc, char* argv[]);
@@ -168,8 +165,9 @@ class MpiMasterProxy
     }
 
     /// Constructor
-    MpiMasterProxy(uint32_t port, const std::string& clusterUuid, uint64_t queryId,
-                   uint64_t instanceId, uint64_t rank,
+    MpiMasterProxy(uint16_t port, const std::string& clusterUuid,
+                   const scidb::QueryID& queryId,
+                   scidb::InstanceID instanceId, uint64_t rank,
                    uint64_t launchId)
     : _port(port), _clusterUuid(clusterUuid), _queryId(queryId), _instanceId(instanceId), _rank(rank),
       _launchId(launchId), _connection(NULL)
@@ -195,7 +193,8 @@ class MpiMasterProxy
             MPI_Abort(MPI_COMM_WORLD, 999);
         }
         const scidb::SciDB& sciDB = scidb::getSciDB();
-        _connection = reinterpret_cast<scidb::BaseConnection*>(sciDB.connect("localhost", _port));
+        _connection = reinterpret_cast<scidb::BaseConnection*>(
+            sciDB.connect("localhost", _port));
         if (!_connection) {
             cerr << "SLAVE: cannot connect to SciDB "<<std::endl;
             MPI_Abort(MPI_COMM_WORLD, 911);
@@ -278,15 +277,15 @@ class MpiMasterProxy
     MpiMasterProxy(const MpiMasterProxy&);
     MpiMasterProxy& operator=(const MpiMasterProxy&);
 
-    friend void handleBadHandshake(QueryID queryId,
-                                   InstanceID instanceId,
+    friend void handleBadHandshake(const scidb::QueryID& queryId,
+                                   scidb::InstanceID instanceId,
                                    uint64_t launchId,
                                    MpiMasterProxy& scidbProxy);
 
-    uint32_t _port;
+    uint16_t _port;
     std::string _clusterUuid;
-    uint64_t _queryId;
-    uint64_t _instanceId;
+    scidb::QueryID _queryId;
+    scidb::InstanceID _instanceId;
     uint64_t _rank;
     uint64_t _launchId;
     scidb::BaseConnection* _connection;
@@ -298,22 +297,22 @@ void handleSlowSlave(const std::vector<std::string>& args,
                       MpiMasterProxy& scidbProxy);
 void handleEchoCommand(const std::vector<std::string>& args,
                        int64_t& result);
-void handleBadMessageFlood(QueryID queryId,
-                           InstanceID instanceId,
+void handleBadMessageFlood(const scidb::QueryID& queryId,
+                           scidb::InstanceID instanceId,
                            uint64_t launchId,
                            MpiMasterProxy& scidbProxy);
-void handleBadHandshake(QueryID queryId,
-                        InstanceID instanceId,
+void handleBadHandshake(const scidb::QueryID& queryId,
+                        scidb::InstanceID instanceId,
                         uint64_t launchId,
                         MpiMasterProxy& scidbProxy);
-void handleBadStatus(QueryID queryId,
-                     InstanceID instanceId,
+void handleBadStatus(const scidb::QueryID& queryId,
+                     scidb::InstanceID instanceId,
                      uint64_t launchId,
                      MpiMasterProxy& scidbProxy);
 void handleAbnormalExit(const std::vector<std::string>& args);
 
 void setupLogging(const std::string& installPath,
-                  uint64_t queryId, uint64_t launchId)
+                  const scidb::QueryID& queryId, uint64_t launchId)
 {
     std::string logFile = scidb::mpi::getSlaveLogFile(installPath, queryId, launchId);
     scidb::mpi::connectStdIoToLog(logFile);
@@ -389,7 +388,7 @@ int main(int argc, char* argv[])
       exit(903); // MPI is not initialized yet, so no MPI_Abort()
     }
 
-    uint64_t queryId(0);
+    scidb::QueryID queryId;
     uint64_t launchId(0);
     string clusterUuidStr;
     uint32_t shmType(0);
@@ -439,12 +438,12 @@ int main(int argc, char* argv[])
     std::cerr << "QUERY ID=" << queryId << std::endl;
     std::cerr << "LAUNCH ID="<< launchId << std::endl;
 
-    uint32_t port = str2uint32(portStr);
+    uint16_t port = scidb::safe_static_cast<uint16_t>(str2uint32(portStr));
     if (port == 0) {
         cerr << "SLAVE: Invalid port arg: " << portStr << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 905);
     }
-    InstanceID instanceId = str2uint64(instanceIdStr);
+    scidb::InstanceID instanceId = str2uint64(instanceIdStr);
 
     if (argc>MIN_ARGC) {
       // For debugging only
@@ -488,7 +487,7 @@ uint32_t str2uint32(const char *str)
 {
     char *ptr=0;
     errno = 0;
-    int32_t num = strtol(str,&ptr,10);
+    int32_t num = scidb::safe_static_cast<int32_t>(strtol(str,&ptr,10));
     if (errno !=0 || str == 0 || (*str) == 0 || (*ptr) != 0 || num<0) {
         cerr << "SLAVE: Invalid numeric string for uint32_t: " << str << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 907);
@@ -526,13 +525,13 @@ int setupMpi()
 }
 
 
-int runScidbCommands(uint32_t port,
-                         const std::string& clusterUuid,
-                         QueryID queryId,
-                         InstanceID instanceId,
-                         uint64_t rank,
-                         uint64_t launchId,
-                         int argc, char* argv[])
+int runScidbCommands(uint16_t port,
+                     const std::string& clusterUuid,
+                     const scidb::QueryID& queryId,
+                     scidb::InstanceID instanceId,
+                     uint64_t rank,
+                     uint64_t launchId,
+                     int argc, char* argv[])
 {
     MpiMasterProxy scidbProxy(port, clusterUuid, queryId,
                               instanceId, rank, launchId);
@@ -716,8 +715,8 @@ void handleEchoCommand(const std::vector<std::string>& args,
     result = 1;
 }
 
-void handleBadMessageFlood(QueryID queryId,
-                           InstanceID instanceId,
+void handleBadMessageFlood(const scidb::QueryID& queryId,
+                           scidb::InstanceID instanceId,
                            uint64_t launchId,
                            MpiMasterProxy& scidbProxy)
 {
@@ -745,8 +744,8 @@ void handleBadMessageFlood(QueryID queryId,
     }
  }
 
-void handleBadHandshake(QueryID queryId,
-                        InstanceID instanceId,
+void handleBadHandshake(const scidb::QueryID& queryId,
+                        scidb::InstanceID instanceId,
                         uint64_t launchId,
                         MpiMasterProxy& scidbProxy)
 {
@@ -778,8 +777,8 @@ void handleBadHandshake(QueryID queryId,
     exit(EXIT_SUCCESS);
 }
 
-void handleBadStatus(QueryID queryId,
-                     InstanceID instanceId,
+void handleBadStatus(const scidb::QueryID& queryId,
+                     scidb::InstanceID instanceId,
                      uint64_t launchId,
                      MpiMasterProxy& scidbProxy)
 {

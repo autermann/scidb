@@ -333,9 +333,6 @@ def get_array_schema(array_name):
     except AppError as e:
         debuglog("Cannot show array", array_name, ":", e)
         return None
-    if 1:
-        # Strip nameline.  14.8 compatibiltiy... soon to be deprecated.
-        out = out.split('\n')[1]
     if not re.match(array_name + r'\s*<', out):
         raise AppError("Unexpected show({0}) output: {1}".format(
                 array_name, out))

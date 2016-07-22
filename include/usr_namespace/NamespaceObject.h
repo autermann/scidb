@@ -58,7 +58,7 @@ namespace scidb
             const std::string & rName);
 
 
-		/**
+        /**
          * Retrieve the name of the namespace object
          * @returns - the name of the namespace object
          */
@@ -78,7 +78,7 @@ namespace scidb
         }
     };
 
-	/**
+    /**
      * @brief Comparison operator - "less than"
      *
      * @param[in] lhs - left hand side of the operator
@@ -92,7 +92,7 @@ namespace scidb
         return (lhs.getName() < rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "greater than"
      *
      * @param[in] lhs - left hand side of the operator
@@ -103,10 +103,10 @@ namespace scidb
         const NamespaceObject& lhs,
         const NamespaceObject& rhs)
     {
-        return lhs > rhs;
+        return (lhs.getName() > rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "less than or equal to"
      *
      * @param[in] lhs - left hand side of the operator
@@ -120,7 +120,7 @@ namespace scidb
         return !(lhs > rhs);
     }
 
-	/**
+    /**
      * @brief Comparison operator - "greater than or equal to"
      *
      * @param[in] lhs - left hand side of the operator
@@ -134,7 +134,7 @@ namespace scidb
         return !(lhs < rhs);
     }
 
-	/**
+    /**
      * @brief Comparison operator - "equality"
      *
      * @param[in] lhs - left hand side of the operator
@@ -148,7 +148,7 @@ namespace scidb
         return (lhs.getName() == rhs.getName());
     }
 
-	/**
+    /**
      * @brief Comparison operator - "inequality"
      *
      * @param[in] lhs - left hand side of the operator

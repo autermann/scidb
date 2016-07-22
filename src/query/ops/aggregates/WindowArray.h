@@ -26,7 +26,7 @@
  * @brief The implementation of the array iterator for the window operator
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>, poliocough@gmail.com,
- *         Paul Brown <paulgeoffreybrown@gmail.com>
+ *         Paul Brown <pbrown@paradigm4.com>
  *
  */
 
@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include <util/RegionCoordinatesIterator.h>
 #include <array/DelegateArray.h>
 #include <array/Metadata.h>
 #include <query/FunctionDescription.h>
@@ -151,9 +152,10 @@ class WindowChunk : public ConstChunk
     /**
      *   Returns true if the chunk's processing algorithm materializes input chunk.
      */
-	inline bool isMaterialized() const { return _materialized; };
+    inline bool isMaterialized() const { return _materialized; };
 
     Value _nextValue;
+
 };
 
 class WindowChunkIterator : public ConstChunkIterator
@@ -193,21 +195,13 @@ private:
 
 class MaterializedWindowChunkIterator : public ConstChunkIterator
 {
-public:
-    MaterializedWindowChunkIterator(WindowArrayIterator const& arrayIterator, WindowChunk const& aChunk, int mode);
-
-    virtual int getMode() const;
-    virtual bool isEmpty() const;
-    virtual Value const& getItem();
-    virtual void operator ++();
-    virtual bool end();
-    virtual Coordinates const& getPosition();
-    virtual bool setPosition(Coordinates const& pos);
-    virtual void reset();
-    ConstChunk const& getChunk();
 
 private:
+    void calculateNextValueOLD();
+    void calculateNextValueNEW();
+    void calculateNextValueEVEN_NEWER();
     void calculateNextValue();
+
     void stepToNextValidValue();
 
     WindowArray const& _array;
@@ -229,6 +223,34 @@ private:
     size_t _nDims;
     Coordinates _coords;
 
+    bool _useOLDWindowAlgorithm;
+
+    Coordinates _windowStartCoords;
+    Coordinates _windowEndCoords;
+    Coordinates _stripeStartCoords;
+    Coordinates _stripeEndCoords;
+    Value       _state;
+
+public:
+    MaterializedWindowChunkIterator(WindowArrayIterator const& arrayIterator, WindowChunk const& aChunk, int mode);
+
+    virtual int getMode() const;
+    virtual bool isEmpty() const;
+    virtual Value const& getItem();
+    virtual void operator ++();
+    virtual bool end();
+    virtual Coordinates const& getPosition();
+    virtual bool setPosition(Coordinates const& pos);
+    virtual void reset();
+    ConstChunk const& getChunk();
+
+    /**
+     * Return a bool that tells you whether to use the old or the
+     * new window algorithm.
+     *
+     * @return true if NEW algorithm to compute each window, false if OLD
+     */
+    bool useOLDWindowAlgorithm() const { return _useOLDWindowAlgorithm; }
 };
 
 class WindowArrayIterator : public ConstArrayIterator
@@ -251,6 +273,14 @@ class WindowArrayIterator : public ConstArrayIterator
      */
     std::string const& getMethod() const { return _method; };
 
+    /**
+     * Return a bool that tells you whether to use the old or the
+     * new window algorithm.
+     *
+     * @return true if NEW algorithm to compute each window, false if OLD
+     */
+    bool useOLDWindowAlgorithm() const { return _useOLDWindowAlgorithm; }
+
     WindowArrayIterator(WindowArray const& array, AttributeID id, AttributeID input, std::string const& method);
 
   private:
@@ -261,6 +291,8 @@ class WindowArrayIterator : public ConstArrayIterator
     WindowChunk chunk;
     bool chunkInitialized;
     std::string _method;
+
+    bool _useOLDWindowAlgorithm;
 
 };
 

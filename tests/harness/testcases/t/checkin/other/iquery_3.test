@@ -21,35 +21,35 @@ store(filter(catalogue,true),catalogue7)
 
 --test
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue1 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue1 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue1 )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue2 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue2 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue2 )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue3 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue3 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue3 )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue4 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue4 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue4 )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue5 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue5 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue5 )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue6 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue6 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue6 )' "
 
---shell  --store --command " iquery  -o lcsv+ -aq 'scan ( catalogue7 )' "
+--shell  --store --command " iquery  -o csv+:l -aq 'scan ( catalogue7 )' "
 
 --shell  --store --command " iquery  -o lsparse -aq 'scan ( catalogue7 )' "
 

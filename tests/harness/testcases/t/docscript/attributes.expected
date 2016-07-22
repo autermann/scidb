@@ -48,16 +48,19 @@ SCIDB QUERY : <scan(winnersFlat)>
 
 SCIDB QUERY : <attributes(winnersFlat)>
 {No} name,type_id,nullable
-{0} 'event','string',false
-{1} 'person','string',false
+{0} 'event','string',true
+{1} 'person','string',true
 {2} 'year','int64',true
 {3} 'country','string',true
-{4} 'time','double',false
+{4} 'time','double',true
 
 SCIDB QUERY : <filter(attributes(winnersFlat),nullable=true)>
 {No} name,type_id,nullable
+{0} 'event','string',true
+{1} 'person','string',true
 {2} 'year','int64',true
 {3} 'country','string',true
+{4} 'time','double',true
 
 Query was executed successfully
 

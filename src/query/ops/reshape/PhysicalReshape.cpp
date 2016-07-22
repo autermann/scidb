@@ -52,10 +52,17 @@ public:
     }
 
     virtual RedistributeContext getOutputDistribution(
-            std::vector<RedistributeContext> const&,
-            std::vector<ArrayDesc> const&) const
+            std::vector<RedistributeContext> const& inputDistributions,
+            std::vector<ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema()==psUndefined);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     virtual bool outputFullChunks(std::vector< ArrayDesc> const&) const
@@ -107,9 +114,14 @@ public:
 	 * Reshape is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 1);
+        assert(inputArrays.size() == 1);
+
+        // Output dims were specified by parameter, and semantic analysis won't allow autochunked
+        // dims for this operator.
+        assert(!_schema.isAutochunked());
+
         std::shared_ptr< Array> array = inputArrays[0];
         ArrayDesc const& desc = array->getArrayDesc();
 
@@ -123,7 +135,7 @@ public:
         }
         array = ensureRandomAccess(array, query);
         return std::shared_ptr<Array>(new ReshapeArray(_schema, array));
-	 }
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalReshape, "reshape", "physicalReshape")

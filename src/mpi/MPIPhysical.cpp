@@ -58,21 +58,6 @@ namespace scidb {
 static const bool DBG = false;
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.mpi"));
 
-///
-/// some operators may not be able to work in degraded mode while they are being implemented
-/// this call can make them exit if that is the case.
-/// TODO: add a more explicit message of what is happening
-void throwIfDegradedMode(std::shared_ptr<Query>& query) {
-    const std::shared_ptr<const InstanceMembership> membership =
-    Cluster::getInstance()->getInstanceMembership();
-    if ((membership->getViewId() != query->getCoordinatorLiveness()->getViewId()) ||
-        (membership->getInstances().size() != query->getInstancesCount())) {
-        // because we can't yet handle the extra data from
-        // replicas that we would be fed in "degraded mode"
-        throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_QUORUM2);
-    }
-}
-
 void MPIPhysical::setQuery(const std::shared_ptr<Query>& query)
 {
     std::shared_ptr<Query> myQuery = _query.lock();
@@ -124,7 +109,8 @@ bool MPIPhysical::launchMPISlaves(std::shared_ptr<Query>& query, const size_t ma
     _launchId = _ctx->getNextLaunchId(); // bump the launch ID by 1
 
     Cluster* cluster = Cluster::getInstance();
-    const std::shared_ptr<const InstanceMembership> membership = cluster->getInstanceMembership();
+    const InstMembershipPtr membership =
+            cluster->getMatchingInstanceMembership(query->getCoordinatorLiveness()->getMembershipId());
     const string& installPath = MpiManager::getInstallPath(membership);
 
     uint64_t lastIdInUse = _ctx->getLastLaunchIdInUse();

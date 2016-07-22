@@ -6,8 +6,8 @@ store(build(foo, 1.0/i), foo)
 
 --test
 
---shell --store --command "iquery -olcsv+ -aq 'scan(foo)'"
---shell --store --command "iquery -olcsv+ -w 10 -aq 'scan(foo)'"
+--shell --store --command "iquery -ocsv+:l -aq 'scan(foo)'"
+--shell --store --command "iquery -ocsv+:l -w 10 -aq 'scan(foo)'"
 
 --cleanup
 remove(foo)

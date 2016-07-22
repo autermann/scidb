@@ -22,8 +22,11 @@
 
 /****************************************************************************/
 
+#include <atomic>
+
 #include <pthread.h>                                     // For pthread_mutex
 #include <errno.h>                                       // For the code EBUSY
+
 #include "Platform.h"                                    // For getBlockSize()
 #include "ArenaDetails.h"                                // For implementation
 
@@ -31,20 +34,12 @@
 namespace scidb { namespace arena { namespace {
 /****************************************************************************/
 
-size_t          _bytes  = 0;                             // Bytes  allocated
-size_t          _blocks = 0;                             // Blocks allocated
-size_t          _peak   = 0;                             // High water mark
-size_t          _limit  = SIZE_MAX;                      // Max memory limit
+std::atomic<size_t> _bytesShared(0);    // bytes allocated (excludes in-malloc data structres)
+std::atomic<size_t> _peakShared(0);     // High water mark of _bytesShared
+std::atomic<size_t> _limitShared(SIZE_MAX);     // Max bytes allowed
+std::atomic<size_t> _blocksShared(0);   // Num blocks allocated (questionable value)
+// TODO: to be removed later (postponed from release branch changes)
 pthread_mutex_t _mutex  = PTHREAD_MUTEX_INITIALIZER;     // Guards counters
-
-/**
- *  Acquire and release the mutex that guards our various counters.
- */
-struct Lock : noncopyable, stackonly
-{
-    Lock() {if (pthread_mutex_lock  (&_mutex)) abort();} // Acquire the mutex
-   ~Lock() {if (pthread_mutex_unlock(&_mutex)) abort();} // Release the mutex
-};
 
 /****************************************************************************/
 }
@@ -57,8 +52,10 @@ struct Lock : noncopyable, stackonly
  *
  *  @see http://cppwisdom.quora.com/Why-threads-and-fork-dont-mix
  */
-void onForkOfChild()
+void onForkOfChild()    // probably meant onExec because fork is a duplicate process
 {
+    // TODO: change name later (postponed from release branch changes)
+    // TODO: to be removed later (postponed from release branch changes)
     int e = pthread_mutex_trylock(&_mutex);              // But do not block
 
     if (e==0 || e==EBUSY)                                // So we acquired it?
@@ -69,10 +66,10 @@ void onForkOfChild()
             is definately not locked within the one and only thread that now
             runs in the forked child process...*/
 
-            _bytes  = 0;                                 // ...bytes allocated
-            _blocks = 0;                                 // ...blocks allocated
-            _peak   = 0;                                 // ...high water mark
-            _limit  = SIZE_MAX;                          // ...max memory limit
+            _bytesShared.store(0);                       // re-initialize
+            _peakShared.store(0);                        // re-intialize
+            _blocksShared.store(0);                      // re-initialize
+            _limitShared.store(SIZE_MAX);                // re-iinitialize
             return;                                      // ...and we're good
         }
     }
@@ -87,54 +84,173 @@ void onForkOfChild()
  */
 size_t getMemoryLimit()
 {
-    return _limit;                                       // The current limit
+    return _limitShared.load();                          // The current limit
 }
 
 /**
  *  Assign the maximum memory limit in bytes. An attempt to allocate more than
  *  this number of bytes should fail; malloc() and friends return 0, while the
  *  root arena and operator new throw a std::bad_alloc exception.
+ *  TODO: Setting or not setting the limit based on whether we are already over the
+ *  limit is of dubious value.  It may well be better to set the limit even if we
+ *  are already over what is desired.  To refuse to set the limit in that case
+ *  may be to cause the user further delay in stopping the growth of a scidb
+ *  process.
  */
 bool setMemoryLimit(size_t limit)
 {
-    Lock l;                                              // Lock the counters
-
-    if (_bytes <= limit)                                 // Not yet exceeded?
+    if (_bytesShared.load() <= _limitShared.load())      // Not yet exceeded at a single moment?
     {
-        _limit = limit;                                  // ...ok, then set it
+        _limitShared.store(limit);                       // ...ok, then set it
+                                                         // note this is not atomic w.r.t.
+                                                         // _bytesShared which is lock-free
+                                                         // so it is possible that when the limit
+                                                         // is set, we are over the limit.
+                                                         // But no further allocations take
+                                                         // place once _limitShared is set.
 
         return true;                                     // ...set succeeded
     }
 
     return false;                                        // Assignment failed
+                                                         // meaning for sure we knew we were
+                                                         // over the limit for one moment in time
+}
+
+//
+//  High performance replacements for the pthread_mutex that used to protect
+//  _bytesShared and _peakShared during [de]allocations.
+//
+//  This technique saved over 5% _real time_ query throughput in some important
+//  commercial cases as measured in a 15.6 code base.
+//
+//  For example using CAS ( Compare And Swap, in this case, std::atomic<>::compare_exchange )
+//  is 200-2000 times faster than a mutex on x86_64 Linux in the no-contention
+//  case, and the overhead of a Mutex is typically larger than the time to execute the
+//  underlying malloc code.
+//
+/**
+ *  This function is used _prior_ to each allocation
+ *  returns non-zero if a new high-watermark could be required
+ *  as a consequence.
+ */
+inline bool publishBytesIncreaseIfAllowed(size_t increase, size_t limit, size_t& newPeak)
+{
+    assert(_bytesShared.is_lock_free());
+
+    size_t bytesSample;
+    size_t moreBytes;
+    do {
+        bytesSample = _bytesShared.load();
+        moreBytes = bytesSample + increase;
+        if(moreBytes > limit) { // overlimit failure
+            newPeak=0;
+            return false;
+        }
+    } while(!_bytesShared.compare_exchange_weak(bytesSample, moreBytes));
+
+    newPeak=moreBytes;
+    return true;
+}
+
+/**
+ *  This function is used only to correct round-up ammounts that
+ *  cannot be known until after an allocation succeeds (since the malloc
+ *  api does not provide any limit on round-up in adance of allocation).
+ *  If it turns out we are over, it makes little sense to back out, as the
+ *  amount of overage would likely be small for any desireable malloc.
+ *  But rather than ingnore the overage, we publish it.
+ */
+inline void publishBytesIncrease(size_t increase, size_t& newPeak)
+{
+    if (increase > 0) {
+        newPeak = _bytesShared += increase;
+    } else {
+        newPeak = 0;
+    }
+}
+
+/**
+ *  This function is used _after_ deallocation
+ *  or a failed allocation that was pre-reserved
+ *  via publishBytesIncrease() and must be withdrawn
+ */
+inline void publishBytesDecrease(size_t decrease)
+{
+    assert(_bytesShared.load() >= decrease);    // true even when _bytes changes in other threads
+    if(decrease > 0) {
+        _bytesShared -= decrease;
+    }
+}
+
+/**
+ *  High performance replacement for using a lock to protect
+ *  a maximum shared value.
+ *
+ *  to understand this implementation, and to validate it,
+ *  you need to be familiar with how to correctly use
+ *  std::atomic<>::compare_exchange_{weak,strong}
+ *
+ */
+template<typename T>
+void atomicEnsureMax(std::atomic<T>& maxShared, T val)
+{
+    assert(maxShared.is_lock_free());
+    T maxSample;
+    do {
+        maxSample = maxShared.load();
+        if(val <= maxSample) { break ;}    // maxShared is already >= val
+    } while(!maxShared.compare_exchange_weak(maxSample, val));
 }
 
 /**
  *  An arena-compatible version of the standard freestore function.
  *
  *  @see http://www.cplusplus.com/reference/cstdlib/malloc
+ *
+ *  note that malloc(0) is legitimate and should return NULL or
+ *  a pointer that works with free() depending on the underlying
+ *  implementation
  */
 void* malloc(size_t size)
 {
-    Lock l;                                              // Lock the counters
-
-    if (_bytes + size > _limit)                          // Exceeds the limit?
-    {
+    //
+    // atomically check that this thread may increase memory usage by size
+    // and publish the new number of bytes used
+    //
+    size_t possiblePeak1;
+    if(!publishBytesIncreaseIfAllowed(size, _limitShared.load(), possiblePeak1)) {
         return NULL;                                     // ...don't even try
     }
 
-    if (void* p = std::malloc(size))                     // Allocate as normal
-    {
-        size_t n = getBlockSize(p);                      // ...the actual size
-
-        _bytes  += n;                                    // ...current bytes
-        _blocks += 1;                                    // ...current blocks
-        _peak    = std::max(_peak,_bytes);               // ...record the max
-
-        return p;                                        // ...the allocation
+    //
+    // attempt the allocation
+    //
+    void* p = std::malloc(size);
+    if (!p) {
+        publishBytesDecrease(size);
+        return NULL;
     }
 
-    return NULL;                                         // Failed to allocate
+    //
+    // alloc successful
+    // but the request is rounded up to some granularity (not necessarily
+    // a multiple of bytes).  Those bytes have been accounted for too
+    // despite the extra accounting cost of doing so.
+    // Note that does not include other memory used within the alloc
+    // implementation we are calling.
+    //
+    size_t blockSize = getBlockSize(p);                 // actual size
+    assert(blockSize >= size);
+    size_t extra  = blockSize - size;                  // amount not already accounted for
+
+    assert(blockSize == size + extra);
+    size_t possiblePeak2;
+    publishBytesIncrease(extra, possiblePeak2);
+    atomicEnsureMax(_peakShared, std::max(possiblePeak1, possiblePeak2));
+    _blocksShared++;
+
+    return p;                                   // ...the allocation
 }
 
 /**
@@ -142,62 +258,123 @@ void* malloc(size_t size)
  *
  *  @see http://www.cplusplus.com/reference/cstdlib/calloc
  */
-void* calloc(count_t count,size_t size)
+void* calloc(size_t count, size_t sz)
 {
-    assert(count < SIZE_MAX/size);                       // Beware of overlow
+    assert(count < SIZE_MAX/sz);                       // Beware of overlow
+    size_t size = count*sz;    // makes remaining code nearly identical with malloc, above
 
-    Lock l;                                              // Lock the counters
-
-    if (_bytes + count * size > _limit)                  // Exceeds the limit?
-    {
+    //
+    // atomically check that this thread may increase memory usage by size
+    // and publish the new number of bytes used
+    //
+    size_t possiblePeak1;
+    if(!publishBytesIncreaseIfAllowed(size, _limitShared.load(), possiblePeak1)) {
         return NULL;                                     // ...don't even try
     }
 
-    if (void* p = std::calloc(count,size))               // Allocate as normal
-    {
-        size_t n = getBlockSize(p);                      // ...the actual size
+    void* p = std::calloc(count, sz);               // Allocate as normal
 
-        _bytes  += n;                                    // ...current bytes
-        _blocks += 1;                                    // ...current blocks
-        _peak    = std::max(_peak,_bytes);               // ...record the max
-
-        return p;                                        // ...the allocation
+    // shoud be just like malloc from here on
+    if (!p) {
+        publishBytesDecrease(size);
+        return NULL;
     }
 
-    return NULL;                                         // Failed to allocate
+    //
+    // alloc successful
+    // but the request is rounded up to some granularity (not necessarily
+    // a multiple of bytes).  Those bytes have been accounted for too
+    // despite the extra accounting cost of doing so.
+    // Note that does not include other memory used within the alloc
+    // implementation we are calling.
+    //
+    size_t blockSize = getBlockSize(p);                 // actual size
+    assert(blockSize >= size);
+    size_t extra  = blockSize - size;                  // amount not already accounted for
+
+    assert(blockSize == size + extra);
+    size_t possiblePeak2;
+    publishBytesIncrease(extra, possiblePeak2);
+    atomicEnsureMax(_peakShared, std::max(possiblePeak1, possiblePeak2));
+    _blocksShared++;
+
+    return p;                                   // ...the allocation
 }
 
 /**
  *  An arena-compatible version of the standard freestore function.
  *
  *  @see http://www.cplusplus.com/reference/cstdlib/realloc
+ *
+ *  Note especially that according to specifications
+ *  1) realloc(0, size!=0) is equivlaent to malloc(size)
+ *  2) realloc(ptr!=0, 0) is equivalent to free(ptr)
  */
-void* realloc(void* payload,size_t size)
+void* realloc(void* ptr, size_t size)
 {
-    Lock l;                                              // Lock the counters
+    size_t blockSize1 = getBlockSize(ptr);          // Fetch current size
+    assert(blockSize1 <= _bytesShared.load());      // Verify accounting
 
-    size_t f = getBlockSize(payload);                    // Fetch current size
+    if (size > blockSize1) { // growing, have to pre-reserve the increase
+        size_t growthEstimate = size - blockSize1;
 
-    assert(f <= _bytes);                                 // Verify accounting
+        size_t possiblePeak1;
+        if(!publishBytesIncreaseIfAllowed(growthEstimate, _limitShared.load(), possiblePeak1)) {
+            return NULL;                                     // ...don't even try
+        }
 
-    if (_bytes - f + size > _limit)                      // Exceeds the limit?
-    {
-        return NULL;                                     // ...don't even try
+        void* p = std::realloc(ptr, size);         // growing case
+        if (!p) {
+            publishBytesDecrease(growthEstimate);
+            return NULL; // failure of realloc
+        }
+
+        size_t blockSize2 = getBlockSize(p);       // actual size
+        assert(blockSize2 >= blockSize1);          // must not have shrunk
+
+        size_t growth  = blockSize2 - blockSize1;  // actual growth
+        ssize_t extra = growth - growthEstimate;   // growth beyond prediction
+
+        size_t possiblePeak2;
+        publishBytesIncrease(extra, possiblePeak2);
+        atomicEnsureMax(_peakShared, std::max(possiblePeak1, possiblePeak2));
+        if(!ptr && size) {
+            _blocksShared++;    // "equivalent to malloc(size)"
+        }
+
+        return p;
+
+    } else { // shrinking or at least logically shrinking (or no change)
+        void* p = std::realloc(ptr, size);
+        if (!p) {
+            if(ptr && !size) {
+                _blocksShared--;    // "equivalent to free"
+            }
+            return NULL;
+        }
+        size_t blockSize2 = getBlockSize(p);       // actual size
+
+        if(blockSize1 >= blockSize2) {          // it did not grow
+            size_t shrinkage  = blockSize1 - blockSize2;  // actual shrink
+            publishBytesDecrease(shrinkage);
+        } else {
+            // [ infrequent case (did not happen with the code-freeze checkin tests)
+            //   can happen e.g. with MALLOC_CHECK_=3 and MALLOC_PERTURB_=127 set
+            //   in the environment, and glibC providing std::malloc()]
+            //
+            // size is smaller than blockSize1, so we expected blockSize2
+            // to be the same or smaller, but actually it was larger.
+            //
+            size_t extra = blockSize2 - blockSize1;
+            size_t possiblePeak;
+            publishBytesIncrease(extra, possiblePeak);
+            atomicEnsureMax(_peakShared, possiblePeak);
+            // do not modify _blocksShared in this case
+        }
+        return p;
     }
 
-    if (void* p = std::realloc(payload,size))            // Allocate as normal
-    {
-        size_t n = getBlockSize(p);                      // ...the actual size
-
-        _bytes -= f;                                     // ...bytes reclaimed
-        _bytes += n;                                     // ...bytes consumed
-        _blocks+= size_t(f==0) - size_t(size==0);        // ...is allocation?
-        _peak   = std::max(_peak,_bytes);                // ...record the max
-
-        return p;                                        // ....the allocation
-    }
-
-    return NULL;                                         // Failed to allocate
+    assert(false); // NOTREACHED
 }
 
 /**
@@ -207,16 +384,15 @@ void* realloc(void* payload,size_t size)
  */
 void free(void* payload)
 {
-    if (size_t n = getBlockSize(payload))                // Fetch actual size
+    size_t blockSize = getBlockSize(payload);            // Fetch actual size
+    if (blockSize)
     {
+        assert(_blocksShared.load() > 0);
+        assert(blockSize <= _bytesShared.load());
+
         std::free(payload);                              // ...free as normal
-
-        Lock l;                                          // ...lock counters
-
-        assert(_blocks>0 && n<=_bytes);                  // ...check counters
-
-        _bytes  -= n;                                    // ...current bytes
-        _blocks -= 1;                                    // ...current blocks
+        publishBytesDecrease(blockSize);
+        _blocksShared-- ;
     }
 }
 
@@ -238,10 +414,10 @@ ArenaPtr getRootArena()
     static struct RootArena : Arena
     {
         name_t      name()                         const {return "root";}
-        size_t      available()                    const {return _limit - _bytes;}
-        size_t      allocated()                    const {return _bytes;}
-        size_t      peakusage()                    const {return _peak;}
-        size_t      allocations()                  const {return _blocks;}
+        size_t      available()                    const {return _limitShared.load() - _bytesShared.load();}
+        size_t      allocated()                    const {return _bytesShared.load();}
+        size_t      peakusage()                    const {return _peakShared.load();}
+        size_t      allocations()                  const {return _blocksShared.load();}
         features_t  features()                     const {return finalizing|recycling|threading;}
 
         void* doMalloc(size_t size)

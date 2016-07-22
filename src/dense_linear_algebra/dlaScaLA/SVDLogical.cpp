@@ -23,6 +23,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <query/OperatorLibrary.h>
 #include <system/Exceptions.h>
 #include <system/SystemCatalog.h>
@@ -106,12 +107,19 @@ inline int_tt divCeil(int_tt val, int_tt divisor) {
  ///
 class SVDLogical: public LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
     SVDLogical(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_INPUT()
         ADD_PARAM_CONSTANT("string")
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query);
@@ -128,7 +136,7 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
     //
     // per-array checks
     //
-    checkScaLAPACKInputs(schemas, query, SINGLE_MATRIX, SINGLE_MATRIX);
+    checkScaLAPACKLogicalInputs(schemas, query, SINGLE_MATRIX, SINGLE_MATRIX);
 
     // TODO: check: ROWS * COLS is not larger than largest ScaLAPACK fortran INTEGER
 
@@ -142,6 +150,9 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
     size_t minRowCol = std::min(dims[0].getLength(),
                                 dims[1].getLength());
 
+    ArrayDistPtr undefDist = scidb::createDistribution(psUndefined);
+
+    _fixer.clear();
     const size_t ZERO_OUTPUT_OVERLAP = 0;
     // TODO: Question: Should these be case-insensitive matches?
     if (whichMatrix == "U" || whichMatrix == "left") // most frequent, and less-frequent names
@@ -155,8 +166,9 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
                                    dims[0].getCurrStart(),
                                    dims[0].getCurrEnd(),
                                    dims[0].getEndMax(),
-                                   dims[0].getChunkInterval(),
+                                   dims[0].getRawChunkInterval(),
                                    ZERO_OUTPUT_OVERLAP);
+        _fixer.takeDimension(0).fromArray(0).fromDimension(0);
 
        // nCol out has size min(nRow,nCol).  It takes us to the subspace of the diagonal matrix "SIGMA"
        // note that it in a different basis than the original, so it cannot actually
@@ -167,11 +179,15 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
                                   Coordinate(0),                // curStart
                                   Coordinate(minRowCol - 1),    // end
                                   Coordinate(minRowCol - 1),    // curEnd
-                                  dims[1].getChunkInterval(),   // inherit
+                                  dims[1].getRawChunkInterval(),// inherit
                                   ZERO_OUTPUT_OVERLAP);
+        _fixer.takeDimension(1).fromArray(0).fromDimension(1);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "u", TID_DOUBLE, 0, 0);
-        ArrayDesc result("U", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
+        ArrayDesc result("U", addEmptyTagAttribute(atts), outDims,
+                         undefDist,
+                         query->getDefaultArrayResidency());
+
         log4cxx_debug_dimensions("SVDLogical::inferSchema(U)", result.getDimensions());
         return result;
     }
@@ -190,8 +206,9 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
                                    Coordinate(0),  // curStart
                                    Coordinate(minRowCol - 1), // end
                                    Coordinate(minRowCol - 1), // curEnd
-                                   dims[0].getChunkInterval(), // inherit
+                                   dims[0].getRawChunkInterval(), // inherit
                                    ZERO_OUTPUT_OVERLAP);
+        _fixer.takeDimension(0).fromArray(0).fromDimension(0);
 
         // nCol out is in the same space as nCol in
         outDims[1] = DimensionDesc(distinctNames.second,
@@ -199,11 +216,15 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
                                 dims[1].getCurrStart(),
                                 dims[1].getCurrEnd(),
                                 dims[1].getEndMax(),
-                                dims[1].getChunkInterval(),
+                                dims[1].getRawChunkInterval(),
                                 ZERO_OUTPUT_OVERLAP);
+        _fixer.takeDimension(1).fromArray(0).fromDimension(1);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "v", TID_DOUBLE, 0, 0);
-        ArrayDesc result("VT", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
+        ArrayDesc result("VT", addEmptyTagAttribute(atts), outDims,
+                     undefDist,
+                     query->getDefaultArrayResidency());
+
         log4cxx_debug_dimensions("SVDLogical::inferSchema(VT)", result.getDimensions());
         return result;
     }
@@ -219,11 +240,15 @@ ArrayDesc SVDLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_pt
                                    Coordinate(0),  // curStart
                                    Coordinate(minRowCol - 1), // end
                                    Coordinate(minRowCol - 1), // curEnd
-                                   dims[0].getChunkInterval(), // inherit
+                                   dims[0].getRawChunkInterval(), // inherit
                                    ZERO_OUTPUT_OVERLAP);
+        _fixer.takeDimension(0).fromArray(0).fromDimension(0);
 
         Attributes atts(1); atts[0] = AttributeDesc((AttributeID)0, "sigma", TID_DOUBLE, 0, 0);
-        ArrayDesc result("SIGMA", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
+        ArrayDesc result("SIGMA", addEmptyTagAttribute(atts), outDims,
+                         undefDist,
+                         query->getDefaultArrayResidency());
+
         log4cxx_debug_dimensions("SVDLogical::inferSchema(SIGMA)", result.getDimensions());
         return result;
     } else {

@@ -78,7 +78,7 @@ message Chunk
     optional bool has_next = 9;
     repeated int64 next_coordinates = 10;
     optional uint32 obj_type = 11; // Same as the Fetch::obj_type message field.
-    optional uint32 count  = 12;
+    optional uint64 count  = 12;
     optional bool tombstone = 13 [default = false];
     optional uint64 dest_instance = 14;
     optional uint64 next_dest_instance = 15;
@@ -146,6 +146,7 @@ message QueryResult
     repeated Warning warnings = 9;//warnings posted during query preparing
     repeated string plugins = 10;
     optional bool exclusive_array_access = 11;
+    optional bool auto_commit = 12;
 }
 
 /**
@@ -154,7 +155,7 @@ message QueryResult
 message PhysicalPlan
 {
     required string physical_plan = 2;
-    required uint64 view_id = 3;
+    required uint64 membership_id = 3;
 
     message InstanceListEntry
     {
@@ -166,7 +167,7 @@ message PhysicalPlan
     {
         repeated InstanceListEntry instance_entry = 2;
     }
- 
+
     required InstanceList dead_list = 4;
     required InstanceList live_list = 5;
     required string cluster_uuid = 6;
@@ -242,7 +243,7 @@ message Control
         required uint64 local_sn = 3;
         required uint64 remote_sn = 4;
     }
-    
+
     required uint64 local_gen_id = 1;
     required uint64 remote_gen_id = 2;
     repeated Channel channels = 3;
@@ -257,8 +258,8 @@ message MpiSlaveHandshake
     required uint64 instance_id = 2;
     required uint64 launch_id = 3;
     required uint64 rank = 4;
-    required uint64 pid  = 5;
-    required uint64 ppid = 6;
+    required int32 pid  = 5;
+    required int32 ppid = 6;
 }
 
 /**

@@ -28,6 +28,8 @@
 #include <util/arena/Vector.h>
 #include <util/Arena.h>
 #include <query/AttributeComparator.h>
+#include <array/ProjectArray.h>
+#include "../sort/DistributedSort.h"
 
 using namespace std;
 
@@ -85,19 +87,19 @@ private:
         mgd::vector<Coordinate> _positionsInOriginalArray;
         mgd::vector<Coordinate> _positionsInSortedArray;   //NOT used if index array was initally sorted
         AttributeComparator _lessThan;
-        bool const _indexPreSorted;
+        bool const _indexPreSortedAndNotNullable;
 
     public:
-        LookupVector(TypeId const& tid, size_t initialSize, bool indexPreSorted, ArenaPtr const& arena):
+        LookupVector(TypeId const& tid, size_t initialSize, bool indexPreSortedAndNotNullable, ArenaPtr const& arena):
             _values(arena.get()),
             _positionsInOriginalArray(arena.get()),
             _positionsInSortedArray(arena.get()),
             _lessThan(tid),
-            _indexPreSorted(indexPreSorted)
+            _indexPreSortedAndNotNullable(indexPreSortedAndNotNullable)
         {
             _values.reserve(initialSize);
             _positionsInOriginalArray.reserve(initialSize);
-            if(_indexPreSorted)
+            if(_indexPreSortedAndNotNullable)
             {
                 return;
             }
@@ -113,7 +115,7 @@ private:
         {
             _values.push_back(v);
             _positionsInOriginalArray.push_back(positionInOriginalArray);
-            if(_indexPreSorted)
+            if(_indexPreSortedAndNotNullable)
             {
                 return;
             }
@@ -150,7 +152,7 @@ private:
             {
                 VALUE_OUT_OF_RANGE;
             }
-            if (_indexPreSorted)
+            if (_indexPreSortedAndNotNullable)
             {
                 ub = _positionsInOriginalArray[index];
                 lb = _positionsInOriginalArray[index-1];
@@ -181,7 +183,7 @@ private:
         Coordinates _currentChunkPosition; //the position of the currently opened chunk
         std::shared_ptr<ConstArrayIterator> _positionArrayIter;
         std::shared_ptr<ConstChunkIterator> _positionChunkIter; //we keep one chunk open at any particular time to save RAM
-        bool const _indexPreSorted;
+        bool const _indexPreSortedAndNotNullable;
 
         //move our iterators to a new chunk position; close current chunk if any
         void repositionIterators(Coordinates const& desiredChunkPos)
@@ -190,7 +192,7 @@ private:
             _valueArrayIter->setPosition(desiredChunkPos);
             _valueChunkIter = _valueArrayIter->getChunk().getConstIterator();
             _currentChunkPosition = desiredChunkPos;
-            if (_indexPreSorted)
+            if (_indexPreSortedAndNotNullable)
             {
                 return;
             }
@@ -225,7 +227,7 @@ private:
                 Value const& item = _valueChunkIter->getItem();
                 if (item == input)
                 {
-                    if(_indexPreSorted)
+                    if(_indexPreSortedAndNotNullable)
                     {
                         result = midPoint[0];
                     }
@@ -250,13 +252,13 @@ private:
 
     public:
         ValueIndex(std::shared_ptr<Array> const& indexArray, std::shared_ptr<LookupVector const> const& partialVector,
-                   bool indexPreSorted):
+                   bool indexPreSortedAndNotNullable):
             _indexArray(indexArray),
             _lessThan(indexArray->getArrayDesc().getAttributes()[0].getType()),
             _lookupVector(partialVector),
             _valueArrayIter(indexArray->getConstIterator(0)),
             _positionArrayIter(indexArray->getConstIterator(1)),
-            _indexPreSorted(indexPreSorted)
+            _indexPreSortedAndNotNullable(indexPreSortedAndNotNullable)
         {}
 
         /**
@@ -308,9 +310,9 @@ private:
                                  int iterationMode,
                                  std::shared_ptr<Array> const& indexArray,
                                  std::shared_ptr<LookupVector const> const& partialMap,
-                                 bool indexPreSorted):
+                                 bool indexPreSortedAndNotNullable):
             DelegateChunkIterator(chunk, iterationMode),
-            _index(indexArray, partialMap, indexPreSorted)
+            _index(indexArray, partialMap, indexPreSortedAndNotNullable)
         {}
 
         virtual Value& getItem()
@@ -365,7 +367,7 @@ private:
         /**
          * True if the index array was pre-sorted. False otherwise.
          */
-        bool const _indexPreSorted;
+        bool const _indexPreSortedAndNotNullable;
 
     public:
         IndexLookupArray(ArrayDesc const& desc,
@@ -373,13 +375,13 @@ private:
                          AttributeID const sourceAttribute,
                          std::shared_ptr<Array> indexArray,
                          std::shared_ptr<LookupVector const> partialMap,
-                         bool indexPreSorted):
+                         bool indexPreSortedAndNotNullable):
             DelegateArray(desc, input, true),
             _sourceAttributeId(sourceAttribute),
-            _dstAttributeId(desc.getAttributes(true).size() -1),
+            _dstAttributeId(safe_static_cast<AttributeID>(desc.getAttributes(true).size() -1)),
             _indexArray(indexArray),
             _partialMap(partialMap),
-            _indexPreSorted(indexPreSorted)
+            _indexPreSortedAndNotNullable(indexPreSortedAndNotNullable)
         {}
 
         virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const
@@ -410,7 +412,7 @@ private:
         {
             if (chunk->getAttributeDesc().getId() == _dstAttributeId)
             {
-                return new IndexLookupChunkIterator(chunk, iterationMode, _indexArray, _partialMap, _indexPreSorted);
+                return new IndexLookupChunkIterator(chunk, iterationMode, _indexArray, _partialMap, _indexPreSortedAndNotNullable);
             }
             return DelegateArray::createChunkIterator(chunk, iterationMode);
         }
@@ -457,7 +459,10 @@ private:
                                                    0,
                                                    0));
             newAttributes = addEmptyTagAttribute(newAttributes);
-            return ArrayDesc(inputDesc.getName(), newAttributes, inputDesc.getDimensions(), defaultPartitioning());
+            return ArrayDesc(inputDesc.getName(), newAttributes, inputDesc.getDimensions(),
+                             inputDesc.getDistribution(),
+                             inputDesc.getResidency());
+
         }
 
     public:
@@ -525,7 +530,7 @@ private:
     /**
      * Compute a MemoryLimits object based on the memory limit and some information about index data.
      */
-    MemoryLimits computeVectorLimits(std::shared_ptr<Array>& indexArray, double memLimit, bool indexPreSorted)
+    MemoryLimits computeVectorLimits(std::shared_ptr<Array>& indexArray, double memLimit, bool indexPreSortedAndNotNullable)
     {
         MemoryLimits result;
         size_t declaredValueSize = indexArray->getArrayDesc().getAttributes()[0].getSize(); //0 means variable size
@@ -543,19 +548,21 @@ private:
             cellCount += chunk.count();
             totalSize += chunk.getSize();
         }
-        double averageValueSize = totalSize * 1.0 / cellCount;
+        double averageValueSize = static_cast<double>(totalSize) / static_cast<double>(cellCount);
         double averageVectorMemberSize;
-        size_t numCoordinatesNeeded = indexPreSorted ? 1 : 2;
+        size_t numCoordinatesNeeded = indexPreSortedAndNotNullable ? 1 : 2;
         if (isIntegralType) //if it is fixed-size and under 8 bytes, it is stored inside the Value class
         {
-            averageVectorMemberSize = numCoordinatesNeeded * sizeof(Coordinate) + sizeof(Value);
+            averageVectorMemberSize = static_cast<double>(
+                numCoordinatesNeeded * sizeof(Coordinate) + sizeof(Value));
         }
         else //otherwise Value points to it
         {
             //averageValueSize includes some chunk overhead, so it is a slight over-estimate; err on the side of caution
-            averageVectorMemberSize = numCoordinatesNeeded *sizeof(Coordinate) + sizeof(Value) + averageValueSize;
+            averageVectorMemberSize = static_cast<double>(
+                numCoordinatesNeeded * sizeof(Coordinate) + sizeof(Value)) + averageValueSize;
         }
-        ssize_t valuesThatFitInLimit = floor( memLimit / averageVectorMemberSize);
+        ssize_t valuesThatFitInLimit = static_cast<ssize_t>(floor( memLimit / averageVectorMemberSize));
         valuesThatFitInLimit -= (2* result.chunkCount);
         if (valuesThatFitInLimit <= 0)
         {}
@@ -566,7 +573,8 @@ private:
         }
         else
         {
-            result.insertionProbability = valuesThatFitInLimit * 1.0 / cellCount;
+            result.insertionProbability =
+                static_cast<double>(valuesThatFitInLimit) / static_cast<double>(cellCount);
             result.numOptionalValues = valuesThatFitInLimit;
         }
         LOG4CXX_DEBUG(logger, "Vector Limits: cellCount "<<cellCount
@@ -583,15 +591,15 @@ private:
      * Scan the data from the index array and insert a portion of it into the vector.
      */
     std::shared_ptr<LookupVector const> buildLookupVector(std::shared_ptr<Array>& indexArray, MemoryLimits const& limits,
-                                                     bool indexPreSorted)
+                                                     bool indexPreSortedAndNotNullable)
     {
         size_t mapSize = limits.numOptionalValues + 2 * limits.chunkCount;
         std::shared_ptr<LookupVector> result = make_shared<LookupVector>(
-                                     indexArray->getArrayDesc().getAttributes()[0].getType(), mapSize, indexPreSorted,
+                                     indexArray->getArrayDesc().getAttributes()[0].getType(), mapSize, indexPreSortedAndNotNullable,
                                      this->_arena);
         size_t optionalValuesInserted = 0;
         std::shared_ptr<ConstArrayIterator> valueArrayIter = indexArray->getConstIterator(0);
-        //note: if indexPreSorted is true, this is just an iterator over the empty tag; harmless
+        //note: if indexPreSortedAndNotNullable is true, this is just an iterator over the empty tag; harmless
         std::shared_ptr<ConstArrayIterator> positionArrayIter = indexArray->getConstIterator(1);
         Value indexValueToAdd;
         Coordinate positionInSortedArray(-1), positionInOriginalArray(-1);
@@ -609,7 +617,7 @@ private:
                 }
                 indexValueToAdd = valueChunkIter->getItem();
                 positionInSortedArray = valueChunkIter->getPosition()[0];
-                if(indexPreSorted)
+                if(indexPreSortedAndNotNullable)
                 {
                     positionInOriginalArray = positionInSortedArray;
                 }
@@ -649,39 +657,71 @@ private:
         return result;
     }
 
-    std::shared_ptr<Array> prepareIndexArray(std::shared_ptr<Array> & inputIndex, std::shared_ptr<Query>& query, bool const indexPreSorted)
+    std::shared_ptr<Array> prepareIndexArray(std::shared_ptr<Array> & inputIndex,
+                                             std::shared_ptr<Query>& query,
+                                             bool const indexPreSortedAndNotNullable)
     {
-        // XXX TODO: SortArray can be fixed to use multiple threads even on a SINGLE_PASS array
-        // Once that is done, we can feed the result of pullRedistribute() into SortArray.
-        std::shared_ptr<Array> replicated = redistributeToRandomAccess(inputIndex, query, psReplication,
-                                                                  ALL_INSTANCE_MASK,
-                                                                  std::shared_ptr<CoordinateTranslator>(),
-                                                                  0,
-                                                                  std::shared_ptr<PartitioningSchemaData>());
-        if(indexPreSorted)
-        {
-            return replicated;
-        }
-        std::shared_ptr<Array> dimApplied (new AddDimensionArray(replicated));
-        SortingAttributeInfos sortingAttributeInfos(1);
-        sortingAttributeInfos[0].columnNo = 0;
-        sortingAttributeInfos[0].ascent = true;
-        const bool preservePositions = false;
-        SortArray sorter(dimApplied->getArrayDesc(),
-                         _arena,
-                         preservePositions,
-                         dimApplied->getArrayDesc().getDimensions()[0].getChunkInterval());
-        std::shared_ptr<TupleComparator> tcomp(std::make_shared<TupleComparator>(sortingAttributeInfos, dimApplied->getArrayDesc()));
-        return sorter.getSortedArray(dimApplied, query, tcomp);
-    }
+        // Add an int64-typed attribute whose value is equal to the dimension coordinate.
+        std::shared_ptr<Array> dimApplied = make_shared<AddDimensionArray>(inputIndex);
 
+        // Sort the array, unless it was pre-sorted AND the attribute is not nullable.
+        if(! indexPreSortedAndNotNullable)
+        {
+            // Local sort, skipping nulls.
+            ArrayDesc const& schemaDimApplied = dimApplied->getArrayDesc();
+            const bool preservePositions = true; // expanding the schema with chunk_pos and cell_pos attributes.
+
+            SortingAttributeInfos sortingAttributeInfos(3);
+            sortingAttributeInfos[0].columnNo = 0; // the original attribute
+            sortingAttributeInfos[0].ascent = true;
+            sortingAttributeInfos[1].columnNo = 2; // chunk_pos
+            sortingAttributeInfos[1].ascent = true;
+            sortingAttributeInfos[2].columnNo = 3; // cell_pos
+            sortingAttributeInfos[2].ascent = true;
+
+            SortArray sorter(schemaDimApplied,
+                             _arena,
+                             preservePositions,
+                             schemaDimApplied.getDimensions()[0].getChunkInterval());
+            const bool EXPANDED = true;
+            ArrayDesc const& sorterOutputSchemaExpanded = sorter.getOutputSchema(EXPANDED);
+            ArrayDesc const& sorterOutputSchemaNonExpanded = sorter.getOutputSchema(!EXPANDED);
+            std::shared_ptr<TupleComparator> tcomp(std::make_shared<TupleComparator>(
+                    sortingAttributeInfos, sorterOutputSchemaExpanded));
+            TupleSkipper tupleSkipper(tupleSkipperIfAnyAttributeIsMissing, &sortingAttributeInfos);
+
+            std::shared_ptr<MemArray> sorted = sorter.getSortedArray(dimApplied, query, tcomp, &tupleSkipper);
+
+            // Global sort.
+            if (query->getInstancesCount() > 1) {
+                ElapsedMilliSeconds timing;
+                DistributedSort ds(query, sorted, sorterOutputSchemaExpanded, _arena, sortingAttributeInfos, timing);
+                sorted = ds.sort();
+            }
+
+            // Project off the chunk_pos and cell_pos attributes.
+            assert(sorted->getArrayDesc().getAttributes().size()==5); // input attribute, dim, chunk_pos, cell_pos, bitmap.
+            vector<AttributeID> projection(3);
+            projection[0] = 0;  // the input attribute.
+            projection[1] = 1;  // dim
+            projection[2] = 4;  // the bitmap.
+            dimApplied = make_shared<ProjectArray>(sorterOutputSchemaNonExpanded, sorted, projection);
+        }
+
+        // Replicate.
+       return redistributeToRandomAccess(
+           dimApplied,
+           createDistribution(psReplication),
+           ArrayResPtr(),
+           query);
+    }
 
 public:
     /**
      * @see PhysicalOperator::getOutputBoundaries
      */
     virtual PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
-                                                          const std::vector< ArrayDesc> & inputSchemas) const
+                                                   const std::vector< ArrayDesc> & inputSchemas) const
     {
        return inputBoundaries[0];
     }
@@ -693,13 +733,22 @@ public:
     {
         ArrayDesc const& inputSchema = inputArrays[0]->getArrayDesc();
         ArrayDesc const& indexSchema = inputArrays[1]->getArrayDesc();
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
+        SCIDB_ASSERT(_schema.getDistribution()->checkCompatibility(inputSchema.getDistribution()));
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(inputSchema.getResidency()));
+
         IndexLookupSettings settings(inputSchema, indexSchema, _parameters, false, query);
-        bool indexPreSorted = settings.isIndexPreSorted();
-        std::shared_ptr<Array> preparedIndex = prepareIndexArray(inputArrays[1], query, indexPreSorted);
-        MemoryLimits vectorLimits = computeVectorLimits(preparedIndex, settings.getMemoryLimit(), indexPreSorted);
-        std::shared_ptr<LookupVector const> partialVector = buildLookupVector(preparedIndex, vectorLimits, indexPreSorted);
+        bool indexPreSortedAndNotNullable = settings.isIndexPreSorted() &&
+                (indexSchema.getAttributes()[0].getFlags() & AttributeDesc::IS_NULLABLE) == 0;
+        std::shared_ptr<Array> preparedIndex = prepareIndexArray(inputArrays[1], query, indexPreSortedAndNotNullable);
+        MemoryLimits vectorLimits = computeVectorLimits(
+            preparedIndex,
+            static_cast<double>(settings.getMemoryLimit()),
+            indexPreSortedAndNotNullable);
+        std::shared_ptr<LookupVector const> partialVector = buildLookupVector(preparedIndex, vectorLimits, indexPreSortedAndNotNullable);
         return std::shared_ptr<Array>(new IndexLookupArray(_schema, inputArrays[0], settings.getInputAttributeId(),
-                                                      preparedIndex, partialVector, indexPreSorted));
+                                                           preparedIndex, partialVector, indexPreSortedAndNotNullable));
     }
 };
 

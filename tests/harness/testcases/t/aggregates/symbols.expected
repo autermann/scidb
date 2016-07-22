@@ -1,13 +1,13 @@
-SCIDB QUERY : <CREATE ARRAY Raw_Data_One < Symbol:string, ID:int32, Qty:int32 > [ Line=0:*,100,0]>
+SCIDB QUERY : <CREATE ARRAY Raw_Data_One < Symbol:string NOT NULL, ID:int32, Qty:int32 > [ Line=0:*,100,0]>
 Query was executed successfully
 
-SCIDB QUERY : <CREATE ARRAY Raw_Data_Two < Symbol:string, Time:string, Price:double > [Line=0:*,100,0]>
+SCIDB QUERY : <CREATE ARRAY Raw_Data_Two < Symbol:string NOT NULL, Time:string NOT NULL, Price:double > [Line=0:*,100,0]>
 Query was executed successfully
 
-SCIDB QUERY : <store(redimension(uniq(sort(project(Raw_Data_One, Symbol))),<Symbol:string>[i=0:*,1000,0]), symbol_indices)>
+SCIDB QUERY : <store(redimension(uniq(sort(project(Raw_Data_One, Symbol))),<Symbol:string NOT NULL>[i=0:*,1000,0]), symbol_indices)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <store(redimension(uniq(sort(project(Raw_Data_Two, Time))),<Time:string>[i=0:*,1000,0]), time_indices)>
+SCIDB QUERY : <store(redimension(uniq(sort(project(Raw_Data_Two, Time))),<Time:string NOT NULL>[i=0:*,1000,0]), time_indices)>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <CREATE array Symbols < ID:int32, Qty:int32 > [ sym_dim=0:*,30,0 ]>
@@ -80,7 +80,6 @@ sym_dim,Price_avg
 23,14.2917
 
 SCIDB QUERY : <scan ( Symbols )>
-sym_dim,ID,Qty
 0,0,10
 1,1,100
 2,21,100000
@@ -107,7 +106,6 @@ sym_dim,ID,Qty
 23,5,1000000
 
 SCIDB QUERY : <aggregate (Timeseries,avg ( Price ),sym_dim)>
-sym_dim,Price_avg
 0,14.2917
 1,14.2917
 2,14.2917

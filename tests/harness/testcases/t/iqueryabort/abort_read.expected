@@ -10,71 +10,71 @@ Query was executed successfully
 
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'aggregate(COPY, count(*), equity)' | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'aggregate(COPY, count(*), equity)' | head -n 2>
 equity,count
 1,300
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'filter(COPY, equity=1)' | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'filter(COPY, equity=1)' | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'between(COPY, null,null,null,null)' | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'between(COPY, null,null,null,null)' | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'between(COPY, 1,0,null,null)'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'between(COPY, 1,0,null,null)'  | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'between(COPY, 0,0,null,null)'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'between(COPY, 0,0,null,null)'  | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'join(COPY,COPY)'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'join(COPY,COPY)'  | head -n 2>
 equity,time,price,price
 1,1,7,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 2>
 i,j,gemm
 0,0,1
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq $'gesvd(M1024x1024, \'values\')'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq $'gesvd(M1024x1024, \'values\')'  | head -n 2>
 i,sigma
 0,1
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'aggregate(COPY, count(*), equity)' | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'aggregate(COPY, count(*), equity)' | head -n 2>
 equity,count
 1,300
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'filter(COPY, equity=1)' | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'filter(COPY, equity=1)' | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'between(COPY, null,null,null,null)' | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'between(COPY, null,null,null,null)' | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'between(COPY, 1,0,null,null)'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'between(COPY, 1,0,null,null)'  | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'between(COPY, 0,0,null,null)'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'between(COPY, 0,0,null,null)'  | head -n 2>
 equity,time,price
 1,1,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'join(COPY,COPY)'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'join(COPY,COPY)'  | head -n 2>
 equity,time,price,price
 1,1,7,7
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 2>
 i,j,gemm
 0,0,1
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq $'gesvd(M1024x1024, \'values\')'  | head -n 2>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq $'gesvd(M1024x1024, \'values\')'  | head -n 2>
 i,sigma
 0,1
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'aggregate(COPY, count(*), equity)' | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'aggregate(COPY, count(*), equity)' | head -n 102>
 equity,count
 1,300
 2,300
@@ -178,7 +178,7 @@ equity,count
 100,300
 101,300
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'filter(COPY, equity=1)' | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'filter(COPY, equity=1)' | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -282,7 +282,7 @@ equity,time,price
 1,100,700
 1,101,707
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'between(COPY, null,null,null,null)' | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'between(COPY, null,null,null,null)' | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -386,7 +386,7 @@ equity,time,price
 10,10,700
 1,11,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'between(COPY, 1,0,null,null)'  | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'between(COPY, 1,0,null,null)'  | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -490,7 +490,7 @@ equity,time,price
 10,10,700
 1,11,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'between(COPY, 0,0,null,null)'  | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'between(COPY, 0,0,null,null)'  | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -594,7 +594,7 @@ equity,time,price
 10,10,700
 1,11,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'join(COPY,COPY)'  | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'join(COPY,COPY)'  | head -n 102>
 equity,time,price,price
 1,1,7,7
 1,2,14,14
@@ -698,7 +698,7 @@ equity,time,price,price
 10,10,700,700
 1,11,77,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 1026>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 1026>
 i,j,gemm
 0,0,1
 0,1,1
@@ -1726,7 +1726,7 @@ i,j,gemm
 31,31,1
 0,32,1
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq $'gesvd(M1024x1024, \'left\')'  | head -n 1026>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq $'gesvd(M1024x1024, \'left\')'  | head -n 1026>
 i_1,i_2,u
 0,0,1
 0,1,0
@@ -2754,7 +2754,7 @@ i_1,i_2,u
 31,31,1
 0,32,0
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'aggregate(COPY, count(*), equity)' | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'aggregate(COPY, count(*), equity)' | head -n 102>
 equity,count
 1,300
 2,300
@@ -2858,7 +2858,7 @@ equity,count
 100,300
 101,300
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'filter(COPY, equity=1)' | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'filter(COPY, equity=1)' | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -2962,7 +2962,7 @@ equity,time,price
 1,100,700
 1,101,707
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'between(COPY, null,null,null,null)' | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'between(COPY, null,null,null,null)' | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -3066,7 +3066,7 @@ equity,time,price
 10,10,700
 1,11,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'between(COPY, 1,0,null,null)'  | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'between(COPY, 1,0,null,null)'  | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -3170,7 +3170,7 @@ equity,time,price
 10,10,700
 1,11,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'between(COPY, 0,0,null,null)'  | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'between(COPY, 0,0,null,null)'  | head -n 102>
 equity,time,price
 1,1,7
 1,2,14
@@ -3274,7 +3274,7 @@ equity,time,price
 10,10,700
 1,11,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'join(COPY,COPY)'  | head -n 102>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'join(COPY,COPY)'  | head -n 102>
 equity,time,price,price
 1,1,7,7
 1,2,14,14
@@ -3378,7 +3378,7 @@ equity,time,price,price
 10,10,700,700
 1,11,77,77
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 1026>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | head -n 1026>
 i,j,gemm
 0,0,1
 0,1,1
@@ -4406,7 +4406,7 @@ i,j,gemm
 31,31,1
 0,32,1
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq $'gesvd(M1024x1024, \'left\')'  | head -n 1026>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq $'gesvd(M1024x1024, \'left\')'  | head -n 1026>
 i_1,i_2,u
 0,0,1
 0,1,0
@@ -5434,13 +5434,13 @@ i_1,i_2,u
 31,31,1
 0,32,0
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | true>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | true>
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+ -aq $'gesvd(M1024x1024, \'right\')'  | true>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p ${IQUERY_PORT:=1239} -o csv+:l -aq $'gesvd(M1024x1024, \'right\')'  | true>
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | true>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq 'gemm(M1024x1024, build(M1024x1024, 0), build(M1024x1024, 1))'  | true>
 
-SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+ -aq $'gesvd(M1024x1024, \'right\')'  | true>
+SCIDB QUERY : <iquery -c ${IQUERY_HOST:=localhost} -p $((${IQUERY_PORT:=1239}+1)) -o csv+:l -aq $'gesvd(M1024x1024, \'right\')'  | true>
 
 SCIDB QUERY : <${TEST_UTILS_DIR}/killquery.sh -afl 9  0 'aggregate(COPY, count(*), equity)' 1> /tmp/${HPID}_1.stdout || echo FAILURE>
 

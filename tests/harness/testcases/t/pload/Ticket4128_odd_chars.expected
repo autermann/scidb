@@ -34,7 +34,6 @@ Save as CSV, reload as CSV, resave, check for diffs.
 [Query was executed successfully, ignoring data output by this query.]
 
 Final CSV output:
-id,s1,s2,code,s3,s4
 1,'Brian','Griffin',1,'5 Spooner St., Quahog RI','[dog]'
 2,'Lois','Griffin*',1,'Quahog','{Utterly charming}'
 4,'Peter','Griffin',2,'Quahog','[less charming]'
@@ -53,7 +52,6 @@ Same test but with double quoting (exhibits libcsv bug):
 [Query was executed successfully, ignoring data output by this query.]
 
 Final CSV-with-double-quotes output:
-id,s1,s2,code,s3,s4
 1,"Brian","Griffin",1,"5 Spooner St., Quahog RI","[dog]"
 2,"Lois","Griffin*",1,"Quahog","{Utterly charming}"
 4,"Peter","Griffin",2,"Quahog","[less charming]"
@@ -61,12 +59,12 @@ id,s1,s2,code,s3,s4
 16,"Stewie","Griffin",7,"Evil Genius ®","[unbound]"
 32,"Chris","Griffin",2,"Quahog","[usually not inhumane]"
 64,"Glenn","Quagmire",69,"I live next door to \"Mr. Etiquette\".","!@#$%^&*()-"
-128,"Cleveland","Brown",6,"I used to live across from \"Mr. Etiquette.\",\"evil triple quote",""
+128,"Cleveland","Brown",6,"I used to live across from \"Mr. Etiquette.\",\"evil triple quote",null
 
-9c9
+8c8
 < 128,"Cleveland","Brown",6,"I used to live across from \"Mr. Etiquette.\"","evil triple quote"
 ---
-> 128,"Cleveland","Brown",6,"I used to live across from \"Mr. Etiquette.\",\"evil triple quote",""
+> 128,"Cleveland","Brown",6,"I used to live across from \"Mr. Etiquette.\",\"evil triple quote",null
 
 {i} id,s1,s2,code,s3,s4,row_offset
 {7} null,null,null,null,null,'Too few input record fields at position 451, line 8, column 5',451
@@ -79,7 +77,6 @@ Same test but using TSV.
 [Query was executed successfully, ignoring data output by this query.]
 
 Final TSV output (with pipes):
-id|s1|s2|code|s3|s4
 1|Brian|Griffin|1|5 Spooner St., Quahog RI|[dog]
 2|Lois|Griffin*|1|Quahog|{Utterly charming}
 4|Peter|Griffin|2|Quahog|[less charming]

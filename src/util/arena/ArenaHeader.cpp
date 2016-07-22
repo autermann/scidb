@@ -85,7 +85,7 @@ void Header::finalize(count_t count)
         frees the entire allocation in which the header sits, as happens to
         the underlying pages of class ScopedArena, for example...*/
 
-        _flags &= ~finalizer;                            // ...taken care of
+        _flags = (_flags & ~finalizer) & _FLAGS_MASK;    // ...taken care of
 
      /* Finalize each of the elements from the end of the array back toward
         its beginning, that is, in the opposite order to that in which they

@@ -19,11 +19,20 @@
 *
 * END_COPYRIGHT
 */
-#include <boost/foreach.hpp>
-#include <boost/tuple/tuple.hpp>
+
+#include "RedimensionCommon.h"
+
+#include "ChunkIdMap.h"
+#include "CoordMetrics.h"
+#include "../create_array/ChunkEstimator.h"
+#include "OverlapRemapperArray.h"
+#include "RemapperArray.h"
+#include "Remapper.h"
+
+#include <boost/assign/list_of.hpp>
 #include <system/Config.h>
 #include <array/SortArray.h>
-#include "RedimensionCommon.h"
+#include <util/OverlappingChunksIterator.h>
 
 using namespace std;
 
@@ -65,7 +74,7 @@ void RedimensionCommon::setupMappings(ArrayDesc const&                  srcArray
                     &aggOutputName);
 
             bool found = false;
-            if (inputAttId == (AttributeID) -1)
+            if (inputAttId == INVALID_ATTRIBUTE_ID)
             {
                 inputAttId = 0;
             }
@@ -108,7 +117,9 @@ void RedimensionCommon::setupMappings(ArrayDesc const&                  srcArray
                 goto NextAttr;
             }
         }
-        assert(false); // A dest attribute either comes from a src dimension or a src attribute. Can't reach here.
+
+        // A dest attribute either comes from a src dimension or a src attribute. Can't reach here.
+        SCIDB_UNREACHABLE();
 
         NextAttr:;
     }
@@ -138,7 +149,6 @@ std::shared_ptr<MemArray> RedimensionCommon::initializeRedimensionedArray(
     PointerRange<const AggregatePtr>     aggregates,
     vector< std::shared_ptr<ArrayIterator> >& redimArrayIters,
     vector< std::shared_ptr<ChunkIterator> >& redimChunkIters,
-    size_t&                              redimCount,
     size_t                               redimChunkSize)
 {
     // Create a 1-D MemArray called 'redimensioned' to hold the redimensioned records.
@@ -166,7 +176,12 @@ std::shared_ptr<MemArray> RedimensionCommon::initializeRedimensionedArray(
 
     Dimensions dimsRedimensioned(1);
     Attributes attrsRedimensioned;
-    for (size_t i=0; i<destAttrs.size(); ++i) {
+    // Avoid having to call safe_static_cast<> in each iteration of for loops
+    // destAttrs is constant so there is no reason to accrue the overhead
+    ASSERT_EXCEPTION(destAttrs.size() <= std::numeric_limits<AttributeID>::max(),
+                     "Too many Destination Attributes");
+    AttributeID destAttrsSize = safe_static_cast<AttributeID>(destAttrs.size());
+    for (AttributeID i=0; i < destAttrsSize; ++i) {
         // For aggregate field, store the source data but under the name of the dest attribute.
         // The motivation is that multiple dest aggregate attribute may come from the same source attribute,
         // in which case storing under the source attribute name would cause conflict.
@@ -185,27 +200,37 @@ std::shared_ptr<MemArray> RedimensionCommon::initializeRedimensionedArray(
             attrsRedimensioned.push_back(destAttrs[i]);
         }
     }
-    attrsRedimensioned.push_back(AttributeDesc(destAttrs.size(), "tmpDestPositionInChunk", TID_INT64, 0, 0));
-    attrsRedimensioned.push_back(AttributeDesc(destAttrs.size()+1, "tmpDestChunkId", TID_INT64, 0, 0));
+
+    // TODO: Seems like leading '_' or some other scheme to prevent name collisions is called for.
+    AttributeID destAttrSize = static_cast<AttributeID>(destAttrs.size());
+    attrsRedimensioned.push_back(
+        AttributeDesc(destAttrSize, "tmpDestPositionInChunk", TID_INT64, 0, 0));
+    attrsRedimensioned.push_back(
+        AttributeDesc(destAttrSize + 1, "tmpDestChunkId", TID_INT64, 0, 0));
     dimsRedimensioned[0] = DimensionDesc("Row", 0, CoordinateBounds::getMax(), redimChunkSize, 0);
 
     Attributes attrsRedimensionedWithET(attrsRedimensioned);
-    attrsRedimensionedWithET.push_back(AttributeDesc(attrsRedimensioned.size(),
-                                                     DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
-                                                     TID_INDICATOR,
-                                                     AttributeDesc::IS_EMPTY_INDICATOR,
-                                                     0));
+    attrsRedimensionedWithET.push_back(
+        AttributeDesc(safe_static_cast<AttributeID>(attrsRedimensioned.size()),
+                      DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+                      TID_INDICATOR,
+                      AttributeDesc::IS_EMPTY_INDICATOR,
+                      0));
     ArrayDesc schemaRedimensioned("",
                                   attrsRedimensionedWithET,
                                   dimsRedimensioned,
-                                  defaultPartitioning());
+                                  createDistribution(psUndefined),
+                                  _schema.getResidency());
     std::shared_ptr<MemArray> redimensioned(make_shared<MemArray>(schemaRedimensioned, query));
 
     // Initialize the iterators
-    redimCount = 0;
     redimArrayIters.resize(attrsRedimensioned.size());
     redimChunkIters.resize(attrsRedimensioned.size());
-    for (size_t i = 0; i < attrsRedimensioned.size(); i++)
+    // Avoid having to call safe_static_cast<> in each iteration of for loops
+    // attrsRedimensioned is constant so there is no reason to accrue the overhead
+    ASSERT_EXCEPTION(attrsRedimensioned.size() <= std::numeric_limits<AttributeID>::max(),
+                     "Too many Attributes in Redimension");
+    for (AttributeID i = 0; i < static_cast<AttributeID>(attrsRedimensioned.size()); i++)
     {
         redimArrayIters[i] = redimensioned->getIterator(i);
     }
@@ -264,12 +289,13 @@ bool RedimensionCommon::updateSyntheticDimForRedimArray(std::shared_ptr<Query> c
                                                         ArrayCoordinatesMapper const& coordMapper,
                                                         ChunkIdMap& chunkIdMaps,
                                                         size_t dimSynthetic,
-                                                        std::shared_ptr<MemArray>& redimensioned)
+                                                        std::shared_ptr<Array>& redimensioned)
 {
+    using std::shared_ptr;
     // If there is a synthetic dimension, and if there are duplicates, modify the values
     // (so that the duplicates get distinct coordinates in the synthetic dimension).
     //
-
+    
     queue< pair<position_t, position_t> > updates;
     bool needsResort = false;
     size_t currChunkId;
@@ -277,16 +303,18 @@ bool RedimensionCommon::updateSyntheticDimForRedimArray(std::shared_ptr<Query> c
     position_t prevPosition;
     position_t currPosition;
     Coordinates currPosCoord(coordMapper.getDims().size());
-    size_t chunkIdAttr = redimensioned->getArrayDesc().getAttributes(true).size() - 1;
-    size_t posAttr = chunkIdAttr - 1;
-    std::shared_ptr<ConstArrayIterator> arrayChunkIdIter = redimensioned->getConstIterator(chunkIdAttr);
-    std::shared_ptr<ArrayIterator> arrayPosIter = redimensioned->getIterator(posAttr);
+    AttributeID chunkIdAttr = safe_static_cast<AttributeID>(
+        redimensioned->getArrayDesc().getAttributes(true).size() - 1);
+    AttributeID posAttr = chunkIdAttr - 1;
+    shared_ptr<ConstArrayIterator> arrayChunkIdIter = redimensioned->getConstIterator(chunkIdAttr);
+    shared_ptr<ArrayIterator> arrayPosIter = redimensioned->getIterator(posAttr);
     SCIDB_ASSERT(!arrayChunkIdIter->end());
     SCIDB_ASSERT(!arrayPosIter->end());
-    std::shared_ptr<ConstChunkIterator> chunkChunkIdIter = arrayChunkIdIter->getChunk().getConstIterator();
-    std::shared_ptr<ConstChunkIterator> chunkPosReadIter = arrayPosIter->getChunk().getConstIterator();
-    std::shared_ptr<ChunkIterator> chunkPosWriteIter;
-    Coordinates lows(coordMapper.getDims().size()), intervals(coordMapper.getDims().size());
+    shared_ptr<ConstChunkIterator> chunkChunkIdIter = arrayChunkIdIter->getChunk().getConstIterator();
+    shared_ptr<ConstChunkIterator> chunkPosReadIter = arrayPosIter->getChunk().getConstIterator();
+    shared_ptr<ChunkIterator> chunkPosWriteIter;
+    Coordinates lows(coordMapper.getDims().size());
+    Coordinates intervals(coordMapper.getDims().size());
 
     // initialize the previous position value, current chunk id, and lows and intervals
     prevPosition = chunkPosReadIter->getItem().getInt64();
@@ -388,13 +416,14 @@ bool RedimensionCommon::updateSyntheticDimForRedimArray(std::shared_ptr<Query> c
 }
 
 
-void RedimensionCommon::appendItemToBeforeRedistribution(ArrayCoordinatesMapper const& coordMapper,
-                                                         CoordinateCRange lows,
-                                                         CoordinateCRange intervals,
-                                                         Coordinates& tmp,
-                                                         position_t prevPosition,
-                                                         PointerRange< std::shared_ptr<ChunkIterator> const> chunkItersBeforeRedist,
-                                                         StateVector& stateVector)
+void RedimensionCommon::appendItemToBeforeRedistribution(
+    ArrayCoordinatesMapper const& coordMapper,
+    CoordinateCRange lows,
+    CoordinateCRange intervals,
+    Coordinates& tmp,
+    position_t prevPosition,
+    PointerRange< std::shared_ptr<ChunkIterator> const> chunkItersBeforeRedist,
+    StateVector& stateVector)
 {
     // Do nothing if stateVector has nothing in it
     if (stateVector.isValid())
@@ -425,6 +454,11 @@ void RedimensionCommon::appendItemToBeforeRedistribution(ArrayCoordinatesMapper 
 template<class T>
 int64_t integerTypeToInt64(Value const& v)
 {
+    // This assert holds, or else we should have thrown SCIDB_LE_OP_REDIMENSION_ERROR2 during
+    // LogicalRedimension::inferSchema().
+    static_assert(std::is_signed<T>::value || std::numeric_limits<T>::digits < 64,
+                  "Cannot safely convert uint64 attribute to int64 dimension.");
+
     return static_cast<int64_t>(v.get<T>());
 }
 
@@ -446,6 +480,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
 
     // Does the dest array have a synthetic dimension?
     bool hasSynthetic = false;
+    bool synthAutochunked = false;
     size_t dimSynthetic = 0;
     Coordinate dimStartSynthetic = CoordinateBounds::getMin();
     Coordinate dimEndSynthetic = CoordinateBounds::getMax();
@@ -455,7 +490,10 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
             hasSynthetic = true;
             dimSynthetic = i;
             dimStartSynthetic = destDims[i].getStartMin();
-            dimEndSynthetic = dimStartSynthetic + destDims[i].getChunkInterval() - 1;
+            synthAutochunked = destDims[i].isAutochunked();
+            if (!synthAutochunked) {
+                dimEndSynthetic = dimStartSynthetic + destDims[i].getChunkInterval() - 1;
+            }
             SCIDB_ASSERT(dimEndSynthetic>=dimStartSynthetic);
             break;
         }
@@ -470,20 +508,47 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
         }
     }
 
-    // Does the dest array have any overlap?
     bool hasOverlap = false;
     for (size_t i = 0; i < destDims.size(); i++) {
+        // Does the dest array have any overlap?
         if (destDims[i].getChunkOverlap() != 0) {
             hasOverlap = true;
-            break;
+        }
+
+        // Any pass-thru intervals we should fix up?
+        if (destDims[i].getRawChunkInterval() == DimensionDesc::PASSTHRU) {
+            size_t srcDim = dimMapping[i];
+            SCIDB_ASSERT(!isFlipped(srcDim));
+            int64_t interval = srcArrayDesc.getDimensions()[srcDim].getChunkInterval();
+            _schema.getDimensions()[i].setChunkInterval(interval);
+            SCIDB_ASSERT(destDims[i].getChunkInterval() == interval);
         }
     }
 
+    // Maybe create dimensions using provisional chunk intervals.
+    //
+    // When autochunking, provDims are the provisional dimensions, and we will eventually compute
+    // the finalDims.  When *not* autochunking, provDims and finalDims are the same: it's a
+    // convenience to have them both to avoid unnecessarily complicating code paths below.
+    //
+    Dimensions finalDims(destDims);
+    Dimensions provDims;
+    bool autochunk = makeProvisionalChunking(hasSynthetic, dimSynthetic, provDims);
+    SCIDB_ASSERT(autochunk == !provDims.empty());
+    if (autochunk) {
+        // The destDims (and hence the finalDims) are autochunked.  "Metric exchange" will fill in
+        // the missing intervals below!
+        LOG4CXX_INFO(logger, "Using provisional chunk intervals, old: [" << destDims
+                     << "], new: [" << provDims << ']');
+        _schema.setDimensions(provDims); // Will set them to finalDims later.
+    } else {
+        provDims = destDims;
+    }
+
     // Initialize 'redimensioned' array
-    std::shared_ptr<MemArray> redimensioned;
+    std::shared_ptr<Array> redimensioned;
     vector< std::shared_ptr<ArrayIterator> > redimArrayIters(_arena);
     vector< std::shared_ptr<ChunkIterator> > redimChunkIters(_arena);
-    size_t redimCount = 0;
     size_t redimChunkSize =
         Config::getInstance()->getOption<size_t>(CONFIG_REDIMENSION_CHUNKSIZE);
 
@@ -499,7 +564,6 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                                                  aggregates,
                                                  redimArrayIters,
                                                  redimChunkIters,
-                                                 redimCount,
                                                  redimChunkSize);
 
     SCIDB_ASSERT(redimArrayIters.size() == destAttrs.size() + 2);
@@ -510,8 +574,9 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
 
     // Iterate through the input array, generate the output data, and append to the MemArray.
     // Note: For an aggregate field, its source value (in the input array) is used.
-    // Note: The synthetic dimension is not handled here. That is, multiple records, that will be differentiated along the synthetic dimension,
-    //       are all appended to the 'redimensioned' array with the same 'position'.
+    // Note: The synthetic dimension is not handled here. That is, multiple records that will be
+    //       differentiated along the synthetic dimension are all appended to the 'redimensioned'
+    //       array with the same 'position'.
     //
     size_t iterAttr = 0;    // one of the attributes from the input array that needs to be iterated
 
@@ -528,7 +593,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
             if (!srcArrayIterators[iterAttr]) {
                 iterAttr = j;
             }
-            srcArrayIterators[j] = srcArray->getConstIterator(j);
+            srcArrayIterators[j] = srcArray->getConstIterator(safe_static_cast<AttributeID>(j));
         }
     }
     for (size_t i = 0; i < destDims.size(); i++) {
@@ -538,8 +603,9 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
             if (!srcArrayIterators[iterAttr]) {
                 iterAttr = j;
             }
-            srcArrayIterators[j] = srcArray->getConstIterator(j);
+            srcArrayIterators[j] = srcArray->getConstIterator(safe_static_cast<AttributeID>(j));
 
+            // TODO:  Ugh.  Use FunctionLibrary::findConverter().  Example in ops/input/ChunkLoader.cpp.
             TypeId tid = srcAttrs[j].getType();
             if (tid == TID_INT8) {
                 functorsGetSourceValue[i] = &integerTypeToInt64<int8_t>;
@@ -563,10 +629,13 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                 functorsGetSourceValue[i] = &integerTypeToInt64<uint32_t>;
             }
             else if (tid == TID_UINT64) {
-                functorsGetSourceValue[i] = &integerTypeToInt64<uint64_t>;
+                // Should have caught this already in LogicalRedimension::inferSchema().
+                ASSERT_EXCEPTION(false, "In RedimensionCommon::redimensionArray(), cannot safely convert"
+                                 " uint64 attribute to int64 dimension.");
             }
             else {
-                ASSERT_EXCEPTION(false, "In RedimensionCommon::redimensionArray(), src attr type must be of integer type.");
+                ASSERT_EXCEPTION(false, "In RedimensionCommon::redimensionArray(), src attr type must be "
+                                 "of integer type.");
             }
         }
         else {
@@ -580,9 +649,12 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     }
 
     // Start scanning the input
-    ArrayCoordinatesMapper arrayCoordinatesMapper(destDims);
-    std::shared_ptr<ChunkIdMap> arrayChunkIdMap = createChunkIdMap(_schema);
+    std::shared_ptr<ArrayCoordinatesMapper> arrayCoordinatesMapper =
+        std::make_shared<ArrayCoordinatesMapper>(provDims); // == destDims if !autochunk
+    std::shared_ptr<ChunkIdMap> arrayChunkIdMap = createChunkIdMap(provDims, _arena);
+    size_t redimCount = 0;      // Actually a count of cells written to the 1-D.
 
+    CoordMetrics coordMetrics(destDims.size(), synthAutochunked);  // local metrics for autochunking
     Coordinates destPos(destDims.size());                          // in outermost loop to avoid mallocs
     vector<Value> valuesInRedimArray(_arena,destAttrs.size()+2);   // in outermost loop to avoid mallocs
 
@@ -620,10 +692,14 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                 }
             }
 
-            // sanity check
+            // Sanity check, and accumulate local metrics.
             for (size_t i=0; i < nDims; ++i) {
                 if (destPos[i]<destDims[i].getStartMin() || destPos[i]>destDims[i].getEndMax()) {
-                    throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_INVALID_REDIMENSION_POSITION) << CoordsToStr(destPos);
+                    throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_INVALID_REDIMENSION_POSITION)
+                        << CoordsToStr(destPos);
+                }
+                if (autochunk) {
+                    coordMetrics.accumulate(i, destPos[i]);
                 }
             }
 
@@ -640,8 +716,9 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                 }
             }
 
-            // Set the last two fields of the data, and append to the redimensioned array
-            if (hasOverlap) {
+            // Set the last two fields of the data, and append to the redimensioned array.
+            // When autochunking, the overlap regions will be generated later.
+            if (hasOverlap && !autochunk) {
                 // OverlappingChunksIterator iterates over the logical space.
                 // Per THE REQUEST TO JUSTIFY LOGICAL-SPACE ITERATION (see RegionCoordinatesIterator.h),
                 // here is why it is ok.
@@ -652,7 +729,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                 OverlappingChunksIterator allChunks(destDims, destPos);
                 while (!allChunks.end()) {
                     Coordinates const& overlappingChunkPos = allChunks.getPosition();
-                    position_t pos = arrayCoordinatesMapper.coord2pos(overlappingChunkPos, destPos);
+                    position_t pos = arrayCoordinatesMapper->coord2pos(overlappingChunkPos, destPos);
                     valuesInRedimArray[destAttrs.size()].setInt64(pos);
                     position_t chunkId = arrayChunkIdMap->mapChunkPosToId(overlappingChunkPos);
                     valuesInRedimArray[destAttrs.size()+1].setInt64(chunkId);
@@ -663,20 +740,25 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                                            redimCount,
                                            redimChunkSize);
 
-                    // Must increment after overlappingChunkPos is no longer needed, because the increment will modify overlappingChunkPos.
+                    // Must increment *after* overlappingChunkPos is no longer needed, because
+                    // the increment will clobber overlappingChunkPos.
                     ++allChunks;
                 }
             } else {
-                position_t pos = arrayCoordinatesMapper.coord2pos(chunkPos, destPos);
-                valuesInRedimArray[destAttrs.size()].setInt64(pos);
-                position_t chunkId = arrayChunkIdMap->mapChunkPosToId(chunkPos);
-                valuesInRedimArray[destAttrs.size()+1].setInt64(chunkId);
+                CoordMetrics::PositionPair pp;
+                pp.pos = arrayCoordinatesMapper->coord2pos(chunkPos, destPos);
+                valuesInRedimArray[destAttrs.size()].setInt64(pp.pos);
+                pp.chunkId = arrayChunkIdMap->mapChunkPosToId(chunkPos);
+                valuesInRedimArray[destAttrs.size()+1].setInt64(pp.chunkId);
                 appendItemToRedimArray(valuesInRedimArray,
                                        query,
                                        redimArrayIters,
                                        redimChunkIters,
                                        redimCount,
                                        redimChunkSize);
+                if (autochunk) {
+                    coordMetrics.accumulate(pp);
+                }
             }
 
             // Advance chunk iterators
@@ -711,14 +793,33 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
         redimArrayIters[i].reset();
     }
 
+    timing.logTiming(logger, "[RedimensionArray] PHASE 1: conversion to redimensioned form (not order)");
+
+    // If autochunking, we now have our partial <min,max,approxdc> metrics and can do "metric
+    // exchange" to compute the final chunk intervals.
+    if (autochunk) {
+        try {
+            exchangeMetrics(query,
+                            coordMetrics,
+                            (hasSynthetic ? dimSynthetic : -1),
+                            finalDims);
+
+            // Pretend like we knew them all along!
+            _schema.setDimensions(finalDims);
+            SCIDB_ASSERT(!_schema.isAutochunked());
+        }
+        catch (std::exception& ex) {
+            LOG4CXX_DEBUG(logger, "Exception from exchangeMetrics: " << ex.what());
+            throw;
+        }
+        LOG4CXX_DEBUG(logger, "Metric exchange yields " << finalDims);
+        timing.logTiming(logger, "[RedimensionArray] PHASE 1A: autochunking metric exchange complete");
+    }
+
     // LOG4CXX_DEBUG(logger, "[RedimensionArray] redimensioned values: ");
     // redimensioned->printArrayToLogger();
 
-    timing.logTiming(logger, "[RedimensionArray] PHASE 1: conversion to redimensioned form (not order)");
     // PHASE 2 - sort "redimensioned" to global order
-
-    // reverse the direction of the chuk pos <=> id bijection
-    arrayChunkIdMap->reverse();
 
     // drop the source array
     redimChunkIters.clear();
@@ -727,14 +828,29 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     srcArrayIterators.clear();
     srcArray.reset();
 
+    // If autochunking (and if we have anything to actually work on, i.e. redimCount > 0), here we
+    // wrap the 1-D array with a "remapper" that will transform the provision coordinates into final
+    // coordinates on the fly.
+    std::shared_ptr<Remapper> remapper;
+    if (autochunk && redimCount) {
+        remapper.reset(new Remapper(*arrayCoordinatesMapper, arrayChunkIdMap, finalDims, _arena));
+        std::shared_ptr<Array> remappedRedim;
+        if (hasOverlap) {
+            remappedRedim.reset(new OverlapRemapperArray(redimensioned, remapper, query));
+        } else {
+            remappedRedim.reset(new RemapperArray(redimensioned, remapper, query));
+        }
+        redimensioned = remappedRedim;
+    }
+
     // Sort the redimensioned array based on the chunkid, followed by the position in the chunk
     //
     SortingAttributeInfos sortingAttributeInfos(2);
     SortingAttributeInfo k;
-    k.columnNo = destAttrs.size() + 1;
+    k.columnNo = safe_static_cast<int>(destAttrs.size() + 1);
     k.ascent = true;
     sortingAttributeInfos[0] = k;
-    k.columnNo = destAttrs.size();
+    k.columnNo = safe_static_cast<int>(destAttrs.size());
     k.ascent = true;
     sortingAttributeInfos[1] = k;
 
@@ -747,6 +863,20 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
         redimensioned = sortedRedimensioned;
     }
 
+    // Sort done, and the resulting array has the final (chunkId,cellPos) pairs.  Extract and use
+    // the corresponding ChunkIdMap.
+    if (autochunk && redimCount) {
+        SCIDB_ASSERT(remapper);
+        arrayChunkIdMap = remapper->getFinalChunkIdMap();
+        arrayCoordinatesMapper = std::make_shared<ArrayCoordinatesMapper>(finalDims);
+        remapper.reset();       // releases provisional ChunkIdMap memory
+    } else {
+        SCIDB_ASSERT(!remapper);
+    }
+    
+    // reverse the direction of the chuk pos <=> id bijection
+    arrayChunkIdMap->reverse();
+
     timing.logTiming(logger, "[RedimensionArray] PHASE 2A: redimensioned sort pass 1");
 
     // LOG4CXX_DEBUG(logger, "[RedimensionArray] redimensioned sorted values: ");
@@ -758,7 +888,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     if (hasSynthetic && redimCount)
     {
         bool updated = updateSyntheticDimForRedimArray(query,
-                                                       arrayCoordinatesMapper,
+                                                       *arrayCoordinatesMapper,
                                                        *arrayChunkIdMap,
                                                        dimSynthetic,
                                                        redimensioned);
@@ -790,14 +920,24 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     //
     // Also, the MemArray has the empty tag, regardless to what the input array has.
     //
+
+    // TODO We need to create the beforeRedistribution array with the finalized schema.  Above
+    // we sent around our partial metrics and computed the final chunk intervals.  Now we can
+    // know the "finalizing transform", and we can create the beforeRedistribution array with
+    // the correct schema.
+
     Attributes attrsBeforeRedistribution;
     attrsBeforeRedistribution.reserve(destAttrs.size());
 
     if (hasAggregate) {
-        for (size_t i=0; i<destAttrs.size(); ++i) {
+        for (AttributeID i=0; i < safe_static_cast<AttributeID>(destAttrs.size()); ++i) {
             if (aggregates[i]) {
-                attrsBeforeRedistribution.push_back(AttributeDesc(i, destAttrs[i].getName(), aggregates[i]->getStateType().typeId(),
-                        destAttrs[i].getFlags(), destAttrs[i].getDefaultCompressionMethod()));
+                attrsBeforeRedistribution.push_back(
+                    AttributeDesc(i,
+                                  destAttrs[i].getName(),
+                                  aggregates[i]->getStateType().typeId(),
+                                  destAttrs[i].getFlags(),
+                                  destAttrs[i].getDefaultCompressionMethod()));
             } else {
                 attrsBeforeRedistribution.push_back(destAttrs[i]);
             }
@@ -806,8 +946,15 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
         attrsBeforeRedistribution = destAttrs;
     }
 
-    std::shared_ptr<MemArray> beforeRedistribution = make_shared<MemArray>(
-              ArrayDesc(_schema.getName(), addEmptyTagAttribute(attrsBeforeRedistribution), _schema.getDimensions(), defaultPartitioning() ),query);
+    SCIDB_ASSERT(finalDims == _schema.getDimensions());
+    std::shared_ptr<MemArray> beforeRedistribution =
+       std::make_shared<MemArray>(ArrayDesc(_schema.getName(),
+                                            addEmptyTagAttribute(attrsBeforeRedistribution),
+                                            _schema.getDimensions(),
+                                            createDistribution(psUndefined),
+                                            _schema.getResidency()
+                                            ),
+                                  query);
 
     // Write data from the 'redimensioned' array to the 'beforeRedistribution' array
     //
@@ -816,13 +963,13 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     //
     vector<std::shared_ptr<ArrayIterator> > arrayItersBeforeRedistribution(_arena,attrsBeforeRedistribution.size());
     vector<std::shared_ptr<ChunkIterator> > chunkItersBeforeRedistribution(_arena,attrsBeforeRedistribution.size());
-    for (size_t i=0; i<destAttrs.size(); ++i)
+    for (AttributeID i=0; i < safe_static_cast<AttributeID>(destAttrs.size()); ++i)
     {
         arrayItersBeforeRedistribution[i] = beforeRedistribution->getIterator(i);
     }
     vector< std::shared_ptr<ConstArrayIterator> > redimArrayConstIters(_arena,destAttrs.size() + 2);
     vector< std::shared_ptr<ConstChunkIterator> > redimChunkConstIters(_arena,destAttrs.size() + 2);
-    for (size_t i = 0; i < redimArrayConstIters.size(); ++i)
+    for (AttributeID i = 0; i < safe_static_cast<AttributeID>(redimArrayConstIters.size()); ++i)
     {
         redimArrayConstIters[i] = redimensioned->getConstIterator(i);
     }
@@ -831,12 +978,14 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     //
     size_t chunkIdAttr = redimArrayConstIters.size() - 1;
     size_t positionAttr = redimArrayConstIters.size() - 2;
-    size_t nDestAttrs = _schema.getDimensions().size();
+    size_t nDestDims = _schema.getDimensions().size();
     size_t chunkId = arrayChunkIdMap->getUnusedId();
 
     // Coordinates outside of loops to reduce number of mallocs
-    Coordinates lows(nDestAttrs), intervals(nDestAttrs), tmp(nDestAttrs);
-    Coordinates outputCoord(nDestAttrs);
+    Coordinates lows(nDestDims);
+    Coordinates intervals(nDestDims);
+    Coordinates tmp(nDestDims);
+    Coordinates outputCoord(nDestDims);
 
     // Init state vector and prev position
     StateVector stateVector(_arena,aggregates, 0);
@@ -850,7 +999,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
         // Set up chunk iters for the input chunk
         for (size_t i = 0; i < redimChunkConstIters.size(); ++i)
         {
-            redimChunkConstIters[i] = redimArrayConstIters[i]->getChunk().getConstIterator(i);
+            redimChunkConstIters[i] = redimArrayConstIters[i]->getChunk().getConstIterator();
         }
 
         while (!redimChunkConstIters[0]->end())
@@ -858,11 +1007,12 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
             // Have we found a new output chunk?
             //
             size_t nextChunkId = redimChunkConstIters[chunkIdAttr]->getItem().getInt64();
+            // TODO Need to transform this /provisional/ (chunkId,chunkPos) pair into /final/ form!
             if (chunkId != nextChunkId)
             {
                 // Write the left-over stateVector
                 //
-                appendItemToBeforeRedistribution(arrayCoordinatesMapper,
+                appendItemToBeforeRedistribution(*arrayCoordinatesMapper,
                                                  lows, intervals, tmp,
                                                  prevPosition,
                                                  chunkItersBeforeRedistribution,
@@ -882,12 +1032,13 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                 // Init the coordinate mapper for the new chunk
                 //
                 chunkId = nextChunkId;
-                arrayCoordinatesMapper.chunkPos2LowsAndIntervals(arrayChunkIdMap->mapIdToChunkPos(chunkId),
-                                                                 lows,
-                                                                 intervals);
+                arrayCoordinatesMapper->chunkPos2LowsAndIntervals(arrayChunkIdMap->mapIdToChunkPos(chunkId),
+                                                                  lows,
+                                                                  intervals);
 
                 // Create new chunks and get the iterators.
-                // The first non-empty-tag attribute does NOT use NO_EMPTY_CHECK (so as to help take care of the empty tag); Others do.
+                // The first non-empty-tag attribute does NOT use NO_EMPTY_CHECK (so as to help
+                // take care of the empty tag); others do.
                 //
                 int iterMode = ConstChunkIterator::SEQUENTIAL_WRITE;
                 for (size_t i=0; i<destAttrs.size(); ++i)
@@ -906,11 +1057,13 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                 stateVector.init();
             }
 
-            // When seeing the first item with a new position, the attribute values in the item are populated into the destItem as follows.
+            // When seeing the first item with a new position, the attribute values in the item are
+            // populated into the destItem as follows.
             //  - For a scalar field, the value is copied.
             //  - For an aggregate field, the value is initialized and accumulated.
             //
-            // When seeing subsequent items with the same position, the attribute values in the item are populated as follows.
+            // When seeing subsequent items with the same position, the attribute values in the item
+            // are populated as follows.
             //  - For a scalar field, the value is ignored (just select the first item).
             //  - For an aggregate field, the value is accumulated.
             //
@@ -924,12 +1077,12 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
             {
                 if (!hasAggregate) {
                     if (redistributeMode==VALIDATED) {
-                        arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, currPosition, outputCoord);
+                        arrayCoordinatesMapper->pos2coordWithLowsAndIntervals(lows, intervals, currPosition, outputCoord);
                         throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_DATA_COLLISION)
                                                                     << CoordsToStr(outputCoord);
                     }
                     if (!_hasDataIntegrityIssue && logger->isWarnEnabled()) {
-                        arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, currPosition, outputCoord);
+                        arrayCoordinatesMapper->pos2coordWithLowsAndIntervals(lows, intervals, currPosition, outputCoord);
                         LOG4CXX_WARN(logger, "RedimensionCommon::redimensionArray: "
                                      << "Data collision is detected at cell position "
                                      << CoordsToStr(outputCoord)
@@ -937,7 +1090,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
                                      << ". Add log4j.logger.scidb.array.RedimensionCommon=TRACE to the log4cxx config file for more");
                         _hasDataIntegrityIssue=true;
                     } else if (_hasDataIntegrityIssue && logger->isTraceEnabled()) {
-                        arrayCoordinatesMapper.pos2coordWithLowsAndIntervals(lows, intervals, currPosition, outputCoord);
+                        arrayCoordinatesMapper->pos2coordWithLowsAndIntervals(lows, intervals, currPosition, outputCoord);
                         LOG4CXX_TRACE(logger, "RedimensionCommon::redimensionArray: "
                                       << "Data collision is detected at cell position "
                                       << CoordsToStr(outputCoord)
@@ -949,7 +1102,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
             else
             {
                 // Output the previous state vector.
-                appendItemToBeforeRedistribution(arrayCoordinatesMapper,
+                appendItemToBeforeRedistribution(*arrayCoordinatesMapper,
                                                  lows, intervals, tmp,
                                                  prevPosition,
                                                  chunkItersBeforeRedistribution,
@@ -980,7 +1133,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     arrayChunkIdMap->clear(); // ok, we're done with this now - release memory
 
     // Flush the leftover statevector
-    appendItemToBeforeRedistribution(arrayCoordinatesMapper,
+    appendItemToBeforeRedistribution(*arrayCoordinatesMapper,
                                      lows, intervals, tmp,
                                      prevPosition,
                                      chunkItersBeforeRedistribution,
@@ -1010,10 +1163,10 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     redimArrayConstIters.clear();
     redimensioned.reset();
 
-    ArrayDesc outSchema(_schema.getName(), _schema.getAttributes(), _schema.getDimensions(), defaultPartitioning());
-
     if( !hasAggregate && redistributeMode!=AGGREGATED) {
         SCIDB_ASSERT(!hasSynthetic);
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(beforeRedistribution->getArrayDesc().getResidency()));
+        SCIDB_ASSERT(_schema.getDistribution()->checkCompatibility(beforeRedistribution->getArrayDesc().getDistribution()));
 
         // return without redistributing : optimizer will have to insert SG
         timing.logTiming(logger, "[RedimStore] PHASE 4: redistribution: non-aggregate early return");
@@ -1021,10 +1174,20 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
     }
     SCIDB_ASSERT(redistributeMode!=VALIDATED);
 
+    ArrayDesc outSchema(_schema.getName(),
+                        _schema.getAttributes(),
+                        _schema.getDimensions(),
+                        _schema.getDistribution(),
+                        _schema.getResidency());
+
+    SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+
     std::shared_ptr<Array> afterRedistribution;
 
     if ( hasSynthetic) {
-        SyntheticDimChunkMerger::RedimInfo redimInfo(hasSynthetic, dimSynthetic, destDims[dimSynthetic]);
+        SyntheticDimChunkMerger::RedimInfo redimInfo(hasSynthetic,
+                                                     safe_static_cast<AttributeID>(dimSynthetic),
+                                                     finalDims[dimSynthetic]);
         std::shared_ptr<Array> input(beforeRedistribution);
         afterRedistribution = redistributeWithSynthetic(input, query, &redimInfo);
     } else {
@@ -1047,7 +1210,7 @@ std::shared_ptr<Array> RedimensionCommon::redimensionArray(std::shared_ptr<Array
 
     timing.logTiming(logger, "[RedimStore] PHASE 4: redistribution: full redistribution");
     assert(outSchema == afterRedistribution->getArrayDesc());
-    return  afterRedistribution;
+    return afterRedistribution;
 }
 
 std::shared_ptr<Array>
@@ -1064,16 +1227,16 @@ RedimensionCommon::redistributeWithSynthetic(std::shared_ptr<Array>& inputArray,
         chunkMergers[a] = merger;
     }
 
+    SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+
     // regardless of user settings there should be no data collisions with a synthetic dimension
     const bool enforceDataIntegrity = true;
+    SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
     return redistributeToRandomAccess(inputArray,
+                                      _schema.getDistribution(),
+                                      ArrayResPtr(), //default query residency
                                       query,
                                       chunkMergers,
-                                      defaultPartitioning(),
-                                      ALL_INSTANCE_MASK,
-                                      std::shared_ptr<CoordinateTranslator>(),
-                                      0,
-                                      std::shared_ptr<PartitioningSchemaData>(),
                                       enforceDataIntegrity );
 }
 
@@ -1205,12 +1368,12 @@ RedimensionCommon::redistributeWithAggregates(std::shared_ptr<Array>& inputArray
 
     PartialChunkMergerList chunkMergers(numAttrs);
 
-    std::shared_ptr<Array> withAggregates = make_shared<MemArray>(outSchema,query);
+    std::shared_ptr<Array> withAggregatesArray = make_shared<MemArray>(outSchema,query);
 
     for (AttributeID a=0; a < (numAttrs-1); ++a) {
         if (aggregates[a]) {
             std::shared_ptr<MultiStreamArray::PartialChunkMerger> merger =
-               make_shared<FinalAggregateChunkMerger>(aggregates[a], &outSchema, isEmptyable, hasOverlap);
+            std::make_shared<FinalAggregateChunkMerger>(aggregates[a], &outSchema, isEmptyable, hasOverlap);
             chunkMergers[a] = merger;
         }
     }
@@ -1218,177 +1381,261 @@ RedimensionCommon::redistributeWithAggregates(std::shared_ptr<Array>& inputArray
     assert(!chunkMergers[numAttrs-1]);
     chunkMergers[numAttrs-1] = make_shared<FinalETChunkMerger>(&outSchema, enforceDataIntegrity);
 
-    redistributeToArray(inputArray, withAggregates, chunkMergers, NULL,
+    redistributeToArray(inputArray,
+                        withAggregatesArray,
+                        chunkMergers,
+                        NULL,
                         query,
-                        defaultPartitioning(),
-                        ALL_INSTANCE_MASK,
-                        std::shared_ptr<CoordinateTranslator>(),
-                        0,
-                        std::shared_ptr<PartitioningSchemaData>(),
                         enforceDataIntegrity );
-     return withAggregates;
-}
-
-/****************************************************************************/
-
-RedimensionCommon::IndirectChunkIdMap::IndirectChunkIdMap(
-    const ArenaPtr& parentArena,
-    size_t rank) :
-    ChunkIdMap(rank),
-    _rbtree(newArena(Options("ChunkIdMap.rbtree").scoped(parentArena).threading(0))),
-    _coords(newArena(Options("ChunkIdMap.coords").scoped(parentArena).threading(0))),
-    _chunkOverhead(LruMemChunk::getFootprint(rank) + sizeof(Address)),
-    _chunkOverheadLimit(Config::getInstance()->getOption<size_t>(CONFIG_REDIM_CHUNK_OVERHEAD_LIMIT)),
-    _posToId(_rbtree,CoordinatePtrLess(rank)),
-    _idToPos(parentArena)
-{
-    assert(!_chunkOverheadLimit || _chunkOverhead<_chunkOverheadLimit*MiB);
-}
-
-/* No need to search the map twice.  Try to insert the initial element.
-   If it is already there, insert will tell us and provide an iterator
-   to the existing element. The reverse mapping will be set up later with an
-   explicit call to reverse().
- */
-size_t
-RedimensionCommon::IndirectChunkIdMap::mapChunkPosToId(CoordinateCRange pos)
-{
-    assert(getDirection() == PosToId);                   // Not yet 'reversed'
-    assert(pos.size() == rank());                        // Validate argument
-
-    PosToIdMap::iterator i;                              // Insertion pointer
-    bool                 b;                              // Insert succeeded?
-
- /* Try adding the pair <pos,size()> to the first map...*/
-
-    boost::tie(i,b) = _posToId.insert(make_pair(pos.begin(),_posToId.size()));
-
-    if (b)                                               // Inserted new entry?
-    {
-        if (_chunkOverheadLimit!=0 && size()*_chunkOverhead > _chunkOverheadLimit*MiB)
-        {
-            throw USER_EXCEPTION(SCIDB_SE_OPERATOR,SCIDB_LE_TOO_MANY_CHUNKS_IN_REDIMENSION)
-                << size() << _chunkOverhead << _chunkOverheadLimit;
-        }
-
-     /* Copy 'pos' onto the coordinate arena...*/
-
-        Coordinate* const p = newVector<Coordinate>(*_coords,rank(),manual);
-
-        std::copy(pos.begin(),pos.end(),p);
-
-     /* Update the map key to point at this new local copy...*/
-
-        const_cast<coords&>(i->first) = p;
-    }
-
-    return i->second;                                    // The chunk number
-}
-
-CoordinateCRange
-RedimensionCommon::IndirectChunkIdMap::mapIdToChunkPos(size_t i)
-{
-    assert(getDirection() == IdToPos);                   // Running in reverse
-
-    return pointerRange(rank(),_idToPos[i]);              // Consult the vector
+     return withAggregatesArray;
 }
 
 /**
- *  Now that all of the chunk positions have been seen and recorded, construct
- *  the reverse mapping id=>pos in _idToPos in one single go, then discard the
- *  contents of the forward mapping pos=>id, which are no longer needed.  This
- *  is slightly more efficient than updating the reverse mapping as we go...
+ * If any @c _schema dimension has an unspecified chunk interval, set up @c provDims with provisional chunk intervals.
+ *
+ * Per wiki:Development/components/Rearrange_Ops/RedimWithAutoChunkingHLD, here we detect whether we
+ * are doing autochunking, and if so we "make up from thin air" provisional chunk intervals to
+ * (temporarily) use in place of the unspecified ones.  These are stored in @c provDims .
+ *
+ * @return true iff we saw an unspecified interval (i.e. we are in autochunking mode)
  */
-void
-RedimensionCommon::IndirectChunkIdMap::reverse()
+bool RedimensionCommon::makeProvisionalChunking(bool hasSynth, size_t synthIndex, Dimensions& provDims)
 {
-    assert(getDirection() == PosToId);                   // Not yet reversed
-    assert(_idToPos.empty());                            // Not yet populated
+    provDims.clear();
 
-    _idToPos.resize(_posToId.size());                    // Resize the vector
+    // Arbitrary, so keep it simple.  Make 'em look funny for easy identification while debugging.
+    const int64_t PROVISIONAL_CHUNK_INTERVAL = 1012101;
+    const int64_t PROVISIONAL_SYNTH_INTERVAL = 121;
 
-    BOOST_FOREACH(PosToIdMap::value_type& kv,_posToId)   // For each <pos,id>
-    {
-        _idToPos[kv.second] = kv.first;                  // ...update vector
+    Dimensions const& destDims = _schema.getDimensions();
+    for (size_t i = 0, n = destDims.size(); i < n; ++i) {
+        DimensionDesc const& dim = destDims[i];
+        int64_t chunkInterval = dim.getRawChunkInterval();
+        if (chunkInterval == DimensionDesc::AUTOCHUNKED) {
+            if (provDims.empty()) {
+                // Late initialization, only do it if we must.
+                provDims = destDims;
+            }
+            if (hasSynth && synthIndex == i) {
+                provDims[i].setChunkInterval(PROVISIONAL_SYNTH_INTERVAL);
+            } else {
+                provDims[i].setChunkInterval(PROVISIONAL_CHUNK_INTERVAL);
+            }
+        }
     }
 
-    _posToId.clear();                                    // No longer needed
-    _rbtree->reset();                                    // Free node memory
-
-    ChunkIdMap::reverse();                              // Switch direction
+    return !provDims.empty();
 }
+
 
 /**
- *  Clear both maps (though only actually has anything in it) and flush their
- *  arenas.
+ *  Exchange and aggregate locally gathered shape metrics to obtain cluster-wide metrics.
+ *
+ *  @description We have seen the full coordinates of every locally produced output cell, and
+ *  gathered metrics along each dimension: min, max, and approximate distinct count.  We also have
+ *  local values for distinct count across *all* dimensions and an estimate of collisions along the
+ *  synthetic dimension (if any).  Now we replicate these local findings, using the aggregation
+ *  facility of SG, to come up with global values for these metrics.  The global metrics will be fed
+ *  to the ChunkEstimator to arrive at reasonable, automatically computed chunk interval values.
+ *
+ *  We exchange a 1-D array containing the metrics.  Attributes and shape of the 1-D metrics array
+ *  we will replicate:
+ *
+ *    dmin/AI_MIN   dmax/AI_MAX  dcnt/AI_ADC      ovdc/AI_ODC      cols/AI_COL
+ *    ------------------------------------------------------------------------
+ *    <minState0,   maxState0,   approxdcState0,  overalldcState,  collisionState> [0]
+ *    <minState1,   maxState1,   approxdcState1,  (dcIdentity),    (zero)> [1]
+ *    ...           ...          ...              ...              ...
+ *    <minStateN,   maxStateN,   approxdcStateN,  (dcIdentity),    (zero)> [N]
  */
-void
-RedimensionCommon::IndirectChunkIdMap::clear()
+void RedimensionCommon::exchangeMetrics(std::shared_ptr<Query> const& query,
+                                        CoordMetrics const& coordMetrics,
+                                        ssize_t synthDim,
+                                        Dimensions& inOutDims)
 {
-    _posToId.clear();
-    _idToPos.clear();
-    _rbtree->reset();
-    _coords->reset();
-}
+    size_t const N_DEST_DIMS = _schema.getDimensions().size();
+    SCIDB_ASSERT(coordMetrics.size() == N_DEST_DIMS);
+    SCIDB_ASSERT(inOutDims.size() == N_DEST_DIMS);
 
-/****************************************************************************/
+    size_t const N_INSTS = _schema.getResidency()->size();
+    SCIDB_ASSERT(query->getInstanceID() < N_INSTS);
+    SCIDB_ASSERT(query->getInstancesCount() == N_INSTS);
 
-/* Factory function which returns a heap-allocated ChunkIdMap object
-   of the appropriate subtype for the given schema.
- */
-std::shared_ptr<RedimensionCommon::ChunkIdMap>
-RedimensionCommon::createChunkIdMap(ArrayDesc const& schema)
-{
-    std::shared_ptr<ChunkIdMap> result;
-    bool useDirect = true;
+    // The redistribute call below will aggregate attributes when there are collisions, so by making
+    // all instances' metrics cells collide along the "destDim" dimension, we'll get the aggregated
+    // values that the ChunkEstimator wants.  Cool!
+    //
+    // We build the aggregates vector first, so that we can use the correct "state types" in the
+    // attributes list.
+    //
+    std::vector<AggregatePtr> aggregates(AI_MAX_ATTRS - 1); // no aggregate for empty bitmap
+    AggregateLibrary* aggLib = AggregateLibrary::getInstance();
+    // Second arg to createAggregate() is its input type.
+    // Note: When aggregating cluster-wide, AI_COL aggregate is sum(), *not* _maxrepcnt().
+    aggregates[AI_MIN] = aggLib->createAggregate("min", TypeLibrary::getType(TID_INT64));
+    aggregates[AI_MAX] = aggLib->createAggregate("max", TypeLibrary::getType(TID_INT64));
+    aggregates[AI_ADC] = aggLib->createAggregate("approxdc", TypeLibrary::getType(TID_INT64));
+    aggregates[AI_ODC] = aggLib->createAggregate("approxdc", TypeLibrary::getType(TID_BINARY));
+    aggregates[AI_COL] = aggLib->createAggregate("sum", TypeLibrary::getType(TID_UINT64));
 
-    /* For each dimension, determine whether a min and max value are
-       provided.  If not, we need an IndirectChunkIdMap.
-    */
-    PointerRange<DimensionDesc const> dims = schema.getDimensions();
+    // Build MemArray to hold metric states.
+    int16_t const NULLABLE = AttributeDesc::IS_NULLABLE; // Chunk::aggregateMerge() insists
+    Attributes attrs = boost::assign::list_of
+        (AttributeDesc(AI_MIN, "dmin", aggregates[AI_MIN]->getStateType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_MAX, "dmax", aggregates[AI_MAX]->getStateType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_ADC, "dcnt", aggregates[AI_ADC]->getStateType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_ODC, "ovdc", aggregates[AI_ODC]->getStateType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_COL, "cols", aggregates[AI_COL]->getStateType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_EBM, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+                       TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+    SCIDB_ASSERT(AI_MAX_ATTRS == attrs.size());
 
-    for (size_t i = 0; i < dims.size(); ++i)
-    {
-        if (dims[i].isMaxStar())
-        {
-            useDirect = false;
-            break;
+    // There are N_DEST_DIMS entries.  The "overall" metric attributes "ovdc" and "cols" are only
+    // set for the zero-th cell (all other cells use the identity for the particular aggregate).
+    Dimensions dims = boost::assign::list_of
+        (DimensionDesc("destDim", 0, N_DEST_DIMS-1, N_DEST_DIMS, 0));
+
+    ArrayDesc metricsInDesc("_metrics", attrs, dims, _schema.getDistribution(), _schema.getResidency());
+    std::shared_ptr<MemArray> metrics = std::make_shared<MemArray>(metricsInDesc, query);
+
+    // Load MemArray with local metric state.  First, get array write-iterators.
+    vector<std::shared_ptr<ArrayIterator> > outAIters(AI_MAX_ATTRS);
+    for (AttributeID aid = 0; aid < AI_MAX_ATTRS; ++aid) {
+        outAIters[aid] = metrics->getIterator(aid);
+    }
+
+    // Now get chunk write-iterators.
+    Coordinates currPos(1);
+    assert(currPos[0] == 0);
+    unsigned chunkMode = ChunkIterator::SEQUENTIAL_WRITE;
+    vector<std::shared_ptr<ChunkIterator> > outCIters(AI_MAX_ATTRS);
+    for (AttributeID aid = 0; aid < AI_MAX_ATTRS; ++aid) {
+        Chunk& chunk = outAIters[aid]->newChunk(currPos);
+        outCIters[aid] = chunk.getIterator(query, chunkMode);
+        chunkMode |= ChunkIterator::NO_EMPTY_CHECK;
+    }
+
+    // Some values we need...
+    Value emptyBitmapValue;
+    emptyBitmapValue.setBool(true);
+    Value zero;
+    zero.setUint64(0UL);                // Identity for sum()
+
+    // Fill in all local metric state.
+    for (size_t i = 0, n = coordMetrics.size(); i < n; ++i) {
+        outCIters[AI_MIN]->writeItem(coordMetrics.getState(i, AI_MIN));
+        outCIters[AI_MAX]->writeItem(coordMetrics.getState(i, AI_MAX));
+        outCIters[AI_ADC]->writeItem(coordMetrics.getState(i, AI_ADC));
+        outCIters[AI_ODC]->writeItem(coordMetrics.getState(i, AI_ODC));
+        if (i == 0) {
+            outCIters[AI_COL]->writeItem(coordMetrics.getFinalResult(i, AI_COL));
+        } else {
+            outCIters[AI_COL]->writeItem(zero);
+        }
+
+        // Write empty bitmap attribute and bump all chunk iterators.
+        outCIters[AI_EBM]->writeItem(emptyBitmapValue);
+        for (auto& cIter : outCIters) {
+            ++(*cIter);
+        }
+
+    }
+    for (auto& cIter : outCIters) {
+        cIter->flush();
+        cIter->reset();
+    }
+    for (auto& aIter : outAIters) {
+        aIter->reset();
+    }
+
+    // The redistribute call needs an output schema slightly modified from the metricsInDesc input
+    // schema to (a) specify replication and (b) use the aggregates' *output* types rather than
+    // their state types.
+    //
+    Attributes outAttrs = boost::assign::list_of
+        (AttributeDesc(AI_MIN, "dmin", aggregates[AI_MIN]->getResultType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_MAX, "dmax", aggregates[AI_MAX]->getResultType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_ADC, "dcnt", aggregates[AI_ADC]->getResultType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_ODC, "ovdc", aggregates[AI_ODC]->getResultType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_COL, "cols", aggregates[AI_COL]->getResultType().typeId(), NULLABLE, 0))
+        (AttributeDesc(AI_EBM, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
+                       TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0));
+    ArrayDesc metricsOutDesc(metricsInDesc.getName(),
+                             outAttrs,
+                             metricsInDesc.getDimensions(),
+                             createDistribution(psReplication),
+                             _schema.getResidency());
+
+    // Replicate metrics, aggregating them as we go.
+    std::shared_ptr<Array> tmp = metrics;
+    std::shared_ptr<Array> allMetricsArray =
+        redistributeWithAggregates(tmp,
+                                   metricsOutDesc,
+                                   query,
+                                   true, // enforceDataIntegrity
+                                   false, // hasOverlap
+                                   aggregates);
+
+    // Pull all metrics.
+
+    // First, get hold of attribute iterators.
+    std::shared_ptr<ConstArrayIterator> rdArrayIterators[AI_MAX_ATTRS];
+    std::shared_ptr<ConstChunkIterator> rdChunkIterators[AI_MAX_ATTRS];
+    for (AttributeID i = 0; i < attrs.size(); ++i) {
+        rdArrayIterators[i] = allMetricsArray->getConstIterator(i);
+    }
+
+    // This is a full-blown multi-chunk iteration loop, but really we know to only expect one chunk.
+    ChunkEstimator estimator(inOutDims, ChunkEstimator::forRedim_t());
+    estimator.setLogger(logger);
+    while (!rdArrayIterators[0]->end()) {
+
+        // Get chunk iterators...
+        for (size_t i = 0; i < AI_MAX_ATTRS; ++i) {
+            ConstChunk const& chunk = rdArrayIterators[i]->getChunk();
+            rdChunkIterators[i] = chunk.getConstIterator();
+        }
+
+        // Read back (the one and only) chunk of per-dimension tuples.
+        for (int64_t dimNum = 0; !rdChunkIterators[0]->end(); ++dimNum) {
+
+            SCIDB_ASSERT(rdChunkIterators[0]->getPosition()[0] == dimNum);
+
+            // Unrolled attribute loop.
+            ChunkEstimator::Statistics stats;
+            stats[ChunkEstimator::minimum] = rdChunkIterators[AI_MIN]->getItem();
+            stats[ChunkEstimator::maximum] = rdChunkIterators[AI_MAX]->getItem();
+            stats[ChunkEstimator::distinct] = rdChunkIterators[AI_ADC]->getItem();
+            if (dimNum == 0) {
+                // This row contains the statistics not tied to any particular dimension.
+                estimator.setOverallDistinct(rdChunkIterators[AI_ODC]->getItem().getInt64());
+                if (synthDim >= 0) {
+                    estimator.setSyntheticInterval(synthDim, rdChunkIterators[AI_COL]->getItem().getUint64());
+                } else {
+                    // No synthetic dimension.  If there *were* collisions, we don't care---it's
+                    // just an estimate and errs on the high side.
+                    uint64_t nCollisions = rdChunkIterators[AI_COL]->getItem().getUint64();
+                    if (nCollisions) {
+                        LOG4CXX_DEBUG(logger, "" << __FUNCTION__ << ": Estimated " << nCollisions
+                                      << " collisions but there is no synthetic dimension.");
+                    }
+                }
+            }
+            estimator.addStatistics(stats);
+
+            for (auto& cIter : rdChunkIterators) {
+                ++(*cIter);
+            }
+        }
+
+        // Bump the array iterators to get the next set of chunks.
+        for (size_t i = 0; i < AI_MAX_ATTRS; ++i) {
+            ++(*rdArrayIterators[i]);
         }
     }
 
-    /* Using the chunk sizes of each dimension, determine the total
-       number of chunks in the logical coordinate space.  If it is
-       greater than 64 bits, we need an IndirectChunkIdMap.
-     */
-    size_t totalChunks = 1;
-    for (size_t i = 0; i < dims.size(); ++i)
-    {
-        assert(dims[i].getLength());
-        size_t chunksInDim =
-            ((dims[i].getLength() - 1) / dims[i].getChunkInterval()) + 1;
-        size_t newTotalChunks = totalChunks * chunksInDim;
-        if (newTotalChunks / totalChunks != chunksInDim)
-        {
-            useDirect = false;
-            break;
-        }
-        totalChunks = newTotalChunks;
-    }
-
-    /* Return the appropriate sub-type of ChunkIdMap
-     */
-    if (useDirect)
-    {
-        LOG4CXX_DEBUG(logger, "Creating direct chunk-id-map.");
-        result = make_shared<DirectChunkIdMap>(_arena, dims);
-    }
-    else
-    {
-        LOG4CXX_DEBUG(logger, "Creating indirect chunk-id-map.");
-        result = make_shared<IndirectChunkIdMap>(_arena, dims.size());
-    }
-
-    return result;
+    // Finally, estimate the chunk size(s).
+    estimator.go();
 }
 
-}
+} // namespace scidb

@@ -37,6 +37,7 @@ namespace scidb
         : _name("")
         , _password("")
         , _passwordMethod("raw")
+        , _id(0)
     {
 
     }
@@ -44,10 +45,12 @@ namespace scidb
     UserDesc::UserDesc(
         const std::string &rName,
         const std::string &rPassword /* = "" */,
-        const std::string &rPasswordMethod /* = "raw" */)
+        const std::string &rPasswordMethod /* = "raw" */,
+        const ID &id /* = 0 */)
         : _name(rName)
         , _password(rPassword)
         , _passwordMethod(rPasswordMethod)
+        , _id(id)
     {
 
     }

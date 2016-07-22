@@ -42,7 +42,7 @@
 
 #include <util/Mutex.h>
 #include <util/Job.h>
-
+#include "Utility.h"
 namespace scidb
 {
 
@@ -114,8 +114,9 @@ public: // subclasses
     public:
         OverflowException(const char* file, const char* function, int32_t line)
     : SystemException(file, function, line, "scidb",
-            SCIDB_SE_NO_MEMORY, SCIDB_LE_RESOURCE_BUSY,
-            "SCIDB_E_NO_MEMORY", "SCIDB_E_RESOURCE_BUSY", uint64_t(0))
+                      SCIDB_SE_NO_MEMORY, SCIDB_LE_RESOURCE_BUSY,
+                      "SCIDB_E_NO_MEMORY", "SCIDB_E_RESOURCE_BUSY",
+                      INVALID_QUERY_ID)
     {
     }
         ~OverflowException() throw () {}
@@ -384,7 +385,7 @@ private:
     uint32_t _size()
     {
         // mutex must be locked
-        return (_outstanding + _reserved + _workQueue.size());
+        return safe_static_cast<uint32_t>(_outstanding + _reserved + _workQueue.size());
     }
 
     /// Mark the item as complete i.e. decrement the outstanding count etc.

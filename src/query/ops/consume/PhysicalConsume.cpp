@@ -52,6 +52,7 @@ public:
     {
         assert(inputArrays.size() == 1);
         assert(_parameters.size() <= 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
         /* This parameter determines the width of the vertical slice that we use to scan
            Default is 1.
@@ -82,7 +83,7 @@ public:
                  i < (baseAttr + sliceSize);
                  ++i)
             {
-                arrayIters[i - baseAttr] = array->getConstIterator(i);
+                arrayIters[i - baseAttr] = array->getConstIterator(safe_static_cast<AttributeID>(i));
             }
 
             /* Scan each attribute one chunk at a time, use MultiConstIterator

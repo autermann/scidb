@@ -51,8 +51,17 @@
 # include <manager.h>
 # include <Exceptions.h>
 # include <system/Constants.h>
+# include <system/Exceptions.h>
+# include <system/ErrorCodes.h>
 # include <util/PluginManager.h>
 # include <util/ConfigUser.h>
+
+# include <util/AuthenticationFile.h>
+
+# include <openssl/bio.h>
+# include <openssl/buffer.h>
+# include <openssl/evp.h>
+# include <openssl/sha.h>
 
 # define LOGGER_TAG_HARNESS  "[HARNESS]"
 
@@ -293,8 +302,7 @@ void SciDBTestHarness :: printConf (void)
     LOG4CXX_INFO (_logger, "KeepPreviousRun =                             " << _c.keepPreviousRun);
     LOG4CXX_INFO (_logger, "TerminateOnFailure =                          " << _c.terminateOnFailure);
 
-    LOG4CXX_INFO (_logger, "UserName =                                    " << _c.userName);
-    LOG4CXX_INFO (_logger, "UserPassword =                                " << "********");
+    LOG4CXX_INFO (_logger, "auth-file =                                   " << _c.authFile);
 }
 
 int SciDBTestHarness :: createLogger (void)
@@ -558,6 +566,108 @@ int SciDBTestHarness :: validateParameters (void)
 	return SUCCESS;
 }
 
+/**
+ * Free all memory associated with the BIO.
+ */
+static void releaseBio(
+    BIO **ppBioBase64,
+    BIO **ppBioMem)
+{
+    if(*ppBioMem)
+    {
+        BIO *pBioMem = *ppBioMem;
+        BIO_free(pBioMem);
+        *ppBioMem = NULL;
+    }
+
+    if(*ppBioBase64)
+    {
+        BIO *pBioBase64 = *ppBioBase64;
+        BIO_free_all(pBioBase64);
+        *ppBioBase64 = NULL;
+    }
+}
+
+/**
+ * @brief Convert the data in "buffer" into base64 format.
+ */
+static std::string _convertToBase64(
+    uint8_t *   buffer,
+    int         length)
+{
+    BIO         *bioMem = NULL;
+    BIO         *bioBase64 = NULL;
+    BUF_MEM     *bptr = NULL;
+    int         ret;
+
+    std::string resultB64;
+
+    if(!buffer)
+    {
+        cerr << "EXCEPTION:  _convertToBase64(...) buffer = NULL: " << endl;
+        return resultB64;
+    }
+
+    if(!length)
+    {
+        cerr << "EXCEPTION:  _convertToBase64(...) length = 0: " << endl;
+        return resultB64;
+    }
+
+    do
+    {
+        bioBase64 = BIO_new(BIO_f_base64());
+        if(bioBase64 == NULL) break;
+
+        bioMem = BIO_new(BIO_s_mem());
+        if(bioMem == NULL) break;
+
+        BIO *b64 = BIO_push(bioBase64, bioMem);
+        if(b64 == NULL) break;
+        bioMem = NULL;
+        bioBase64 = b64;
+
+        ret = BIO_write(bioBase64, buffer, length);
+        if(ret != length) break;
+
+        ret = BIO_flush(bioBase64);
+        if(1 != ret) break;
+
+        BIO_get_mem_ptr(bioBase64, &bptr);
+        if(bptr == NULL) break;
+
+        std::vector<char> buff(bptr->length);
+        memcpy(buff.data(), bptr->data, bptr->length - 1);
+        buff[bptr->length - 1] = '\0';
+        resultB64 = buff.data();
+    } while(0);
+
+    releaseBio(&bioBase64, &bioMem);
+
+    return resultB64;
+}
+
+/**
+ * @brief Use SHA512 to hash the password and then convert to Base64.
+ * @param password - password to be converted
+ */
+static std::string _hashPassword(
+    const std::string &password,
+    uint32_t           maxIterations = 1)
+{
+    SHA512_CTX              ctx;
+    std::vector<uint8_t>    digest(SHA512_DIGEST_LENGTH);
+
+    SHA512_Init(&ctx);
+    for(uint32_t iteration=0; iteration < maxIterations; ++iteration)
+    {
+        SHA512_Update(&ctx, password.c_str(), password.length());
+    }
+    SHA512_Final(digest.data(), &ctx);
+
+    return _convertToBase64(digest.data(), static_cast<int>(digest.size()));
+}
+
 int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 {
 	po::options_description desc(
@@ -596,8 +706,7 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 		("save-failures",                             "Save output file, log file and diff file with timestamp")
 		("terminate-on-failure",                      "Stop running the harness when a test case fails. By default it will continue to run.")
 		("cleanup",                                   "Does a cleanup and exit. Removes Report.xml and also everything under r/ and log/ directories generated in previous run.")
-		("user-name",            po::value<string>(), "Name of the user to connect as.")
-		("user-password",        po::value<string>(), "The user's password.")
+		("auth-file",            po::value<string>(), "specify the authentication file which contains the user name and password (with password in plaintext format)")
 		("help,h", "View this text.")
                 ("plugins,p",            po::value<string>(), "Plugins folder.")
                 ("version", "version");
@@ -645,11 +754,8 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 			exit (0);
 		}
 
-		if (vm.count ("user-name"))
-			_c.userName = vm["user-name"].as<string>();
-
-		if (vm.count ("user-password"))
-			_c.userPassword = vm["user-password"].as<string>();
+		if (vm.count ("auth-file"))
+			_c.authFile = vm["auth-file"].as<string>();
 
 		if (vm.count ("connect"))
 			_c.scidbServer = vm["connect"].as<string>();
@@ -794,65 +900,96 @@ int SciDBTestHarness :: parseCommandLine (unsigned int argc, char** argv)
 	}
 
 
-	if(_c.userName.empty() && _c.userPassword.empty())
+    std::string scidbConfigUserFilename = _c.authFile;
+	if(_c.authFile.empty())
 	{
-		try
-		{
-			std::string scidbConfigUserFilename =
-				getEnvironmentVariable("SCIDB_CONFIG_USER");
-			if(scidbConfigUserFilename.length() != 0)
-			{
-				// The environment variable "SCIDB_CONFIG_USER" points to
-				// a file that allows setting the username and password if
-				// they are not specified on the command line.  This
-				// segement of code handles that functionality.
+        // The environment variable "SCIDB_CONFIG_USER" points to
+        // a file that allows setting the username and password.
+        scidbConfigUserFilename =
+            getEnvironmentVariable("SCIDB_CONFIG_USER");
+    }
 
-				scidb::ConfigUser *cfgUser = scidb::ConfigUser::getInstance();
+    try
+    {
+        scidb::ConfigUser::verifySafeFile(scidbConfigUserFilename);
 
-				cfgUser->addOption
-					(
-						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_NAME,    // int32_t option
-						'u',                    // char shortCmdLineArg
-						"user-name",            // const std::string &longCmdLineArg
-						"user-name",            // const std::string &configOption
-						"",                     // const std::string &envVariable
-						scidb::ConfigUser::STRING,  // ConfigOptionType type
-						"UserName.",            // const std::string &description = ""
-						std::string("root"),    // const boost::any &value = boost::any()
-						false)                  // bool required = true
+        // New file format 2016_01_07
+        scidb::AuthenticationFile af(scidbConfigUserFilename);
+        _c.userName     = af.getUserName();
+        _c.userPassword = af.getUserPassword();
+    } catch(const scidb::Exception& e) {
+        std::string err = e.what();
 
-					(
-						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_PASSWORD,  // int32_t option
-						'p',                    // char shortCmdLineArg
-						"user-password",        // const std::string &longCmdLineArg
-						"user-password",        // const std::string &configOption
-						"",                     // const std::string &envVariable
-						scidb::ConfigUser::STRING,  // ConfigOptionType type
-						"UserPassword.",        // const std::string &description = ""
-						std::string(""),        // const boost::any &value = boost::any()
-						false)                  // bool required = true
-					;
+        if( (err.find("SCIDB_LE_CONFIGURATION_FILE_BLANK_NAME") != string::npos) ||
+            (err.find("SCIDB_LE_CONFIGURATION_FILE_MISSING") != string::npos) ||
+            (err.find("SCIDB_LE_CONFIGURATION_FILE_MODE") != string::npos)
+          ) {
+            /** Allow for trust mode **/
+            _c.authFile     = "";
+            _c.userName     = "";
+            _c.userPassword = "";
+        } else if(err.find("SCIDB_LE_ERROR_IN_CONFIGURATION_FILE") != string::npos) {
+#if 1
+            // Older file format support (keep for a period of time (two releases?) then remove
+            // and use the code in the #else section
+            stringstream ss;
+            cout    << "WARNING:  Exception=" << e.what() << std::endl
+                    << "    Trying previous authentication file format" << std::endl;
 
-				cfgUser->verifySafeFile(scidbConfigUserFilename);
-				cfgUser->parse(0, NULL, scidbConfigUserFilename.c_str());
+            scidb::ConfigUser *cfgUser = scidb::ConfigUser::getInstance();
 
-				_c.userName =
-					cfgUser->getOption<std::string>(
-						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_NAME);
+            cfgUser->addOption
+                (
+                    scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_NAME,    // int32_t option
+                    'u',                    // char shortCmdLineArg
+                    "user-name",            // const std::string &longCmdLineArg
+                    "user-name",            // const std::string &configOption
+                    "",                     // const std::string &envVariable
+                    scidb::ConfigUser::STRING,  // ConfigOptionType type
+                    "UserName.",            // const std::string &description = ""
+                    std::string("root"),    // const boost::any &value = boost::any()
+                    false)                  // bool required = true
 
-				_c.userPassword =
-					cfgUser->getOption<std::string>(
-						scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_PASSWORD);
-			}
-		} catch (const scidb::Exception& e) {
-			// Assume we are in 'trust' mode but log the exception
-			cerr << "Exception:  - " << e.what() << endl;
+                (
+                    scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_PASSWORD,  // int32_t option
+                    'p',                    // char shortCmdLineArg
+                    "user-password",        // const std::string &longCmdLineArg
+                    "user-password",        // const std::string &configOption
+                    "",                     // const std::string &envVariable
+                    scidb::ConfigUser::STRING,  // ConfigOptionType type
+                    "UserPassword.",        // const std::string &description = ""
+                    std::string(""),        // const boost::any &value = boost::any()
+                    false)                  // bool required = true
+                ;
 
-			// If we cannot read the information from the user config
-			// file it is not the end of the world.  So, we do not
-			// rethrow the exception here.
-		}
-	}
+            cfgUser->verifySafeFile(scidbConfigUserFilename);
+            cfgUser->parse(0, NULL, scidbConfigUserFilename.c_str());
+
+            _c.userName =
+                cfgUser->getOption<std::string>(
+                    scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_NAME);
+
+            _c.userPassword =
+                cfgUser->getOption<std::string>(
+                    scidb::ConfigUser::CONFIG_STRING_SECURITY_USER_PASSWORD);
+#else
+            // Assume we are in 'trust' mode but log the exception
+            cerr << "EXCEPTION:  harness - " << e.what() << endl;
+
+            // If we cannot read the information from the user config
+            // file it is not the end of the world.  So, we do not
+            // rethrow the exception here.
+#endif
+        } else {
+            // Log the exception
+            cerr << "EXCEPTION:  harness - " << e.what() << endl;
+        }
+    }
+
+    if(_c.userPassword.length() != 0)
+    {
+        _c.userPassword = _hashPassword(_c.userPassword);
+    }
 
 	validateParameters ();
 

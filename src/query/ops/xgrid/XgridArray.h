@@ -31,6 +31,7 @@
 #ifndef XGRID_ARRAY_H
 #define XGRID_ARRAY_H
 
+#include "LogicalXgrid.h"       // for ScaleFactors
 #include <array/DelegateArray.h>
 #include <array/MemArray.h>
 
@@ -97,7 +98,9 @@ class XgridArrayIterator : public DelegateArrayIterator
     virtual Coordinates const& getPosition();
     virtual bool setPosition(Coordinates const& pos);
 
-	XgridArrayIterator(XgridArray const& array, AttributeID attrID, std::shared_ptr<ConstArrayIterator> inputIterator);
+    XgridArrayIterator(XgridArray const& array,
+                       AttributeID attrID,
+                       std::shared_ptr<ConstArrayIterator> inputIterator);
 };
 
 class XgridArray : public DelegateArray
@@ -111,14 +114,19 @@ class XgridArray : public DelegateArray
     void out2in(Coordinates const& outPos, Coordinates& inPos) const;
     void in2out(Coordinates const& inPos, Coordinates& outPos) const;
 
+    XgridArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array);
+
   public:
 
     virtual DelegateChunk* createChunk(DelegateArrayIterator const* iterator, AttributeID id) const;
     virtual DelegateArrayIterator* createArrayIterator(AttributeID id) const;
 
-    XgridArray(ArrayDesc const& desc, std::shared_ptr<Array> const& array);
+    // Factory method performs execute()-time scaling on autochunked dimensions.
+    static std::shared_ptr<Array> create(ArrayDesc const& partlyScaledSchema,
+                                         std::vector<int32_t> const& scaleFactors,
+                                         std::shared_ptr<Array>& inputArray);
 };
 
-}
+} // namespace
 
 #endif

@@ -6,12 +6,12 @@
 # 128 MiB == 134217728
 #   8 GiB == 8589934592
 --start-query-logging
---set-format lcsv+
-filter(setopt('read-ahead-size', '134217728'), No = 0)
-filter(setopt('read-ahead-size', '8589934592'), No = 0)
---error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ERROR_NEAR_CONFIG_OPTION "setopt('read-ahead-size', '-42')" 
+--set-format csv+:l
+filter(_setopt('read-ahead-size', '134217728'), No = 0)
+filter(_setopt('read-ahead-size', '8589934592'), No = 0)
+--error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ERROR_NEAR_CONFIG_OPTION "_setopt('read-ahead-size', '-42')" 
 # Restore default value...
-filter(setopt('read-ahead-size', '67108864'), No = 0)
+filter(_setopt('read-ahead-size', '67108864'), No = 0)
 --reset-format
 --stop-query-logging
 

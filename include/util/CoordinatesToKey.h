@@ -26,6 +26,9 @@
  *  Created on: September 26, 2013.
  */
 
+#ifndef COORDINATES_TO_KEY_H_
+#define COORDINATES_TO_KEY_H_
+
 #include <vector>
 #include <query/Operator.h>
 
@@ -109,4 +112,6 @@ public:
     }
 };
 
-}
+}  // namespace scidb
+
+#endif

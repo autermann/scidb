@@ -1,21 +1,21 @@
 Query was executed successfully
 
-SCIDB QUERY : <create array FMT2 <v:double>[i=0:1,2,0, j=0:1,2,0]>
+SCIDB QUERY : <create array FMT2 <v:double NOT NULL>[i=0:1,2,0, j=0:1,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array FMT3 <v:double>[i=0:2,3,0, j=0:2,3,0]>
+SCIDB QUERY : <create array FMT3 <v:double NOT NULL>[i=0:2,3,0, j=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array FMT5 <v:double>[i=0:4,5,0, j=0:4,5,0]>
+SCIDB QUERY : <create array FMT5 <v:double NOT NULL>[i=0:4,5,0, j=0:4,5,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s2_c1 <v:double>[i=0:1,1,0, j=0:1,1,0]>
+SCIDB QUERY : <create array s2_c1 <v:double NOT NULL>[i=0:1,1,0, j=0:1,1,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s2_c2 <v:double>[i=0:1,2,0, j=0:1,2,0]>
+SCIDB QUERY : <create array s2_c2 <v:double NOT NULL>[i=0:1,2,0, j=0:1,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s2_c3 <v:double>[i=0:1,3,0, j=0:1,3,0]>
+SCIDB QUERY : <create array s2_c3 <v:double NOT NULL>[i=0:1,3,0, j=0:1,3,0]>
 Query was executed successfully
 
 SCIDB QUERY : <repart(store( filter(build(s2_c1, 1+10*i+2*j), true), s2_c1 ), FMT2)>
@@ -39,16 +39,16 @@ SCIDB QUERY : <repart(store( filter(build(s2_c3, 1+10*i+2*j), true), s2_c3 ), FM
 {1,0} 11
 {1,1} 13
 
-SCIDB QUERY : <create array s3_c1 <v:double>[i=0:2,1,0, j=0:2,1,0]>
+SCIDB QUERY : <create array s3_c1 <v:double NOT NULL>[i=0:2,1,0, j=0:2,1,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s3_c2 <v:double>[i=0:2,2,0, j=0:2,2,0]>
+SCIDB QUERY : <create array s3_c2 <v:double NOT NULL>[i=0:2,2,0, j=0:2,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s3_c3 <v:double>[i=0:2,3,0, j=0:2,3,0]>
+SCIDB QUERY : <create array s3_c3 <v:double NOT NULL>[i=0:2,3,0, j=0:2,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s3_c4 <v:double>[i=0:2,4,0, j=0:2,4,0]>
+SCIDB QUERY : <create array s3_c4 <v:double NOT NULL>[i=0:2,4,0, j=0:2,4,0]>
 Query was executed successfully
 
 SCIDB QUERY : <repart(store( filter(build(s3_c1, 1+10*i+2*j), true), s3_c1 ), FMT3)>
@@ -99,22 +99,22 @@ SCIDB QUERY : <repart(store( filter(build(s3_c4, 1+10*i+2*j), true), s3_c4 ), FM
 {2,1} 23
 {2,2} 25
 
-SCIDB QUERY : <create array s5_c1 <v:double>[i=0:4,1,0, j=0:4,1,0]>
+SCIDB QUERY : <create array s5_c1 <v:double NOT NULL>[i=0:4,1,0, j=0:4,1,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s5_c2 <v:double>[i=0:4,2,0, j=0:4,2,0]>
+SCIDB QUERY : <create array s5_c2 <v:double NOT NULL>[i=0:4,2,0, j=0:4,2,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s5_c3 <v:double>[i=0:4,3,0, j=0:4,3,0]>
+SCIDB QUERY : <create array s5_c3 <v:double NOT NULL>[i=0:4,3,0, j=0:4,3,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s5_c4 <v:double>[i=0:4,4,0, j=0:4,4,0]>
+SCIDB QUERY : <create array s5_c4 <v:double NOT NULL>[i=0:4,4,0, j=0:4,4,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s5_c5 <v:double>[i=0:4,5,0, j=0:4,5,0]>
+SCIDB QUERY : <create array s5_c5 <v:double NOT NULL>[i=0:4,5,0, j=0:4,5,0]>
 Query was executed successfully
 
-SCIDB QUERY : <create array s5_c6 <v:double>[i=0:4,6,0, j=0:4,6,0]>
+SCIDB QUERY : <create array s5_c6 <v:double NOT NULL>[i=0:4,6,0, j=0:4,6,0]>
 Query was executed successfully
 
 SCIDB QUERY : <repart(store( filter(build(s5_c1, 1+10*i+2*j), true), s5_c1 ), FMT5)>

@@ -78,18 +78,12 @@ public:
         return true;
     }
 
-
-    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
-    {
-        return RedistributeContext(psScaLAPACK);
-    }
     // if outputting partial blocks that need to be merged, one needs to override
     // another operator called ???
 
     virtual std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query);
     virtual std::shared_ptr<Array>  invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query>& query,
-                                         ArrayDesc& outSchema);
+                                              ArrayDesc& outSchema);
 };
 
 std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<Array> >& inputArrays,
@@ -147,11 +141,9 @@ std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<
     } else {
         LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): not participating in MPI");
 
-        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
-
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0],
+                                                                         outSchema.getDistribution(),
+                                                                         query, "MPICopyPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
@@ -160,7 +152,7 @@ std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<
         }
         inputArrays[0].reset();
         unlaunchMPISlavesNonParticipating();
-        return std::shared_ptr<Array>(new MemArray(_schema,query));
+        return std::shared_ptr<Array>(new MemArray(outSchema,query));
     }
 
     // REFACTOR: this is a pattern in DLAs
@@ -179,8 +171,8 @@ std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<
     if(DBG) std::cerr << tmp2.str() << std::endl;
 
     // find M,N from input array
-    slpp::int_t M = nRow(Ain);
-    slpp::int_t N = nCol(Ain);
+    slpp::int_t M = slpp::int_cast(nRow(Ain));
+    slpp::int_t N = slpp::int_cast(nCol(Ain));
     if(DBG) std::cerr << "M " << M << " N " << N << std::endl;
 
 
@@ -271,11 +263,10 @@ std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<
     size_t resultShmIpcIndx = 2;
     shmSharedPtr_t OUTx(shmIpc[resultShmIpcIndx]);
 
-    procRowCol_t firstChunkSize = { chunkRow(Ain), chunkCol(Ain) };
-    std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-       make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
-
-    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain, schemeData, query, "MPICopyPhysical");
+    std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(Ain,
+                                                                     outSchema.getDistribution(),
+                                                                     query,
+                                                                     "MPICopyPhysical");
 
     bool wasConverted = (tmpRedistedInput != Ain) ;  // only when redistribute was actually done (sometimes optimized away)
 
@@ -302,7 +293,7 @@ std::shared_ptr<Array>  MPICopyPhysical::invokeMPI(std::vector< std::shared_ptr<
     //
     LOG4CXX_DEBUG(logger, "MPICopyPhysical::invokeMPI(): calling mpiCopyMaster M,N " << M << "," << N << "MB,NB:" << MB << "," << NB);
     std::shared_ptr<MpiSlaveProxy> slave = _ctx->getSlave(_launchId);
-    slpp::int_t MYPE = query->getInstanceID() ;  // we map 1-1 between instanceID and MPI rank
+    slpp::int_t MYPE = slpp::int_cast(query->getInstanceID()) ;  // we map 1-1 between instanceID and MPI rank
     slpp::int_t INFO = DEFAULT_BAD_INFO ;
     mpiCopyMaster(query.get(), _ctx, slave, _ipcName, argsBuf,
                   NPROW, NPCOL, MYPROW, MYPCOL, MYPE,
@@ -370,6 +361,8 @@ std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Arr
 
     if(DBG) std::cerr << "MPICopyPhysical::execute() begin ---------------------------------------" << std::endl;
 
+    checkOrUpdateIntervals(_schema, inputArrays[0]);
+
     //
     // repartition and redistribution from SciDB chunks and arbitrary distribution
     // to
@@ -378,7 +371,7 @@ std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Arr
     //   arbitrary chunkSize to one that is efficient for ScaLAPACK
     //
     size_t nInstances = query->getInstancesCount();
-    slpp::int_t instanceID = query->getInstanceID();
+    slpp::int_t instanceID = slpp::int_cast(query->getInstanceID());
 
     if (inputArrays.size() != 1) {
          throw (SYSTEM_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OPERATION_FAILED) << "MPICopyPhysical must have only one input");
@@ -392,11 +385,9 @@ std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Arr
         bool isParticipating = launchMPISlaves(query, 0);
         SCIDB_ASSERT(!isParticipating);
 
-        procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
-
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0],
+                                                                         _schema.getDistribution(),
+                                                                         query, "MPICopyPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
@@ -443,10 +434,15 @@ std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Arr
         SCIDB_ASSERT(!isParticipating);
 
         procRowCol_t firstChunkSize = { chunkRow(inputArrays[0]), chunkCol(inputArrays[0]) };
-        std::shared_ptr<PartitioningSchemaDataForScaLAPACK> schemeData =
-        make_shared<PartitioningSchemaDataForScaLAPACK>(getBlacsGridSize(inputArrays, query, "MPICopyPhysical"), firstChunkSize);
 
-        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0], schemeData, query, "MPICopyPhysical");
+        std::shared_ptr<ScaLAPACKArrayDistribution> schemeData =
+        std::make_shared<ScaLAPACKArrayDistribution>(DEFAULT_REDUNDANCY,
+                                                     getBlacsGridSize(inputArrays, query, "MPICopyPhysical"),
+                                                     firstChunkSize);
+
+        std::shared_ptr<Array> tmpRedistedInput = redistributeInputArray(inputArrays[0],
+                                                                         _schema.getDistribution(),
+                                                                         query, "MPICopyPhysical");
 
         bool wasConverted = (tmpRedistedInput != inputArrays[0]) ;  // only when redistribute was actually done (sometimes optimized away)
         if (wasConverted) {
@@ -464,7 +460,7 @@ std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Arr
         }
     }
 
-    slpp::int_t IC = query->getInstancesCount();
+    slpp::int_t IC = slpp::int_cast(query->getInstancesCount());
     slpp::int_t NP = blacsGridSize.row * blacsGridSize.col ;
 
     if(DBG) {
@@ -486,7 +482,7 @@ std::shared_ptr<Array> MPICopyPhysical::execute(std::vector< std::shared_ptr<Arr
         std::cerr << "   -> gridPos:(" << MYPROW << ", " << MYPCOL << ")" << std::endl;
     }
 
-    int minLen = std::min(nRows, nCols);
+    int minLen = safe_static_cast<int>(std::min(nRows, nCols));
     if(DBG) {
         std::cerr << "-------------------------------------" << std::endl ;
         std::cerr << "MPICopyPhysical::execute(): nInstances=" << nInstances << std::endl ;

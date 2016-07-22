@@ -35,7 +35,8 @@ using namespace std;
 using namespace boost;
 
 namespace scidb {
-    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.qproc.processor"));
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.merge"));
 
 class PhysicalMerge: public PhysicalOperator
 {
@@ -56,6 +57,18 @@ public:
         return inputBoundaries[0].unionWith(inputBoundaries[1]);
     }
 
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const& inputDistributions,
+                                                      std::vector<ArrayDesc> const& inputSchemas) const
+    {
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+        assertConsistency(inputSchemas[1], inputDistributions[1]);
+
+        RedistributeContext distro = PhysicalOperator::getOutputDistribution(inputDistributions,
+                                                                             inputSchemas);
+        LOG4CXX_TRACE(logger, "merge() output distro: "<< distro);
+        return distro;
+    }
+
     /**
      * Ensure startMin, endMax, chunkOverlap, and chunkInterval match
      * for each of the input arrays.  Note:  the only one this routine
@@ -69,65 +82,44 @@ public:
         assert(N > 1);
         assert(N == modifiedPtrs.size());
 
-
         ArrayDesc const&     mergedSchema      = _schema;
-        std::string const&   mergedName        = mergedSchema.getName();
-        Dimensions const&    mergedDimensions  = mergedSchema.getDimensions();
-        Attributes const &   mergedAttributes  = mergedSchema.getAttributes();
-
         _redimRepartSchemas.clear();
+        bool foundNonAutochunked = false;
         for (size_t nSchema = 0; nSchema < inputSchemas.size(); nSchema++)
         {
             ArrayDesc const &currentSchema  = inputSchemas[nSchema];
-            if (modifiedPtrs[nSchema])
-            {
-                // If an explicit redimension or repartition is
-                // present, we are forbidden to change it
-                // --- yet it *must* match!!! ---
-                ArrayDesc const &modifiedSchema = *(modifiedPtrs[nSchema]);
-                if(!mergedSchema.sameSchema(modifiedSchema))
-                {
-                    Dimensions const&  modifiedDimensions =
-                        modifiedSchema.getDimensions();
-
-                    throw USER_EXCEPTION(
-                            SCIDB_SE_OPERATOR,
-                            SCIDB_LE_BAD_EXPLICIT_REPART)
-                        << getLogicalName()
-                        << mergedDimensions
-                        << modifiedDimensions;
-                }
-
-                // Indicate no modification is necessary.
-                modifiedPtrs[nSchema] = 0;
+            if (!currentSchema.isAutochunked()) {
+                foundNonAutochunked = true;
             }
-            else
-            {
-                if(mergedSchema.sameSchema(currentSchema))
-                {
-                    // Indicate no modification is necessary.
-                    modifiedPtrs[nSchema] = 0;
-                }
-                else
-                {
-                    ArrayDesc newSchema  = currentSchema;
+            if(mergedSchema.sameShape(currentSchema)) {
+                // Indicate no modification is necessary.
+                modifiedPtrs[nSchema] = nullptr;
+            }
+            else {
+                ArrayDesc newSchema  = currentSchema;
 
-                    // Replace the current schema's dimension values with
-                    // those from the merged schema.
-                    newSchema.replaceDimensionValues(mergedSchema);
-
-                    // Create a modifification indicator.
-                    _redimRepartSchemas.push_back(make_shared<ArrayDesc>(
-                        newSchema.getName(),
-                        newSchema.getAttributes(),
-                        newSchema.getDimensions(),
-                        defaultPartitioning()));
-
-                    // Indicate modification is necessary.
-                    modifiedPtrs[nSchema] = _redimRepartSchemas.back().get();
-                }
-            }  // if (modifiedPtrs[nSchema]) { ... } else { ... }
+                // Replace the current schema's dimension values with
+                // those from the merged schema.
+                newSchema.replaceDimensionValues(mergedSchema);
+                // Create a modifification indicator.
+                _redimRepartSchemas.push_back(make_shared<ArrayDesc>(
+                                                  newSchema.getName(),
+                                                  newSchema.getAttributes(),
+                                                  newSchema.getDimensions(),
+                                                  newSchema.getDistribution(),
+                                                  newSchema.getResidency() ));
+                // Indicate modification is necessary.
+                modifiedPtrs[nSchema] = _redimRepartSchemas.back().get();
+            }
         }  // for (size_t nSchema = 0; nSchema < ...) { ... }
+
+        if (!foundNonAutochunked) {
+            // All the input schemas are autochunked, which is not allowed.
+            // This should have been caught in LogicalMerge::inferSchema when
+            // the exemplar schema was being determined.
+            throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ALL_INPUTS_AUTOCHUNKED)
+                << getPhysicalName();
+        }
 
         if (_redimRepartSchemas.empty())
         {
@@ -136,13 +128,25 @@ public:
         }
     }
 
-    /***
+    /**
      * Merge is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
      * that overrides the chunkiterator method.
      */
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() >= 2);
+        checkOrUpdateIntervals(_schema, inputArrays[0]); // The mergedDimensions[] intervals come from left array.
+                                                         // See LogicalMerge::inferSchema().
+
+        const std::shared_ptr<Array>& left = inputArrays[0];
+        const std::shared_ptr<Array>& right = inputArrays[1];
+        if (isDebug()) {
+            SCIDB_ASSERT(left->getArrayDesc().getResidency()->isEqual(right->getArrayDesc().getResidency()));
+            SCIDB_ASSERT(left->getArrayDesc().getDistribution()->checkCompatibility(right->getArrayDesc().getDistribution()));
+
+            SCIDB_ASSERT(left->getArrayDesc().getResidency()->isEqual(_schema.getResidency()));
+            SCIDB_ASSERT(left->getArrayDesc().getDistribution()->checkCompatibility(_schema.getDistribution()));
+        }
         return std::shared_ptr<Array>(new MergeArray(_schema, inputArrays));
     }
 };

@@ -37,12 +37,12 @@
 #include <log4cxx/logger.h>
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <util/arena/Vector.h>
 #include <util/arena/UnorderedMap.h>
 #include <array/Metadata.h>
 #include <array/MemArray.h>
 #include <array/TileIteratorAdaptors.h>
-#include <query/QueryProcessor.h>
 #include <network/NetworkManager.h>
 #include <query/Aggregate.h>
 #include <array/DelegateArray.h>
@@ -206,7 +206,9 @@ public:
                     << "improper use of FinalResultArray";
             }
 
-            for(AttributeID i =0, n=desc.getAttributes().size(); i<n; i++)
+            for(AttributeID i =0, n=safe_static_cast<AttributeID>(desc.getAttributes().size());
+                i<n;
+                i++)
             {
                 if (_aggs[i].get())
                 {
@@ -337,7 +339,15 @@ class AggregatePartitioningOperator : public PhysicalOperator
             std::vector<RedistributeContext> const&,
             std::vector<ArrayDesc> const&) const
     {
-        return RedistributeContext(defaultPartitioning());
+        std::shared_ptr<Query> query(_query);
+        SCIDB_ASSERT(query);
+
+        SCIDB_ASSERT(query->getDefaultArrayResidency()->isEqual(_schema.getResidency()));
+        SCIDB_ASSERT(defaultPartitioning()->checkCompatibility(_schema.getDistribution()));
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
+
     }
 
     virtual void initializeOperator(ArrayDesc const& inputSchema)
@@ -425,7 +435,7 @@ class AggregatePartitioningOperator : public PhysicalOperator
                         }
                     }
                 }
-                countMapping.setInputAttributeId(j);
+                countMapping.setInputAttributeId(safe_static_cast<AttributeID>(j));
                 _ioMappings.push_back(countMapping);
             }
         }
@@ -436,9 +446,12 @@ class AggregatePartitioningOperator : public PhysicalOperator
     ArrayDesc createStateDesc()
     {
         Attributes outAttrs;
-        for (size_t i=0, n=_schema.getAttributes().size(); i<n; i++)
+        for (AttributeID i=0, n=safe_static_cast<AttributeID>(_schema.getAttributes().size());
+             i < n;
+             i++)
         {
-            if (_schema.getEmptyBitmapAttribute() == NULL || _schema.getEmptyBitmapAttribute()->getId() != i)
+            if (_schema.getEmptyBitmapAttribute() == NULL
+                || _schema.getEmptyBitmapAttribute()->getId() != i)
             {
                 Value defaultNull;
                 defaultNull.setNull(0);
@@ -446,11 +459,17 @@ class AggregatePartitioningOperator : public PhysicalOperator
                                                   _schema.getAttributes()[i].getName(),
                                                   _aggs[i]->getStateType().typeId(),
                                                   AttributeDesc::IS_NULLABLE,
-                                                  0, std::set<std::string>(), &defaultNull, ""));
+                                                  0, std::set<std::string>(),
+                                                  &defaultNull, ""));
             }
         }
 
-        return ArrayDesc(_schema.getName(), outAttrs, _schema.getDimensions(), defaultPartitioning(), _schema.getFlags());
+        return ArrayDesc(_schema.getName(),
+                         outAttrs,
+                         _schema.getDimensions(),
+                         _schema.getDistribution(),
+                         _schema.getResidency(),
+                         _schema.getFlags());
     }
 
     void initializeOutput(std::shared_ptr<ArrayIterator>& stateArrayIterator,
@@ -1111,9 +1130,18 @@ class AggregatePartitioningOperator : public PhysicalOperator
         }
     }
 
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
+    }
+
     std::shared_ptr<Array>
     execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
+        AutochunkFixer af(getControlCookie());
+        af.fix(_schema, inputArrays);
+
         ArrayDesc const& inArrayDesc = inputArrays[0]->getArrayDesc();
         initializeOperator(inArrayDesc);
 
@@ -1168,14 +1196,17 @@ class AggregatePartitioningOperator : public PhysicalOperator
 
         std::shared_ptr<Array> input(stateArray);
         std::shared_ptr<Array> mergedArray = redistributeToRandomAccess(input,
-                                                                          query,
-                                                                          _aggs,
-                                                                          defaultPartitioning(),
-                                                                          ALL_INSTANCE_MASK,
-                                                                          std::shared_ptr<CoordinateTranslator>(),
-                                                                          0,
-                                                                          std::shared_ptr<PartitioningSchemaData>());
+                                                                        defaultPartitioning(),
+                                                                        ArrayResPtr(), //default query residency
+                                                                        query,
+                                                                        _aggs);
         stateArray.reset();
+
+        _schema.setDistribution(mergedArray->getArrayDesc().getDistribution());
+        _schema.setResidency(mergedArray->getArrayDesc().getResidency());
+
+        SCIDB_ASSERT(_schema.getDistribution()->checkCompatibility(defaultPartitioning()));
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(query->getDefaultArrayResidency()));
 
         std::shared_ptr<Array> finalResultArray (std::make_shared<FinalResultArray>(
                                                 _schema, mergedArray, _aggs, _schema.getEmptyBitmapAttribute()));

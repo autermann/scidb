@@ -49,12 +49,6 @@ namespace scidb
 
     void Job::execute()
     {
-        if (_query) {
-            Query::setCurrentQueryID(_query->getQueryID());
-        } else {
-            Query::setCurrentQueryID(0);
-        }
-
         if (!_removed) {
             const char *err_msg = "Job::execute: unhandled exception";
             try {
@@ -66,7 +60,7 @@ namespace scidb
                               << "\ntype: " << typeid(x).name()
                               << "\njobType: " << typeid(*this).name()
                               << "\nmesg: " << x.what()
-                              << "\nqueryID = "<<(_query ? _query->getQueryID() : 0));
+                              << "\nqueryID = "<<(_query ? _query->getQueryID() : INVALID_QUERY_ID));
             } catch (const std::exception& e) {
                 try {
                     _error = SYSTEM_EXCEPTION_SPTR(SCIDB_SE_EXECUTION, SCIDB_LE_UNKNOWN_ERROR) << e.what();
@@ -74,7 +68,7 @@ namespace scidb
                                   << "\ntype: " << typeid(e).name()
                                   << "\njobType: " << typeid(*this).name()
                                   << "\nmesg: " << e.what()
-                                  << "\nqueryID = "<<(_query ? _query->getQueryID() : 0));
+                                  << "\nqueryID = "<<(_query ? _query->getQueryID() : INVALID_QUERY_ID));
                 } catch (...) {}
                 throw;
             } catch (...) {
@@ -87,7 +81,6 @@ namespace scidb
         }
         _query.reset();
         _done.release();
-        Query::setCurrentQueryID(0);
     }
 
     // Waits until job is done

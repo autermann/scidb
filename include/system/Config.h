@@ -77,7 +77,7 @@ enum
     CONFIG_STORAGE_MIN_ALLOC_SIZE_BYTES,
     CONFIG_READ_AHEAD_SIZE,
     CONFIG_DAEMON_MODE,
-    CONFIG_UNUSED_23,           // ditto
+    CONFIG_REDIM_TARGET_CELLS_PER_CHUNK,
     CONFIG_RESULT_PREFETCH_THREADS,
     CONFIG_RESULT_PREFETCH_QUEUE_SIZE,
     CONFIG_VERSION,
@@ -138,7 +138,10 @@ enum
     CONFIG_INPUT_DOUBLE_BUFFERING,
     CONFIG_SECURITY,
     CONFIG_ENABLE_CHUNKMAP_RECOVERY,
-    CONFIG_SKIP_CHUNKMAP_INTEGRITY_CHECK
+    CONFIG_SKIP_CHUNKMAP_INTEGRITY_CHECK,
+    CONFIG_ONLINE,
+    CONFIG_OLD_OR_NEW_WINDOW,
+    CONFIG_AUTOCHUNK_MAX_SYNTHETIC_INTERVAL
 };
 
 enum RepartAlgorithm
@@ -371,6 +374,8 @@ public:
     std::string setOptionValue(std::string const& name, std::string const& value);
 
     std::string getOptionValue(std::string const& name);
+
+    ConfigOptionType getOptionType(int32_t option);
 
     std::string toString();
 

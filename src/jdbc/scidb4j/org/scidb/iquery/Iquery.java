@@ -45,6 +45,7 @@ import java.util.Vector;
 import org.scidb.client.*;
 import org.scidb.jdbc.ResultSet;
 import org.scidb.client.SciDBException;
+import org.scidb.client.QueryID;
 
 /**
  * Iquery simulates iquery.
@@ -70,7 +71,7 @@ public class Iquery
         private boolean  _aql;
         private boolean  _interactive;
         private org.scidb.client.Connection _connection;
-        private long     _currentQueryID;
+        private QueryID  _currentQueryID;
         private boolean  _firstSaving; //For clearing result file for the first time and appending next times
         private boolean  _nofetch;
         private boolean  _timer;
@@ -89,7 +90,7 @@ public class Iquery
         public boolean  getAql() { return _aql; }
         public boolean  getInteractive() { return _interactive; }
         public org.scidb.client.Connection getConnection() { return _connection; }
-        public long     getCurrentQueryID() { return _currentQueryID; }
+        public QueryID  getCurrentQueryID() { return _currentQueryID; }
         public boolean  getFirstSaving() { return _firstSaving; }
         public boolean  getNoFetch() { return _nofetch; }
         public boolean  getTimer() { return _timer; }
@@ -110,7 +111,7 @@ public class Iquery
         public void     setAql(boolean newValue) { _aql = newValue; }
         public void     setInteractive(boolean newValue) { _interactive = newValue; }
         public void     setConnection(org.scidb.client.Connection newValue) { _connection = newValue; }
-        public void     setCurrentQueryID(long newValue) { _currentQueryID = newValue; }
+        public void     setCurrentQueryID(QueryID newValue) { _currentQueryID = newValue; }
         public void     setFirstSaving(boolean newValue) { _firstSaving = newValue; }
         public void     setNoFetch(boolean newValue) { _nofetch = newValue; }
         public void     setTimer(boolean newValue) { _timer = newValue; }
@@ -198,49 +199,50 @@ public class Iquery
         }
 
 
-        if( (config.getUserName().length() == 0) &&
-            (config.getUserPassword().length() == 0))
+        String scidbConfigUserFilename = config.getAuthFile();
+        if(scidbConfigUserFilename.length() == 0)
         {
-            String scidbConfigUserFilename =
-                System.getenv("SCIDB_CONFIG_USER");
-            if( (scidbConfigUserFilename!= null) &&
-                (scidbConfigUserFilename.length() != 0))
-            {
+            scidbConfigUserFilename = System.getenv("SCIDB_CONFIG_USER");
+        }
 
+        if( (scidbConfigUserFilename!= null) &&
+            (scidbConfigUserFilename.length() != 0))
+        {
+            try
+            {
+                ConfigUser configUser = ConfigUser.getInstance();
+                configUser.verifySafeFile(
+                    scidbConfigUserFilename,
+                    iquery.getState().getBypassUsrCfgPermsChk());
+
+                AuthenticationFile authFile;
                 try
                 {
-                    ConfigUser configUser = ConfigUser.getInstance();
-                    configUser.verifySafeFile(
-                        scidbConfigUserFilename,
-                        iquery.getState().getBypassUsrCfgPermsChk());
-
-                    configUser.addObject(
-                        "user-name",
-                        new String("root"));
-
-                    configUser.addObject(
-                        "user-password",
-                        new String("Paradigm4"));
-
-                    configUser.parse(scidbConfigUserFilename);
-                    //configUser.show();
-
-                    String name = configUser.get("user-name").toString();
-                    String password = configUser.get("user-password").toString();
-
-                    if((name.length() != 0) && (password.length() != 0))
-                    {
-                        iquery.getState().setUserName(name);
-                        iquery.getState().setUserPassword(password);
-                    }
-                } catch(ConfigUserException ex) {
-                    // Print error and terminate application
-                    ex.printStackTrace();
-                    System.exit(1);
+                    authFile = new AuthenticationFile(scidbConfigUserFilename);
+                    //System.out.println( authFile.toString() );
+                } catch(FileNotFoundException ex) {
+                    // Rethrow as ConfigUserException
+                    throw new ConfigUserException(ex);
                 } catch(IOException ex) {
                     // Rethrow as ConfigUserException
                     throw new ConfigUserException(ex);
                 }
+
+                String name     = authFile.getUserName();
+                String password = authFile.getUserPassword();
+
+                if((name.length() != 0) && (password.length() != 0))
+                {
+                    iquery.getState().setUserName(name);
+                    iquery.getState().setUserPassword(password);
+                }
+            } catch(ConfigUserException ex) {
+                // Print error and terminate application
+                ex.printStackTrace();
+                System.exit(1);
+            } catch(IOException ex) {
+                // Rethrow as ConfigUserException
+                throw new ConfigUserException(ex);
             }
         }
 
@@ -254,7 +256,7 @@ public class Iquery
         iquery.getState().setCol(1);
         iquery.getState().setLine(1);
         iquery.getState().setInteractive(false);
-        iquery.getState().setCurrentQueryID(0);
+        iquery.getState().setCurrentQueryID(new QueryID());
         iquery.getState().setFirstSaving(true);
 
         //
@@ -461,8 +463,9 @@ public class Iquery
 
     /**
      * A private function supporting executeCommandOrQuery().
+     * @return true if the executed query requires an explicit commit
      */
-    private void executePreparedSciDBQuery(String queryString, Config config)
+    private boolean executePreparedSciDBQuery(String queryString, Config config)
     throws IOException, FileNotFoundException, SciDBException
     {
         if (getState().getVerbose())
@@ -555,6 +558,8 @@ public class Iquery
 
         // Note from Donghui Zhang:
         // Warnings handling from iquery is omitted here.
+
+        return (!result.getAutoCommit());
     }
 
     /**
@@ -576,16 +581,18 @@ public class Iquery
 
         getState().setCurrentQueryID(queryResult.getQueryId());
 
+        boolean needCommit = true;
         try {
-            executePreparedSciDBQuery(queryString, config);
+            needCommit = executePreparedSciDBQuery(queryString, config);
         } catch (Exception e) {
             SciDBException.errorOut(e);
         }
 
-        long queryID = getState().getCurrentQueryID();
-        getState().setCurrentQueryID(0);
+        QueryID queryID = getState().getCurrentQueryID();
+        getState().setCurrentQueryID(new QueryID());
 
-        if (queryID!=0 && getState().getConnection()!=null)
+        if (queryID.isValid() && needCommit &&
+            getState().getConnection()!=null)
         {
             getState().getConnection().commit();
         }

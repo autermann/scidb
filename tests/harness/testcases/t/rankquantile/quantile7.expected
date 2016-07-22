@@ -13,7 +13,7 @@ Query was executed successfully
 
 SCIDB QUERY : <show(P)>
 {i} schema
-{0} 'P<a:string,b:double> [x=0:1,2,0,y=0:1,2,0]'
+{0} 'P<a:string,b:double NOT NULL> [x=0:1,2,0,y=0:1,2,0]'
 
 SCIDB QUERY : <store(build(A,string(100000000*(x+2))),A)>
 {x} a

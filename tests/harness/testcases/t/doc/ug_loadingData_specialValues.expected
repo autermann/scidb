@@ -5,7 +5,7 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "LOAD v4 FROM '${TEST_D
 {i} val1,val2
 {0} 0,100
 {1} 1,99
-{2} 2,0
+{2} 2,null
 {3} 3,97
 
 SCIDB QUERY : <CREATE ARRAY v4_dflt <val1:int8,val2:int8 default 111>[i=0:3,4,0]>

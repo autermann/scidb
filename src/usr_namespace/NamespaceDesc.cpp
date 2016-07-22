@@ -34,28 +34,35 @@
 namespace scidb
 {
     NamespaceDesc::NamespaceDesc()
-        : _name("")
-        , _id(-1)  // Not initialized
+        : _name("public")
+        , _id(PUBLIC_NS_ID)
     {
 
     }
 
     NamespaceDesc::NamespaceDesc(
-        const std::string &rName)
-        : _name(rName)
-        , _id(-1)
+        const std::string &name)
+        : _name(name)
+        , _id(UNINITIALIZED_NS_ID)
     {
-
+        
+        if(name == "public")
+        {
+            _id = PUBLIC_NS_ID;
+        }
     }
 
 
     NamespaceDesc::NamespaceDesc(
-        const std::string &     rName,
+        const std::string &     name,
         NamespaceDesc::ID       id)
-        : _name(rName)
+        : _name(name)
         , _id(id)
     {
-
+        if(name == "public")
+        {
+            _id = PUBLIC_NS_ID;
+        }
     }
 } // namespace scidb
 

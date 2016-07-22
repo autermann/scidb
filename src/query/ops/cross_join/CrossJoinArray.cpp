@@ -366,10 +366,10 @@ namespace scidb
       rightDesc(rightArray->getArrayDesc()),
       left(leftArray),
       right(rightArray),
-      nLeftDims(leftDesc.getDimensions().size()),
-      nRightDims(rightDesc.getDimensions().size()),
-      nLeftAttrs(leftDesc.getAttributes().size()),
-      nRightAttrs(rightDesc.getAttributes().size()),
+      nLeftDims(safe_static_cast<AttributeID>(leftDesc.getDimensions().size())),
+      nRightDims(safe_static_cast<AttributeID>(rightDesc.getDimensions().size())),
+      nLeftAttrs(safe_static_cast<AttributeID>(leftDesc.getAttributes().size())),
+      nRightAttrs(safe_static_cast<AttributeID>(rightDesc.getAttributes().size())),
       leftJoinDims(ljd),
       rightJoinDims(rjd),
       nJoinDims(0)
@@ -382,8 +382,8 @@ namespace scidb
             }
         }
 
-        leftEmptyTagPosition = leftDesc.getEmptyBitmapAttribute() != NULL ? leftDesc.getEmptyBitmapAttribute()->getId() : -1;
-        rightEmptyTagPosition = rightDesc.getEmptyBitmapAttribute() != NULL ? rightDesc.getEmptyBitmapAttribute()->getId() : -1;
+        leftEmptyTagPosition = leftDesc.getEmptyBitmapAttribute() != NULL ? leftDesc.getEmptyBitmapAttribute()->getId() : INVALID_ATTRIBUTE_ID;
+        rightEmptyTagPosition = rightDesc.getEmptyBitmapAttribute() != NULL ? rightDesc.getEmptyBitmapAttribute()->getId() : INVALID_ATTRIBUTE_ID;
     }
 
     bool CrossJoinArray::matchPosition(Coordinates const& left, Coordinates const& right) const

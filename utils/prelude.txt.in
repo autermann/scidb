@@ -129,6 +129,20 @@ func_max ( _FIRST_, _SECOND_ ) = iif ( _FIRST_ > _SECOND_, _FIRST_, _SECOND_ );
 func_min ( _FIRST_, _SECOND_ ) = iif ( _FIRST_ < _SECOND_, _FIRST_, _SECOND_ );
 
 /**
+ *  Macro to pull out the current version and code revision of SciDB.
+ */
+op_scidbversion() = redimension(
+  apply(
+    project(
+      filter(list('libraries'), name='SciDB' and inst=0), 
+      major, minor, build
+    ), 
+    i, inst
+  ), 
+  <major:uint32, minor:uint32, build:uint32>[i=0:0,1,0]
+);
+
+/**
  *  Macros to set the values of a particular attribute in a named array at
  *  the specified array coordinates.
  *
@@ -229,8 +243,7 @@ sys_create_array_att(_L_,_S_,_D_) =
      min   :int64 null,
      max   :int64 null,
      count:int64 null>
-     [n]      
-);
+     [n=0:*,?,0]);
 
  /**
  *  Computes summary statistics for a proposed  dimension '_D_' of a new array
@@ -277,6 +290,6 @@ sys_create_array_dim(_L_,_S_,_D_) =
      min  :int64 null,
      max  :int64 null,
      count:int64 null>
-     [n]);
+     [n=0:*,?,0]);
 
 /****************************************************************************/

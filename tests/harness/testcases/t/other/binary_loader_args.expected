@@ -32,26 +32,26 @@ SCIDB QUERY : <(... omitted ...)>
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A2, '${TEST_DATA_DIR}/A2_err.txt', -2, 'text', 3)">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A2, '${TEST_DATA_DIR}/A2_err.txt', -2, 'text', 9999, A2_shadow)">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A2a, '${TEST_DATA_DIR}/A2_err.txt', -2, 'text', 9999)">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <(... omitted ...)>
 [An error expected at this place for the query "(... omitted ...)". And it failed with error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED. Expected error code = scidb::SCIDB_SE_IMPORT_ERROR::SCIDB_LE_FILE_IMPORT_FAILED.]
@@ -62,10 +62,10 @@ SCIDB QUERY : <(... omitted ...)>
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(A2a, '${TEST_DATA_DIR}/A2_err.txt', -2, 'text', 4, A2a_err)">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <scan(A2a_err)>
 {i} a,b,c,d,e,f,g,row_offset

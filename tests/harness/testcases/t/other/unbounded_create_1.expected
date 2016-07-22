@@ -8,7 +8,7 @@ Query was executed successfully
 {1} 'y',0,4611686018427387904,10,0,4611686018427387903,-4611686018427387903,'int64'
 
 {No} name,type_id,nullable
-{0} 'a','int64',false
+{0} 'a','int64',true
 
 Query was executed successfully
 

@@ -30,9 +30,11 @@
 
 #include <string.h>
 
-#include <query/Operator.h>
 #include <array/TupleArray.h>
+#include <query/Operator.h>
 #include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+
 
 using namespace std;
 using namespace boost;
@@ -60,17 +62,25 @@ public:
             std::vector<RedistributeContext> const& inputDistributions,
             std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)
     {
         assert(_parameters.size() == 1);
-        string arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
 
-        SystemCatalog& catalog = * SystemCatalog::getInstance();
+        string arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
         ArrayDesc arrayDesc;
-        catalog.getArrayDesc(arrayName, query->getCatalogVersion(arrayName), LAST_VERSION, arrayDesc);
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(
+            namespaceName, arrayName, arrayId, LAST_VERSION, arrayDesc);
 
         Coordinates lowBoundary = arrayDesc.getLowBoundary();
         Coordinates highBoundary = arrayDesc.getHighBoundary();

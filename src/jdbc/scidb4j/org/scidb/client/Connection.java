@@ -31,6 +31,12 @@ import org.scidb.io.network.Message;
 import org.scidb.io.network.Message.QueryResult;
 import org.scidb.io.network.Network;
 
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
+
+
 /**
  * SciDB connection
  */
@@ -38,18 +44,18 @@ public class Connection
 {
     private Network _net;
     private boolean _afl = false;
-    private long _queryId = 0;
+    private QueryID _queryId = new QueryID();
     private String _queryStr = "";
     private WarningCallback _warningCallback;
-    private List<Long> _activeQueries = new ArrayList<Long>();
+    private List<Result> _activeQueries = new ArrayList<Result>();
 
     private static Logger log = Logger.getLogger(Connection.class.getName());
 
-    private long       getQueryId() { return _queryId; }
+    private QueryID    getQueryId() { return _queryId; }
     private String     getQueryStr() { return _queryStr; }
-    private List<Long> getActiveQueries() { return _activeQueries; }
+    private List<Result> getActiveQueries() { return _activeQueries; }
 
-    private void       setQueryId(long newValue) { _queryId = newValue; }
+    private void       setQueryId(QueryID newValue) { _queryId = newValue; }
     private void       setQueryStr(String newValue) { _queryStr = newValue; }
 
     /**
@@ -102,7 +108,7 @@ public class Connection
         setQueryStr(queryString);
         log.fine(String.format("Preparing query '%s'", queryString));
         Message msg = new Message.Query(
-            0, queryString, getAfl(), "", false);  // false = no execute
+            null, queryString, getAfl(), "", false);  // false = no execute
         getNetwork().write(msg);
         msg = getNetwork().read();
 
@@ -174,12 +180,19 @@ public class Connection
      */
     public Result execute() throws IOException, SciDBException
     {
-        if (getQueryId() == 0)
+        assert(getQueryId() != null);
+
+        log.fine(String.format("Executing query %s",
+                               getQueryId().toString()));
+
+
+        if (!getQueryId().isValid())
         {
-            throw new SciDBException("Query not prepared");
+            throw new SciDBException("Query not prepared"+
+                                     String.format(" -- query %s",
+                                                   getQueryId().toString()));
         }
 
-        log.fine(String.format("Executing query %d", getQueryId()));
         Message msg = new Message.Query(
             getQueryId(), getQueryStr(), getAfl(), "", true);
 
@@ -196,7 +209,7 @@ public class Connection
                 log.fine("Got result from server");
                 Result res = new Result((QueryResult) msg, this);
                 res.setElapsedTimeMillis(elapsedTimeMillis);
-                getActiveQueries().add(res.getQueryId());
+                getActiveQueries().add(res);
                 return res;
 
             case Message.mtError:
@@ -215,14 +228,19 @@ public class Connection
      */
     public void commit() throws IOException, SciDBException
     {
-        List<Long> activeQueries = new ArrayList<Long>(
+        List<Result> activeQueries = new ArrayList<Result>(
             getActiveQueries());
         getActiveQueries().clear();
 
-        for (long queryId: activeQueries)
+        for (Result res: activeQueries)
         {
-            log.fine(String.format("Committing query %d", queryId));
-            getNetwork().write(new Message.CompleteQuery(queryId));
+            if (res.getAutoCommit()) {
+                continue;
+            }
+
+            log.fine(String.format("Committing query %s",
+                                   res.getQueryId().toString()));
+            getNetwork().write(new Message.CompleteQuery(res.getQueryId()));
             Message msg = getNetwork().read();
 
             switch (msg.getHeader().messageType)
@@ -250,14 +268,16 @@ public class Connection
      */
     public void rollback() throws IOException, SciDBException
     {
-        List<Long> activeQueries = new ArrayList<Long>(
+        List<Result> activeQueries = new ArrayList<Result>(
             getActiveQueries());
         getActiveQueries().clear();
 
-        for (long queryId: activeQueries)
+        for (Result res: activeQueries)
         {
-            log.fine(String.format("Rolling back query %d", queryId));
-            getNetwork().write(new Message.AbortQuery(queryId));
+            log.fine(String.format("Rolling back query %s",
+                                   res.getQueryId().toString()));
+
+            getNetwork().write(new Message.AbortQuery(res.getQueryId()));
             Message msg = getNetwork().read();
 
             switch (msg.getHeader().messageType)
@@ -308,6 +328,7 @@ public class Connection
         return getNetwork().getTimeout();
     }
 
+
     /**
      * Tells SciDB that a new client is starting.
      * If SciDB is in authentication mode it will request the user
@@ -326,7 +347,7 @@ public class Connection
             throw new SciDBException(new String("null network"));
         }
 
-        getNetwork().write(new Message.NewClientStart(0));
+        getNetwork().write(new Message.NewClientStart(null));
         Message resultMessage = getNetwork().read();
 
         Boolean done = false;
@@ -352,6 +373,32 @@ public class Connection
                         if(strMessage.compareTo("login:") == 0) {
                             userResponse = userName;
                         } else if(strMessage.compareTo("password:") == 0) {
+                            try {
+                                // Digest with SHA-512
+                                MessageDigest messageDigest = MessageDigest.getInstance("SHA-512");
+                                messageDigest.update(userPassword.getBytes());
+                                byte[] messageDigestSHA512 = messageDigest.digest();
+
+                                // Encode with Base64
+                                Base64.Encoder encoder = Base64.getEncoder();
+                                String encodeResult = encoder.encodeToString(messageDigestSHA512);
+
+                                userPassword=encodeResult;
+                            } catch(NoSuchAlgorithmException ex) {
+                                // --- send SecurityMessageResponse --- //
+                                {
+                                    getNetwork().write(
+                                        new Message.SecurityMessageResponse(null, ""));
+                                    resultMessage = getNetwork().read();
+                                }
+
+                                log.severe("Unable to get the MsgDigest");
+
+                                throw new SciDBException(
+                                    String.format(
+                                        "Unable to get the MsgDigest '%s'", messageType));
+                            }
+
                             userResponse = userPassword;
                         } else {
                             userResponse = "Unknown request";
@@ -368,7 +415,7 @@ public class Connection
                     // --- send SecurityMessageResponse --- //
                     {
                         getNetwork().write(
-                            new Message.SecurityMessageResponse(1, userResponse));
+                            new Message.SecurityMessageResponse(null, userResponse));
                         resultMessage = getNetwork().read();
                     }
                 } break;

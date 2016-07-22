@@ -13,23 +13,15 @@ SCIDB QUERY : <store(build(ARRAY1,I+J),ARRAY1)>
 SCIDB QUERY : <store(build(ARRAY2,I+J),ARRAY2)>
 [Query was executed successfully, ignoring data output by this query.]
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=0),count(*))>
-{i} count
-{0} 500760
+SCIDB QUERY : <aggregate(ARRAY1, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 3004501500,0,3000
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=1),count(*))>
-{i} count
-{0} 500760
+SCIDB QUERY : <aggregate(ARRAY2, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 3004501500,0,3000
 
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=2),count(*))>
-{i} count
-{0} 500741
-
-SCIDB QUERY : <aggregate(filter(apply(ARRAY1, instanceid, instanceid()), instanceid=3),count(*))>
-{i} count
-{0} 500740
-
-SCIDB QUERY : <apply(ARRAY1,zz,injectError(2, 4))>
+SCIDB QUERY : <apply(ARRAY1,zz,injectError(1, 4))>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <(... omitted ...)>
@@ -38,6 +30,14 @@ SCIDB QUERY : <(... omitted ...)>
 SCIDB QUERY : <aggregate(filter(apply(join(ARRAY1,ARRAY2),attrDiff,ARRAY1.v - ARRAY2.v), attrDiff<>0),count(*))>
 {i} count
 {0} 0
+
+SCIDB QUERY : <aggregate(ARRAY1, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 3004501500,0,3000
+
+SCIDB QUERY : <aggregate(ARRAY2, SUM(v), MIN(v), MAX(v))>
+{i} v_sum,v_min,v_max
+{0} 3004501500,0,3000
 
 SCIDB QUERY : <remove(ARRAY1)>
 Query was executed successfully

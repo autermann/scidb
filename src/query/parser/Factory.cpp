@@ -23,6 +23,7 @@
 /****************************************************************************/
 
 #include "AST.h"                                         // For Factory
+#include <system/Config.h>                               // For Config::getOption<>()
 
 /****************************************************************************/
 namespace scidb { namespace parser { namespace {
@@ -304,6 +305,28 @@ Node* Factory::newRef(const location& w,Name* name,Node* av,Node* order)
         v = av;                                          // ...set qualifier
     }
 
+    /**
+     *  AFL% remove(NS1.A1);
+     *
+     *  From AST.h:
+     *    n      = referenceArgName
+     *    a      = referenceArgArray,
+     *    v      = referenceArgVersion,
+     *    order  = referenceArgOrder,
+     *    0      = referenceArgAlias,
+     *
+     *  From Desugarer.cpp:
+     *
+     *    Node*       const a(pn->get(applicationArgOperands));// The operand list
+     *    Node*       const n(a->get(listArg0));               // The remove array name
+     *    std::string arrayName     = n->get(referenceArgName,variableArgName)->getString();
+     *    std::string namespaceName;
+     *
+     *    if(n->get(referenceArgArray,variableArgName)->is(cstring))
+     *    {
+     *      namespaceName = n->get(referenceArgArray,variableArgName)->getString();
+     *    }
+     */
     return newNode(reference,w,n,a,v,order,0);           // Create a reference
 }
 
@@ -385,6 +408,27 @@ Node* Factory::newReal   (const location& w,real    v){return new(_arena) NodeOf
 Node* Factory::newString (const location& w,chars   v){return new(_arena) NodeOf<chars>  (cstring, w,v);}
 Node* Factory::newBoolean(const location& w,boolean v){return new(_arena) NodeOf<boolean>(cboolean,w,v);}
 Node* Factory::newInteger(const location& w,integer v){return new(_arena) NodeOf<integer>(cinteger,w,v);}
+
+Node* Factory::newCfgParm(const location& w,integer v)
+{
+    integer parmValue;
+    string badOption("newCfgParm: unsupported config option type: ");
+    Config* cfg = Config::getInstance();
+
+    switch (cfg->getOptionType(v)) {
+    case Config::SIZE:
+        parmValue = safe_static_cast<integer>(cfg->getOption<size_t>(v));
+        break;
+    case Config::INTEGER:
+        parmValue = cfg->getOption<integer>(v);
+        break;
+    default:
+        badOption += cfg->getOptionName(v);
+        assert(!badOption.c_str());
+    }
+
+    return newInteger(w, parmValue);
+}
 
 /****************************************************************************/
 

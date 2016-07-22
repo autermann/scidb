@@ -115,7 +115,7 @@ LQPtr Driver::translatePlan(Node* n)
 
 void Driver::fail(const UserException& what)
 {
-    throw what;
+    what.raise();
 }
 
 void Driver::fail(error e,const Node& n,const char* s)
@@ -146,7 +146,7 @@ void Driver::fail(error e,const location& w,const char* s)
     switch (e)
     {
         case SCIDB_LE_QUERY_PARSING_ERROR:  fail(USER_QUERY_EXCEPTION(SCIDB_SE_PARSER,SCIDB_LE_QUERY_PARSING_ERROR, c) << s);break;
-        case SCIDB_LE_BAD_BLOCK_COMMENT:    fail(USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX,SCIDB_LE_BAD_BLOCK_COMMENT,   c) << s);break;
+        case SCIDB_LE_BAD_BLOCK_COMMENT:    fail(USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX,SCIDB_LE_BAD_BLOCK_COMMENT,   c));break;
         case SCIDB_LE_BAD_LITERAL_REAL:     fail(USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX,SCIDB_LE_BAD_LITERAL_REAL,    c) << s);break;
         case SCIDB_LE_BAD_LITERAL_INTEGER:  fail(USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX,SCIDB_LE_BAD_LITERAL_INTEGER, c) << s);break;
         case SCIDB_LE_NAME_REDEFINED:       fail(USER_QUERY_EXCEPTION(SCIDB_SE_SYNTAX,SCIDB_LE_NAME_REDEFINED,      c) << s);break;

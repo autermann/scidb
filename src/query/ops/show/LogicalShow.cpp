@@ -32,6 +32,7 @@
 
 #include "query/Operator.h"
 #include "query/OperatorLibrary.h"
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 using namespace boost;
@@ -84,22 +85,30 @@ public:
         std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
         if (_parameters.size() == 0)
         {
-			res.push_back(PARAM_SCHEMA());
-			res.push_back(PARAM_CONSTANT(TID_STRING));
+            res.push_back(PARAM_SCHEMA());
+            res.push_back(PARAM_CONSTANT(TID_STRING));
         }
         else if (_parameters.size() == 1)
         {
-			if (_parameters[0]->getParamType() == PARAM_LOGICAL_EXPRESSION)
-			{
-				res.push_back(PARAM_CONSTANT(TID_STRING));
-			}
-			res.push_back(END_OF_VARIES_PARAMS());
+            if (_parameters[0]->getParamType() == PARAM_LOGICAL_EXPRESSION)
+            {
+                res.push_back(PARAM_CONSTANT(TID_STRING));
+            }
+            res.push_back(END_OF_VARIES_PARAMS());
         }
         else if (_parameters.size() == 2)
         {
-			res.push_back(END_OF_VARIES_PARAMS());
+            res.push_back(END_OF_VARIES_PARAMS());
         }
         return res;
+    }
+
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to read the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ReadArray);
+        return permissions;
     }
 
     ArrayDesc inferSchema(vector<ArrayDesc> inputSchemas, std::shared_ptr<Query> query)
@@ -108,24 +117,32 @@ public:
 
         if (_parameters.size() == 2)
         {
-			string lang = evaluate(
-					((std::shared_ptr<OperatorParamLogicalExpression>&) _parameters[1])->getExpression(),
-					query, TID_STRING).getString();
-			std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
-			if (lang != "aql" && lang != "afl")
-			{
-				throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_LANGUAGE_STRING,
-						_parameters[1]->getParsingContext());
-			}
-		}
+            const std::shared_ptr<scidb::LogicalExpression> &queryString =
+                ((std::shared_ptr<OperatorParamLogicalExpression>&) _parameters[1])->getExpression();
 
-		Attributes atts(1);
-		atts[0] = AttributeDesc((AttributeID)0, "schema",  TID_STRING, 0, 0 );
+            string lang = evaluate(queryString, query, TID_STRING).getString();
+            std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
+            if (lang != "aql" && lang != "afl")
+            {
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_WRONG_LANGUAGE_STRING,
+                    _parameters[1]->getParsingContext());
+            }
+        }
 
-		Dimensions dims(1);
-		dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
+        Attributes atts(1);
+        atts[0] = AttributeDesc((AttributeID)0, "schema",  TID_STRING, 0, 0 );
 
-		return ArrayDesc("", atts, dims, defaultPartitioning());
+        Dimensions dims(1);
+        dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
+
+        stringstream ss;
+        ss << query->getInstanceID();
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        return ArrayDesc("", atts, dims,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

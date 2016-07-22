@@ -171,7 +171,7 @@ SCIDB QUERY : <store(gemm(ident11c32,   ident11c32, build(ident11c32,0)), tmp)>
 
 SCIDB QUERY : <show(tmp)>
 {i} schema
-{0} 'tmp<gemm:double> [r=0:0,32,0,c=0:0,32,0]'
+{0} 'tmp<gemm:double NOT NULL> [r=0:0,32,0,c=0:0,32,0]'
 
 SCIDB QUERY : <scan(tmp)>
 {r,c} gemm

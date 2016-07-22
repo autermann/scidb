@@ -22,10 +22,10 @@
 # shared library for executing simple text queries
 set(scidbclient_src
     SciDBRemote.cpp
+    SciDBRemoteStubs.cpp
     ../network/BaseConnection.cpp
     ../system/Exceptions.cpp
     ../array/Metadata.cpp
-    ../array/ArrayDistribution.cpp
     ${CMAKE_BINARY_DIR}/src/system/Constants.cpp
     ../smgr/io/ArrayWriter.cpp
     ../smgr/io/TemplateParser.cpp
@@ -57,7 +57,7 @@ file(GLOB scidbclient_include "include/*.h")
 include_directories(${CityHash_INCLUDE_DIR})
 add_library(scidbclient SHARED ${scidbclient_src} ${scidbclient_include})
 add_dependencies(scidbclient scidb_msg_lib)
-
+set_source_files_properties(../query/FunctionLibrary.cpp PROPERTIES COMPILE_FLAGS "-Wno-conversion")
 
 
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "libscidbclient${CMAKE_SHARED_LIBRARY_SUFFIX}" scidbclient)

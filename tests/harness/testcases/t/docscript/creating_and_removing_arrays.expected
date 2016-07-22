@@ -62,7 +62,7 @@ SCIDB QUERY : <create array D<val1:char default 'a', val2:int32 default 1, val3:
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <show(D)>
-[('D<val1:char DEFAULT \'a\',val2:int32 DEFAULT 1,val3:int64 NULL DEFAULT ?30> [i=0:9,10,0]')]
+[('D<val1:char,val2:int32,val3:int64> [i=0:9,10,0]')]
 
 SCIDB QUERY : <store(build(<val:double null> [i=0:4,5,0], '[47.0, ?, -21.1, ?100, ?50]',true), A)>
 [Query was executed successfully, ignoring data output by this query.]

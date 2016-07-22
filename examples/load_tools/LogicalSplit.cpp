@@ -60,7 +60,9 @@ public:
         vector<DimensionDesc> dimensions(2);
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        return ArrayDesc("split", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("split", attributes, dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 
 };

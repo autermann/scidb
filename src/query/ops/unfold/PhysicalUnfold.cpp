@@ -28,6 +28,7 @@
  */
 
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include "UnfoldArray.h"
 
 using namespace std;
@@ -44,17 +45,32 @@ namespace scidb
 		   ArrayDesc const& schema)
       : PhysicalOperator(logicalName, physicalName, parameters, schema) {}
 
-    virtual RedistributeContext
-    getOutputDistribution(vector<RedistributeContext> const& inputDistributions,
-			  vector<ArrayDesc> const& inputSchemas) const {
-      // Distribution is undefined.
-      return RedistributeContext(psUndefined);
-    }
+      virtual RedistributeContext
+      getOutputDistribution(vector<RedistributeContext> const& inputDistributions,
+                            vector<ArrayDesc> const& inputSchemas) const
+      {
+          // Distribution is undefined.
+          assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+          ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+          SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema()==psUndefined);
+          mySchema->setResidency(inputDistributions[0].getArrayResidency());
+
+          return RedistributeContext(_schema.getDistribution(),
+                                     _schema.getResidency());
+      }
 
     virtual bool
     changesDistribution(std::vector<ArrayDesc> const& sourceSchemas) const {
       // This could change the distribution.
       return true;
+    }
+
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see LogicalUnfold::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
     }
 
     /**
@@ -68,6 +84,9 @@ namespace scidb
 	    std::shared_ptr<Query> query) {
       // This operator never takes more than one input array.
       assert(inputArrays.size() == 1);
+
+      AutochunkFixer af(getControlCookie());
+      af.fix(_schema, inputArrays);
 
       // Return an UnfoldArray which defers the work to the "pull" phase.
       return std::make_shared<UnfoldArray> (_schema, inputArrays[0],

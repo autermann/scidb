@@ -26,7 +26,7 @@
  * @brief Window array implementation
  *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>, poliocough@gmail.com,
-           paulgeoffreybrown@gmail.com
+           pbrown@paradigm4.com
  */
 #include <boost/numeric/conversion/cast.hpp>
 #include <log4cxx/logger.h>
@@ -36,6 +36,8 @@
 #include "system/SciDBConfigOptions.h"
 
 #include "WindowArray.h"
+
+#include <util/RegionCoordinatesIterator.h>
 
 using namespace std;
 using namespace boost;
@@ -58,7 +60,12 @@ namespace scidb
      _inputMap(_chunk._inputMap),
      _currPos(0),
      _nDims(chunk._nDims),
-     _coords(_nDims)
+     _coords(_nDims),
+     _useOLDWindowAlgorithm( arrayIterator.useOLDWindowAlgorithm() ),
+     _windowStartCoords(_nDims),
+     _windowEndCoords(_nDims),
+     _stripeStartCoords(_nDims),
+     _stripeEndCoords(_nDims)
     {
        if ((_iterationMode & IGNORE_EMPTY_CELLS) == false)
        {
@@ -83,8 +90,127 @@ namespace scidb
      *  have been materialized. As we scan the cells in the input
      *  chunk, this method computes the window aggregate(s) for each
      *  non-empty cell in the input.
+     *
+     *   NOTE: This implementation replaces the original, which is
+     *         in the calculateNextValueOLD() function. If we don't
+     *         encounter any problems with the NEW algorithm in the
+     *         field, we'll get rid of the OLD completely, and
+     *         replace it with the NEW all the time.  function. If we don't
+     *         encounter any problems with the NEW algorithm in the
+     *         field, we'll get rid of the OLD completely, and
+     *         replace it with the NEW all the time.
      */
-    void MaterializedWindowChunkIterator::calculateNextValue()
+    void MaterializedWindowChunkIterator::calculateNextValueNEW()
+    {
+        SCIDB_ASSERT ((_nDims == _chunk._array._dimensions.size()));
+        SCIDB_ASSERT ((_nDims > 0 ));
+
+        //
+        // Where are we?
+        Coordinates const& currPos = getPosition();
+
+        //
+        //  Figure out the start and end positions of the window.
+        //
+        //  We need to check that we're not stepping out over the limit of the
+        // entire array's dimensional boundaries when the chunk is at the array edge.
+        for (size_t i = 0; i < _nDims; i++)
+        {
+            _windowStartCoords[i] = std::max(currPos[i] - _chunk._array._window[i]._boundaries.first, _chunk._array._dimensions[i].getStartMin());
+            _windowEndCoords[i]   = std::min(currPos[i] + _chunk._array._window[i]._boundaries.second, _chunk._array._dimensions[i].getEndMax());
+        }
+
+        //
+        //  Set up the object we'll use to track the several start and
+        // end stripes of the window.
+        RegionCoordinatesIterator regionCoordinatesIterator( _windowStartCoords, _windowEndCoords );
+
+        //
+        //  The map<> we're using to hold the data is keyed on the logical
+        // position within the chunk, not on the coordinates. So we need to
+        // convert the Coordinates for each stripe to the logical position.
+        uint64_t windowStartPos = _chunk.coord2pos( regionCoordinatesIterator.getPosition() );
+        uint64_t windowEndPos   = _chunk.coord2pos( _windowEndCoords );
+
+        //
+        //  Data object used to hold the state of the aggregate as
+        //  we process the values in the window.
+        _state.setNull(0);
+
+        //
+        //  The _inputMap contains an entry for every non-NULL cell in the
+        // input. So set iterators at the start and the end of the window
+        // to ensure we're not going outside it's bounds.
+        map<uint64_t, Value>::const_iterator windowIteratorCurr =
+                                        _inputMap.lower_bound(windowStartPos);
+        map<uint64_t, Value>::const_iterator windowIteratorEnd  =
+                                        _inputMap.upper_bound(windowEndPos);
+
+        //
+        //  We process the data stripe at a time. So we need another iterator
+        // to point to the end of the current "stripe".
+        map<uint64_t, Value>::const_iterator endOfStripeIter;
+        uint64_t stripeStartPos = 0, stripeEndPos = 0;
+
+        while( windowIteratorCurr != windowIteratorEnd )
+        {
+            //
+            //  Where are we in coordinates space?
+            _chunk.pos2coord( windowIteratorCurr->first, _stripeStartCoords );
+
+            //
+            //  Find the "next" cell that's inside the window in coordinate
+            // space ...
+            regionCoordinatesIterator.advanceToAtLeast( _stripeStartCoords );
+
+            //
+            //  We're inside a window. Let's find the map<> position at the 'start'
+            // of the stripe ...
+            _stripeStartCoords         = regionCoordinatesIterator.getPosition();
+            stripeStartPos             = _chunk.coord2pos(_stripeStartCoords);
+            windowIteratorCurr         = _chunk._inputMap.lower_bound(stripeStartPos);
+
+            //
+            // Now find the coordinate at the 'end' of the stripe ...
+            _stripeEndCoords           = _stripeStartCoords;
+            _stripeEndCoords[_nDims-1] = _windowEndCoords[_nDims-1];
+            stripeEndPos               = _chunk.coord2pos(_stripeEndCoords);
+            endOfStripeIter            = _inputMap.upper_bound(stripeEndPos);
+
+            //
+            //  Check that we found anything from this stripe in the map<> at all, and
+            // if not proceed to the next stripe...
+            if ( windowIteratorCurr == endOfStripeIter )
+                continue;
+
+            //
+            //  Now, just zip through the stripe of values in the map<>,
+            // accumulating data into the aggregate as we go.
+            while ( windowIteratorCurr != endOfStripeIter )
+            {
+               _aggregate->accumulateIfNeeded(_state, windowIteratorCurr->second);
+               windowIteratorCurr++;
+            }
+        }
+
+        //
+        // Done. Finalize the aggregate and compute the result ...
+        _aggregate->finalResult(_nextValue, _state);
+
+    }
+    /**
+     *   Calculate next value using materialized input chunk
+     *
+     *   Private function used when the input chunk's contents
+     *  have been materialized. As we scan the cells in the input
+     *  chunk, this method computes the window aggregate(s) for each
+     *  non-empty cell in the input.
+     *
+     *    NOTE: This is the original implementation to be replaced
+     *          (we hope) if the NEW algorithm doesn't stir up any
+     *          issues in the field.
+     */
+    void MaterializedWindowChunkIterator::calculateNextValueOLD()
     {
         Coordinates const& currPos = getPosition();
         Coordinates windowStart(_nDims);
@@ -158,6 +284,16 @@ namespace scidb
             nextIter:;
         }
         _aggregate->finalResult(_nextValue, state);
+    }
+
+    void MaterializedWindowChunkIterator::calculateNextValue()
+    {
+        if ( useOLDWindowAlgorithm() )
+        {
+          calculateNextValueOLD();
+        } else {
+          calculateNextValueNEW();
+        }
     }
 
     /**
@@ -811,13 +947,12 @@ namespace scidb
                     materialize();
                 } else {
 
-				    LOG4CXX_TRACE ( windowLogger,
+                    LOG4CXX_TRACE ( windowLogger,
                                     "WindowChunk::setPosition(..) - NOT MATERIALIZING \n"
                                     << "\t materializedChunkSize = " << materializedChunkSize
                                     << " as inputChunk.count() = " << inputChunk.count() << " and varSize = " << varSize
                                     << " and maxMaterializedChunkSize = " << maxMaterializedChunkSize
-				                  );
-				    LOG4CXX_TRACE ( windowLogger, "\t NOT MATERIALIZING ");
+                                  );
                 }
             }
         }
@@ -829,7 +964,8 @@ namespace scidb
       iterator(arr._inputArray->getConstIterator(input)),
       currPos(arr._dimensions.size()),
       chunk(arr, attrID),
-      _method(method)
+      _method(method),
+      _useOLDWindowAlgorithm(Config::getInstance()->getOption<bool>(CONFIG_OLD_OR_NEW_WINDOW))
     {
         reset();
     }

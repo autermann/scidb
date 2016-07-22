@@ -19,9 +19,9 @@
 *
 * END_COPYRIGHT
 */
+
 ///
-/// ScaLAPACKLogical.cpp
-///
+/// @file ScaLAPACKLogical.cpp
 ///
 
 // standards
@@ -31,6 +31,7 @@
 #include <log4cxx/logger.h>
 
 // SciDB
+#include <system/Warnings.h>
 
 // local
 #include "scalapackUtil/ScaLAPACKLogical.hpp"
@@ -46,17 +47,25 @@ inline bool hasSingleAttribute(ArrayDesc const& desc)
     return desc.getAttributes().size() == 1 || (desc.getAttributes().size() == 2 && desc.getAttributes()[1].isEmptyIndicator());
 }
 
-void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query,
-                          size_t nMatsMin, size_t nMatsMax)
+// Called from both logical and physical operators, via the wrappers that immediately follow it.
+//
+// @note We use SCIDB_SE_INFER_SCHEMA here but it would be nice to use either that or
+// SCIDB_SE_OPTIMIZER depending on the caller.  See Trac ticket #5048.
+//
+static void checkScaLAPACKSchemasInternal(std::vector<ArrayDesc const*> schemas,
+                                          std::shared_ptr<Query> query,
+                                          size_t nMatsMin,
+                                          size_t nMatsMax,
+                                          bool fromLogical)
 {
     enum dummy  {ROW=0, COL=1};
     enum dummy2 { ATTR0=0 };
 
     const size_t NUM_MATRICES = schemas.size();
 
-
     if(schemas.size() < nMatsMin ||
        schemas.size() > nMatsMax) {
+        assert(fromLogical);
         throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR2);
     }
 
@@ -65,15 +74,18 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query>
     // Check individual properties in the loop, and any inter-matrix properties after the loop
     // TODO: in all of these, name the argument # at fault
     for(size_t iArray=0; iArray < NUM_MATRICES; iArray++) {
+        assert(schemas[iArray]);
 
         // check: attribute count == 1
-        if (!hasSingleAttribute(schemas[iArray])) {
+        if (!hasSingleAttribute(*schemas[iArray])) {
+            assert(fromLogical);
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR2);
             // TODO: offending matrix is iArray
         }
 
         // check: attribute type is double
-        if (schemas[iArray].getAttributes()[ATTR0].getType() != TID_DOUBLE) {
+        if (schemas[iArray]->getAttributes()[ATTR0].getType() != TID_DOUBLE) {
+            assert(fromLogical);
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR5);
             // TODO: offending matrix is iArray
         }
@@ -84,14 +96,16 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query>
         //       and call that a "row vector"  The other way could never be acceptable.
         //
         const size_t SCALAPACK_IS_2D = 2 ;
-        if (schemas[iArray].getDimensions().size() != SCALAPACK_IS_2D) {
+        if (schemas[iArray]->getDimensions().size() != SCALAPACK_IS_2D) {
+            assert(fromLogical);
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR3);
             // TODO: offending matrix is iArray
         }
 
         // check: size is bounded
-        const Dimensions& dims = schemas[iArray].getDimensions();
+        const Dimensions& dims = schemas[iArray]->getDimensions();
         if (dims[ROW].isMaxStar() || dims[COL].isMaxStar()) {
+            assert(fromLogical);
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR9);
         }
         // TODO: check: sizes are not larger than largest ScaLAPACK fortran INTEGER
@@ -100,21 +114,31 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query>
         // "dimensions must start at 0"
         for(unsigned dim =ROW; dim <= COL; dim++) {
             if(dims[dim].getStartMin() != 0) {
+                assert(fromLogical);
                 throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR44);
             }
         }
 
+        // Check intervals at physical execute() time too, since they may be unspecified
+        // (autochunked) at logical inferSchema() time.
+        bool rowAutochunked = dims[ROW].isAutochunked();
+        bool colAutochunked = dims[COL].isAutochunked();
+        ASSERT_EXCEPTION(fromLogical || (!rowAutochunked && !colAutochunked),
+                         "Unresolved chunk intervals at execute() time");
+
         // check: chunk interval not too small
-        if (dims[ROW].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE ||
-            dims[COL].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE ) {
+        // If autochunked, interval checks must wait until execute().
+        if ((!rowAutochunked && dims[ROW].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE) ||
+            (!colAutochunked && dims[COL].getChunkInterval() < slpp::SCALAPACK_MIN_BLOCK_SIZE) ) {
             // the cache will thrash and performance will be unexplicably horrible to the user
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR41); // too small
         }
 
 
         // check: chunk interval not too large
-        if (dims[ROW].getChunkInterval() > slpp::SCALAPACK_MAX_BLOCK_SIZE ||
-            dims[COL].getChunkInterval() > slpp::SCALAPACK_MAX_BLOCK_SIZE ) {
+        // If autochunked, interval checks must wait until execute().
+        if ((!rowAutochunked && dims[ROW].getChunkInterval() > slpp::SCALAPACK_MAX_BLOCK_SIZE) ||
+            (!colAutochunked && dims[COL].getChunkInterval() > slpp::SCALAPACK_MAX_BLOCK_SIZE) ) {
             // the cache will thrash and performance will be unexplicably horrible to the user
             throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR42); // too large
         }
@@ -126,9 +150,15 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query>
         if (false) {
             // broken code inside postWarning(SCIDB_WARNING()) faults and needs a different argument.
             for(size_t d = ROW; d <= COL; d++) {
-                if(dims[d].getChunkInterval() != slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE) {
+                // If autochunked, interval checks must wait until execute().
+                if(dims[d].isAutochunked())
+                    continue;
+                // If executing, just warn once (on the coordinator).
+                if (!fromLogical && !query->isCoordinator())
+                    continue;
+                if(dims[d].getRawChunkInterval() != slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE) {
                     query->postWarning(SCIDB_WARNING(DLA_WARNING4) << slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE
-                                                                   << slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE);
+                                       << slpp::SCALAPACK_EFFICIENT_BLOCK_SIZE);
                 }
             }
         }
@@ -149,14 +179,17 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query>
     // check: the chunkSizes from the user must be identical (until auto-repart is working)
     const bool AUTO_REPART_WORKING = false ;  // #2032
     if( ! AUTO_REPART_WORKING ) {
-        int64_t commonChunkSize = schemas[0].getDimensions()[ROW].getChunkInterval();
+        int64_t commonChunkSize = schemas[0]->getDimensions()[ROW].getRawChunkInterval();
+        if (commonChunkSize == DimensionDesc::AUTOCHUNKED) {
+            throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR10);
+        }
         // TODO: remove these checks if #2023 is fixed and requiresRedimensionOrRepartition()
         // is functioning correctly
         for(size_t iArray=0; iArray < NUM_MATRICES; iArray++) {
-            const Dimensions& dims = schemas[iArray].getDimensions();
+            const Dimensions& dims = schemas[iArray]->getDimensions();
             // arbitrarily take first mentioned chunksize as the one for all to share
-            if (dims[ROW].getChunkInterval() != commonChunkSize ||
-                dims[COL].getChunkInterval() != commonChunkSize ) {
+            if (dims[ROW].getRawChunkInterval() != commonChunkSize ||
+                dims[COL].getRawChunkInterval() != commonChunkSize ) {
                 throw PLUGIN_USER_EXCEPTION(DLANameSpace, SCIDB_SE_INFER_SCHEMA, DLA_ERROR10);
                 // TODO: name the matrix
             }
@@ -185,6 +218,39 @@ void checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query>
     // TODO: after #2032 is fixed, have James fix note(4) above.
     //
 }
+
+
+// Check dimensions from logical inferSchema()
+void checkScaLAPACKLogicalInputs(std::vector<ArrayDesc> const& schemas,
+                                 std::shared_ptr<Query> query,
+                                 size_t nMatsMin, size_t nMatsMax)
+{
+    std::vector<ArrayDesc const*> schemaPtrs(schemas.size());
+    size_t i = 0;
+    for (auto const& schema : schemas) {
+        schemaPtrs[i++] = &schema;
+    }
+
+    checkScaLAPACKSchemasInternal(schemaPtrs, query, nMatsMin, nMatsMax,
+                                  /*fromLogical:*/ true);
+}
+
+
+// Check dimensions from physical execute()
+void checkScaLAPACKPhysicalInputs(std::vector< std::shared_ptr<Array> > const& inputs,
+                                  std::shared_ptr<Query> query,
+                                  size_t nMatsMin, size_t nMatsMax)
+{
+    std::vector<ArrayDesc const*> schemaPtrs(inputs.size());
+    size_t i = 0;
+    for (auto& arrayPtr : inputs) {
+        schemaPtrs[i++] = &arrayPtr->getArrayDesc();
+    }
+
+    checkScaLAPACKSchemasInternal(schemaPtrs, query, nMatsMin, nMatsMax,
+                                  /*fromLogical:*/ false);
+}
+
 
 // PGB: the requirement on names is that until such a time as we have syntax to disambiguate them by dimesion index
 //      or other means, they must be distinct, else if stored, we will lose access to any but the first.

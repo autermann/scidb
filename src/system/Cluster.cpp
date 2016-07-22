@@ -27,6 +27,7 @@
  *
  * @author roman.simakov@gmail.com
  */
+#include <limits>
 #include <string>
 #include <memory>
 #include <system/Cluster.h>
@@ -38,38 +39,72 @@ using namespace std;
 
 namespace scidb
 {
+const double InstanceDesc::INFINITY_TS = std::numeric_limits<double>::infinity();
 
-/**
- * @todo XXX Use NetworkManager until we explicitely start managing the membership
- */
-std::shared_ptr<const InstanceMembership> Cluster::getInstanceMembership()
+Cluster::Cluster()
+: _uuid(SystemCatalog::getInstance()->getClusterUuid())
+{
+}
+
+InstMembershipPtr
+Cluster::getInstanceMembership(MembershipID id)
 {
    ScopedMutexLock lock(_mutex);
 
-   if (_lastMembership) {
-      return _lastMembership;
+   if (!_lastMembership || _lastMembership->getId() < id) {
+       getInstances();
    }
-   std::shared_ptr<const Instances> instances = NetworkManager::getInstance()->getInstances();
-   _lastMembership = std::shared_ptr<const InstanceMembership>(new InstanceMembership(0, instances));
+   SCIDB_ASSERT(_lastMembership);
+
    return _lastMembership;
 }
 
-std::shared_ptr<const InstanceLiveness> Cluster::getInstanceLiveness()
+void Cluster::getInstances()
 {
-   std::shared_ptr<const InstanceLiveness> liveness(NetworkManager::getInstance()->getInstanceLiveness());
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
+
+    Instances instances;
+    MembershipID id = SystemCatalog::getInstance()->getInstances(instances);
+    SCIDB_ASSERT(!instances.empty());
+    _lastMembership = std::make_shared<InstanceMembership>(id, instances);
+    SCIDB_ASSERT(instances.empty());
+}
+
+namespace
+{
+    /// A functor class that adds a given instance to a liveness object
+    class LivenessConstructor
+    {
+    public:
+        LivenessConstructor(InstanceLiveness* newLiveness)
+        :  _newLiveness(newLiveness)
+        {}
+        void operator() (const InstanceDesc& i)
+        {
+            const InstanceID instanceId = i.getInstanceId();
+            InstanceLivenessEntry entry(instanceId, 0, false);
+            _newLiveness->insert(&entry);
+        }
+    private:
+        InstanceLiveness* _newLiveness;
+    };
+}
+
+InstLivenessPtr Cluster::getInstanceLiveness()
+{
+   InstLivenessPtr liveness(NetworkManager::getInstance()->getInstanceLiveness());
    if (liveness) {
       return liveness;
    }
-   std::shared_ptr<const InstanceMembership> membership(getInstanceMembership());
-   std::shared_ptr<InstanceLiveness> newLiveness(new InstanceLiveness(membership->getViewId(), 0));
-   for (std::set<InstanceID>::const_iterator i = membership->getInstances().begin();
-        i != membership->getInstances().end(); ++i) {
-      InstanceID instanceId(*i);
-      InstanceLiveness::InstancePtr entry(new InstanceLivenessEntry(instanceId, 0, false));
-      newLiveness->insert(entry);
-   }
+   InstMembershipPtr membership(getInstanceMembership(0));
+   SCIDB_ASSERT(membership);
+
+   std::shared_ptr<InstanceLiveness> newLiveness(new InstanceLiveness(membership->getId(), 0));
+   LivenessConstructor lc(newLiveness.get());
+   membership->visitInstances(lc);
+
    liveness = newLiveness;
-   assert(liveness->getNumLive() > 0);
+   SCIDB_ASSERT(liveness->getNumLive() > 0);
    return liveness;
 }
 
@@ -78,49 +113,69 @@ InstanceID Cluster::getLocalInstanceId()
    return NetworkManager::getInstance()->getPhysicalInstanceID();
 }
 
-const string& Cluster::getUuid()
+InstanceDesc::InstanceDesc(const std::string& host,
+                           uint16_t port,
+                           const std::string& basePath,
+                           uint32_t serverId,
+                           uint32_t serverInstanceId)
+        : _instanceId(INVALID_INSTANCE),
+          _membershipId(0),
+          _host(host),
+          _port(port),
+          _online(INFINITY_TS),
+          _basePath(basePath),
+          _serverId(serverId),
+          _serverInstanceId(serverInstanceId)
 {
-    if (_uuid.empty()) {
-        _uuid = SystemCatalog::getInstance()->getClusterUuid();
-    }
-    return _uuid;
+    boost::filesystem::path p(_basePath);
+    _basePath = p.normalize().string();
+    SCIDB_ASSERT(!_host.empty());
+    SCIDB_ASSERT(!_basePath.empty());
+}
+
+InstanceDesc::InstanceDesc(InstanceID instanceId,
+                           MembershipID membershipId,
+                           const std::string& host,
+                           uint16_t port,
+                           double onlineTs,
+                           const std::string& basePath,
+                           uint32_t serverId,
+                           uint32_t serverInstanceId)
+        : _instanceId(instanceId),
+          _membershipId(membershipId),
+          _host(host),
+          _port(port),
+          _online(onlineTs),
+          _basePath(basePath),
+          _serverId(serverId),
+          _serverInstanceId(serverInstanceId)
+{
+    boost::filesystem::path p(_basePath);
+    _basePath = p.normalize().string();
+    SCIDB_ASSERT(!_host.empty());
+    SCIDB_ASSERT(!_basePath.empty());
+}
+
+std::string InstanceDesc::getPath() const
+{
+    std::stringstream ss;
+    // XXX TODO: consider boost path utils
+    ss << _basePath << "/" << _serverId << "/" << _serverInstanceId ;
+    return ss.str();
+}
+
+std::ostream& operator<<(std::ostream& stream,const InstanceDesc& instance)
+{
+    stream << "instance { id = " << instance.getInstanceId()
+           << ", membership_id = " << instance.getMembershipId()
+           << ", host = " << instance.getHost()
+           << ", port = " << instance.getPort()
+           << ", member since " << instance.getOnlineSince()
+           << ", base_path = " << instance.getPath()
+           << ", server_id = " << instance.getServerId()
+           << ", server_instance_id = " << instance.getServerInstanceId()
+           <<" }";
+    return stream;
 }
 
 } // namespace scidb
-
-namespace std
-{
-   bool operator< (std::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
-                   std::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
-      if (!l || !r) {
-         assert(false);
-         return false;
-      }
-      return (*l.get()) < (*r.get());
-   }
-
-   bool operator== (std::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
-                    std::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
-
-      if (!l || !r) {
-         assert(false);
-         return false;
-      }
-      return (*l.get()) == (*r.get());
-   }
-
-   bool operator!= (std::shared_ptr<const scidb::InstanceLivenessEntry> const& l,
-                    std::shared_ptr<const scidb::InstanceLivenessEntry> const& r) {
-       return (!operator==(l,r));
-   }
-} // namespace std
-
-namespace std
-{
-   bool less<std::shared_ptr<const scidb::InstanceLivenessEntry> >::operator() (
-                               const std::shared_ptr<const scidb::InstanceLivenessEntry>& l,
-                               const std::shared_ptr<const scidb::InstanceLivenessEntry>& r) const
-   {
-      return l < r;
-   }
-}

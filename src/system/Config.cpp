@@ -42,12 +42,13 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include "lib_json/json.h"
+#include <lib_json/json.h>
 
-#include "system/Config.h"
-#include "system/Exceptions.h"
-#include "util/forced_lexical_cast.h"
-#include "util/Platform.h"
+#include <system/Config.h>
+#include <system/Exceptions.h>
+#include <util/forced_lexical_cast.h>
+#include <util/Platform.h>
+#include <util/Utility.h>
 
 using namespace std;
 using namespace boost;
@@ -664,7 +665,7 @@ void ConfigBase::parse(int argc, char **argv, const char* configFileName)
                                 case ConfigBase::INTEGER:
                                 {
                                     if (root.isMember(opt->getConfigName())) {
-                                        int value = root[opt->getConfigName()].asInt();
+                                        int value = safe_static_cast<int>(root[opt->getConfigName()].asInt());
                                         opt->setValue(value);
                                         opt->setActivated();
                                     }
@@ -858,6 +859,12 @@ std::string ConfigBase::getOptionValue(std::string const& name)
         throw USER_EXCEPTION(SCIDB_SE_CONFIG, SCIDB_LE_UNKNOWN_CONFIG_OPTION) << name;
     ConfigOption *opt = _values[i->second];
     return opt->getValueAsString();
+}
+
+ConfigBase::ConfigOptionType ConfigBase::getOptionType(int32_t option)
+{
+    assert(_values[option]);
+    return _values[option]->getType();
 }
 
 static po::value_semantic* optTypeToValSem(ConfigBase::ConfigOptionType optionType)

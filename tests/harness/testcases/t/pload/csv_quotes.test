@@ -14,7 +14,7 @@ load(simple1, '/tmp/quotes1.csv', -2, 'csv:d')
 --start-igdata
 save(simple1, '/tmp/quotes1.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes1.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes1.tsv"
 
 --echo Same but w/o the :d option, auto-quoting should handle it OK.
 --shell --command "printf "\"Double 'quotes' w/ , & (\"\") inside\",1\n" > /tmp/quotes1.csv"
@@ -22,14 +22,14 @@ load(simple1, '/tmp/quotes1.csv', -2, 'csv')
 --start-igdata
 save(simple1, '/tmp/quotes1.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes1.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes1.tsv"
 
 --shell --command "printf "\"Double 'quotes' w/ , & (\\\") inside\",1\n" > /tmp/quotes2.csv"
 load(simple1, '/tmp/quotes2.csv', -2, 'csv:d')
 --start-igdata
 save(simple1, '/tmp/quotes2.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes2.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes2.tsv"
 
 --echo Same but w/o the :d option, auto-quoting should handle it OK.
 --shell --command "printf "\"Double 'quotes' w/ , & (\\\") inside\",1\n" > /tmp/quotes2.csv"
@@ -37,21 +37,21 @@ load(simple1, '/tmp/quotes2.csv', -2, 'csv')
 --start-igdata
 save(simple1, '/tmp/quotes2.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes2.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes2.tsv"
 
 --shell --command "printf "'Single \"quotes\" w/ , & ('') inside',3\n" > /tmp/quotes3.csv"
 load(simple2, '/tmp/quotes3.csv', -2, 'csv')
 --start-igdata
 save(simple2, '/tmp/quotes3.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes3.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes3.tsv"
 
 --shell --command "printf "'Single \"quotes\" w/ , & (\\') inside',4\n" > /tmp/quotes4.csv"
 load(simple2, '/tmp/quotes4.csv', -2, 'csv')
 --start-igdata
 save(simple2, '/tmp/quotes4.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes4.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes4.tsv"
 
 --echo This input used to crash in the CsvParser, but now it should just make a shadow entry.
 --shell --command "printf "'Single \"quotes\" w/ , MISSING_END_QUOTE,5\n" > /tmp/quotes5.csv"
@@ -59,7 +59,7 @@ load(simple2, '/tmp/quotes5.csv', -2, 'csv', 100, simp2_shadow)
 --start-igdata
 save(simple2, '/tmp/quotes5.tsv', -2, 'tsv')
 --stop-igdata
---shell --store --command "sed 1d /tmp/quotes5.tsv | od -c"
+--shell --store --command "od -c /tmp/quotes5.tsv"
 scan(simp2_shadow)
 
 # Ticket 4125.

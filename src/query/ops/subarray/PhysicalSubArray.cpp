@@ -26,7 +26,7 @@
  *  Created on: May 20, 2010
  *      Author: knizhnik@garret.ru
  */
-
+#include <log4cxx/logger.h>
 #include <query/Operator.h>
 #include <array/Metadata.h>
 #include <array/Array.h>
@@ -35,6 +35,8 @@
 
 namespace scidb
 {
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.array.subarray"));
 
 class PhysicalSubArray: public  PhysicalOperator
 {
@@ -126,7 +128,9 @@ public:
     }
 
     //return the delta between the subarray window origin and the input array origin
-    virtual DimensionVector getOffsetVector(const std::vector< ArrayDesc> & inputSchemas) const
+
+    private:
+    DimensionVector getOffsetVector(const std::vector< ArrayDesc> & inputSchemas) const
     {
         ArrayDesc const& desc = inputSchemas[0];
         Dimensions const& inputDimensions = desc.getDimensions();
@@ -143,38 +147,76 @@ public:
         return result;
     }
 
+    public:
     /**
      * @see PhysicalOperator::getOutputDistribution
      */
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        const RedistributeContext& inputDistro = inputDistributions[0];
+
+        mySchema->setResidency(inputDistro.getArrayResidency());
+
         if (!changesDistribution(inputSchemas))
         {
-            return inputDistributions[0];
+            mySchema->setDistribution(inputDistro.getArrayDistribution());
+            LOG4CXX_TRACE(logger, "subarray() output distro: "<< inputDistro);
+            return inputDistro;
         }
+
+        if (inputDistro.getPartitioningSchema() != psHashPartitioned &&
+            inputDistro.getPartitioningSchema() != psByRow &&
+            inputDistro.getPartitioningSchema() != psByCol) {
+
+            SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema()==psUndefined);
+            RedistributeContext distro(_schema.getDistribution(),
+                                       _schema.getResidency());
+           LOG4CXX_TRACE(logger, "subarray() output distro: "<< distro);
+           return distro;
+        }
+
+        Coordinates inputOffset;
+        InstanceID instanceShift;
+        ArrayDistributionFactory::getTranslationInfo(inputDistro.getArrayDistribution().get(),
+                                                     inputOffset,
+                                                     instanceShift);
+        if (instanceShift != 0) {
+
+           SCIDB_ASSERT(_schema.getDistribution()->getPartitioningSchema()==psUndefined);
+           RedistributeContext distro(_schema.getDistribution(),
+                                      _schema.getResidency());
+           LOG4CXX_TRACE(logger, "subarray() output distro: "<< distro);
+           return distro;
+        }
+
         DimensionVector offset = getOffsetVector(inputSchemas);
-        std::shared_ptr<CoordinateTranslator> distMapper;
-        RedistributeContext inputDistro = inputDistributions[0];
-        if (inputDistro.isUndefined() ||
-            inputDistro.getPartitioningSchema() == psScaLAPACK ||
-            inputDistro.getPartitioningSchema() == psGroupby)
-        {
-            return RedistributeContext(psUndefined);
+
+        if (offset.isEmpty() ) {
+            mySchema->setDistribution(inputDistro.getArrayDistribution());
+            LOG4CXX_TRACE(logger, "subarray() output distro: "<< inputDistro);
+            return inputDistro;
         }
-        else
-        {
-            std::shared_ptr<CoordinateTranslator> inputMapper = inputDistro.getMapper();
-            if (!offset.isEmpty())
-            {
-                distMapper = CoordinateTranslator::createOffsetMapper(offset) ->combine(inputMapper);
-            }
-            else
-            {
-                distMapper = inputMapper;
-            }
-            return RedistributeContext(inputDistro.getPartitioningSchema(), distMapper);
+        std::shared_ptr<OffsetCoordinateTranslator> distMapper = OffsetCoordinateTranslator::createOffsetMapper(offset);
+
+        if (!inputOffset.empty()) {
+            distMapper = distMapper->combine(OffsetCoordinateTranslator::createOffsetMapper(inputOffset));
         }
+        ArrayDistPtr dist = ArrayDistributionFactory::getInstance()->construct(
+                                                           inputDistro.getArrayDistribution()->getPartitioningSchema(),
+                                                           inputDistro.getArrayDistribution()->getRedundancy(),
+                                                           std::string(), // empty for psHashPartitioned, psByRow, psByCol
+                                                           distMapper,
+                                                           instanceShift);
+        mySchema->setDistribution(dist);
+        RedistributeContext distro(_schema.getDistribution(),
+                                   _schema.getResidency());
+
+        LOG4CXX_TRACE(logger, "subarray() output distro: "<< distro);
+        return distro;
     }
 
     /**
@@ -207,9 +249,12 @@ public:
      * @see PhysicalOperator::execute
      */
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays,
-                                      std::shared_ptr< Query> query)
+                                    std::shared_ptr< Query> query)
     {
         assert(inputArrays.size() == 1);
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(inputArrays[0]->getArrayDesc().getResidency()));
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
         std::shared_ptr<Array> input = ensureRandomAccess(inputArrays[0], query);
 
         ArrayDesc const& desc = input->getArrayDesc();
@@ -231,6 +276,8 @@ public:
          * Create an iterator-based array implementation for the operator
          */
         std::shared_ptr< Array> arr = std::shared_ptr< Array>( new SubArray(_schema, lowPos, highPos, input, query));
+
+        LOG4CXX_TRACE(logger, "subarray() output array distro: "<< RedistributeContext(_schema.getDistribution(), _schema.getResidency()));
         return arr;
     }
 };

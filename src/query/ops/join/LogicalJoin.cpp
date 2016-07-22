@@ -27,7 +27,6 @@
  *      Author: Knizhnik
  */
 
-#include <boost/foreach.hpp>
 #include <query/Operator.h>
 #include <system/SystemCatalog.h>
 #include <system/Exceptions.h>
@@ -90,19 +89,23 @@ class LogicalJoin: public LogicalOperator
         ArrayDesc const& leftArrayDesc = schemas[0];
         ArrayDesc const& rightArrayDesc = schemas[1];
         Attributes const& leftAttributes = leftArrayDesc.getAttributes();
-        Dimensions leftDimensions = leftArrayDesc.getDimensions();
         Attributes const& rightAttributes = rightArrayDesc.getAttributes();
-        Dimensions const& rightDimensions = rightArrayDesc.getDimensions();
+
+        // The join attributes are the set of attributes formed from the union of the
+        // attributes of the two inputs.
         size_t totalAttributes = leftAttributes.size() + rightAttributes.size();
         int nBitmaps = 0;
         nBitmaps += (leftArrayDesc.getEmptyBitmapAttribute() != NULL);
         nBitmaps += (rightArrayDesc.getEmptyBitmapAttribute() != NULL);
         if (nBitmaps == 2) {
+            // The attributes for the join output only require one empty bitmap
+            // attribute.
             totalAttributes -= 1;
         }
-
         Attributes joinAttributes(totalAttributes);
-        size_t j = 0;
+        AttributeID j = 0;
+        // Add all of the attributes from the first (left) input (except any
+        // empty bitmap attribute).
         for (size_t i = 0, n = leftAttributes.size(); i < n; i++) {
             AttributeDesc const& attr = leftAttributes[i];
             if (!attr.isEmptyIndicator()) {
@@ -113,6 +116,11 @@ class LogicalJoin: public LogicalOperator
                 j += 1;
             }
         }
+        // Add all the attributes from the second (right) input (including any
+        // empty bitmap attribute).
+        // The set of join attributes ONLY needs one empty bitmap attribute.
+        // Prefer using the one given in the second (right) input attribute set, otherwise
+        // use a completely new empty bitmap attribute.
         for (size_t i = 0, n = rightAttributes.size(); i < n; i++, j++) {
             AttributeDesc const& attr = rightAttributes[i];
             joinAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
@@ -120,30 +128,52 @@ class LogicalJoin: public LogicalOperator
                 attr.getDefaultValueExpr());
             joinAttributes[j].addAlias(rightArrayDesc.getName());
         }
+        // Add an empty bitmap Attribute if the right input did not have one.
         if (j < totalAttributes) {
             joinAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,  TID_INDICATOR,
                 AttributeDesc::IS_EMPTY_INDICATOR, 0);
         }
 
-        if(leftDimensions.size() != rightDimensions.size())
-        {
-            ostringstream left, right;
-            printDimNames(left, leftDimensions);
-            printDimNames(right, rightDimensions);
-            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_COUNT_MISMATCH)
-                << "join" << left.str() << right.str();
+        // The exemplar schema is the left-most Non-autochunked schema. It will
+        // be used to define the needed chunkInterval.
+        size_t exemplarIndex = 0;
+        size_t targetIndex = 1;
+        if (leftArrayDesc.isAutochunked()) {
+            if (rightArrayDesc.isAutochunked()) {
+                // Only one input may be autochunked
+                throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_ALL_INPUTS_AUTOCHUNKED)
+                    << getLogicalName();
+            }
+            // The left input is autochunked, so the exemplar is the right
+            // schema (index 1)
+            exemplarIndex = 1;
+            targetIndex = 0;
         }
 
+        Dimensions const& exemplarDimensions = schemas[exemplarIndex].getDimensions();
+        Dimensions const& targetDimensions = schemas[targetIndex].getDimensions();
+        // Check that the two inputs have the same number of dimensions.
+        if(exemplarDimensions.size() != targetDimensions.size())
+        {
+            ostringstream exemplar, target;
+            printDimNames(exemplar, exemplarDimensions);
+            printDimNames(target, targetDimensions);
+            throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_COUNT_MISMATCH)
+                << getLogicalName() << exemplar.str() << target.str();
+        }
+
+        // Check that the corresponding dimensions in the two inputs have the
+        // same starting index (startMin). Report any and all mismatches.
         ostringstream ss;
         int mismatches = 0;
-        for (size_t i = 0, n = leftDimensions.size(); i < n; i++)
+        for (size_t i = 0, n = exemplarDimensions.size(); i < n; i++)
         {
-            if(leftDimensions[i].getStartMin() != rightDimensions[i].getStartMin())
+            if(exemplarDimensions[i].getStartMin() != targetDimensions[i].getStartMin())
             {
                 if (mismatches++) {
                     ss << ", ";
                 }
-                ss << '[' << leftDimensions[i] << "] != [" << rightDimensions[i] << ']';
+                ss << '[' << exemplarDimensions[i] << "] != [" << targetDimensions[i] << ']';
             }
         }
         if (mismatches)
@@ -152,40 +182,41 @@ class LogicalJoin: public LogicalOperator
         }
 
         Dimensions joinDimensions;
-        for (size_t i = 0, n = leftDimensions.size(); i < n; i++)
+        for (size_t i = 0, n = exemplarDimensions.size(); i < n; i++)
         {
-            assert(leftDimensions[i].getStartMin() == rightDimensions[i].getStartMin());
-            DimensionDesc &lDim = leftDimensions[i];
+            assert(exemplarDimensions[i].getStartMin() == targetDimensions[i].getStartMin());
+            DimensionDesc const& exemplarDim = exemplarDimensions[i];
+            DimensionDesc const& targetDim = targetDimensions[i];
+            // The names of the dimensions in the output are defined by the names
+            // of the first (left) schema, which is not necessarily the exemplarDim.
+            DimensionDesc const& leftDim = (exemplarIndex == 0
+                                            ? exemplarDim
+                                            : targetDim);
             joinDimensions.push_back(
-                   DimensionDesc(
-                           lDim.getBaseName(),
-                           lDim.getNamesAndAliases(),
-                           lDim.getStartMin(),
-                           lDim.getCurrStart(),
-                           lDim.getCurrEnd(),
-                           lDim.getEndMax(),
-                           lDim.getChunkInterval(),
-                           min(lDim.getChunkOverlap(), rightDimensions[i].getChunkOverlap())
-                       )
-                   );
-           joinDimensions[i].addAlias(leftArrayDesc.getName());
+                DimensionDesc(
+                    leftDim.getBaseName(),
+                    leftDim.getNamesAndAliases(),
+                    exemplarDim.getStartMin(),
+                    max(exemplarDim.getCurrStart(), targetDim.getCurrStart()),
+                    min(exemplarDim.getCurrEnd(), targetDim.getCurrEnd()),
+                    min(exemplarDim.getEndMax(), targetDim.getEndMax()),
+                    exemplarDim.getChunkInterval(),
+                    min(exemplarDim.getChunkOverlap(), targetDim.getChunkOverlap())
+                    )
+                );
+            joinDimensions[i].addAlias(leftArrayDesc.getName());
 
-           Coordinate newCurrStart = max(leftDimensions[i].getCurrStart(), rightDimensions[i].getCurrStart());
-           Coordinate newCurrEnd = min(leftDimensions[i].getCurrEnd(), rightDimensions[i].getCurrEnd());
-           Coordinate newEndMax = min(leftDimensions[i].getEndMax(), rightDimensions[i].getEndMax());
-           joinDimensions[i].setCurrStart(newCurrStart);
-           joinDimensions[i].setCurrEnd(newCurrEnd);
-           joinDimensions[i].setEndMax(newEndMax);
-
-           BOOST_FOREACH(const ObjectNames::NamesPairType &rDimName, rightDimensions[i].getNamesAndAliases())
-           {
-               BOOST_FOREACH(const string &alias, rDimName.second)
-               {
+            for (const ObjectNames::NamesPairType& rDimName : targetDimensions[i].getNamesAndAliases()) {
+                for (const string& alias : rDimName.second) {
                    joinDimensions[i].addAlias(alias, rDimName.first);
-               }
-           }
+                }
+            }
         }
-        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(), joinAttributes, joinDimensions, defaultPartitioning());
+        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(),
+                         joinAttributes,
+                         joinDimensions,
+                         createDistribution(psUndefined), // Distribution is unknown until the physical stage.
+                         query->getDefaultArrayResidency() );
     }
 };
 

@@ -375,7 +375,8 @@ namespace scidb {
                 if ((AttributeID)array.bindings[i].resolvedId == inAttrID) {
                     iterators[i] = inputIterator;
                 } else {
-                    iterators[i] = array.getInputArray()->getConstIterator(array.bindings[i].resolvedId);
+                    iterators[i] = array.getInputArray()->
+                        getConstIterator(safe_static_cast<AttributeID>(array.bindings[i].resolvedId));
                 }
                 break;
               case BindInfo::BI_COORDINATE:

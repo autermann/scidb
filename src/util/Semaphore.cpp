@@ -35,11 +35,8 @@
 #include <system/Exceptions.h>
 #include <util/Semaphore.h>
 
-
 namespace scidb
 {
-
-#ifdef POSIX_SEMAPHORES
 
 Semaphore::Semaphore()
 {
@@ -62,13 +59,17 @@ Semaphore::~Semaphore()
 	}
 }
 
-void Semaphore::enter()
+void Semaphore::enter(perfTimeCategory_t tc /*= PTCW_SEM_OTHER*/)
 {
-    do
     {
-        if (sem_wait(_sem) == 0)
-            return;
-    } while (errno == EINTR);
+        ScopedWaitTimer timer(tc);         // destruction updates the timing of tc
+        do
+        {
+            if (sem_wait(_sem) == 0) {
+                return;
+            }
+        } while (errno == EINTR);
+    }
 
     throw SYSTEM_EXCEPTION(
         SCIDB_SE_INTERNAL,
@@ -76,17 +77,18 @@ void Semaphore::enter()
             << "wait" << ::strerror(errno) << errno;
 }
 
-void Semaphore::enter(int count)
+void Semaphore::enter(size_t count, perfTimeCategory_t tc /*= TCW_SEM_OTHER*/)
 {
-    for (int i = 0; i < count; i++)
+    for (size_t i = 0; i < count; i++)
     {
-        enter();
+        enter(tc);
     }
 }
 
 bool Semaphore::enter(
     ErrorChecker&   errorChecker,
-    time_t          timeoutSeconds /* = 10 */ )
+    time_t          timeoutSeconds, /* = 10 */
+    perfTimeCategory_t tc /*= TCW_SEM_OTHER*/)
 {
     if (errorChecker && !errorChecker()) {
         return false;
@@ -101,6 +103,7 @@ bool Semaphore::enter(
     }
     ts.tv_sec += timeoutSeconds;
 
+    ScopedWaitTimer timer(tc);         // destruction updates the timing of tc
     while (true)
     {
         if (sem_timedwait(_sem, &ts) == 0) {
@@ -130,12 +133,13 @@ bool Semaphore::enter(
 }
 
 bool Semaphore::enter(
-    int             count,
+    size_t          count,
     ErrorChecker&   errorChecker,
-    time_t          timeoutSeconds /* = 10 */)
+    time_t          timeoutSeconds, /* = 10 */
+    perfTimeCategory_t tc /*= TCW_SEM_OTHER*/)
 {
-    for (int i = 0; i < count; i++) {
-        if (!enter(errorChecker)) {
+    for (size_t i = 0; i < count; i++) {
+        if (!enter(errorChecker, timeoutSeconds)) {
             return false;
         }
     }
@@ -186,65 +190,5 @@ void Semaphore::release(bool &result, int count /* = 1 */)
         }
     }
 }
-
-#else
-
-Semaphore::Semaphore(): _count(0)
-{
-}
-
-Semaphore::~Semaphore()
-{
-}
-
-
-bool Semaphore::enter(int n, ErrorChecker& errorChecker)
-{
-    ScopedMutexLock mutexLock(_cs);
-    while (_count < n) {
-        // take what is possible currently to prevent infinity waiting
-        n -= _count;
-        _count = 0;
-        // wait for new releases
-        if (!_cond.wait(_cs, errorChecker)) {
-            return false;
-        }
-    }
-    _count -= n;
-    return true;
-}
-
-void Semaphore::enter(int n)
-{
-    ScopedMutexLock mutexLock(_cs);
-    while (_count < n) {
-        ErrorChecker errorChecker;
-        // take what is possible currently to prevent infinity waiting
-        n -= _count;
-        _count = 0;
-        // wait for new releases
-        _cond.wait(_cs, errorChecker);
-    }
-    _count -= n;
-}
-
-void Semaphore::release(int n)
-{
-    ScopedMutexLock mutexLock(_cs);
-    _count += n;
-    _cond.signal();
-}
-
-bool Semaphore::tryEnter()
-{
-    ScopedMutexLock mutexLock(_cs);
-    if (_count > 0) {
-        _count--;
-        return true;
-    }
-    return false;
-}
-
-#endif
 
 } //namespace

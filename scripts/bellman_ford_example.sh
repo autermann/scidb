@@ -248,7 +248,7 @@ timequery_n "store(merge($MAT_DIAG_USED_TMP,$MAT_IN), $MAT_DIAG_USED_TMP2)"
 # now transpose the matrix... note that currently the redimesion is faster
 # than this transpose:
 #     timequery_n "store(transpose($MAT_DIAG_USED_TMP2), $MAT_DZ)"
-MAT_DZ_SCHEMA="<w:float>[v1=0:$MAX_VERT,$CSIZE,0, v0=0:$MAX_VERT,$CSIZE,0]"
+MAT_DZ_SCHEMA="<w:float NOT NULL>[v1=0:$MAX_VERT,$CSIZE,0, v0=0:$MAX_VERT,$CSIZE,0]"
 $IQUERY -aq  "create array $MAT_DZ $MAT_DZ_SCHEMA"
 timequery_n "store(redimension($MAT_DIAG_USED_TMP2,$MAT_DZ), $MAT_DZ)"
 # TODO: may be slightly cheaper to do the tranpose prior to the merge, so the
@@ -280,7 +280,7 @@ VEC_SHORTEST_NEXT="BELLMAN_FORD_SHORTEST_NEXT_TMP_$$"
 $IQUERY -aq "remove($VEC_SHORTEST)" > /dev/null 2>&1   # "just run"
 $IQUERY -aq "remove($VEC_SHORTEST_NEXT)" > /dev/null 2>&1   # "just run"
 
-VEC_SHORTEST_SCHEMA="<w:float>[v0=0:$MAX_VERT,$CSIZE,0, dummy=0:0,1,0]"  # (column) vector as matrix
+VEC_SHORTEST_SCHEMA="<w:float NOT NULL>[v0=0:$MAX_VERT,$CSIZE,0, dummy=0:0,1,0]"  # (column) vector as matrix
 $IQUERY -aq  "create array $VEC_SHORTEST $VEC_SHORTEST_SCHEMA"
 timequery_n "store(redimension($START_VTX, $VEC_SHORTEST), $VEC_SHORTEST)"
 

@@ -35,10 +35,13 @@ InjectedErrorLibrary::~InjectedErrorLibrary()
 {
 }
 
+/*
+ * NOTE: no lock, because it is called from a static initializer
+ *       if ever called from ordinary code, then turn the library into a singleton
+ */
 bool InjectedErrorLibrary::registerError(long int id, const std::shared_ptr<const InjectedError>& err)
 {
-#ifndef NDEBUG
-    ScopedMutexLock lock(_mutex);
+#ifndef NDEBUG  // not possible to inject errors in NDEBUG mode for safety
     return _registeredErrors.insert(std::make_pair(id, err)).second;
 #endif
     return false;

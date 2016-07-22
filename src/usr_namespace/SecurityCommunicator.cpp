@@ -46,7 +46,7 @@ namespace scidb
 
     namespace security
     {
-        static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.services.network"));
+        static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.securityPluginComm"));
 
         // -------------------------------------------------------------
         Communicator::Communicator()
@@ -87,7 +87,7 @@ namespace scidb
             FunctionDescription func;
 
             FunctionLibrary::getInstance()->findFunction(
-                "getAuthorization",     // const std::string& name
+                "_getAuthorization",    // const std::string& name
                 boost::assign::list_of  // const std::vector<TypeId>& inputArgTypes
                     (TID_UINT32)        //   maxTries
                     (TID_BINARY),       //   *session
@@ -98,7 +98,7 @@ namespace scidb
                 throw SYSTEM_EXCEPTION(
                     SCIDB_SE_NETWORK,
                     SCIDB_LE_PLUGIN_FUNCTION_ACCESS)
-                    << "authpw";
+                    << "namespaces";
             }
 
             Value inputParams[2] = {
@@ -129,7 +129,7 @@ namespace scidb
             Value returnParams(TypeLibrary::getType(TID_INT32));
             func.getFuncPtr()(vInputParams, &returnParams, NULL);
 
-            // If the return from libauthpw.getAuthorization is 0
+            // If the return from libnamespaces.getAuthorization is 0
             // then it succeeded.  Otherwise, it failed.
             retval = returnParams.getInt32();
             if(0 == retval)
@@ -147,5 +147,52 @@ namespace scidb
                     SCIDB_LE_AUTHENTICATION_ERROR);
             }
         }
+
+        bool Communicator::checkSecurityPermissions(
+            const std::shared_ptr<scidb::Session> &         session,
+            const std::string &                             permissions)
+        {
+            std::vector<FunctionPointer> convs;
+            FunctionDescription func;
+
+            FunctionLibrary::getInstance()->findFunction(
+                "_checkSecurityPermissions",// const std::string& name
+                boost::assign::list_of      // const std::vector<TypeId>& inputArgTypes
+                    (TID_BINARY)            //   in - const std::shared_ptr<scidb::Session> *
+                    (TID_BINARY),           //   in - std::string *
+                func,                       // FunctionDescription& funcDescription
+                convs,                      // std::vector<FunctionPointer>& converters
+                false);                     // bool tile );
+
+            if(!func.getFuncPtr())
+            {
+                return true;
+            }
+
+            Value inputParams[] = {
+                Value(TypeLibrary::getType(TID_BINARY)),    // pSession
+                Value(TypeLibrary::getType(TID_BINARY))};   // pPermissions
+
+
+            const std::shared_ptr<scidb::Session> * pSession        = &session;
+            const std::string *                     pPermissions    = &permissions;
+
+            inputParams[0].setData(&pSession,       sizeof(pSession));
+            inputParams[1].setData(&pPermissions,   sizeof(pPermissions));
+
+
+            const Value* vInputParams[] = {
+                &inputParams[0],
+                &inputParams[1]};
+
+            Value returnParams(TypeLibrary::getType(TID_INT32));
+            func.getFuncPtr()(vInputParams, &returnParams, NULL);
+
+            // If the return from libnamespaces.checkArrayAccess is 0
+            // then it succeeded.  Otherwise, it failed.
+            int retval = returnParams.getInt32();
+            return ((0 == retval) ? true : false);
+        }
+
     } // namespace security
 } // namespace scidb

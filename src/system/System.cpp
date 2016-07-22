@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <util/FileIO.h>
 #include <system/Utils.h>
 #include <system/Exceptions.h>
 
@@ -68,6 +69,19 @@ std::string getDir(const std::string& filePath)
     return filePath.substr(0,found);
 }
 
+std::string getFile(const std::string& filePath)
+{
+    size_t found = filePath.find_last_of("/");
+
+    if (found == std::string::npos)
+    {
+        return filePath;
+    }
+    ++found;
+    assert(found<=filePath.length());
+    return filePath.substr(found);
+}
+
 bool isFullyQualified(const std::string& filePath)
 {
     return !filePath.empty() && filePath[0]=='/';
@@ -82,7 +96,7 @@ FILE* openMemoryStream(char const* ptr,size_t size)
         throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION,SCIDB_LE_OPERATION_FAILED) << "tmpfile";
     }
 
-    size_t rc = fwrite(ptr,1,size,f);
+    size_t rc = scidb::fwrite(ptr,1,size,f);
 
     if (rc != size)
     {
@@ -102,6 +116,17 @@ void bad_dynamic_cast(const std::type_info& b,const std::type_info& d)
       << d.name();                                      // ...and target type
 
     ASSERT_EXCEPTION(false,s.str());                    // And report failure
+}
+
+void bad_static_cast(const std::type_info& to,const std::type_info& from)
+{
+    std::stringstream s;
+
+    s << " safe_static_cast: bad cast from "
+      << from.name()   << " to "
+      << to.name();
+
+    ASSERT_EXCEPTION(false,s.str());
 }
 
 /****************************************************************************/

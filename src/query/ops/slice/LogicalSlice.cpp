@@ -27,9 +27,9 @@
  *      Author: Knizhnik
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-
+#include <query/Operator.h>
+#include <query/AutochunkFixer.h>
+#include <system/Exceptions.h>
 
 namespace scidb {
 
@@ -68,13 +68,20 @@ namespace scidb {
  */
 class LogicalSlice: public LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
-	LogicalSlice(const std::string& logicalName, const std::string& alias):
-	    LogicalOperator(logicalName, alias)
-	{
-		ADD_PARAM_INPUT()
-		ADD_PARAM_VARIES()
-	}
+    LogicalSlice(const std::string& logicalName, const std::string& alias)
+        : LogicalOperator(logicalName, alias)
+    {
+        ADD_PARAM_INPUT()
+        ADD_PARAM_VARIES()
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
+    }
 
 	std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector<ArrayDesc> &schemas)
 	{
@@ -94,8 +101,8 @@ public:
 	}
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
-	{
-		assert(schemas.size() == 1);
+    {
+        assert(schemas.size() == 1);
         ArrayDesc const& schema = schemas[0];
         Dimensions const& dims = schema.getDimensions();
         size_t nDims = dims.size();
@@ -108,10 +115,11 @@ public:
         for (size_t i = 0; i < nParams; i+=2) {
             sliceDimName[i >> 1]  = ((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectName();
         }
+        _fixer.clear();
         size_t j = 0;
         for (size_t i = 0; i < nDims; i++) {
             const std::string dimName = dims[i].getBaseName();
-            int k = sliceDimName.size();
+            int k = safe_static_cast<int>(sliceDimName.size());
             while (--k >= 0
                    && sliceDimName[k] != dimName
                    && !(sliceDimName[k][0] == '_' && (size_t)atoi(sliceDimName[k].c_str()+1) == i+1));
@@ -120,11 +128,15 @@ public:
                 if (j >= newDims.size())
                     throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DUPLICATE_DIMENSION_NAME,
                                                _parameters[i]->getParsingContext()) << dimName;
+                _fixer.takeDimension(j).fromArray(0).fromDimension(i);
                 newDims[j++] = dims[i];
             }
         }
-        return ArrayDesc(schema.getName(), schema.getAttributes(), newDims, defaultPartitioning());
-	}
+
+        return ArrayDesc(schema.getName(), schema.getAttributes(), newDims,
+                         createDistribution(psUndefined),
+                         schema.getResidency());
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSlice, "slice")

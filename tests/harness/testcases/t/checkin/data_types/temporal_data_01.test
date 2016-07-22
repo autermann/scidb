@@ -1,5 +1,5 @@
 --setup
---set-format csv
+--set-format csv:l
 --test
 # Next line is specifically to cover the bug in #4682.
 build(<a:datetime>[i=0:2,1,0],datetime('01-Feb-2009 4.11.19 PM'))

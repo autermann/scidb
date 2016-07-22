@@ -28,10 +28,12 @@
  * Get list of persistent array attributes
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "array/Metadata.h"
-#include "system/SystemCatalog.h"
+#include <array/Metadata.h>
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 namespace scidb
 {
@@ -90,15 +92,29 @@ public:
     	ADD_PARAM_IN_ARRAY_NAME()
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to read the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ReadArray);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector< ArrayDesc> inputSchemas, std::shared_ptr< Query> query)
     {
         assert(inputSchemas.size() == 0);
         assert(_parameters.size() == 1);
 
-        const string &arrayName = ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+        const string &arrayNameOrg =
+            ((std::shared_ptr<OperatorParamReference>&)_parameters[0])->getObjectName();
+
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
         ArrayDesc arrayDesc;
-        SystemCatalog::getInstance()->getArrayDesc(arrayName, query->getCatalogVersion(arrayName), arrayDesc);
+        ArrayID arrayId = query->getCatalogVersion(namespaceName, arrayName);
+        scidb::namespaces::Communicator::getArrayDesc(namespaceName, arrayName, arrayId, arrayDesc);
 
         Attributes attributes(3);
         attributes[0] = AttributeDesc((AttributeID)0, "name", TID_STRING, 0, 0);
@@ -108,7 +124,15 @@ public:
         size_t nAttrs = arrayDesc.getAttributes(true).size();
         size_t end    = nAttrs>0 ? nAttrs-1 : 0;
         dimensions[0] = DimensionDesc("No", 0, 0, end, end, nAttrs, 0);
-        return ArrayDesc("Attributes", attributes, dimensions, defaultPartitioning());
+
+        stringstream ss;
+        ss << query->getInstanceID(); // coordinator instance
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        return ArrayDesc("Attributes", attributes, dimensions,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

@@ -5,6 +5,8 @@
 # Tests cover AQL syntax
 
 load_library('point')
+load_library('rational')
+
 create array A <a:int32>[x=0:2,3,0]
 create array B <b:point>[x=0:2,3,0]
 create array C <c:rational>[x=0:2,3,0]

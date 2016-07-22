@@ -134,7 +134,7 @@ public:
         inSeg.setPPosition(0);
         inSeg.setSame(false);
         inSeg.setNull(false);
-        inSeg.setValueIndex(ec[0].getTile()->addRawValues(32));
+        inSeg.setValueIndex(safe_static_cast<uint32_t>(ec[0].getTile()->addRawValues(32)));
         ec[1].getTile()->addRawValues(32);
 
         ec[0].getTile()->addSegment(inSeg);

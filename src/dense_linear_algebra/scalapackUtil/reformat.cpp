@@ -61,7 +61,7 @@ slpp::desc_t scidbDistrib(const slpp::desc_t& DESCA)
     DESC_SCIDB.DTYPE = 1 ;
     DESC_SCIDB.CTXT = -1 ;  // we'll use B's context to do the work
     DESC_SCIDB.M = min(DESCA.M, DESCA.MB);
-    DESC_SCIDB.N = DESCA.N * heightInChunks;
+    DESC_SCIDB.N = slpp::int_cast(DESCA.N * heightInChunks);
 
     return DESC_SCIDB;
 }

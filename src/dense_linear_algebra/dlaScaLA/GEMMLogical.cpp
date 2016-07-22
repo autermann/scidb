@@ -28,6 +28,7 @@
 // SciDB
 #include <log4cxx/logger.h>
 #include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 #include <query/OperatorLibrary.h>
 #include <system/Exceptions.h>
 #include <system/SystemCatalog.h>
@@ -90,6 +91,8 @@ namespace scidb
  ///
 class GEMMLogical: public LogicalOperator
 {
+    AutochunkFixer _fixer;
+
 public:
     GEMMLogical(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
@@ -101,6 +104,11 @@ public:
         // TODO: Note that TRANS is the standard ScaLAPACK shorthand for transpose or conjugate transpose
         // TODO: Once checked in, give S.Marcus the pointer to the TRANS,ALPHA,BETA doc from ScaLAPACK
         //       and have him include the pointer to the netlib page "for more detail"
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query);
@@ -136,7 +144,7 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_p
     // array checks (first 3 arguments)
     //
     assert(schemas.size() == NUM_MATRICES);
-    checkScaLAPACKInputs(schemas, query, NUM_MATRICES, NUM_MATRICES);
+    checkScaLAPACKLogicalInputs(schemas, query, NUM_MATRICES, NUM_MATRICES);
 
     //
     // get the optional 4th argument: the parameters string: ( TRANSA, TRANSB, ALPHA, BETA)
@@ -193,27 +201,32 @@ ArrayDesc GEMMLogical::inferSchema(std::vector<ArrayDesc> schemas, std::shared_p
 
     std::pair<string, string> distinctNames = ScaLAPACKDistinctDimensionNames(dimsCC[ROW].getBaseName(),
                                                                               dimsCC[COL].getBaseName());
+    _fixer.clear();
     Dimensions outDims(2);
     outDims[ROW] = DimensionDesc(distinctNames.first,
                                  dimsCC[ROW].getStartMin(),
                                  dimsCC[ROW].getCurrStart(),
                                  dimsCC[ROW].getCurrEnd(),
                                  dimsCC[ROW].getEndMax(),
-                                 dimsCC[ROW].getChunkInterval(),
+                                 dimsCC[ROW].getRawChunkInterval(),
                                  0);
+    _fixer.takeDimension(ROW).fromArray(CC).fromDimension(ROW);
 
     outDims[COL] = DimensionDesc(distinctNames.second,
                                  dimsCC[COL].getStartMin(),
                                  dimsCC[COL].getCurrStart(),
                                  dimsCC[COL].getCurrEnd(),
                                  dimsCC[COL].getEndMax(),
-                                 dimsCC[COL].getChunkInterval(),
+                                 dimsCC[COL].getRawChunkInterval(),
                                  0);
+    _fixer.takeDimension(COL).fromArray(CC).fromDimension(COL);
 
     Attributes atts(1); atts[0] = AttributeDesc(AttributeID(0), "gemm", TID_DOUBLE, 0, 0);
 
     LOG4CXX_TRACE(logger, "GEMMLogical::inferSchema(): end.");
-    return ArrayDesc("GEMM", addEmptyTagAttribute(atts), outDims, defaultPartitioning());
+    return ArrayDesc("GEMM", addEmptyTagAttribute(atts), outDims,
+                     scidb::createDistribution(psUndefined),
+                     query->getDefaultArrayResidency());
 }
 
 REGISTER_LOGICAL_OPERATOR_FACTORY(GEMMLogical, "gemm");

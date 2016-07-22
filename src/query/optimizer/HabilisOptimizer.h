@@ -32,13 +32,18 @@
 #ifndef HABILISOPTIMIZER_H_
 #define HABILISOPTIMIZER_H_
 
-#include <vector>
-
 #include <query/optimizer/Optimizer.h>
-#include <query/QueryPlan.h>
+#include <query/QueryPlanFwd.h>
+#include <array/ArrayDistributionInterface.h>
+#include <vector>
 
 namespace scidb
 {
+class Query;
+class OperatorParam;
+class ArrayDesc;
+class RedistributeContext;
+class PhysicalOperator;
 
 class HabilisOptimizer : public Optimizer
 {
@@ -60,10 +65,9 @@ public:
    enum FeatureMask
    {
         CONDENSE_SG                          = 0x01,
-        // INSERT_REPART                        = 0x02,  // replaced with INSERT_RESHAPE
+        INSERT_REDIM_OR_REPART               = 0x02,
         INSERT_MATERIALIZATION               = 0x04,
         REWRITE_STORING_SG                   = 0x08,
-        INSERT_REDIMENSION_OR_REPARTITION    = 0x10
    };
 
 private:
@@ -81,6 +85,8 @@ private:
        {
           _instance._root.reset();
           _instance._query.reset();
+          _instance._defaultArrRes.reset();
+          _instance._defaultArrDist.reset();
        }
     private:
        Eraser();
@@ -112,6 +118,12 @@ private:
      * Mask of features that are enabled
      */
     uint64_t        _featureMask;
+
+    /// Temp array residency acquired from the query
+    ArrayResPtr _defaultArrRes;
+    /// Temp array distribution acquired from defaulPartitioning()
+    ArrayDistPtr _defaultArrDist;
+
 
     //////Helper functions - misc:
 
@@ -177,21 +189,34 @@ private:
      * If array is persisted, the name and id of are taken from outputSchema.
      * @param[in] outputSchema the output of the SG node
      * @param[in] instanceId the argument to the SG operator
-     * @param[in] storeArray store the result as a permanent new array (if true)
+     * @param[in] persistentArrayName store the result as a permanent new array (if true)
      */
      PhysNodePtr
      n_buildSgNode(const ArrayDesc & outputSchema,
-                   PartitioningSchema partSchema,
-                   const std::shared_ptr<OperatorParam>& persistentArrayName =
-                   std::shared_ptr<OperatorParam>());
+                   RedistributeContext const& dist,
+                   const std::shared_ptr<OperatorParam>& persistentArrayName = std::shared_ptr<OperatorParam>());
 
      /**
       * Build a new ReduceDistro node based on a given child attributes.
       * @param[in] child the op whose distribution shall be reduced
-      * @param[in] partSchema the requested partitioning schema to reduce to
+      * @param[in] arrDist the requested distribution to reduce to
       */
      PhysNodePtr
-     n_buildReducerNode(PhysNodePtr const& child, PartitioningSchema partSchema);
+     n_buildReducerNode(PhysNodePtr child,
+                        const ArrayDistPtr& arrDist);
+
+     /**
+      * Build a new ReduceDistro node based on a given distribution+residency
+      * and add an SG node if necessary.
+      * @param[in] target the op whose distribution shall be reduced
+      * @param[in] parent target's parent
+      * @param[in] dist the requested distribution+residency to reduce to
+      */
+     PhysNodePtr
+     insertReducerAndSgNode(PhysNodePtr parent,
+                            PhysNodePtr target,
+                            RedistributeContext const& dist);
+
 
     //////Helper functions - chain walkers:
 
@@ -292,6 +317,50 @@ private:
     tw_insertRedimensionOrRepartitionNodes(PhysNodePtr root);
 
 
+    /**
+     * Determine if an inserted repart/redimension (child input) for a
+     * PhysicalOperator may change the dimension range.
+     *
+     * @param physOperator the physicalOperator
+     * @return true IFF physicalOperator can alter the dimension range.
+     */
+    bool allowEndMaxChange(std::shared_ptr<PhysicalOperator> const & physOperator) const;
+
+    /**
+     * Can the @c desired and @c given input schemas be collapsed into a schema
+     * for a singular repart/redimension operator for a particular @parent
+     * operator?
+     *
+     * @param parent[in]
+     * @parblock
+     * the PhysicalQueryPlanNode with a redimension/repart child input.
+     * The parent's physical operator provides rules about what can and cannot be collapsed.
+     *
+     * (e.g. merge allows for the endMax to be modified)
+     * @endparblock
+     *
+     * @param[in] desired
+     * @parblock
+     * the schema of the implicit redimension/repart schema wanted by requiresRedimensionOrRepartition
+     * @endparblock
+     *
+     * @param[in] given
+     * @parblock
+     * the schema of the child redimension/repart schema in the query
+     * @endparblock
+     *
+     * @param[out] result
+     * @parblock
+     * the resulting schema iff a collapse of the two redimension/repart schemas is possible
+     * @endparblock
+     *
+     * @return @c true IFF desired schema can be "collapsed" with the current
+     */
+    bool
+    isRedimCollapsible(PhysNodePtr const& parent,
+                       ArrayDesc const& desired,
+                       ArrayDesc const& given,
+                       ArrayDesc & result) const;
 
     void
     tw_insertChunkMaterializers(PhysNodePtr root);

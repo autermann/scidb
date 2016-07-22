@@ -30,8 +30,9 @@ import org.scidb.io.network.ScidbMsg;
 public class Result
 {
     private Schema schema;
-    private long queryId;
+    private QueryID queryId;
     private boolean selective;
+    private boolean autoCommit;
     private String explainLogical;
     private String explainPhysical;
     private long elapsedTimeMillis;
@@ -50,6 +51,7 @@ public class Result
         ScidbMsg.QueryResult rec = result.getRecord();
         this.queryId = result.getHeader().queryID;
         this.selective = rec.getSelective();
+        this.autoCommit = rec.hasAutoCommit() ? rec.getAutoCommit() : false;
         this.explainLogical = rec.getExplainLogical();
         this.explainPhysical = rec.getExplainPhysical();
 
@@ -116,7 +118,7 @@ public class Result
      * Returns result query ID
      * @return Query ID
      */
-    public long getQueryId()
+    public QueryID getQueryId()
     {
         return queryId;
     }
@@ -131,6 +133,12 @@ public class Result
     public boolean getSelective()
     {
         return selective;
+    }
+
+    /// @return whether the query result has a result array.
+    public boolean getAutoCommit()
+    {
+        return autoCommit;
     }
 
     /**

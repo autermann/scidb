@@ -181,8 +181,8 @@ private:
          * the input coordinates without the last one.
          * @param[in] attId asserted to be 0, otherwise ignored
          * @param[in] multiDesc deserialized array descriptor
-         * @param[in,out] scratch space to avoid memory allocation
          * @param[in,out] chunk to convert
+         * @param[in,out] scratch space to avoid memory allocation
          * @param[in] query the current Query context
          */
         static void toMultiAttribute(AttributeID attId,
@@ -195,7 +195,7 @@ private:
         ArrayDesc _finalMultiDesc;
         const ArrayDesc _singleDesc;
         PullSGArrayBlocking::ChunkHandler _handler;
-        size_t _multiAttId;
+        AttributeID _multiAttId;
         Address _tmpMemChunkAddr;
         std::vector<std::shared_ptr<PartialChunkMerger> > _chunkMergers;
     };
@@ -459,25 +459,17 @@ struct FailOnInvocation
     }
 };
 
-/// Validate and adjust the destination instance ID
-/// @return the new instance ID
-InstanceID resolveDestInstance(PartitioningSchema ps,
-                               InstanceID destInstanceId,
-                               const std::shared_ptr<Query>& query);
 /**
  * Wrap the input array into a SerializedArray and return the result of pullRedistribute()
  * For the description of parameters @see scidb::pullRedistributeInAttributeOrder()
  * @return a SerializedArray to be pulled or inputArray if the distribution is not needed
  */
 std::shared_ptr<Array> getSerializedArray(std::shared_ptr<Array>& inputArray,
-                                     std::set<AttributeID>& attributeOrdering,
-                                     const std::shared_ptr<Query>& query,
-                                     PartitioningSchema ps,
-                                     InstanceID destInstanceId,
-                                     const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                     size_t shift,
-                                     const std::shared_ptr<PartitioningSchemaData>& psData,
-                                     bool enforceDataIntegrity);
+                                          std::set<AttributeID>& attributeOrdering,
+                                          const ArrayDistPtr& outputArrayDist,
+                                          const ArrayResPtr&  outputArrayRes,
+                                          const std::shared_ptr<Query>& query,
+                                          bool enforceDataIntegrity);
 /**
  * Redistribute inputArray applying chunkHandler on every redistributed chunk
  * For the description of parameters @see scidb::pullRedistributeToRandomAccess()
@@ -485,15 +477,12 @@ std::shared_ptr<Array> getSerializedArray(std::shared_ptr<Array>& inputArray,
  * @return either inputArray if no redistribution is necessary or a pointer to an undefined array
  */
 std::shared_ptr<Array> redistributeWithCallback(std::shared_ptr<Array>& inputArray,
-                                           PullSGArrayBlocking::ChunkHandler& chunkHandler,
-                                           PartialChunkMergerList* mergers,
-                                           const std::shared_ptr<Query>& query,
-                                           PartitioningSchema ps,
-                                           InstanceID destInstanceId,
-                                           const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                           size_t shift,
-                                           const std::shared_ptr<PartitioningSchemaData>& psData,
-                                           bool enforceDataIntegrity);
+                                                PullSGArrayBlocking::ChunkHandler& chunkHandler,
+                                                PartialChunkMergerList* mergers,
+                                                const ArrayDistPtr& outputArrayDist,
+                                                const ArrayResPtr& outputArrayRes,
+                                                const std::shared_ptr<Query>& query,
+                                                bool enforceDataIntegrity);
 
 } //namespace
 

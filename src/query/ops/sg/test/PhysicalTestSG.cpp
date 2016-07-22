@@ -73,25 +73,6 @@ class PhysicalTestSG: public PhysicalOperator
         return true;
     }
 
-    PartitioningSchema getPartitioningSchema() const
-    {
-        assert(_parameters[0]);
-        OperatorParamPhysicalExpression* pExp = static_cast<OperatorParamPhysicalExpression*>(_parameters[0].get());
-        PartitioningSchema ps = static_cast<PartitioningSchema>(pExp->getExpression()->evaluate().getInt32());
-        return ps;
-    }
-
-    InstanceID getInstanceId() const
-    {
-        InstanceID instanceId = ALL_INSTANCE_MASK;
-        if (_parameters.size() >=2 )
-        {
-            OperatorParamPhysicalExpression* pExp = static_cast<OperatorParamPhysicalExpression*>(_parameters[1].get());
-            instanceId = static_cast<InstanceID>(pExp->getExpression()->evaluate().getInt64());
-        }
-        return instanceId;
-    }
-
     bool outputFullChunks(std::vector< ArrayDesc> const&) const
     {
         return true;
@@ -100,36 +81,8 @@ class PhysicalTestSG: public PhysicalOperator
     RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                               const std::vector< ArrayDesc> & inputSchemas) const
     {
-        PartitioningSchema ps = getPartitioningSchema();
-
-        DimensionVector offset = getOffsetVector(inputSchemas);
-
-        std::shared_ptr<CoordinateTranslator> distMapper;
-
-        if ( !offset.isEmpty() )
-        {
-            distMapper = CoordinateTranslator::createOffsetMapper(offset);
-        }
-
-        return RedistributeContext(ps,distMapper);
-    }
-
-    DimensionVector getOffsetVector(const vector<ArrayDesc> & inputSchemas) const
-    {
-        if (_parameters.size() <= 4)
-        {
-            return DimensionVector();
-        }
-        else
-        {
-            DimensionVector result(_schema.getDimensions().size());
-            assert (_parameters.size() == _schema.getDimensions().size() + 4);
-            for (size_t i = 0; i < result.numDimensions(); i++)
-            {
-                result[i] = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[i+4])->getExpression()->evaluate().getInt64();
-            }
-            return result;
-        }
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     PhysicalBoundaries getOutputBoundaries(const std::vector<PhysicalBoundaries> & inputBoundaries,
@@ -140,15 +93,8 @@ class PhysicalTestSG: public PhysicalOperator
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        const PartitioningSchema ps = getPartitioningSchema();
-        const InstanceID instanceID = getInstanceId();
-        DimensionVector offsetVector = getOffsetVector(vector<ArrayDesc>());
         std::shared_ptr<Array> srcArray = inputArrays[0];
-        std::shared_ptr <CoordinateTranslator> distMapper;
-        if (!offsetVector.isEmpty())
-        {
-            distMapper = CoordinateTranslator::createOffsetMapper(offsetVector);
-        }
+
         std::string sgMode = getSGMode(_parameters);
         if (sgMode.empty()) {
             sgMode = "parallel";
@@ -163,19 +109,27 @@ class PhysicalTestSG: public PhysicalOperator
             assert(paramExpr->isConstant());
         }
 
-        if (sgMode == "parallel") {
-            return redistributeToRandomAccess(srcArray, query, ps,
-                                              instanceID, distMapper, 0,
-                                              std::shared_ptr<PartitioningSchemaData>(),
+        ArrayDistPtr  arrDist = _schema.getDistribution();
+        ArrayResPtr arrRes; //default query residency
+        if (sgMode == "randomRes") {
+            arrRes = _schema.getResidency();
+            return redistributeToRandomAccess(srcArray,
+                                              arrDist,
+                                              arrRes,
+                                              query,
+                                              enforceDataIntegrity);
+        } else if (sgMode == "parallel") {
+            return redistributeToRandomAccess(srcArray,
+                                              arrDist,
+                                              arrRes,
+                                              query,
                                               enforceDataIntegrity);
         } else if (sgMode == "serial") {
-            return redistributeSeriallyInReverse(srcArray,
-                                                 query, ps,
-                                                 instanceID,
-                                                 distMapper,
-                                                 0,
-                                                 std::shared_ptr<PartitioningSchemaData>(),
-                                                 enforceDataIntegrity);
+            return redistributeSerially(srcArray,
+                                        arrDist,
+                                        arrRes,
+                                        query,
+                                        enforceDataIntegrity);
         }
 
         ASSERT_EXCEPTION_FALSE("Bad SG mode");
@@ -184,20 +138,25 @@ class PhysicalTestSG: public PhysicalOperator
     }
 
     std::shared_ptr<Array>
-    redistributeSeriallyInReverse(std::shared_ptr<Array>& inputArray,
-                                  const std::shared_ptr<Query>& query,
-                                  PartitioningSchema ps,
-                                  InstanceID destInstanceId,
-                                  const std::shared_ptr<CoordinateTranslator > & distMapper,
-                                  size_t shift,
-                                  const std::shared_ptr<PartitioningSchemaData>& psData,
-                                  bool enforceDataIntegrity)
+    redistributeSerially(std::shared_ptr<Array>& inputArray,
+                         const ArrayDistPtr& arrDist,
+                         const ArrayResPtr& arrRes,
+                         const std::shared_ptr<Query>& query,
+                         bool enforceDataIntegrity)
     {
-
         inputArray = ensureRandomAccess(inputArray, query);
 
         const ArrayDesc& inputArrayDesc = inputArray->getArrayDesc();
-        std::shared_ptr<MemArray> outputArray = make_shared<MemArray>(inputArray->getArrayDesc(), query);
+
+        ArrayDesc outputArrayDesc(inputArray->getArrayDesc());
+        outputArrayDesc.setDistribution(arrDist);
+        if (!arrRes) {
+            outputArrayDesc.setResidency(query->getDefaultArrayResidency());
+        } else {
+            outputArrayDesc.setResidency(arrRes);
+        }
+
+        std::shared_ptr<MemArray> outputArray = std::make_shared<MemArray>(outputArrayDesc, query);
 
         // set up redistribute without the empty bitmap
         std::set<AttributeID> attributeOrdering;
@@ -215,12 +174,9 @@ class PhysicalTestSG: public PhysicalOperator
             }
         }
         redistributeAttributes(inputArray,
+                               outputArrayDesc.getDistribution(),
+                               outputArrayDesc.getResidency(),
                                query,
-                               ps,
-                               destInstanceId,
-                               std::shared_ptr<CoordinateTranslator>(),
-                               0,
-                               std::shared_ptr<PartitioningSchemaData>(),
                                enforceDataIntegrity,
                                attributeOrdering,
                                outputArray);
@@ -239,39 +195,30 @@ class PhysicalTestSG: public PhysicalOperator
             }
         }
         redistributeAttributes(inputArray,
+                               outputArrayDesc.getDistribution(),
+                               outputArrayDesc.getResidency(),
                                query,
-                               ps,
-                               destInstanceId,
-                               std::shared_ptr<CoordinateTranslator>(),
-                               0,
-                               std::shared_ptr<PartitioningSchemaData>(),
                                enforceDataIntegrity,
                                attributeOrdering,
                                outputArray);
-
 
         return std::shared_ptr<Array>(outputArray);
     }
 
     void redistributeAttributes(std::shared_ptr<Array>& inputArray,
+                                const ArrayDistPtr& arrDist,
+                                const ArrayResPtr& arrRes,
                                 const std::shared_ptr<Query>& query,
-                                PartitioningSchema ps,
-                                InstanceID destInstanceId,
-                                const std::shared_ptr<CoordinateTranslator > & distMapper,
-                                size_t shift,
-                                const std::shared_ptr<PartitioningSchemaData>& psData,
                                 bool enforceDataIntegrity,
                                 std::set<AttributeID>& attributeOrdering,
                                 const std::shared_ptr<MemArray>& outputArray)
     {
-        std::shared_ptr<Array> tmpRedistedInput = pullRedistributeInAttributeOrder(inputArray,
-                                                            attributeOrdering,
-                                                            query,
-                                                            ps,
-                                                            destInstanceId,
-                                                            std::shared_ptr<CoordinateTranslator>(),
-                                                            0,
-                                                            std::shared_ptr<PartitioningSchemaData>());
+        std::shared_ptr<Array> tmpRedistedInput =
+        pullRedistributeInAttributeOrder(inputArray,
+                                         attributeOrdering,
+                                         arrDist,
+                                         arrRes,
+                                         query);
 
         // only when redistribute was actually done (sometimes optimized away)
         const bool wasConverted = (tmpRedistedInput != inputArray) ;

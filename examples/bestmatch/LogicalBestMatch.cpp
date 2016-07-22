@@ -70,6 +70,13 @@ class LogicalBestMatch: public LogicalOperator
                 << "bestmatch" << left.str() << right.str();
         }
         for (size_t i = 0, n = catalogDimensions.size(); i < n; i++) {
+
+            // XXX To do: No hope of autochunk support until requiresRedimensionOrRepartition() is
+            // implemented (see below), since we'd need to make an unspecified (autochunked)
+            // interval match some specified one.
+            ASSERT_EXCEPTION(!catalogDimensions[i].isAutochunked(), "Operator does not support autochunked input");
+            ASSERT_EXCEPTION(!patternDimensions[i].isAutochunked(), "Operator does not support autochunked input");
+
             if (!(catalogDimensions[i].getStartMin() == patternDimensions[i].getStartMin()
                   && catalogDimensions[i].getChunkInterval() == patternDimensions[i].getChunkInterval()
                   && catalogDimensions[i].getChunkOverlap() == patternDimensions[i].getChunkOverlap()))
@@ -81,7 +88,10 @@ class LogicalBestMatch: public LogicalOperator
             }
         }
 
-        size_t j = 0;
+        AttributeID j = 0;
+        assert((patternAttributes.size() +
+                catalogAttributes.size() +
+                catalogDimensions.size()) < std::numeric_limits<AttributeID>::max());
         for (size_t i = 0, n = patternAttributes.size(); i < n; i++, j++) {
             AttributeDesc const& attr = patternAttributes[i];
             matchAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
@@ -99,7 +109,11 @@ class LogicalBestMatch: public LogicalOperator
         }
         matchAttributes[j] = AttributeDesc(j, DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME, TID_INDICATOR, AttributeDesc::IS_EMPTY_INDICATOR, 0);
 
-        return ArrayDesc("bestmatch", matchAttributes, patternDimensions, defaultPartitioning());
+        ArrayDistPtr undefDist = ArrayDistributionFactory::getInstance()->construct(psUndefined,
+                                                                                    DEFAULT_REDUNDANCY);
+        return ArrayDesc("bestmatch", matchAttributes, patternDimensions,
+                         undefDist, // not known until the physical stage
+                         query->getDefaultArrayResidency() );
     }
 };
 

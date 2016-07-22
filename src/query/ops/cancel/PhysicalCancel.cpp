@@ -26,14 +26,14 @@
  * \author roman.simakov@gmail.com
  */
 
-#include <boost/foreach.hpp>
-#include <queue>
+#include <iostream>
+#include <query/QueryID.h>
+#include <query/Operator.h>
+#include <query/executor/SciDBExecutor.h>
 
-#include "query/Operator.h"
-#include "query/executor/SciDBExecutor.h"
+#include <SciDBAPI.h>
 
 using namespace std;
-using namespace boost;
 
 namespace scidb {
 
@@ -48,7 +48,9 @@ public:
     std::shared_ptr<Array> execute(vector<std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         const scidb::SciDB& scidb = getSciDBExecutor();
-        const QueryID queryID = dynamic_pointer_cast<OperatorParamPhysicalExpression>(_parameters[0])->getExpression()->evaluate().getInt64();
+        std::stringstream queryIdS (dynamic_pointer_cast<OperatorParamPhysicalExpression>(_parameters[0])->getExpression()->evaluate().getString());
+        QueryID queryID;
+        queryIdS >> queryID;
         scidb.cancelQuery(queryID);
 
         return std::shared_ptr<Array>();

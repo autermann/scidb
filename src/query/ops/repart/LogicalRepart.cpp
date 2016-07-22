@@ -107,15 +107,29 @@ public:
         {
             if (srcDimensions[i].getStartMin() != dstDimensions[i].getStartMin())
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR3);
+
+            // The source chunk interval may be unspecified (autochunked) if we are downstream from
+            // a redimension().  If that's true, then the source array *must* have an empty bitmap:
+            // we can't rely on its length being a multiple of its chunk interval.
+
             if (!(srcDimensions[i].getEndMax() == dstDimensions[i].getEndMax()
                                || (srcDimensions[i].getEndMax() < dstDimensions[i].getEndMax()
-                                   && ((srcDimensions[i].getLength() % srcDimensions[i].getChunkInterval()) == 0
+                                   && ((!srcDimensions[i].isAutochunked() &&
+                                        (srcDimensions[i].getLength() % srcDimensions[i].getChunkInterval()) == 0)
                                        || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
+            {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR4);
+            }
             if (srcDimensions[i].getStartMin() == CoordinateBounds::getMin())
+            {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_REPART_ERROR5);
+            }
         }
-        return ArrayDesc(schemaParam.getName(), srcAttributes, dstDimensions, defaultPartitioning(), schemaParam.getFlags());
+
+        return ArrayDesc(schemaParam.getName(), srcAttributes, dstDimensions,
+                         createDistribution(psUndefined),
+                         srcArrayDesc.getResidency(),
+                         schemaParam.getFlags());
     }
 };
 

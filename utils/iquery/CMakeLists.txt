@@ -61,7 +61,7 @@ set (iquery_src
 
 file(GLOB iquery_inc "*.h" "*.yy" "*.ll")
 
-set_source_files_properties(iquery_parser.cpp keywords.cpp ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp ${iquery_scanner_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses")
+set_source_files_properties(iquery_parser.cpp keywords.cpp ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp ${iquery_scanner_fixed_src} PROPERTIES COMPILE_FLAGS "-Wno-parentheses -Wno-conversion")
 add_executable(iquery ${iquery_src} ${iquery_inc})
 extractDebugInfo("${GENERAL_OUTPUT_DIRECTORY}" "iquery" iquery)
 

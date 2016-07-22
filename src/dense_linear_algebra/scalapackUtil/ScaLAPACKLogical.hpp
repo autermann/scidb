@@ -24,8 +24,8 @@
 ///
 ///
 
-#ifndef SCALAPACKPHYSICAL_HPP_
-#define SCALAPACKPHYSICAL_HPP_
+#ifndef SCALAPACK_LOGICAL_HPP_
+#define SCALAPACK_LOGICAL_HPP_
 
 
 // std C
@@ -51,10 +51,37 @@ namespace scidb {
 /// no actual ScaLAPACKLogical class yet,
 /// just helpers for the Logicals are all that are needed so far
 
-/// returns or throws an exception if the input matrices are not suitable for ScaLAPACK
-/// processing.
-void                      checkScaLAPACKInputs(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query,
-                                               size_t nMatsMin, size_t nMatsMax);
+/// Check dimensions from logical inferSchema().
+/// @returns nothing
+/// @throw if the input schemas are not suitable for ScaLAPACK processing
+/// @see checkScaLAPACKInputs
+///
+void checkScaLAPACKLogicalInputs(std::vector<ArrayDesc> const& schemas,
+                                 std::shared_ptr<Query> query,
+                                 size_t nMatsMin, size_t nMatsMax);
+
+
+/// Check dimensions from physical execute()
+///
+/// @returns nothing
+/// @throw if the input arrays are not suitable for ScaLAPACK processing
+/// @see checkScaLAPACKSchemas
+///
+/// @note This and the previous routine are wrappers around the same logic.  Because some schema
+/// dimensions are autochunked (that is, their chunk intervals are not known at logical
+/// inferSchema() time), their intervals must be rechecked for ScaLAPACK acceptability at
+/// PhysicalOperator::execute() time.  Rather than perform major surgery to get just the necessary
+/// rechecks, it seemed clearer to wrap the same logic, and assert that only errors we might expect
+/// at physical execute time actually occur.
+///
+/// @note Ideally this call would be made just once for the query, from
+/// PhysicalFoo::preSingleExecute().  Unfortunately the input schemas are not available for
+/// inspection there.
+///
+void checkScaLAPACKPhysicalInputs(std::vector< std::shared_ptr<Array> > const& inputs,
+                                  std::shared_ptr<Query> query,
+                                  size_t nMatsMin, size_t nMatsMax);
+
 
 /// constructs distinct dimension names, from names that may or may not be distinct
 std::pair<std::string, std::string> ScaLAPACKDistinctDimensionNames(const std::string& a, const std::string& b);
@@ -63,4 +90,4 @@ void log4cxx_debug_dimensions(const std::string& prefix, const Dimensions& dims)
 
 } // namespace
 
-#endif /* SCALAPACKPHYSICAL_HPP_ */
+#endif /* SCALAPACK_LOGICAL_HPP_ */

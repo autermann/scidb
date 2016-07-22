@@ -328,11 +328,11 @@ namespace scidb
     // NonEmptyable array
     //
 
-    NonEmptyableArray::NonEmptyableArray(std::shared_ptr<Array> input)
+    NonEmptyableArray::NonEmptyableArray(const std::shared_ptr<Array>& input)
     : DelegateArray(input->getArrayDesc(), input, true)
     {
         Attributes const& oldAttrs(desc.getAttributes());
-        emptyTagID = oldAttrs.size();
+        emptyTagID = safe_static_cast<AttributeID>(oldAttrs.size());
         Attributes newAttrs(emptyTagID+1);
         for (size_t i = 0; i < emptyTagID; i++) {
             newAttrs[i] = oldAttrs[i];
@@ -341,7 +341,11 @@ namespace scidb
                                              DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME,
                                              TID_INDICATOR,
                                              AttributeDesc::IS_EMPTY_INDICATOR, 0);
-        desc = ArrayDesc(desc.getName(), newAttrs, desc.getDimensions(), defaultPartitioning());
+        desc = ArrayDesc(desc.getName(),
+                         newAttrs,
+                         desc.getDimensions(),
+                         desc.getDistribution(),
+                         desc.getResidency());
     }
 
     DelegateArrayIterator* NonEmptyableArray::createArrayIterator(AttributeID id) const
@@ -351,7 +355,7 @@ namespace scidb
         }
         return new DelegateArrayIterator(*this, id,
                                          inputArray->getConstIterator(id == emptyTagID ?
-                                                                      0 : id));
+                                                                      AttributeID(0) : id));
     }
 
     DelegateChunkIterator* NonEmptyableArray::createChunkIterator(DelegateChunk const* chunk,

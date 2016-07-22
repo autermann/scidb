@@ -36,6 +36,7 @@
 #include <set>
 
 #include <usr_namespace/NamespaceDesc.h>
+#include <usr_namespace/RoleDesc.h>
 #include <usr_namespace/UserDesc.h>
 #include <util/Mutex.h>
 
@@ -70,7 +71,8 @@ namespace scidb
         std::string             _securityMode;
         NamespaceDesc           _currentNamespaceDesc;
         NamespaceDesc           _defaultNamespaceDesc;
-        UserDesc                _userDesc;
+        scidb::UserDesc         _userDesc;
+        scidb::RoleDesc         _roleDesc;
         AUTHENTICATION_STATE_E  _authenticationState;
         class Mutex             _lockAuthenticationState;
         ValidSecurityModes      _validSecurityModes;
@@ -149,17 +151,17 @@ namespace scidb
          * Saves the AUTHENTICATED user info for later retrieval
          * @param userDesc - the AUTHHENTICATED user's info
          */
-        void setUser(const UserDesc &userDesc);
+        void setUser(const scidb::UserDesc &userDesc);
 
         /**
          *  Retrieves the AUTHENTICATED user info
          */
-        const UserDesc &getUser() const;
+        const scidb::UserDesc &getUser() const;
 
         /**
          *  Allows switching the current user.
          */
-        void changeUser(const UserDesc &newUser);
+        void changeUser(const scidb::UserDesc &newUser);
 
         /**
          *  Set the user info to an invalid state
@@ -167,8 +169,19 @@ namespace scidb
         void invalidateUser();
 
         /**
+         * Sets the current role to roleDesc
+         * @param roleDesc - the descriptor for which role to switch to
+         */
+        void setRole(const scidb::RoleDesc &roleDesc);
+
+        /**
+         *  Retrieves the current role descriptor
+         */
+        const scidb::RoleDesc &getRole() const;
+
+        /**
          * Saves a communicator to the Security for later retrieval
-         * Currently the only security library is "libauthpw.so"
+         * Currently the only security library is "libnamespaces.so"
          *
          * @param securityCommunicator - the communicator to the
          *   security
@@ -181,7 +194,7 @@ namespace scidb
 
         /**
          * Retrieves a communicator to the Security
-         * Currently the only security library is "libauthpw.so"
+         * Currently the only security library is "libnamespaces.so"
          */
         std::shared_ptr<security::Communicator>
             getSecurityCommunicator() const;

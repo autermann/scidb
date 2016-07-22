@@ -28,15 +28,17 @@
 
 #include "ReplicationManager.h"
 
+#include <system/Config.h>
+#include <network/BaseConnection.h>
+
 using namespace std;
-using namespace boost;
 namespace scidb
 {
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.replication"));
 
 void ReplicationManager::start(const std::shared_ptr<JobQueue>& jobQueue)
 {
-    ScopedMutexLock cs(_repMutex);
+    ScopedMutexLock cs(_repMutex, PTCW_REP);
     assert(!_lsnrId);
     Notification<NetworkManager::ConnectionStatus>::PublishListener pListener =
     bind(&ReplicationManager::handleConnectionStatus, this, _1); // bare pointer because RM should never go away
@@ -56,7 +58,7 @@ void ReplicationManager::start(const std::shared_ptr<JobQueue>& jobQueue)
 
 void ReplicationManager::stop()
 {
-    ScopedMutexLock cs(_repMutex);
+    ScopedMutexLock cs(_repMutex, PTCW_REP);
     Notification<NetworkManager::ConnectionStatus>::removePublishListener(_lsnrId);
     _lsnrId.reset();
     clear();
@@ -71,7 +73,7 @@ void ReplicationManager::send(const std::shared_ptr<Item>& item)
     assert(!item->isDone());
     assert(_lsnrId);
 
-    ScopedMutexLock cs(_repMutex);
+    ScopedMutexLock cs(_repMutex, PTCW_REP);
     std::shared_ptr<RepItems>& ri = _repQueue[item->getInstanceId()];
     if (!ri) {
         ri = std::shared_ptr<RepItems>(new RepItems);
@@ -85,7 +87,7 @@ void ReplicationManager::send(const std::shared_ptr<Item>& item)
 
 void ReplicationManager::wait(const std::shared_ptr<Item>& item)
 {
-    ScopedMutexLock cs(_repMutex);
+    ScopedMutexLock cs(_repMutex, PTCW_REP);
 
     assert(_lsnrId);
 
@@ -117,7 +119,7 @@ void ReplicationManager::wait(const std::shared_ptr<Item>& item)
         if (!res) {
             try {
                 InjectedErrorListener<ReplicaWaitInjectedError>::check();
-                _repEvent.wait(_repMutex, ec);
+                _repEvent.wait(_repMutex, ec, PTCW_REP);
             } catch (Exception& e) {
                 item->setDone(e.copy());
                 throw;
@@ -147,7 +149,7 @@ void ReplicationManager::handleConnectionStatus(Notification<NetworkManager::Con
     {
         return;
     }
-    ScopedMutexLock cs(_repMutex);
+    ScopedMutexLock cs(_repMutex, PTCW_REP);
 
     RepQueue::iterator iter = _repQueue.find(connStatus->getPhysicalInstanceId());
     if (iter == _repQueue.end()) {
@@ -163,7 +165,7 @@ void ReplicationManager::handleConnectionStatus(Notification<NetworkManager::Con
 
 bool ReplicationManager::sendItem(RepItems& ri)
 {
-    ScopedMutexLock cs(_repMutex);
+    ScopedMutexLock cs(_repMutex, PTCW_REP);
 
     const std::shared_ptr<Item>& item = ri.front();
 

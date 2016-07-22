@@ -60,7 +60,7 @@ namespace scidb
         /**
          * Default constructor
          */
-        Address() : attId(~0)
+        Address() : attId(INVALID_ATTRIBUTE_ID)
         {}
 
         /**
@@ -146,7 +146,7 @@ namespace scidb
         uint64_t hash() const
         {
             uint64_t h = 0;
-            for (int i = coords.size(); --i >= 0;)
+            for (int i = safe_static_cast<int>(coords.size()); --i >= 0;)
             {
                 h ^= coords[i];
             }

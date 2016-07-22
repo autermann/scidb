@@ -697,8 +697,9 @@ namespace scidb
         if (vertical)
         {
             assert(input->getSupportedAccess() >= MULTI_PASS);
-
-            for (size_t i = 0, n = getArrayDesc().getAttributes().size(); i < n; i++) {
+            for (AttributeID i = 0,
+                     attribTotal = safe_static_cast<AttributeID>(getArrayDesc().getAttributes().size());
+                 i < attribTotal; i++) {
                 std::shared_ptr<ArrayIterator> dst = getIterator(i);
                 std::shared_ptr<ConstArrayIterator> src = input->getConstIterator(i);
                 while (!src->end())
@@ -719,8 +720,9 @@ namespace scidb
             std::vector< std::shared_ptr<ConstArrayIterator> > srcIterators(nAttrs);
             for (size_t i = 0; i < nAttrs; i++)
             {
-                dstIterators[i] = getIterator(i);
-                srcIterators[i] = input->getConstIterator(i);
+                AttributeID aid = safe_static_cast<AttributeID>(i);
+                dstIterators[i] = getIterator(aid);
+                srcIterators[i] = input->getConstIterator(aid);
             }
             while (!srcIterators[0]->end())
             {
@@ -833,7 +835,8 @@ namespace scidb
         for (size_t j = 0; j < nDims; j++) {
             if (last[j] < first[j] ||
                 (first[j] - dims[j].getStartMin()) % dims[j].getChunkInterval() != 0) {
-                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNALIGNED_COORDINATES);
+                throw USER_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_UNALIGNED_COORDINATES)
+                    << dims[j];
             }
             bufSize *= last[j] - first[j] + 1;
         }
@@ -989,15 +992,16 @@ namespace scidb
     {
         // This function is only usable in debug builds, otherwise it is a no-op
 #ifndef NDEBUG
-        size_t nattrs = this->getArrayDesc().getAttributes(true).size();
+        AttributeID nattrs = safe_static_cast<AttributeID>(
+            this->getArrayDesc().getAttributes(true).size());
 
         vector< std::shared_ptr<ConstArrayIterator> > arrayIters(nattrs);
         vector< std::shared_ptr<ConstChunkIterator> > chunkIters(nattrs);
         vector<TypeId> attrTypes(nattrs);
 
         LOG4CXX_DEBUG(logger, "[printArray] name (" << this->getName() << ")");
-
-        for (size_t i = 0; i < nattrs; i++)
+        
+        for (AttributeID i = 0; i < nattrs; i++)
         {
             arrayIters[i] = this->getConstIterator(i);
             attrTypes[i] = this->getArrayDesc().getAttributes(true)[i].getType();

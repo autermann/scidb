@@ -28,9 +28,10 @@
  */
 
 #include <query/Operator.h>
-#include <system/SystemCatalog.h>
-#include <system/Exceptions.h>
+#include <query/AutochunkFixer.h>
 #include <array/Metadata.h>
+
+#include <bitset>
 
 using namespace std;
 
@@ -98,6 +99,8 @@ namespace scidb
  */
 class LogicalCrossJoin: public LogicalOperator
 {
+    AutochunkFixer  _fixer;
+
   public:
     LogicalCrossJoin(const string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
@@ -105,6 +108,11 @@ class LogicalCrossJoin: public LogicalOperator
     	ADD_PARAM_INPUT()
         ADD_PARAM_INPUT()
         ADD_PARAM_VARIES()
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     std::vector<std::shared_ptr<OperatorParamPlaceholder> >
@@ -118,11 +126,13 @@ class LogicalCrossJoin: public LogicalOperator
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
     {
+        // Matched dimensions must come in pairs.
         if ((_parameters.size() & 1) != 0) {
             throw USER_EXCEPTION(SCIDB_SE_OPERATOR, SCIDB_LE_OP_CROSSJOIN_ERROR2);
         }
         assert(schemas.size() == 2);
 
+        // Names for things... leftFoo, rightFoo.
         ArrayDesc const& leftArrayDesc = schemas[0];
         ArrayDesc const& rightArrayDesc = schemas[1];
         Attributes const& leftAttributes = leftArrayDesc.getAttributes();
@@ -136,12 +146,15 @@ class LogicalCrossJoin: public LogicalOperator
             totalAttributes -= 1;
         }
 
+        // Accumulate the result attributes.  Prefer the rightBitmap if present; if not then the
+        // leftBitmap; if not then oh well.
         Attributes CrossJoinAttributes(totalAttributes);
-        size_t j = 0;
+        AttributeID j = 0;
         for (size_t i = 0, n = leftAttributes.size(); i < n; i++) {
             AttributeDesc const& attr = leftAttributes[i];
             if (!attr.isEmptyIndicator()) {
-                CrossJoinAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
+                CrossJoinAttributes[j] = AttributeDesc(
+                    j, attr.getName(), attr.getType(), attr.getFlags(),
                     attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
                     attr.getDefaultValueExpr());
                 CrossJoinAttributes[j].addAlias(leftArrayDesc.getName());
@@ -150,14 +163,16 @@ class LogicalCrossJoin: public LogicalOperator
         }
         for (size_t i = 0, n = rightAttributes.size(); i < n; i++, j++) {
             AttributeDesc const& attr = rightAttributes[i];
-            CrossJoinAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
+            CrossJoinAttributes[j] = AttributeDesc(
+                j, attr.getName(), attr.getType(), attr.getFlags(),
                 attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
                 attr.getDefaultValueExpr());
             CrossJoinAttributes[j].addAlias(rightArrayDesc.getName());
         }
         if (leftBitmap && !rightBitmap) {
             AttributeDesc const& attr = *leftBitmap;
-            CrossJoinAttributes[j] = AttributeDesc(j, attr.getName(), attr.getType(), attr.getFlags(),
+            CrossJoinAttributes[j] = AttributeDesc(
+                j, attr.getName(), attr.getType(), attr.getFlags(),
                 attr.getDefaultCompressionMethod(), attr.getAliases(), &attr.getDefaultValue(),
                 attr.getDefaultValueExpr());
             CrossJoinAttributes[j].addAlias(leftArrayDesc.getName());
@@ -165,9 +180,10 @@ class LogicalCrossJoin: public LogicalOperator
 
         size_t nRightDims = rightDimensions.size();
         size_t nLeftDims = leftDimensions.size();
-        vector<int> CrossJoinOnDimensions(nRightDims, -1);
-        uint64_t leftCrossJoinOnMask = 0;
-        uint64_t rightCrossJoinOnMask = 0;
+        vector<ssize_t> CrossJoinOnDimensions(nRightDims, -1);
+        std::bitset<MAX_NUM_DIMS_SUPPORTED> leftCrossJoinOnMask;
+        std::bitset<MAX_NUM_DIMS_SUPPORTED> rightCrossJoinOnMask;
+        // For each pair of matched dimensions...
         for (size_t p = 0, np = _parameters.size(); p < np; p += 2) {
             std::shared_ptr<OperatorParamDimensionReference> leftDim = (std::shared_ptr<OperatorParamDimensionReference>&)_parameters[p];
             std::shared_ptr<OperatorParamDimensionReference> rightDim = (std::shared_ptr<OperatorParamDimensionReference>&)_parameters[p+1];
@@ -177,31 +193,33 @@ class LogicalCrossJoin: public LogicalOperator
             const string &leftDimArray = leftDim->getArrayName();
             const string &rightDimArray = rightDim->getArrayName();
 
+            // Get left dimension index, make sure it's not a repeat.
             ssize_t l = leftArrayDesc.findDimension(leftDimName, leftDimArray);
             if (l < 0) {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_NOT_EXIST,
                                            leftDim->getParsingContext())
                     << leftDimName << "lefthand" << leftDimensions;
             }
-            if ((leftCrossJoinOnMask & ((uint64_t)1 << l)) != 0) {
+            if (leftCrossJoinOnMask.test(l)) {
                 // Dimension should be specified only once in parameter list.
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CROSSJOIN_ERROR1,
                                            leftDim->getParsingContext());
             }
-            leftCrossJoinOnMask |=  (uint64_t)1 << l;
+            leftCrossJoinOnMask.set(l);
 
+            // Get right dimension index, make sure it's not a repeat.
             ssize_t r = rightArrayDesc.findDimension(rightDimName, rightDimArray);
             if (r < 0) {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_DIMENSION_NOT_EXIST,
                                            rightDim->getParsingContext())
                     << rightDimName << "righthand" << rightDimensions;
             }
-            if ((rightCrossJoinOnMask & ((uint64_t)1 << r)) != 0) {
+            if (rightCrossJoinOnMask.test(r)) {
                 // Dimension should be specified only once in parameter list.
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CROSSJOIN_ERROR1,
                                            rightDim->getParsingContext());
             }
-            rightCrossJoinOnMask |=  (uint64_t)1 << r;
+            rightCrossJoinOnMask.set(r);
 
             // Differences in chunk size and overlap are now handled
             // via PhysicalCrossJoin::requiresRedimensionOrRepartition().
@@ -211,29 +229,41 @@ class LogicalCrossJoin: public LogicalOperator
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_START_INDEX_MISMATCH) << ss.str();
             }
 
+            // Build (r --> l) "joinOn" map of matched dimensions.
             if (CrossJoinOnDimensions[r] >= 0) {
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CROSSJOIN_ERROR1);
             }
-            CrossJoinOnDimensions[r] = (int)l;
+            CrossJoinOnDimensions[r] = l;
         }
 
+        // Build result dimensions descriptor vector.  Left dimensions are untouched, right
+        // dimensions are the unmatched ones---those not part of a matched parameter pair.
+        _fixer.clear();
         j = 0;
         Dimensions CrossJoinDimensions(nLeftDims + nRightDims - _parameters.size()/2);
+        // All of the left Dimensions are in the CrossJoinDimensions
         for (size_t i = 0; i < nLeftDims; i++) {
             CrossJoinDimensions[j] = leftDimensions[i];
             CrossJoinDimensions[j].addAlias(leftArrayDesc.getName());
+            _fixer.takeDimension(j).fromArray(0).fromDimension(i);
             ++j;
         }
         for (size_t i = 0; i < nRightDims; i++) {
+            // If the rightDimension is not part of the parameter pairs, add it
+            // to the CrossJoinDimensions.
             if (CrossJoinOnDimensions[i] < 0)
             {
                 CrossJoinDimensions[j] = rightDimensions[i];
                 CrossJoinDimensions[j].addAlias(rightArrayDesc.getName());
+                _fixer.takeDimension(j).fromArray(1).fromDimension(i);
                 ++j;
             }
             else
             {
-                // Tweak corresponding left dimension 'd'.
+                // We are joining on this right-dimension.  Adjust the paired left-dimension
+                // descriptor so that it covers its *intersection* with the paired right-dimension.
+                // (We use the smaller of the two dimension lengths... and the smallest overlap.)
+
                 DimensionDesc& d = CrossJoinDimensions[CrossJoinOnDimensions[i]];
                 DimensionDesc const& right = rightDimensions[i];
                 Coordinate newCurrStart = max(d.getCurrStart(), right.getCurrStart());
@@ -245,10 +275,23 @@ class LogicalCrossJoin: public LogicalOperator
                 d.setChunkOverlap(min(d.getChunkOverlap(), right.getChunkOverlap()));
             }
         }
-        return ArrayDesc(leftArrayDesc.getName() + rightArrayDesc.getName(),
+
+        const std::string &leftName = leftArrayDesc.getName();
+        const std::string &rightName = rightArrayDesc.getName();
+
+        std::string newName;
+        if(ArrayDesc::isQualifiedArrayName(leftName) ||
+           ArrayDesc::isQualifiedArrayName(rightName))
+        {
+            newName = leftArrayDesc.getName() + std::string("~") + rightArrayDesc.getName();
+        } else {
+            newName = leftArrayDesc.getName() + rightArrayDesc.getName();
+        }
+        return ArrayDesc(newName,
                          CrossJoinAttributes,
                          CrossJoinDimensions,
-                         defaultPartitioning());
+                         createDistribution(psUndefined),
+                         leftArrayDesc.getResidency());
     }
 };
 

@@ -34,26 +34,22 @@
  * Query and QueryResult interfaces instead of the QueryProcessor interface.
  */
 
-#include <time.h>
-#include <memory>
-#include <boost/serialization/string.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <log4cxx/logger.h>
-
 #include <query/QueryProcessor.h>
-#include <query/Parser.h>
-#include <smgr/io/Storage.h>
+
+#include <query/QueryPlan.h>
+#include <query/RemoteArray.h>
+#include <query/optimizer/Optimizer.h>
+
+#include <array/ParallelAccumulatorArray.h>
 #include <network/MessageUtils.h>
 #include <network/NetworkManager.h>
-#include <system/SciDBConfigOptions.h>
-#include <system/SystemCatalog.h>
-#include <system/Cluster.h>
-#include <array/ParallelAccumulatorArray.h>
-#include <util/Thread.h>
+#include <query/Parser.h>
 
-using namespace std;
-using namespace boost;
-using namespace boost::archive;
+#include <log4cxx/logger.h>
+
+using std::string;
+using std::stringstream;
+using std::vector;
 
 namespace scidb
 {
@@ -97,6 +93,7 @@ public:
     void execute(std::shared_ptr<Query> query);
     void postSingleExecute(std::shared_ptr<Query> query);
     void inferArrayAccess(std::shared_ptr<Query> query);
+    std::string inferPermissions(std::shared_ptr<Query> query);
 };
 
 
@@ -105,12 +102,12 @@ std::shared_ptr<Query> QueryProcessorImpl::createQuery(
     QueryID                             queryID,
     const std::shared_ptr<Session> &    session)
 {
-    assert(queryID > 0);
+    SCIDB_ASSERT(queryID.isValid());
     assert(session);
 
     std::shared_ptr<Query> query = Query::create(queryID);
 
-LOG4CXX_DEBUG(logger, "QueryProcessorImpl::createQuery("
+    LOG4CXX_DEBUG(logger, "QueryProcessorImpl::createQuery("
     << "_qry=" << this << ","
     << "id=" << queryID << ","
     << "session=" << session.get()
@@ -153,6 +150,11 @@ const ArrayDesc& QueryProcessorImpl::inferTypes(std::shared_ptr<Query> query)
 void QueryProcessorImpl::inferArrayAccess(std::shared_ptr<Query> query)
 {
     return query->logicalPlan->inferArrayAccess(query);
+}
+
+std::string QueryProcessorImpl::inferPermissions(std::shared_ptr<Query> query)
+{
+    return query->logicalPlan->inferPermissions(query);
 }
 
 
@@ -240,9 +242,17 @@ std::shared_ptr<Array> QueryProcessorImpl::execute(std::shared_ptr<PhysicalQuery
             std::shared_ptr<Array> arg = execute(childs[i], query, depth+1);
             if (!arg)
                 throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_NO_OPERATOR_RESULT);
+            SCIDB_ASSERT(!arg->getArrayDesc().isAutochunked()); // Should have been caught below at depth+1!
             operatorArguments.push_back(arg);
         }
-        return physicalOperator->executeWrapper(operatorArguments, query);
+        std::shared_ptr<Array> result(physicalOperator->executeWrapper(operatorArguments, query));
+        if (result.get() && result->getArrayDesc().isAutochunked()) {
+            // Possibly a user-defined operator has not been adapted for autochunking.  (If it's a
+            // built-in operator, this is an internal error, *sigh*.)
+            throw SYSTEM_EXCEPTION(SCIDB_SE_EXECUTION, SCIDB_LE_AUTOCHUNKED_EXECUTE_RESULT)
+                << physicalOperator->getLogicalName() << result->getArrayDesc().getDimensions();
+        }
+        return result;
     }
 }
 

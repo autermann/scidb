@@ -30,6 +30,7 @@
 #include <vector>                                        // For vector
 #include <typeinfo>                                      // For typeid
 #include <functional>                                    // For less<>.
+#include <limits>                                        // For numeric_limits
 #include <util/Platform.h>                               // For SCIDB_NORETURN
 
 /****************************************************************************/
@@ -199,6 +200,96 @@ inline derived safe_dynamic_cast(base* pb)
 
     bad_dynamic_cast(typeid(base),typeid(derived));      // Report the failure
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+/**
+ * Cast an integral type to a smaller sized type, ensuring that its
+ * value is preserved.
+ */
+template <typename TO_TYPE, typename FROM_TYPE>
+inline TO_TYPE safe_static_cast(FROM_TYPE from)
+{
+    // There is a penalty for using this conversion, so just use
+    // the type without casting back to itself.
+    static_assert(!std::is_same<TO_TYPE,FROM_TYPE>::value,
+                  "types should be different");
+    static_assert(std::numeric_limits<FROM_TYPE>::is_integer
+                  && std::numeric_limits<TO_TYPE>::is_integer,
+                  "Use boost::numeric_cast<> for floating point.");
+
+    /// Use 'c++filt -t' to translate the types reported by bad_static_cast
+    void bad_static_cast(const std::type_info&,const std::type_info&) SCIDB_NORETURN;
+    //
+    // Static numeric_limits definitions are used so that the number of comparisons
+    // performed for the conversions is kept to a bare minimum when the templatized
+    // function is instantiated. This keeps the performance penalty to a minimum.
+    //
+    // Both are signed or both are unsigned
+    //
+    if (std::numeric_limits<TO_TYPE>::is_signed == std::numeric_limits<FROM_TYPE>::is_signed) {
+        // TO_TYPE has smaller bit length to represent the number
+        if (std::numeric_limits<TO_TYPE>::digits < std::numeric_limits<FROM_TYPE>::digits) {
+            if (from > std::numeric_limits<TO_TYPE>::max()
+                || from < std::numeric_limits<TO_TYPE>::min()) {
+                bad_static_cast(typeid(TO_TYPE),typeid(FROM_TYPE));
+            }
+        }
+        // else {
+        // if FROM_TYPE and TO_TYPE both (un)signed  values and TO_TYPE has
+        // a larger (or same) bit length representation then FROM_TYPE set is a
+        // proper subset (or equal set) of TO_TYPE set:
+        // FROM_TYPE: [ -2^(n-1), 2^(n-1) ) or [0, 2^n )
+        // TO_TYPE :  [ -2^(m+n-1), 2^(m+n-1) ) or [0, 2^(n+m) )
+        // m >= 0
+        // }
+    }
+    //
+    // converting from unsigned to signed
+    //
+    else if (std::numeric_limits<TO_TYPE>::is_signed) {
+        // TO_TYPE has smaller bit length to represent the number
+        if (std::numeric_limits<TO_TYPE>::digits < std::numeric_limits<FROM_TYPE>::digits) {
+            // [0, 2^(n)] --> [-2^(m-1), 2^(m-1)) ; m < n
+            // NOTE: the entire set of TO_TYPE fits into the FROM_TYPE set
+            // so the conversions in the comparison below are valid
+            if (from > std::numeric_limits<TO_TYPE>::max()) {
+                bad_static_cast(typeid(TO_TYPE),typeid(FROM_TYPE));
+            }
+        }
+        else if (std::numeric_limits<TO_TYPE>::digits == std::numeric_limits<FROM_TYPE>::digits) {
+            // [0, 2^n]  ---> [ -2^(n-1), 2^(n-1) )
+            if (from > std::numeric_limits<TO_TYPE>::max()) {
+                bad_static_cast(typeid(TO_TYPE),typeid(FROM_TYPE));
+            }
+        }
+        // else {
+            // an unsigned [0, 2^n) can always be represented in the
+            // range [ -2^(n+m-1), 2^(n+m-1) ) where m is positive: n,m are in [8, 16,32, 64]
+        // }
+    }
+    //
+    // converting from signed to unsigned
+    //
+    else {
+        // [ -2^(n-1), 2^(n-1) ) --> [0, 2^m] where m < n
+        if (std::numeric_limits<TO_TYPE>::digits < std::numeric_limits<FROM_TYPE>::digits) {
+            if (from < 0 || from > std::numeric_limits<TO_TYPE>::max() ) {
+                // This comparison conversion is okay because [0, 2^m) will fit into
+                // [ -2^(n-1), 2^(n-1) ) for all m < n
+                bad_static_cast(typeid(TO_TYPE),typeid(FROM_TYPE));
+            }
+        }
+        // for a x in [ -2^(n-1), 2^(n-1) ) --> x is in [0, 2^m] for all x > 0, m>=n
+        else {
+            if (from < 0) {
+                bad_static_cast(typeid(TO_TYPE),typeid(FROM_TYPE));
+            }
+        }
+    }
+    return static_cast<TO_TYPE>(from);
+}
+#pragma GCC diagnostic pop
 
 /**
  *  Return true if the truth of 'a' logically implies the truth of 'b'; that

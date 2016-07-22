@@ -71,6 +71,6 @@ ${DATA_GEN} --dims-sizes 50,50,50 --seed 915087 --sparsity-rate 0.03 --null-rate
 
 echo "Ok."
 
-iquery -ocsv -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -aq "dimensions(real_02_A_0)"
+iquery -ocsv:l -c ${IQUERY_HOST:=127.0.0.1} -p ${IQUERY_PORT:=1239} -aq "dimensions(real_02_A_0)"
 
 echo "Done."

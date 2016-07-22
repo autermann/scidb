@@ -97,26 +97,16 @@ class ArrayCleaner(object):
         self._pushed = False
         self._dbgWriter = DebugStreamWriter(debug,stream)
     #-----------------------------------------------------------------------------
-    # getArrayNames: extract the names of arrays currently stored in scidb from
-    #                the "raw" data returned by the list-array query.  The names
-    #                are returned as a set back to the caller.
-    def _getArrayNames(self, iqueryData):
-        # Run the regular expression check to grab the names of the arrays with
-        # some extraneous characters.  L will contain regular expression match
-        # objects.
-        lines = iqueryData.split('\n')
-        arrayNames = [line.split(',')[0] for line in lines[1:]]
-        arrayNames = [name.replace('\'','') for name in arrayNames if len(name) > 0]
-        return set(arrayNames)
-    #-----------------------------------------------------------------------------
     # getSciDBArrays: get a set of arrays currently stored in the scidb database
     #                 (as reported by a call to iquery).
     def getSciDBArrays(self):
         # Run iquery to get the list of arrays.
-        _,stdoutData,stderrData = self._iquery.runQuery(listSciDBArraysCmd,opts=['-o','csv','-aq'])
-
-        # Get the names from the "raw" data and return them:
-        return self._getArrayNames(stdoutData)
+        _,stdoutData,_ = self._iquery.runQuery(listSciDBArraysCmd,opts=['-o','csv','-aq'])
+        # Parse out the array names.
+        arrayNames = [line.split(',')[0] for line in stdoutData.splitlines()]
+        arrayNames = [name.replace('\'','') for name in arrayNames if name] # strip quotes
+        # Paranoid, but: no duplicates!
+        return set(arrayNames)
     #-----------------------------------------------------------------------------
     # removeSciDBArrays: remove all of the arrays specified by the user; the
     #                    function repeatedly calls iquery to remove a single array

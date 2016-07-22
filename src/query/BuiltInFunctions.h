@@ -41,7 +41,8 @@ typedef uint32_t Uint32;
 typedef uint64_t Uint64;
 typedef double Double;
 typedef float Float;
-typedef uint64_t DateTime;
+typedef time_t DateTime;
+static_assert(sizeof(time_t) == sizeof(uint64_t), "DateTime is handled as a 64bit value");
 typedef char Char;
 typedef bool Bool;
 
@@ -329,6 +330,12 @@ void missingReason(const Value** args, Value* res, void*)
     res->setInt32(args[0]->getMissingReason());
 }
 
+// sizeof implementation
+void sizeofDatum(const Value** args, Value* res, void*)
+{
+    res->setUint64(args[0]->size());
+}
+
 void missing(const Value** args, Value* res, void*)
 {
     int32_t i = args[0]->getInt32();
@@ -338,7 +345,7 @@ void missing(const Value** args, Value* res, void*)
         throw USER_EXCEPTION(SCIDB_SE_EXECUTION,SCIDB_LE_BAD_MISSING_REASON) << i;
     }
 
-    res->setNull(i);
+    res->setNull(safe_static_cast<Value::reason>(i));
 }
 
 void identicalConversion(const Value** args, Value* res, void*)
@@ -514,7 +521,7 @@ void strFTime(const Value** args, Value* res, void*)
     char buf[STRFTIME_BUF_LEN];
     *buf = '\0';
     struct tm tm;
-    time_t dt = (time_t)args[0]->getDateTime();
+    time_t dt = args[0]->getDateTime();
     gmtime_r(&dt, &tm);
     strftime(buf, sizeof(buf), args[1]->getString(), &tm);
     res->setString(buf);
@@ -533,7 +540,7 @@ void convDateTime2Str(const Value** args, Value* res, void*)
     }
     char buf[STRFTIME_BUF_LEN];
     struct tm tm;
-    time_t dt = (time_t)args[0]->getDateTime();
+    time_t dt = args[0]->getDateTime();
     gmtime_r(&dt, &tm);
     strftime(buf, sizeof(buf), DEFAULT_STRFTIME_FORMAT, &tm);
     res->setString(buf);
@@ -577,7 +584,7 @@ void dayOfWeekT(const Value** args, Value* res, void*)
     time_t *seconds = (time_t*) args[0]->data();
     struct tm tm;
     gmtime_r(seconds,&tm);
-    res->setUint8(tm.tm_wday);
+    res->setUint8(static_cast<uint8_t>(tm.tm_wday));
 }
 
 void hourOfDayT(const Value** args, Value* res, void*)
@@ -591,7 +598,7 @@ void hourOfDayT(const Value** args, Value* res, void*)
     time_t *seconds = (time_t*) args[0]->data();
     struct tm tm;
     gmtime_r(seconds,&tm);
-    res->setUint8(tm.tm_hour);
+    res->setUint8(static_cast<uint8_t>(tm.tm_hour));
 }
 
 void dayOfWeekTZ(const Value** args, Value* res, void*)
@@ -606,7 +613,7 @@ void dayOfWeekTZ(const Value** args, Value* res, void*)
     time_t seconds = t->first;
     struct tm tm;
     gmtime_r(&seconds,&tm);
-    res->setUint8(tm.tm_wday);
+    res->setUint8(static_cast<uint8_t>(tm.tm_wday));
 }
 
 void hourOfDayTZ(const Value** args, Value* res, void*)
@@ -621,12 +628,12 @@ void hourOfDayTZ(const Value** args, Value* res, void*)
     time_t seconds = t->first;
     struct tm tm;
     gmtime_r(&seconds,&tm);
-    res->setUint8(tm.tm_hour);
+    res->setUint8(static_cast<uint8_t>(tm.tm_hour));
 }
 
 void scidb_random(const Value** args, Value* res, void*)
 {
-    res->setUint32(::random());
+    res->setUint32(static_cast<uint32_t>(::random()));
 }
 
 void tzToGmt(const Value** args, Value* res, void*)

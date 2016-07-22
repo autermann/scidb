@@ -61,12 +61,13 @@ struct LogicalLoadModule : LogicalOperator
         _usage = "load_module(module-path : string)";    // The usage string
     }
 
-    ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query>)
+    ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query> query)
     {
         return ArrayDesc("load_module",
-               Attributes(1,AttributeDesc(0,"module",TID_STRING,0,0)),
-               Dimensions(1,DimensionDesc("i",0,0,0,0,1,0)),
-               defaultPartitioning());
+                         Attributes(1,AttributeDesc(0,"module",TID_STRING,0,0)),
+                         Dimensions(1,DimensionDesc("i",0,0,0,0,1,0)),
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

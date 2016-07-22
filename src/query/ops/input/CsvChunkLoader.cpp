@@ -30,6 +30,7 @@
 
 #include <util/StringUtil.h>    // for debugEncode
 #include <util/CsvParser.h>
+#include <system/Warnings.h>
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -94,9 +95,9 @@ bool CsvChunkLoader::loadChunk(std::shared_ptr<Query>& query, size_t chunkIndex)
 
     // Initialize a chunk and chunk iterator for each attribute.
     Attributes const& attrs = schema().getAttributes();
-    size_t nAttrs = attrs.size();
+    AttributeID nAttrs = safe_static_cast<AttributeID>(attrs.size());
     vector< std::shared_ptr<ChunkIterator> > chunkIterators(nAttrs);
-    for (size_t i = 0; i < nAttrs; i++) {
+    for (AttributeID i = 0; i < nAttrs; i++) {
         Address addr(i, _chunkPos);
         MemChunk& chunk = getLookaheadChunk(i, chunkIndex);
         chunk.initialize(array(), &schema(), addr, attrs[i].getDefaultCompressionMethod());

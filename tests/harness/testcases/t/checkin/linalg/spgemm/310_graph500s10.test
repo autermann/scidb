@@ -9,8 +9,8 @@ create array pairs_scale10 <i:int64, j:int64>[dummy=0:*,1000*1000,0]
 #we'd like to use the following chunks size for spgemm, but we have to
 #accomodate gemm() in a test below, so we'll use 1024 as the chunk size
 #if we had the compare() operator this would not be a problem
-#create array mat_scale10 <v:double>[i=0:1023,262144,0, j=0:1023,262144,0]
-create array mat_scale10 <v:double>[i=0:1023,1024,0, j=0:1023,1024,0]
+#create array mat_scale10 <v:double NOT NULL>[i=0:1023,262144,0, j=0:1023,262144,0]
+create array mat_scale10 <v:double NOT NULL>[i=0:1023,1024,0, j=0:1023,1024,0]
 
 --start-query-logging
 --start-igdata

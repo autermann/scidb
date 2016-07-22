@@ -35,6 +35,9 @@
 # include <boost/date_time/posix_time/posix_time.hpp>
 # include <log4cxx/logger.h>
 # include <log4cxx/ndc.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 # include "Exceptions.h"
 # include "errdb.h"
@@ -344,6 +347,21 @@ static Result execute_testcase (struct InfoForExecutor &ie)
 	{
 		LOG4CXX_INFO (logger, ie.testID << result_str << " " << duration << "s" );
 	}
+
+    // The following allows a python program named postTestExecutor.py
+    // in the $PYTHONPATH directory to execute after each test is run.
+    // This has been helpful, for example, in determining which tests are
+    // leaving arrays behind post execution of a test.
+    std::string pythonPath = getenv("PYTHONPATH");
+    std::string postTestExecutor = pythonPath + "/postTestExecutor.py";
+    if( access(postTestExecutor.c_str(), F_OK ) != -1 )
+    {
+        std::stringstream ss;
+        ss  << postTestExecutor
+            << " "
+            << ie.testID;
+        std::system (ss.str().c_str());
+    }
 
 	IndividualTestInfo ti(ie, g_test_ei);
 	g_rptr->writeTestcaseExecutionInfo (ti);

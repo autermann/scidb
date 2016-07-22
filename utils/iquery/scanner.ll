@@ -101,10 +101,6 @@ Other .
     return token::CSV_PLUS;
 }
 
-(?i:lcsv\+) {
-    return token::LCSV_PLUS;
-}
-
 (?i:dense) {
     return token::DENSE;
 }
@@ -131,10 +127,6 @@ Other .
 
 (?i:tsv\+) {
     return token::TSV_PLUS;
-}
-
-(?i:ltsv\+) {
-    return token::LTSV_PLUS;
 }
 
 {OneLineComment} {

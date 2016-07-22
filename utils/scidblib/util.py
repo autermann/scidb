@@ -30,10 +30,15 @@
 # END_COPYRIGHT_EXCEPTIONS
 
 import getpass
+import os
+import subprocess
+from collections import namedtuple
 from operator import itemgetter
 
 def superTuple(typename, *attribute_names):
     """Create and return a subclass of 'tuple', with named attributes.
+
+    THIS FUNCTION IS OBSOLETE!  USE collections.namedtuple INSTEAD!!!
 
     Sample Usage:
         Employee = superTuple('Employee', 'name', 'phone', 'email')
@@ -61,6 +66,7 @@ def superTuple(typename, *attribute_names):
     supertup.__name__ = typename
     return supertup
 
+
 def getVerifiedPassword(prompt=None, verify=None):
     """Read and verify a password from the tty.
 
@@ -82,3 +88,69 @@ def getVerifiedPassword(prompt=None, verify=None):
         except OSError:
             print >>sys.stderr, "Passwords do not match"
     return p1
+
+
+def iquery(*args, **kwargs):
+    """Run an iquery command.  First argument should be '-aq' or similar.
+
+    Unfortunately the code in scidb_afl.py is very unpythonic, hence
+    this minimalist iquery command wrapper.  SciDB host and port are
+    taken from keyword args or from the environment in that order.
+
+    Keyword Args:
+    host - SciDB cluster host (e.g. $IQUERY_HOST, default 'localhost').
+    port - SciDB query port (e.g. $IQUERY_PORT, default 1239).
+    """
+    cmd = ['iquery']
+    if 'host' in kwargs:
+        cmd.extend(['-c', kwargs['host']])
+    elif 'IQUERY_HOST' in os.environ:
+        cmd.extend(['-c', os.environ['IQUERY_HOST']])
+    if 'port' in kwargs:
+        cmd.extend(['-p', str(kwargs['port'])])
+    elif 'IQUERY_PORT' in os.environ:
+        cmd.extend(['-p', os.environ['IQUERY_PORT']])
+    cmd.extend(map(str, args))
+    p = subprocess.Popen(cmd,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT)
+    return p.communicate()[0]
+
+
+def make_table(entry_name, query, **kwargs):
+    """Build a list of named tuples based on result of the given AFL query.
+
+    @param entry_name name of type to be created by collections.namedtuple
+    @param query      AFL query from whose output we will make a table
+    @param kwargs     keyword args for iquery() call
+
+    Because the entire query result is read into memory, best to use
+    this only with queries returning smallish results.
+
+    All returned namedtuple fields are strings; we do not (yet)
+    automatically convert AFL data types to their Python equivalents.
+
+    An example:
+    >>> t = make_table('ArrayTable', "list('arrays',true)")
+    >>> all_versioned_array_ids = [x.aid for x in t if x.aid != x.uaid]
+    """
+    # Format tsv+:l gives dimension/attribute names for use as tuple attributes.
+    table_data = iquery('-otsv+:l', '-aq', query, kwargs).splitlines()
+    if "Error id:" in table_data:
+        raise RuntimeError(table_data)
+    # Sometimes SciDB can give the same label to >1 attribute; make them unique.
+    attrs = []
+    seen = dict()
+    for label in table_data[0].split():
+        if label in seen:
+            seen[label] += 1
+            label = '_'.join((label, str(seen[label])))
+        else:
+            seen[label] = 1
+        attrs.append(label)
+    # Create our data type and fill in the table.
+    tuple_type = namedtuple(entry_name, attrs)
+    table = []
+    for line in table_data[1:]:
+        table.append(tuple_type._make(line.split('\t')))
+    return table

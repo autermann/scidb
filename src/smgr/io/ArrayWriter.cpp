@@ -62,9 +62,10 @@
 #include <smgr/io/Storage.h>
 #include <system/SystemCatalog.h>
 #include <smgr/io/TemplateParser.h>
+#include <system/Warnings.h>
+#include <util/FileIO.h>
 
 using namespace std;
-using namespace boost;
 using namespace boost::archive;
 
 namespace scidb
@@ -94,7 +95,7 @@ namespace scidb
 
 #   define Fprintf(_fp,  _vargs...)             \
     do {                                        \
-        int e = ::fprintf(_fp, _vargs);         \
+        auto e = scidb::fprintf(_fp, _vargs);    \
         if (e < 0) {                            \
             e = errno ? errno : EIO;            \
             throw AwIoError(e);                 \
@@ -104,8 +105,8 @@ namespace scidb
     int ArrayWriter::_precision = ArrayWriter::DEFAULT_PRECISION;
 
     static const char* supportedFormats[] = {
-        "csv", "dense", "csv+", "lcsv+", "text", "sparse", "lsparse",
-        "store", "opaque", "dcsv", "tsv", "tsv+", "ltsv+"
+        "csv", "csv+", "dcsv", "dense", "lsparse", "opaque", "sparse",
+        "store", "text", "tsv", "tsv+",
     };
     static const unsigned NUM_FORMATS = SCIDB_SIZE(supportedFormats);
 
@@ -113,9 +114,25 @@ namespace scidb
     static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.smgr.io.ArrayWriter"));
 
     /*
-     * XXX This seems to have something to do with the EmptyTag
-     * attribute for l<xxx> formats, but it would be great if someone
-     * more familiar could elaborate!
+     * The *apparent* purpose of this iterator wrapper is to never
+     * skip over default values.  One could wish the original author
+     * had left some documentation.
+     *
+     * - Currently used only by dcsv and text formats.
+     * - Without it, we cannot load 'store' output as 'text'.
+     * - Also, various test failures occur:
+     *   + These fail with FILES_DIFFER:
+     *     . checkin.other.unbounded_cast_002 (uses 'dense')
+     *     . docscript.aggregate_op (uses 'dense')
+     *   + These fail due to assertion failures in saveTextFormat()
+     *     that cause scidbtestharness to exit, aborting the test run:
+     *     . docscript.analytics_aggregates
+     *     . p4/nova.03_filter
+     *   + Crashed the coordinator:
+     *     . p4/checkin.la_pearson2
+     *
+     * So I guess we need to keep it, despite the name's implied
+     * suggestion that it could go away one day.
      */
     class CompatibilityIterator : public ConstChunkIterator
     {
@@ -408,18 +425,18 @@ namespace scidb
      *
      * @description The handling of some text formats is remarkably
      * similar, and can be parameterized via an @c XsvParms object.
-     * Currently supported formats are csv, csv+, lcsv+, tsv, tsv+,
-     * ltsv+ and dcsv.
+     * Currently supported formats are csv, csv+, tsv, tsv+, and dcsv.
      */
     static uint64_t saveXsvFormat(Array const& array,
                                   ArrayDesc const& desc,
                                   FILE* f,
-                                  const XsvParms& parms)
+                                  const XsvParms& parms,
+                                  std::shared_ptr<Query> const& query)
     {
         // No attributes, no problem.
         Attributes const& attrs = desc.getAttributes();
         AttributeDesc const* emptyAttr = desc.getEmptyBitmapAttribute();
-        unsigned numAttrs = attrs.size() - (emptyAttr ? 1 : 0);
+        size_t numAttrs = attrs.size() - (emptyAttr ? 1 : 0);
         if (numAttrs == 0) {
             checkStreamError(f, "No attributes");
             return 0;
@@ -443,9 +460,17 @@ namespace scidb
             ++j;
         }
 
-        // Labels are trouble for parallel saves (i.e. on subsequent reload).
-        if (!parms.parallelSave() && parms.wantLabels()) {
-            printLabels(f, desc.getDimensions(), attrs, emptyAttr, parms);
+        if (parms.wantLabels()) {
+            if (parms.parallelSave()) {
+                // Can't parallel-load labels, so don't save them in the first place.
+#ifndef SCIDB_CLIENT
+                query->postWarning(SCIDB_WARNING(SCIDB_LE_CANNOT_RELOAD_LABELS_IN_PARALLEL));
+#endif
+                LOG4CXX_WARN(logger, USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER,
+                                                    SCIDB_LE_CANNOT_RELOAD_LABELS_IN_PARALLEL).what());
+            } else {
+                printLabels(f, desc.getDimensions(), attrs, emptyAttr, parms);
+            }
         }
 
         // Time to walk the chunks!
@@ -457,11 +482,10 @@ namespace scidb
         while (!arrayIterators[0]->end()) {
 
             // Set up chunk iterators, one per attribute.
-            for (unsigned i = 0; i < numAttrs; ++i) {
+            for (size_t i = 0; i < numAttrs; ++i) {
                 ConstChunk const& chunk = arrayIterators[i]->getChunk();
                 chunkIterators[i] = chunk.getConstIterator(CHUNK_MODE);
                 if (parms.compatMode()) {
-                    // This compatibility wrapper must do something cool.
                     chunkIterators[i] = std::shared_ptr<ConstChunkIterator>(
                         new CompatibilityIterator(chunkIterators[i],
                                                   false));
@@ -491,7 +515,7 @@ namespace scidb
 
                 // Then come the attributes.  Bump their corresponding
                 // chunk iterators as we go.
-                for (unsigned i = 0; i < numAttrs; ++i) {
+                for (size_t i = 0; i < numAttrs; ++i) {
                     if (i) {
                         Fputc(parms.delim(), f);
                     }
@@ -526,7 +550,6 @@ namespace scidb
                                    FILE* f,
                                    std::string const& format)
     {
-        size_t i, j;
         uint64_t n = 0;
         int precision = ArrayWriter::getPrecision();
         Attributes const& attrs = desc.getAttributes();
@@ -550,12 +573,13 @@ namespace scidb
         int iterationMode = ConstChunkIterator::IGNORE_OVERLAPS;
 
         // Get array iterators for all attributes
-        for (i = 0, j = 0; i < attrs.size(); i++)
+        for (AttributeID i = 0, j = 0, attrsSize = safe_static_cast<AttributeID>(attrs.size());
+             i < attrsSize; i++)
         {
             if (omitEmptyTag && attrs[i] == *desc.getEmptyBitmapAttribute())
                 continue;
 
-            arrayIterators[j] = array.getConstIterator((AttributeID)i);
+            arrayIterators[j] = array.getConstIterator(i);
             types[j] = attrs[i].getType();
             if (! isBuiltinType(types[j])) {
                 converters[j] =  FunctionLibrary::getInstance()->findConverter(types[j], TID_STRING, false);
@@ -585,14 +609,14 @@ namespace scidb
 
         // Set initial position
         Coordinates chunkPos(nDimensions);
-        for (i = 0; i < nDimensions; i++) {
+        for (AttributeID i = 0; i < nDimensions; i++) {
             coord[i] = dims[i].getStartMin();
             chunkPos[i] = dims[i].getStartMin();
         }
 
         // Check if chunking is performed in more than one dimension
         bool multisplit = false;
-        for (i = 1; i < nDimensions; i++) {
+        for (AttributeID i = 1; i < nDimensions; i++) {
             if (dims[i].getChunkInterval() < static_cast<int64_t>(dims[i].getLength())) {
                 multisplit = true;
             }
@@ -606,7 +630,7 @@ namespace scidb
             while (!arrayIterators[0]->end()) {
                 // Get iterators for the current chunk
                 bool isSparse = false;
-                for (i = 0; i < iteratorsCount; i++) {
+                for (AttributeID i = 0; i < iteratorsCount; i++) {
                     ConstChunk const& chunk = arrayIterators[i]->getChunk();
                     chunkIterators[i] = chunk.getConstIterator(iterationMode);
                     if (i == 0) {
@@ -616,7 +640,7 @@ namespace scidb
                     chunkIterators[i] = std::shared_ptr<ConstChunkIterator>(
                          new CompatibilityIterator(chunkIterators[i], isSparse));
                 }
-                int j = nDimensions;
+                int j = safe_static_cast<int>(nDimensions);
                 while (--j >= 0 && (chunkPos[j] += dims[j].getChunkInterval()) > dims[j].getEndMax()) {
                     chunkPos[j] = dims[j].getStartMin();
                 }
@@ -625,7 +649,7 @@ namespace scidb
                 if (!sparseFormat || !chunkIterators[0]->end()) {
                     if (!multisplit) {
                         Coordinates const& last = chunkIterators[0]->getLastPosition();
-                        for (i = 1; i < nDimensions; i++) {
+                        for (AttributeID i = 1; i < nDimensions; i++) {
                             if (last[i] < dims[i].getEndMax()) {
                                 multisplit = true;
                             }
@@ -634,13 +658,13 @@ namespace scidb
                     if (isSparse || storeFormat) {
                         if (!firstItem) {
                             firstItem = true;
-                            for (i = 0; i < nDimensions; i++) {
+                            for (AttributeID i = 0; i < nDimensions; i++) {
                                 Fputc(']', f);
                             }
                             Fprintf(f, ";\n");
                             if (storeFormat) {
                                 Fputc('{', f);
-                                for (i = 0; i < nDimensions; i++) {
+                                for (AttributeID i = 0; i < nDimensions; i++) {
                                     if (i != 0) {
                                         Fputc(',', f);
                                     }
@@ -648,7 +672,7 @@ namespace scidb
                                 }
                                 Fputc('}', f);
                             }
-                            for (i = 0; i < nDimensions; i++) {
+                            for (AttributeID i = 0; i < nDimensions; i++) {
                                 Fputc('[', f);
                             }
                         }
@@ -662,7 +686,9 @@ namespace scidb
                         if (!isSparse) {
                             Coordinates const& pos = chunkIterators[0]->getPosition();
                             int nbr = 0;
-                            for (i = nDimensions-1; pos[i] != ++coord[i]; i--) {
+                            for (AttributeID i = safe_static_cast<AttributeID>(nDimensions-1);
+                                 pos[i] != ++coord[i];
+                                 i--) {
                                 if (!firstItem) {
                                     Fputc(']', f);
                                     nbr += 1;
@@ -683,6 +709,7 @@ namespace scidb
                                                 break;
                                             }
                                         } else {
+                                            // These assertions only hold when using the CompatibilityIterator.
                                             assert(coord[i] == pos[i]);
                                             assert(i != 0);
                                         }
@@ -694,7 +721,7 @@ namespace scidb
                             }
                             if (gap) {
                                 Fputc('{', f);
-                                for (i = 0; i < nDimensions; i++) {
+                                for (AttributeID i = 0; i < nDimensions; i++) {
                                     if (i != 0) {
                                         Fputc(',', f);
                                     }
@@ -707,7 +734,7 @@ namespace scidb
                             if (startOfArray) {
                                 if (storeFormat) {
                                     Fputc('{', f);
-                                    for (i = 0; i < nDimensions; i++) {
+                                    for (AttributeID i = 0; i < nDimensions; i++) {
                                         if (i != 0) {
                                             Fputc(',', f);
                                         }
@@ -715,7 +742,7 @@ namespace scidb
                                     }
                                     Fputc('}', f);
                                 }
-                                for (i = 0; i < nDimensions; i++) {
+                                for (AttributeID i = 0; i < nDimensions; i++) {
                                     Fputc('[', f);
                                 }
                                 startOfArray = false;
@@ -726,7 +753,7 @@ namespace scidb
                             if (sparseFormat) {
                                 Fputc('{', f);
                                 Coordinates const& pos = chunkIterators[0]->getPosition();
-                                for (i = 0; i < nDimensions; i++) {
+                                for (AttributeID i = 0; i < nDimensions; i++) {
                                     if (i != 0) {
                                         Fputc(',', f);
                                     }
@@ -741,7 +768,7 @@ namespace scidb
                             if (startOfArray) {
                                 if (storeFormat) {
                                     Fputc('{', f);
-                                    for (i = 0; i < nDimensions; i++) {
+                                    for (AttributeID i = 0; i < nDimensions; i++) {
                                         if (i != 0) {
                                             Fputc(',', f);
                                         }
@@ -749,14 +776,14 @@ namespace scidb
                                     }
                                     Fputc('}', f);
                                 }
-                                for (i = 0; i < nDimensions; i++) {
+                                for (AttributeID i = 0; i < nDimensions; i++) {
                                     Fputc('[', f);
                                 }
                                 startOfArray = false;
                             }
                             Fputc('{', f);
                             Coordinates const& pos = chunkIterators[0]->getPosition();
-                            for (i = 0; i < nDimensions; i++) {
+                            for (AttributeID i = 0; i < nDimensions; i++) {
                                 if (i != 0) {
                                     Fputc(',', f);
                                 }
@@ -766,7 +793,7 @@ namespace scidb
                         }
                         Fputc('(', f);
                         if (!chunkIterators[0]->isEmpty()) {
-                            for (i = 0; i < iteratorsCount; i++) {
+                            for (AttributeID i = 0; i < iteratorsCount; i++) {
                                 if (i != 0) {
                                     Fputc(',', f);
                                 }
@@ -778,27 +805,27 @@ namespace scidb
                         firstItem = false;
                         Fputc(')', f);
 
-                        for (i = 0; i < iteratorsCount; i++) {
+                        for (AttributeID i = 0; i < iteratorsCount; i++) {
                             ++(*chunkIterators[i]);
                         }
                     }
                 }
-                for (i = 0; i < iteratorsCount; i++) {
+                for (AttributeID i = 0; i < iteratorsCount; i++) {
                     ++(*arrayIterators[i]);
                 }
                 if (multisplit) {
-                    for (i = 0; i < nDimensions; i++) {
+                    for (AttributeID i = 0; i < nDimensions; i++) {
                         coord[i] = dims[i].getEndMax() + 1;
                     }
                 }
             }
             if (startOfArray) {
-                for (i = 0; i < nDimensions; i++) {
+                for (AttributeID i = 0; i < nDimensions; i++) {
                     Fputc('[', f);
                 }
                 startOfArray = false;
             }
-            for (i = 0; i < nDimensions; i++) {
+            for (AttributeID i = 0; i < nDimensions; i++) {
                 Fputc(']', f);
             }
         }
@@ -886,7 +913,7 @@ namespace scidb
                         chunkIterators[i] = chunk.getConstIterator(iterationMode);
                     }
 
-                    int j = nDimensions;
+                    int j = safe_static_cast<int>(nDimensions);
                     while (--j >= 0 && (chunkPos[j] += dims[j].getChunkInterval()) > dims[j].getEndMax())
                     {
                         chunkPos[j] = dims[j].getStartMin();
@@ -1033,7 +1060,7 @@ namespace scidb
                                FILE* f,
                                std::shared_ptr<Query> const& query)
     {
-        size_t nAttrs = desc.getAttributes().size();
+        AttributeID nAttrs = safe_static_cast<AttributeID>(desc.getAttributes().size());
         vector< std::shared_ptr<ConstArrayIterator> > arrayIterators(nAttrs);
         uint64_t n;
         OpaqueChunkHeader hdr;
@@ -1048,16 +1075,17 @@ namespace scidb
         text_oarchive oa(ss);
         oa & desc;
         string const& s = ss.str();
-        hdr.size = s.size();
-        if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
-            || fwrite(&s[0], 1, hdr.size, f) != hdr.size)
+        hdr.size = safe_static_cast<uint32_t>(s.size());
+        // NOTE: fwrite_unlocked() is >= 20% faster than fwrite() for double-precision matrices
+        if (scidb::fwrite_unlocked(&hdr, sizeof(hdr), 1, f) != 1
+            || scidb::fwrite_unlocked(&s[0], 1, hdr.size, f) != hdr.size)
         {
             int err = errno ? errno : EIO;
             throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
                 << ::strerror(err) << err;
         }
 
-        for (size_t i = 0; i < nAttrs; i++) {
+        for (AttributeID i = 0; i < nAttrs; i++) {
             arrayIterators[i] = array.getConstIterator(i);
         }
         for (n = 0; !arrayIterators[0]->end(); n++) {
@@ -1070,9 +1098,9 @@ namespace scidb
                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
                         << "Chunk larger than maximum size: " << chunk->getSize();
                 }
-                hdr.size = chunk->getSize();
+                hdr.size = safe_static_cast<uint32_t>(chunk->getSize());
                 hdr.attrId = i;
-                hdr.compressionMethod = chunk->getCompressionMethod();
+                hdr.compressionMethod = safe_static_cast<int8_t>(chunk->getCompressionMethod());
                 hdr.flags = 0;
                 hdr.flags |= OpaqueChunkHeader::RLE_FORMAT;
                 if (!chunk->getAttributeDesc().isEmptyIndicator()) {
@@ -1080,12 +1108,12 @@ namespace scidb
                     // There is no need to save this bitmap in each chunk - so just cut it.
                     ConstRLEPayload payload((char*)chunk->getData());
                     assert(hdr.size >= payload.packedSize());
-                    hdr.size = payload.packedSize();
+                    hdr.size = safe_static_cast<uint32_t>(payload.packedSize());
                 }
-                hdr.nDims = pos.size();
-                if (fwrite(&hdr, sizeof(hdr), 1, f) != 1
-                    || fwrite(&pos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims
-                    || fwrite(chunk->getData(), 1, hdr.size, f) != hdr.size)
+                hdr.nDims = safe_static_cast<int8_t>(pos.size());
+                if (scidb::fwrite_unlocked(&hdr, sizeof(hdr), 1, f) != 1
+                    || scidb::fwrite_unlocked(&pos[0], sizeof(Coordinate), hdr.nDims, f) != hdr.nDims
+                    || scidb::fwrite_unlocked(chunk->getData(), 1, hdr.size, f) != hdr.size)
                 {
                     int err = errno ? errno : EIO;
                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
@@ -1096,6 +1124,9 @@ namespace scidb
                 ++(*arrayIterators[i]);
             }
         }
+
+        // TODO: investigate: checkStreamError(fp, __FUNCTION__); not used here,
+        //       but it is before other returns in this file.  explain or modify.
         return n;
     }
 
@@ -1137,7 +1168,7 @@ namespace scidb
             } else {
                 // Prepare to write values.
                 SCIDB_ASSERT(i < N_ATTRS);
-                arrayIterators[i] = array.getConstIterator(i);
+                arrayIterators[i] = array.getConstIterator(safe_static_cast<AttributeID>(i));
                 if (column.converter) {
                     cnvValues[i] = Value(column.externalType);
                 }
@@ -1145,6 +1176,7 @@ namespace scidb
             }
         }
 
+        // NOTE: fwrite_unlocked() is >= 20% faster than fwrite() for double-precision matrices
         uint64_t nCells = 0;    // aka number of tuples written
         for (size_t n = 0; !arrayIterators[0]->end(); n++) {
             for (size_t i = 0; i < N_ATTRS; i++) {
@@ -1160,7 +1192,7 @@ namespace scidb
                         // On output, skip means write NUL bytes (ticket #4703).
                         size_t pad = skip_bytes(column);
                         SCIDB_ASSERT(padBuffer.size() >= pad);
-                        if (fwrite(&padBuffer[0], 1, pad, f) != pad) {
+                        if (scidb::fwrite_unlocked(&padBuffer[0], 1, pad, f) != pad) {
                             int err = errno ? errno : EIO;
                             throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
                                 << ::strerror(err) << err;
@@ -1169,13 +1201,11 @@ namespace scidb
                     else {
                         Value const* v = &chunkIterators[i]->getItem();
                         if (column.nullable) {
-                            if (v->getMissingReason() > 127) {
-                                LOG4CXX_WARN(logger, "Missing reason " << v->getMissingReason()
-                                             << " cannot be stored in binary file");
-                                nMissingReasonOverflows += 1;
-                            }
-                            int8_t missingReason = (int8_t)v->getMissingReason();
-                            if (fwrite(&missingReason, sizeof(missingReason), 1, f) != 1) {
+                            // Binary format supports int8_t reasons only.
+                            static_assert(std::is_same<Value::reason,int8_t>::value,
+                                          "Value::reason type has changed, range checking may be needed");
+                            int8_t missingReason = v->getMissingReason();
+                            if (scidb::fwrite_unlocked(&missingReason, sizeof(missingReason), 1, f) != 1) {
                                 int err = errno ? errno : EIO;
                                 throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
                                     << ::strerror(err) << err;
@@ -1188,7 +1218,7 @@ namespace scidb
                             // for varying size type write 4-bytes counter
                             size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
                             SCIDB_ASSERT(padBuffer.size() >= size);
-                            if (fwrite(&padBuffer[0], 1, size, f) != size) {
+                            if (scidb::fwrite_unlocked(&padBuffer[0], 1, size, f) != size) {
                                 int err = errno ? errno : EIO;
                                 throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
                                     << ::strerror(err) << err;
@@ -1204,8 +1234,8 @@ namespace scidb
                             }
                             uint32_t size = (uint32_t)v->size();
                             if (column.fixedSize == 0) { // varying size type
-                                if (fwrite(&size, sizeof(size), 1, f) != 1
-                                    || fwrite(v->data(), 1, size, f) != size)
+                                if (scidb::fwrite_unlocked(&size, sizeof(size), 1, f) != 1
+                                    || scidb::fwrite_unlocked(v->data(), 1, size, f) != size)
                                 {
                                     int err = errno ? errno : EIO;
                                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
@@ -1216,7 +1246,7 @@ namespace scidb
                                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION)
                                         << size << column.fixedSize;
                                 }
-                                if (fwrite(v->data(), 1, size, f) != size)
+                                if (scidb::fwrite_unlocked(v->data(), 1, size, f) != size)
                                 {
                                     int err = errno ? errno : EIO;
                                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
@@ -1225,7 +1255,7 @@ namespace scidb
                                 if (size < column.fixedSize) {
                                     size_t padSize = column.fixedSize - size;
                                     assert(padSize <= padBuffer.size());
-                                    if (fwrite(&padBuffer[0], 1, padSize, f) != padSize)
+                                    if (scidb::fwrite_unlocked(&padBuffer[0], 1, padSize, f) != padSize)
                                     {
                                         int err = errno ? errno : EIO;
                                         throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
@@ -1282,10 +1312,17 @@ namespace scidb
             flc.l_start = 0;
             flc.l_len = 1;
 
-            int rc = fcntl(fileno(f), F_SETLK, &flc);
-            if (rc == -1) {
-                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_CANT_LOCK_FILE)
-                    << file << ::strerror(errno) << errno;
+            if(file.compare("/dev/null") != 0 ) {   // skip locking if /dev/null
+                // ... because the fcntl will fail
+                // in fact in parallel mode, all absolute paths will fail the fcntl
+                // so the logical operator and/or open code should be fixed to reject
+                // all absoluate paths in parallel mode *except* /dev/null
+                // which is very important to support for performance testing and diagnosis
+                int rc = fcntl(fileno(f), F_SETLK, &flc);
+                if (rc == -1) {
+                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_CANT_LOCK_FILE)
+                        << file << ::strerror(errno) << errno;
+                }
             }
         }
 
@@ -1295,14 +1332,9 @@ namespace scidb
         string baseFmt = format.substr(0, colon);
         if (compareStringsIgnoreCase(baseFmt, "csv") == 0) {
             xParms = make_shared<XsvParms>(format);
-            xParms->setLabels(true); // 14.3 compatbility... to be deprecated!
         } else if (compareStringsIgnoreCase(baseFmt, "csv+") == 0) {
             xParms = make_shared<XsvParms>(format);
             xParms->setCoords(true);
-            xParms->setLabels(true); // 14.3 compatbility... to be deprecated!
-        } else if (compareStringsIgnoreCase(baseFmt, "lcsv+") == 0) {
-            xParms = make_shared<XsvParms>(format);
-            xParms->setCoords(true).setCompat(true).setLabels(true);
         } else if (compareStringsIgnoreCase(baseFmt, "dcsv") == 0) {
             xParms = make_shared<XsvParms>(format);
             xParms->setCoords(true).setCompat(true).setLabels(true)
@@ -1310,22 +1342,16 @@ namespace scidb
         } else if (compareStringsIgnoreCase(baseFmt, "tsv") == 0) {
             xParms = make_shared<XsvParms>(format);
             xParms->setDelim('\t');
-            xParms->setLabels(true); // 14.3 compatbility... to be deprecated!
         } else if (compareStringsIgnoreCase(baseFmt, "tsv+") == 0) {
             xParms = make_shared<XsvParms>(format);
             xParms->setDelim('\t').setCoords(true);
-            xParms->setLabels(true); // 14.3 compatbility... to be deprecated!
-        } else if (compareStringsIgnoreCase(baseFmt, "ltsv+") == 0) {
-            xParms = make_shared<XsvParms>(format);
-            xParms->setDelim('\t').setCoords(true).setCompat(true)
-                .setLabels(true);
         }
 
         try {
             if (xParms.get()) {
                 xParms->setParallel(flags & F_PARALLEL);
                 xParms->setPrecision(ArrayWriter::getPrecision());
-                n = saveXsvFormat(array, desc, f, *xParms);
+                n = saveXsvFormat(array, desc, f, *xParms, query);
             }
             else if (compareStringsIgnoreCase(format, "lsparse") == 0) {
                 n = saveLsparseFormat(array, desc, f, format);

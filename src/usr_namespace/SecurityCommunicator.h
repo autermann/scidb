@@ -61,6 +61,10 @@ namespace scidb
     {
         static log4cxx::LoggerPtr _logger(log4cxx::Logger::getLogger("scidb.ops.securityPluginComm"));
 
+
+        /**
+         * Communication interface between the security plugin and SciDB.
+         */
         class Communicator
         {
         // -------------------------------------------------------------
@@ -109,21 +113,20 @@ namespace scidb
                 std::shared_ptr<Session> &session,
                 int maxTries = 1);
 
-
-            static bool createUserTr(
-                pqxx::connection *          connection,
-                UserDesc &                  userDesc,
-                pqxx::basic_transaction *   tr)
+            /**
+             * Retrieve descriptors for all users.
+             * @param usersDescs A vector of user descriptors that describe each user
+             */
+            static bool getUsers(
+                std::vector<scidb::UserDesc> &  usersDescs)
             {
                 std::vector<FunctionPointer> convs;
                 FunctionDescription func;
 
                 FunctionLibrary::getInstance()->findFunction(
-                    "createUserTr",         // const std::string& name
+                    "_getUsers",            // const std::string& name
                     boost::assign::list_of  // const std::vector<TypeId>& inputArgTypes
-                        (TID_BINARY)        //   in - pqxx::connection * connection
-                        (TID_BINARY)        //   in - UserDesc * pUserDesc
-                        (TID_BINARY),       //   in - pqxx::basic_transaction * tr
+                        (TID_BINARY),       //   in - const UserDesc * pUserDesc
                     func,                   // FunctionDescription& funcDescription
                     convs,                  // std::vector<FunctionPointer>& converters
                     false);                 // bool tile );
@@ -133,223 +136,26 @@ namespace scidb
                     return false;
                 }
 
-                Value inputParams[3] = {
-                    Value(TypeLibrary::getType(TID_BINARY)),  // connection
-                    Value(TypeLibrary::getType(TID_BINARY)),  // pNamespaceDesc
-                    Value(TypeLibrary::getType(TID_BINARY))}; // tr
-
-                UserDesc *pUserDesc = &userDesc;
-                inputParams[0].setData(&connection, sizeof(connection));
-                inputParams[1].setData(&pUserDesc,  sizeof(pUserDesc));
-                inputParams[2].setData(&tr,         sizeof(tr));
-
-                const Value* vInputParams[3] = {
-                    &inputParams[0],
-                    &inputParams[1],
-                    &inputParams[2]};
-
-                Value returnParams(TypeLibrary::getType(TID_INT32));
-                func.getFuncPtr()(vInputParams, &returnParams, NULL);
-
-                // If the return from libnamespaces.checkArrayAccess is 0
-                // then it succeeded.  Otherwise, it failed.
-                int retval = returnParams.getInt32();
-                return ((0 == retval) ? true : false);
-            }
-
-            static bool dropUserTr(
-                pqxx::connection *          connection,
-                const UserDesc &            userDesc,
-                pqxx::basic_transaction *   tr)
-            {
-                std::vector<FunctionPointer> convs;
-                FunctionDescription func;
-
-                FunctionLibrary::getInstance()->findFunction(
-                    "dropUserTr",           // const std::string& name
-                    boost::assign::list_of  // const std::vector<TypeId>& inputArgTypes
-                        (TID_BINARY)        //   in - pqxx::connection * connection
-                        (TID_BINARY)        //   in - const UserDesc * pUserDesc
-                        (TID_BINARY),       //   in - pqxx::basic_transaction * tr
-                    func,                   // FunctionDescription& funcDescription
-                    convs,                  // std::vector<FunctionPointer>& converters
-                    false);                 // bool tile );
-
-                if(!func.getFuncPtr())
-                {
-                    return false;
-                }
-
-                Value inputParams[3] = {
-                    Value(TypeLibrary::getType(TID_BINARY)),  // connection
-                    Value(TypeLibrary::getType(TID_BINARY)),  // pNamespaceDesc
-                    Value(TypeLibrary::getType(TID_BINARY))}; // tr
-
-                const UserDesc *pUserDesc = &userDesc;
-                inputParams[0].setData(&connection, sizeof(connection));
-                inputParams[1].setData(&pUserDesc,  sizeof(pUserDesc));
-                inputParams[2].setData(&tr,         sizeof(tr));
-
-                const Value* vInputParams[3] = {
-                    &inputParams[0],
-                    &inputParams[1],
-                    &inputParams[2]};
-
-                Value returnParams(TypeLibrary::getType(TID_INT32));
-                func.getFuncPtr()(vInputParams, &returnParams, NULL);
-
-                // If the return from libnamespaces.checkArrayAccess is 0
-                // then it succeeded.  Otherwise, it failed.
-                int retval = returnParams.getInt32();
-                return ((0 == retval) ? true : false);
-            }
-
-            static bool changeUserTr(
-                pqxx::connection *          connection,
-                UserDesc &                  userDesc,
-                const std::string &         whatToChange,
-                pqxx::basic_transaction *   tr)
-            {
-                std::vector<FunctionPointer> convs;
-                FunctionDescription func;
-
-                FunctionLibrary::getInstance()->findFunction(
-                    "changeUserTr",         // const std::string& name
-                    boost::assign::list_of  // const std::vector<TypeId>& inputArgTypes
-                        (TID_BINARY)        //   in - pqxx::connection * connection
-                        (TID_BINARY)        //   in - UserDesc * pUserDesc
-                        (TID_BINARY)        //   in - std::string * whatToChange
-                        (TID_BINARY),       //   in - pqxx::basic_transaction * tr
-                    func,                   // FunctionDescription& funcDescription
-                    convs,                  // std::vector<FunctionPointer>& converters
-                    false);                 // bool tile );
-
-                if(!func.getFuncPtr())
-                {
-                    return false;
-                }
-
-                Value inputParams[4] = {
-                    Value(TypeLibrary::getType(TID_BINARY)),  // connection
-                    Value(TypeLibrary::getType(TID_BINARY)),  // pNamespaceDesc
-                    Value(TypeLibrary::getType(TID_BINARY)),  // pWhatToChange
-                    Value(TypeLibrary::getType(TID_BINARY))}; // tr
-
-                UserDesc *pUserDesc = &userDesc;
-                const std::string *pWhatToChange = &whatToChange;
-                inputParams[0].setData(&connection,     sizeof(connection));
-                inputParams[1].setData(&pUserDesc,      sizeof(pUserDesc));
-                inputParams[2].setData(&pWhatToChange,  sizeof(pWhatToChange));
-                inputParams[3].setData(&tr,             sizeof(tr));
-
-                const Value* vInputParams[4] = {
-                    &inputParams[0],
-                    &inputParams[1],
-                    &inputParams[2],
-                    &inputParams[3]};
-
-                Value returnParams(TypeLibrary::getType(TID_INT32));
-                func.getFuncPtr()(vInputParams, &returnParams, NULL);
-
-                // If the return from libnamespaces.checkArrayAccess is 0
-                // then it succeeded.  Otherwise, it failed.
-                int retval = returnParams.getInt32();
-                return ((0 == retval) ? true : false);
-            }
-
-            static bool findUserTr(
-                pqxx::connection *          connection,
-                UserDesc &                  userDesc,
-                pqxx::basic_transaction *   tr)
-            {
-                std::vector<FunctionPointer> convs;
-                FunctionDescription func;
-
-                FunctionLibrary::getInstance()->findFunction(
-                    "findUserTr",           // const std::string& name
-                    boost::assign::list_of  // const std::vector<TypeId>& inputArgTypes
-                        (TID_BINARY)        //   in - pqxx::connection * connection
-                        (TID_BINARY)        //   in - const UserDesc * pUserDesc
-                        (TID_BINARY),       //   in - pqxx::basic_transaction * tr
-                    func,                   // FunctionDescription& funcDescription
-                    convs,                  // std::vector<FunctionPointer>& converters
-                    false);                 // bool tile );
-
-                if(!func.getFuncPtr())
-                {
-                    return false;
-                }
-
-                Value inputParams[3] = {
-                    Value(TypeLibrary::getType(TID_BINARY)),  // connection
-                    Value(TypeLibrary::getType(TID_BINARY)),  // pNamespaceDesc
-                    Value(TypeLibrary::getType(TID_BINARY))}; // tr
-
-                UserDesc *pUserDesc = &userDesc;
-                inputParams[0].setData(&connection, sizeof(connection));
-                inputParams[1].setData(&pUserDesc,  sizeof(pUserDesc));
-                inputParams[2].setData(&tr,         sizeof(tr));
-
-                const Value* vInputParams[3] = {
-                    &inputParams[0],
-                    &inputParams[1],
-                    &inputParams[2]};
-
-                Value returnParams(TypeLibrary::getType(TID_INT32));
-                func.getFuncPtr()(vInputParams, &returnParams, NULL);
-
-                // If the return from libnamespaces.checkArrayAccess is 0
-                // then it succeeded.  Otherwise, it failed.
-                int retval = returnParams.getInt32();
-                return ((0 == retval) ? true : false);
-            }
-
-            static bool getUsersTr(
-                pqxx::connection *              connection,
-                std::vector<scidb::UserDesc> &  usersDescs,
-                pqxx::basic_transaction *       tr)
-            {
-                std::vector<FunctionPointer> convs;
-                FunctionDescription func;
-
-                FunctionLibrary::getInstance()->findFunction(
-                    "getUsersTr",           // const std::string& name
-                    boost::assign::list_of  // const std::vector<TypeId>& inputArgTypes
-                        (TID_BINARY)        //   in - pqxx::connection * connection
-                        (TID_BINARY)        //   in - const UserDesc * pUserDesc
-                        (TID_BINARY),       //   in - pqxx::basic_transaction * tr
-                    func,                   // FunctionDescription& funcDescription
-                    convs,                  // std::vector<FunctionPointer>& converters
-                    false);                 // bool tile );
-
-                if(!func.getFuncPtr())
-                {
-                    return false;
-                }
-
-                Value inputParams[3] = {
-                    Value(TypeLibrary::getType(TID_BINARY)),  // connection
-                    Value(TypeLibrary::getType(TID_BINARY)),  // pNamespaceDesc
-                    Value(TypeLibrary::getType(TID_BINARY))}; // tr
+                Value inputParams[1] = {
+                    Value(TypeLibrary::getType(TID_BINARY))}; // pUserDescs
 
                 std::vector<scidb::UserDesc> *pUserDescs = &usersDescs;
-                inputParams[0].setData(&connection, sizeof(connection));
-                inputParams[1].setData(&pUserDescs, sizeof(pUserDescs));
-                inputParams[2].setData(&tr,         sizeof(tr));
+                inputParams[0].setData(&pUserDescs, sizeof(pUserDescs));
 
-                const Value* vInputParams[3] = {
-                    &inputParams[0],
-                    &inputParams[1],
-                    &inputParams[2]};
+                const Value* vInputParams[1] = {
+                    &inputParams[0]};
 
                 Value returnParams(TypeLibrary::getType(TID_INT32));
                 func.getFuncPtr()(vInputParams, &returnParams, NULL);
 
-                // If the return from libnamespaces.checkArrayAccess is 0
-                // then it succeeded.  Otherwise, it failed.
-                int retval = returnParams.getInt32();
-                return ((0 == retval) ? true : false);
+                // If the return from then it succeeded.  Otherwise, it failed.
+                int32_t retval = returnParams.getInt32();
+                return (0 == retval);
             }
+
+            static bool checkSecurityPermissions(
+                const std::shared_ptr<scidb::Session> &         session,
+                const std::string &                             permissions);
         };  // class Communicator
     } // namespace security
 } // namespace scidb

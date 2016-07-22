@@ -143,7 +143,10 @@ public:
             }
             if  ( dstAttributes[i].getFlags()!= srcAttributes[i].getFlags() &&
                   dstAttributes[i].getFlags()!= (srcAttributes[i].getFlags() | AttributeDesc::IS_NULLABLE ))
-                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR3, pc)  << dstAttributes[i].getName();
+            {
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR3, pc)
+                    << dstAttributes[i].getName();
+            }
         }
 
         if (srcDimensions.size() != dstDimensions.size())
@@ -158,11 +161,17 @@ public:
         for (size_t i = 0, n = srcDimensions.size(); i < n; i++) {
             DimensionDesc const& srcDim = srcDimensions[i];
             DimensionDesc const& dstDim = dstDimensions[i];
+
+            // The source chunk interval may be unspecified (autochunked) if we are downstream from
+            // a redimension().  If that's true, then the source array *must* have an empty bitmap:
+            // we can't rely on its length being a multiple of its chunk interval.
+
             if (!(srcDim.getEndMax() == dstDim.getEndMax()
                   || (srcDim.getEndMax() < dstDim.getEndMax()
-                      && ((srcDim.getLength() % srcDim.getChunkInterval()) == 0
-                          || srcArrayDesc.getEmptyBitmapAttribute() != NULL))))
+                      && ((!srcDim.isAutochunked() && (srcDim.getLength() % srcDim.getChunkInterval()) == 0)
+                          || srcArrayDesc.getEmptyBitmapAttribute() != NULL)))) {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_CAST_ERROR5, pc) << dstDim.getBaseName();
+            }
 
             if (!srcDim.getEndMax() != dstDim.getEndMax()) {
                 _properties.tile = false;
@@ -179,11 +188,13 @@ public:
                                              dstDim.getEndMax() == CoordinateBounds::getMax() &&
                                                  srcDim.getCurrEnd() != CoordinateBounds::getMin()
                                                       ? srcDim.getEndMax() : dstDim.getEndMax(),
-                                             srcDim.getChunkInterval(),
+                                             srcDim.getRawChunkInterval(),
                                              srcDim.getChunkOverlap());
         }
         return ArrayDesc(schemaParam.getName(), dstAttributes, dstDimensions,
-                         defaultPartitioning(), schemaParam.getFlags());
+                         srcArrayDesc.getDistribution(),
+                         srcArrayDesc.getResidency(),
+                         schemaParam.getFlags());
     }
 };
 

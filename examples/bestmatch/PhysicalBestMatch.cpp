@@ -67,6 +67,16 @@ class PhysicalBestMatch: public PhysicalOperator
     {
         assert(inputArrays.size() == 2);
         int64_t error = ((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getInt64();
+
+        std::shared_ptr<Array> left = inputArrays[0];
+        std::shared_ptr<Array> right = inputArrays[1];
+        if (isDebug()) {
+            SCIDB_ASSERT(left->getArrayDesc().getResidency()->isEqual(right->getArrayDesc().getResidency()));
+            SCIDB_ASSERT(left->getArrayDesc().getDistribution()->checkCompatibility(right->getArrayDesc().getDistribution()));
+            SCIDB_ASSERT(left->getArrayDesc().getResidency()->isEqual(query->getDefaultArrayResidency()));
+            SCIDB_ASSERT(left->getArrayDesc().getResidency()->isEqual(_schema.getResidency()));
+            SCIDB_ASSERT(left->getArrayDesc().getDistribution()->checkCompatibility(_schema.getDistribution()));
+        }
         return std::shared_ptr<Array>(new BestMatchArray(_schema, inputArrays[0], inputArrays[1], error));
     }
 };

@@ -141,15 +141,15 @@ Query was executed successfully
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(multiMedia_array_new,'${TEST_DATA_DIR}/multi.txt')">
 {I,J} name,val,sal
-{1,1} '2',0,0
-{1,2} '3',0,0
-{1,3} '4',0,0
-{2,1} '5',0,0
-{2,2} '6',0,0
-{2,3} '7',0,0
-{3,1} '10',0,0
-{3,2} '11',0,0
-{3,3} '12',0,0
+{1,1} '2',null,null
+{1,2} '3',null,null
+{1,3} '4',null,null
+{2,1} '5',null,null
+{2,2} '6',null,null
+{2,3} '7',null,null
+{3,1} '10',null,null
+{3,2} '11',null,null
+{3,3} '12',null,null
 
 SCIDB QUERY : <create array threeD_array < val : double > [ I=1:3,3,0, J=1:3,3,0 , K=1:3,3,0]>
 Query was executed successfully
@@ -354,27 +354,27 @@ SCIDB QUERY : <select * from store((select* from Media,Media_E),AA)>
 
 SCIDB QUERY : <select * from store((select* from multiMedia_array_new,Media),AB)>
 {I,J} name,val,sal,val_2
-{1,1} '2',0,0,2
-{1,2} '3',0,0,3
-{1,3} '4',0,0,4
-{2,1} '5',0,0,5
-{2,2} '6',0,0,6
-{2,3} '7',0,0,7
-{3,1} '10',0,0,10
-{3,2} '11',0,0,11
-{3,3} '12',0,0,12
+{1,1} '2',null,null,2
+{1,2} '3',null,null,3
+{1,3} '4',null,null,4
+{2,1} '5',null,null,5
+{2,2} '6',null,null,6
+{2,3} '7',null,null,7
+{3,1} '10',null,null,10
+{3,2} '11',null,null,11
+{3,3} '12',null,null,12
 
 SCIDB QUERY : <join (multiMedia_array_new, Media)>
 {I,J} name,val,sal,val
-{1,1} '2',0,0,2
-{1,2} '3',0,0,3
-{1,3} '4',0,0,4
-{2,1} '5',0,0,5
-{2,2} '6',0,0,6
-{2,3} '7',0,0,7
-{3,1} '10',0,0,10
-{3,2} '11',0,0,11
-{3,3} '12',0,0,12
+{1,1} '2',null,null,2
+{1,2} '3',null,null,3
+{1,3} '4',null,null,4
+{2,1} '5',null,null,5
+{2,2} '6',null,null,6
+{2,3} '7',null,null,7
+{3,1} '10',null,null,10
+{3,2} '11',null,null,11
+{3,3} '12',null,null,12
 
 SCIDB QUERY : <Join(threeD_array_A,threeD_array)>
 {I,J,K} initial,val,val

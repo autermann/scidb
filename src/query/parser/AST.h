@@ -77,7 +77,8 @@ enum type
     attribute,
     dimension,
     asterisk,
-    list
+    questionMark,
+    list,
 };
 
 enum child
@@ -312,6 +313,7 @@ class Factory
             Node*             newString (const location&,string);
             Node*             newBoolean(const location&,boolean);
             Node*             newInteger(const location&,integer);
+            Node*             newCfgParm(const location&,integer);
 
  public:                   // Helper Functions
             Node*             newApp    (const location&,name);

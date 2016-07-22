@@ -170,7 +170,7 @@ class Live
                                : _live(0),               // Not yet resurrected
                                  _succ(0),               // No successor block
                                  _pred(0),               // No predecessor block
-                                 _size(size)             {assert(_size==size);}
+                                 _size(size & _BITS_MASK) {assert(_size==size);}
 
  public:                   // Operations
             bool              live()               const {return _live;}
@@ -181,11 +181,12 @@ class Live
     static  size_t            smallest()                 {return asWords(sizeof(Link<Live,Live>));}
 
  protected:                // Representation
-    static  size_t      const _bits = std::numeric_limits<size_t>::digits/2-1;
+    static  size_t      const _BITS = std::numeric_limits<size_t>::digits/2-1;
+    static  size_t      const _BITS_MASK = size_t(~0) >> (std::numeric_limits<size_t>::digits - _BITS);
             size_t            _live : 1;                 // Currently in use?
             size_t            _succ : 1;                 // Successor exists?
-            size_t            _pred : _bits;             // Predecessor offset
-            size_t            _size : _bits;             // Full size in words
+            size_t            _pred : _BITS;             // Predecessor offset
+            size_t            _size : _BITS;             // Full size in words
 };
 
 /**
@@ -393,7 +394,7 @@ void Live::predecessor(Dead* dead)
     assert(this  == dead->successor());                  // Dead precedes this
     assert(_pred >= dead->size());                       // Dead has been split
 
-    this->_pred = dead->size();                          // Update its offset
+    this->_pred = dead->size() & _BITS_MASK;             // Update its offset
 }
 
 /**
@@ -445,9 +446,9 @@ Dead* Dead::split(size_t size)
         Dead* b = new(v) Dead(_size - size);             // ...carve an offcut
 
         b->_succ = _succ;                                // ...adopt successor
-        b->_pred = size;                                 // ...we are its pred
+        b->_pred = size & _BITS_MASK;                    // ...we are its pred
 
-        _size = size;                                    // ...shrink original
+        _size = size & _BITS_MASK;                       // ...shrink original
         _succ = true;                                    // ...has a successor
 
         if (Live* s = b->successor())                    // Has b a successor?
@@ -471,8 +472,8 @@ void Dead::merge(Dead* block)
     assert(this->dead() && block->dead());               // Must both be dead
     assert(block == this->successor());                  // Must be successor
 
-    _size += block->_size;                               // Swallow the  block
-    _succ  = block->_succ;                               // Only if he has one
+    _size = (_size + block->_size) & _BITS_MASK;         // Swallow the  block
+    _succ = block->_succ;                                // Only if he has one
 
     if (Live* s = block->successor())                    // Has successor too?
     {
@@ -870,7 +871,7 @@ bool LeaArena::consistent() const
  */
 const size_t LeaArena::_size[128] =
 {
-#define bin(bin,     bytes)  (asWords(bytes) + Live::overhead())
+#define bin(bin,     bytes)  (asWords(static_cast<size_t>(bytes)) + Live::overhead())
         bin(  0,        16),
         bin(  1,        24),
         bin(  2,        32),

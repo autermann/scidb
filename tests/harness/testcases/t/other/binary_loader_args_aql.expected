@@ -46,26 +46,26 @@ SCIDB QUERY : <(... omitted ...)>
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A2 from current instance '${TEST_DATA_DIR}/A2_err.txt' as 'text' errors 3">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A2 from current instance '${TEST_DATA_DIR}/A2_err.txt' as 'text' errors 9999 shadow array A2_shadow">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -q "load A2a from current instance '${TEST_DATA_DIR}/A2_err.txt' as 'text' errors 9999">
 {i} a,b,c,d,e,f,g
 {1} 1,4,'one','four','sixteen','thirty two',128
-{888} 2,5,'five','ten','fifteen','thirty',0
+{888} 2,5,'five','ten','fifteen','thirty',null
 {889} 2,5,'five','ten','fifteen','thirty',256
-{998} 2,5,'five','ten','fifteen','thirty',0
-{1000} 2,5,'five','ten','','',0
+{998} 2,5,'five','ten','fifteen','thirty',null
+{1000} 2,5,'five','ten',null,null,null
 
 SCIDB QUERY : <save SP into current instance 'sp_int32.bin' as '(int32,string,double,int64,bool,float,string)'>
 {i} a,b,c,d,e,f,g

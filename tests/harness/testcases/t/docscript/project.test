@@ -11,7 +11,7 @@ store(build(<country:string>[i=0:*,12,0],'["Canada","USA","Kenya","USA","Ethiopi
 store(build(<time:double>[i=0:*,12,0],'[9.84,9.87,503.17,7956,7811,7596]',true),time)  
 store(join(event,join(year,(join(person,join(country,time))))),winnersFlat)  
 store(sort(winnersFlat,year),champions) 
---set-format csv
+--set-format csv:l
 --stop-igdata
 scan(champions) 
 project(champions,year,event,country,time) 

@@ -109,8 +109,6 @@ function db_init()
 
 [ "`whoami`" = "postgres" ] || die "You must run this script as owner of PostgreSQL!"
 
-echo "$(db_exists $database) is the result"
-
 if [[ $(db_exists $database) = $database ]]; then
     echo "Deleting $database..."
     psql -p $pgPort postgres -c "drop database $database;" || die
@@ -123,6 +121,6 @@ fi
 
 db_init $owner $database $password
 
-echo Sample of connection string:
-echo host=localhost port="$pgPort" dbname="$database" user="$owner" password="$password"
+# Sample of connection string:
+# host=localhost port="$pgPort" dbname="$database" user="$owner" password="********"
 

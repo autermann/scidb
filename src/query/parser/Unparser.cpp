@@ -318,7 +318,8 @@ void Unparser::onDimension(Node*& pn)
 
     _out << pn->get(dimensionArgName)->getString();      // Emit the name
 
-    if (Node* n = pn->get(dimensionArgLoBound))          // Has lower bound?
+    Node* n = pn->get(dimensionArgLoBound);
+    if (n && !n->is(questionMark))                       // Has lower bound?
     {
         _out << '=' << n;                                // ...emit the bound
     }
@@ -327,7 +328,8 @@ void Unparser::onDimension(Node*& pn)
         _out << '=' << 0;                                // ...emit default
     }
 
-    if (Node* n = pn->get(dimensionArgHiBound))          // Has upper bound?
+    n = pn->get(dimensionArgHiBound);
+    if (n && !n->is(questionMark) && !n->is(asterisk))   // Has upper bound?
     {
         _out << ':' << n;                                // ...emit the bound
     }
@@ -336,20 +338,28 @@ void Unparser::onDimension(Node*& pn)
         _out << ":*";                                    // ...emit default
     }
 
-    if (Node* n = pn->get(dimensionArgChunkInterval))    // Has an interval?
+    if (0 != (n = pn->get(dimensionArgChunkInterval)))   // Has an interval?
     {
-        _out << ',' << n;                                // ...emit interval
-    }
-    else                                                 // No, its missing
-    {
-        _out << ",?";                                    // ...emit default
+        if (n->is(questionMark))                         // An indefinite one?
+        {
+            _out << ",?";                                // ...emit '?'
+        }
+        else if (n->is(asterisk))                        // An autochunked one?
+        {
+            _out << ",*";                                // ...emit '*'
+        }
+        else                                             // No, a definite one
+        {
+            _out << ',' << n;                            // ...emit interval
+        }
     }
 
-    if (Node* n = pn->get(dimensionArgChunkOverlap))     // Has an overlap?
+    n = pn->get(dimensionArgChunkOverlap);
+    if (n && !n->is(questionMark))                       // Has an overlap?
     {
         _out << ',' << n;                                // ...emit overlap
     }
-    else                                                 // No, its missing
+    else                                                 // No, it's missing
     {
         _out << ",0";                                    // ...emit default
     }

@@ -19,10 +19,11 @@
 *
 * END_COPYRIGHT
 */
-
 #include <malloc.h>
 #include <string.h>
 #include <sstream>
+
+#include <log4cxx/logger.h>
 
 #include <query/Parser.h>
 #include <query/Operator.h>
@@ -37,16 +38,17 @@
 #include "ListArrayBuilders.h"
 #include <usr_namespace/NamespacesCommunicator.h>
 #include <usr_namespace/NamespaceDesc.h>
+#include <usr_namespace/Permissions.h>
+#include <usr_namespace/RoleDesc.h>
+#include <usr_namespace/SecurityCommunicator.h>
 #include <usr_namespace/UserDesc.h>
 #include <util/session/Session.h>
-
-
-#include <log4cxx/logger.h>
 
 /****************************************************************************/
 namespace scidb {
 /****************************************************************************/
-    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.PhysicalList"));
+
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.ops.PhysicalList"));
 
 using namespace std;
 using namespace boost;
@@ -102,9 +104,23 @@ struct PhysicalList : PhysicalOperator
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                 const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(coordinatorOnly() ? psLocalInstance : psUndefined);
+        if (coordinatorOnly()) {
+            stringstream ss;
+
+            std::shared_ptr<Query> query(_query);
+            SCIDB_ASSERT(query);
+
+            ss << query->getInstanceID();
+            ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                        DEFAULT_REDUNDANCY,
+                                                                                        ss.str());
+            ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+            mySchema->setDistribution(localDist);
+        }
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
@@ -119,7 +135,8 @@ struct PhysicalList : PhysicalOperator
         bool           showSys = getShowSysParameter();
 
         if (what == "aggregates") {
-            ListAggregatesArrayBuilder builder(AggregateLibrary::getInstance()->getNumAggregates());
+            ListAggregatesArrayBuilder builder(
+                AggregateLibrary::getInstance()->getNumAggregates(), showSys);
             builder.initialize(query);
             AggregateLibrary::getInstance()->visitPlugins(
                 AggregateLibrary::Visitor(
@@ -186,15 +203,24 @@ struct PhysicalList : PhysicalOperator
             tuple1[2].setBool(true);
             tuple1[3].setString("scidb");
             tuples->appendTuple(tuple1);
+
             Value tuple2[4];
             tuple2[0].setString("missing_reason");
             tuple2[1].setString("int32 missing_reason(<any>)");
             tuple2[2].setBool(true);
             tuple2[3].setString("scidb");
             tuples->appendTuple(tuple2);
+
+            Value tuple3[4];
+            tuple3[0].setString("sizeof");
+            tuple3[1].setString("uint64 sizeof(<any>)");
+            tuple3[2].setBool(true);
+            tuple3[3].setString("scidb");
+            tuples->appendTuple(tuple3);
+
             return tuples;
         } else if (what == "macros") {
-            return physicalListMacros(_arena); // see Parser.h
+            return physicalListMacros(_arena, query); // see Parser.h
         } else if (what == "queries") {
             ListQueriesArrayBuilder builder;
             builder.initialize(query);
@@ -207,6 +233,8 @@ struct PhysicalList : PhysicalOperator
             return listInstances(query);
         } else if (what == "users") {
             return listUsers(query);
+        } else if (what == "roles") {
+            return listRoles(query);
         } else if (what == "namespaces") {
             return listNamespaces(query);
         } else if (what == "chunk descriptors") {
@@ -330,11 +358,30 @@ struct PhysicalList : PhysicalOperator
             std::make_shared<TupleArray>(_schema, _arena));
 
         std::vector<scidb::UserDesc> users;
-        SystemCatalog::getInstance()->getUsers(users);
+        scidb::security::Communicator::getUsers(users);
         for (size_t i=0, n=users.size(); i!=n; ++i) {
             scidb::UserDesc &user = users[i];
-            Value tuple[1];
+            Value tuple[2];
             tuple[0].setString(user.getName());
+            tuple[1].setUint64(user.getId());
+            tuples->appendTuple(tuple);
+        }
+
+        return tuples;
+    }
+
+    std::shared_ptr<Array> listRoles(
+        const std::shared_ptr<Query>& query)
+    {
+        std::shared_ptr<TupleArray> tuples(
+            std::make_shared<TupleArray>(_schema, _arena));
+
+        std::vector<scidb::RoleDesc> roles;
+        scidb::namespaces::Communicator::getRoles(roles);
+        for (size_t i=0, n=roles.size(); i!=n; ++i) {
+            scidb::RoleDesc &role = roles[i];
+            Value tuple[1];
+            tuple[0].setString(role.getName());
             tuples->appendTuple(tuple);
         }
 
@@ -347,10 +394,26 @@ struct PhysicalList : PhysicalOperator
         std::shared_ptr<TupleArray> tuples(
             std::make_shared<TupleArray>(_schema, _arena));
 
+        const std::shared_ptr<scidb::Session> &session = query->getSession();
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ListArrays);
+
+        // Add only the namespaces that we have permission to list
         std::vector<NamespaceDesc> namespaces;
-        SystemCatalog::getInstance()->getNamespaces(namespaces);
+        scidb::namespaces::Communicator::getNamespaces(namespaces);
         for (size_t i=0, n=namespaces.size(); i!=n; ++i) {
             NamespaceDesc &current_namespace = namespaces[i];
+
+            try
+            {
+                scidb::namespaces::Communicator::checkNamespacePermissions(
+                    session, current_namespace, permissions);
+            }
+            catch(const scidb::Exception& e)
+            {
+                continue;
+            }
+
             Value tuple[1];
             tuple[0].setString(current_namespace.getName());
             tuples->appendTuple(tuple);
@@ -370,45 +433,32 @@ struct PhysicalList : PhysicalOperator
         vector<ArrayDesc> arrayDescs;
         const bool ignoreOrphanAttributes = true;
 
-        SystemCatalog::getInstance()->getArrays(arrayDescs,
-                                                ignoreOrphanAttributes,
-                                                !showAllArrays);
+        std::string namespaceName = scidb::namespaces::Communicator::getNamespaceName(query);
+        scidb::namespaces::Communicator::getArrays(
+            namespaceName,
+            arrayDescs,
+            ignoreOrphanAttributes,
+            !showAllArrays);
 
-
-        scidb::namespaces::Communicator::updateNamespaceId(
-            query->getSession()->getNamespace());
-
-        NamespaceDesc::ID currentNamespaceId =
-            query->getSession()->getNamespace().getId();
-
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::ListArrays);
+        scidb::namespaces::Communicator::checkNamespacePermissions(
+            query->getSession(), namespaceName, permissions);
 
         for (size_t i=0, n=arrayDescs.size(); i!=n; ++i)
         {
-            const ArrayDesc& desc = arrayDescs[i];
+            const ArrayDesc& arrayDesc = arrayDescs[i];
             // filter out metadata introduced after the catalog version of this query/txn
             // XXX TODO: this does not deal with the arrays not locked by this query
             // XXX TODO: (they can be added/updated/removed mid-flight, i.e. before list::execute() runs).
             // XXX TODO: Either make list() take an 'ALL' array lock or
             // XXX TODO: introduce a single serialized PG timestamp, or ...
             const ArrayID catVersion = query->getCatalogVersion(
-                desc.getName(), true);
+                namespaceName, arrayDesc.getName(), true);
 
-            if (desc.getId() <= catVersion && desc.getUAId() <= catVersion)
+            if (arrayDesc.getId() <= catVersion && arrayDesc.getUAId() <= catVersion)
             {
-                NamespaceDesc::ID arrayNamespaceId=-1;
-                try {
-                    SystemCatalog::getInstance()->getNamespaceIdFromArrayId(
-                            desc.getId(), arrayNamespaceId);
-                } catch (const scidb::Exception& e ) {
-                    if (e.getLongErrorCode() == SCIDB_LE_ARRAYID_DOESNT_EXIST) {
-                        continue;
-                    }
-                    throw;
-                }
-                if(arrayNamespaceId == currentNamespaceId)
-                {
-                    builder.list(desc);
-                }
+                builder.list(arrayDesc);
             }
         }
         return builder.getArray();

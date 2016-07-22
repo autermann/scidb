@@ -158,13 +158,14 @@ class InjectedErrorLibrary
  public:
     InjectedErrorLibrary();
     virtual ~InjectedErrorLibrary();
-    bool registerError(long int id, const std::shared_ptr<const InjectedError>& err);
     std::shared_ptr<const InjectedError> getError(long int id);
     static InjectedErrorLibrary* getLibrary()
     {
         return &_injectedErrorLib;
     }
  private:
+    bool registerError(long int id, const std::shared_ptr<const InjectedError>& err);
+
     typedef std::map<long int, std::shared_ptr<const InjectedError> > IdToErrorMap;
 #ifndef NDEBUG
     IdToErrorMap _registeredErrors;

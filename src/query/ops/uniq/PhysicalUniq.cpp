@@ -654,13 +654,19 @@ public:
      * @param inputDistributions the distributions of all the input arrays
      * @param inputSchemas the shapes of the input arrays.
      */
-    virtual RedistributeContext getOutputDistribution(vector<RedistributeContext> const&,
-                                                    vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(vector<RedistributeContext> const& inputDistributions,
+                                                      vector<ArrayDesc> const& inputSchemas) const
     {
        /* Usually the answer is either "psHashPartitioned" or "psUndefined". Other distributions are a more advanced topic.
         * psUndefined is a catch-all.
         */
-       return RedistributeContext(psUndefined);
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /**
@@ -693,6 +699,8 @@ public:
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(inputArrays[0]->getArrayDesc().getResidency()));
+
         InputArrayInfo inputArrayInfo;
         fillInputArrayInfo(inputArrays[0], inputArrayInfo);
         OutputArrayInfo outputArrayInfo;

@@ -28,11 +28,16 @@
  * @author Artyom Smirnov <smirnoffjr@gmail.com>
  */
 
-#include "query/Operator.h"
+#include "log4cxx/logger.h"
+#include <query/Operator.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
+
 
 #define fail(e) throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA,e)
 
 namespace scidb {
+    static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.logicalCreate"));
 
 using namespace std;
 using std::shared_ptr;
@@ -165,22 +170,42 @@ struct LogicalCreateArray : LogicalOperator
         ADD_PARAM_CONSTANT(TID_BOOL);                    // The temporary flag
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to create the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::CreateArray);
+        return permissions;
+    }
+
     ArrayDesc inferSchema(vector<ArrayDesc>,std::shared_ptr<Query> query)
     {
         assert(param<OperatorParam>(0)->getParamType() == PARAM_ARRAY_REF);
         assert(param<OperatorParam>(1)->getParamType() == PARAM_SCHEMA);
 
-        string arrayName(param<OperatorParamArrayReference>(0)->getObjectName());
+        string arrayNameOrg(param<OperatorParamArrayReference>(0)->getObjectName());
 
-        if (SystemCatalog::getInstance()->containsArray(arrayName))
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
+
+        try
         {
-            throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
-                                       SCIDB_LE_ARRAY_ALREADY_EXIST,
-                                       _parameters[0]->getParsingContext()) << arrayName;
+            scidb::namespaces::Communicator::checkArrayAccess(namespaceName, arrayName);
+        } catch(scidb::SystemException& e) {
+            if(e.getLongErrorCode() != SCIDB_LE_ARRAY_DOESNT_EXIST)
+            {
+                // Array already exists or another exception occurred
+                LOG4CXX_ERROR(logger, "Array "
+                    << ArrayDesc::makeQualifiedArrayName(namespaceName, arrayName)
+                    << " already exists");
+                throw;
+            }
         }
 
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
         return arrDesc;
     }
 
@@ -190,15 +215,21 @@ struct LogicalCreateArray : LogicalOperator
 
         SCIDB_ASSERT(param<OperatorParam>(0)->getParamType() == PARAM_ARRAY_REF);
 
-        string arrayName(param<OperatorParamArrayReference>(0)->getObjectName());
+        string arrayNameOrg(param<OperatorParamArrayReference>(0)->getObjectName());
+        SCIDB_ASSERT(!arrayNameOrg.empty() && arrayNameOrg.find('@')==string::npos);  // no version number
 
-        SCIDB_ASSERT(!arrayName.empty() && arrayName.find('@')==string::npos);  // no version number
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(arrayNameOrg, namespaceName, arrayName);
 
-        std::shared_ptr<SystemCatalog::LockDesc> lock(make_shared<SystemCatalog::LockDesc>(arrayName,
-                                                                                      query->getQueryID(),
-                                                                                      Cluster::getInstance()->getLocalInstanceId(),
-                                                                                      SystemCatalog::LockDesc::COORD,
-                                                                                      SystemCatalog::LockDesc::XCL));
+        std::shared_ptr<SystemCatalog::LockDesc> lock(
+            make_shared<SystemCatalog::LockDesc>(
+                namespaceName,
+                arrayName,
+                query->getQueryID(),
+                Cluster::getInstance()->getLocalInstanceId(),
+                SystemCatalog::LockDesc::COORD,
+                SystemCatalog::LockDesc::XCL));
         std::shared_ptr<SystemCatalog::LockDesc> resLock = query->requestLock(lock);
         SCIDB_ASSERT(resLock);
         SCIDB_ASSERT(resLock->getLockMode() >= SystemCatalog::LockDesc::XCL);
@@ -224,6 +255,14 @@ struct LogicalCreateArrayUsing : LogicalCreateArray
     LogicalCreateArrayUsing(const string& logicalName,const string& alias)
      : LogicalCreateArray(logicalName,alias,true)       // 2 extra arrays at front
     {}
+
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to create the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::CreateArray);
+        return permissions;
+    }
 
     ArrayDesc inferSchema(vector<ArrayDesc> schema,std::shared_ptr<Query> query)
     {
@@ -268,7 +307,8 @@ struct LogicalCreateArrayUsing : LogicalCreateArray
     /** DLL commands are non-nestable, and always return a null array...*/
 
         ArrayDesc arrDesc;
-        arrDesc.setPartitioningSchema(defaultPartitioning());
+        arrDesc.setDistribution(defaultPartitioning());
+        arrDesc.setResidency(query->getDefaultArrayResidency());
         return arrDesc;
     }
 };

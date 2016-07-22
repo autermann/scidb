@@ -183,7 +183,7 @@ namespace scidb
                 uint8_t bitSetter = 1;
                 for(uint32_t i = 0; i < 8; ++i)
                 {
-                    _bitSetters.push_back(bitSetter  << (7 - i));
+                    _bitSetters.push_back(static_cast<uint8_t>(bitSetter  << (7 - i)));
                 }
 
             }

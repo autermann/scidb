@@ -41,15 +41,16 @@ namespace scidb {
 /****************************************************************************/
 
 const char* SCIDB_VERSION()         {return "@CONFIGURE_SCIDB_VERSION@";}
-const char* SCIDB_VERSION_PUBLIC()  {return "@CONFIGURE_SCIDB_VERSION_MAJOR@.@CONFIGURE_SCIDB_VERSION_MINOR@.@CONFIGURE_SCIDB_VERSION_BUILD@";}
+const char* SCIDB_VERSION_PUBLIC()  {return "@CONFIGURE_SCIDB_VERSION_MAJOR@.@CONFIGURE_SCIDB_VERSION_MINOR@.@CONFIGURE_SCIDB_VERSION_PATCH@";}
 const char* SCIDB_BUILD_TYPE()      {return "@CONFIGURE_SCIDB_BUILD_TYPE@";}
+const char* SCIDB_COMMIT()          {return "@CONFIGURE_SCIDB_VERSION_BUILD@";}
 const char* SCIDB_COPYRIGHT()       {return "Copyright (C) 2008-2015 SciDB, Inc.";}
 const char* SCIDB_INSTALL_PREFIX()  {return "@CMAKE_INSTALL_PREFIX@";}
 
 uint32_t    SCIDB_VERSION_MAJOR()   {return @CONFIGURE_SCIDB_VERSION_MAJOR@;}
 uint32_t    SCIDB_VERSION_MINOR()   {return @CONFIGURE_SCIDB_VERSION_MINOR@;}
 uint32_t    SCIDB_VERSION_PATCH()   {return @CONFIGURE_SCIDB_VERSION_PATCH@;}
-uint32_t    SCIDB_VERSION_BUILD()   {return @CONFIGURE_SCIDB_VERSION_BUILD@;}
+uint32_t    SCIDB_VERSION_BUILD()   {return 0x@CONFIGURE_SCIDB_VERSION_BUILD@;}
 
 std::string DEFAULT_MPI_DIR()       {return "@CONFIGURE_DEFAULT_MPI_DIR@";}
 std::string DEFAULT_MPI_TYPE()      {return "@CONFIGURE_DEFAULT_MPI_TYPE@";}
@@ -60,6 +61,7 @@ std::string SCIDB_BUILD_INFO_STRING(const char* separator)
 
     o << "SciDB Version: " << SCIDB_VERSION_PUBLIC() << separator
       << "Build Type: "    << SCIDB_BUILD_TYPE()     << separator
+      << "Commit: "        << SCIDB_COMMIT()         << separator
       << SCIDB_COPYRIGHT();
 
     return o.str();

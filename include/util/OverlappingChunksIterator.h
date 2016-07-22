@@ -49,8 +49,74 @@ namespace scidb
  * @see THE REQUEST TO JUSTIFY LOGICAL-SPACE ITERATION in RegionCoordinatesIterator.h.
  *
  */
-class OverlappingChunksIterator : public RegionCoordinatesIterator
+class OverlappingChunksIterator : public ConstIterator
 {
+public:
+    /**
+     * @param dims the array dimensions used for chunk size and overlap
+     * @param itemPos the position of a cell in the array
+     */
+    OverlappingChunksIterator(Dimensions const& dims, Coordinates const& itemPos)
+        : _low(getLowCoordinates(dims, itemPos)),
+          _high(getHighCoordinates(dims, itemPos)),
+          _intervals(getIntervals(dims)),
+          _regionIter(_low, _high, _intervals)
+    {}
+
+    /**
+     * Check if end is reached
+     * @return true if iterator reaches the end of the region
+     */
+    bool end() override
+    {
+        return _regionIter.end();
+    }
+
+    /**
+     * Position cursor to the next chunk.
+     */
+    void operator ++() override
+    {
+        ++_regionIter;
+    }
+
+    /**
+     * Advance to the smallest position >= a given newPos.
+     * @param newPos  the position to reach or exceed.
+     * @return whether any advancement is made.
+     */
+    bool advanceToAtLeast(Coordinates const& newPos)
+    {
+        return _regionIter.advanceToAtLeast(newPos);
+    }
+
+    /**
+     * Get coordinates of the current element.
+     */
+    Coordinates const& getPosition() override
+    {
+        return _regionIter.getPosition();
+    }
+
+    /**
+     * Set iterator's current positions
+     * @return true if specified position is valid (in the region),
+     * false otherwise
+     * @note the pos MUST be a chunk start.
+     */
+    bool setPosition(Coordinates const& pos) override
+    {
+        return _regionIter.setPosition(pos);
+    }
+
+    /**
+     * Reset iterator to the first coordinates.
+     */
+    void reset() override
+    {
+        _regionIter.reset();
+    }
+
 private:
     //helpers so we can construct the superclass in the initializer list
     static Coordinates getLowCoordinates(Dimensions const& dims, Coordinates const& itemPos)
@@ -87,15 +153,10 @@ private:
         return res;
     }
 
-public:
-    /**
-     * Create an iterator.
-     * @param dims the array dimensions used for chunk size and overlap
-     * @param itemPos the position of a cell in the array
-     */
-    OverlappingChunksIterator(Dimensions const& dims, Coordinates const& itemPos):
-        RegionCoordinatesIterator( getLowCoordinates(dims, itemPos), getHighCoordinates(dims, itemPos), getIntervals(dims))
-    {}
+    Coordinates _low;
+    Coordinates _high;
+    std::vector<size_t> _intervals;
+    RegionCoordinatesIterator _regionIter;
 };
 
 }

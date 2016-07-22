@@ -163,7 +163,7 @@ private: // private members.
     FILE* _f;
 
     // which of the two buffers can be used to support the next call to myGetc()?
-    short _which;
+    int _which;
 
     // buffer size in bytes
     int64_t _bufferSize;

@@ -81,7 +81,11 @@ class MPIInitLogical: public LogicalOperator
         dimensions[0] = DimensionDesc(string("mpi_init_dimension"),
                                       Coordinate(0), Coordinate(0),
                                       uint32_t(0), uint32_t(0));
-        return ArrayDesc("mpi_init_array", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("mpi_init_array",
+                         attributes,
+                         dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

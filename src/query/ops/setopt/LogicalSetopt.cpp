@@ -27,9 +27,10 @@
  *      Author: Knizhnik
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-#include "system/SystemCatalog.h"
+#include <query/Operator.h>
+#include <system/Exceptions.h>
+#include <system/SystemCatalog.h>
+#include <usr_namespace/Permissions.h>
 
 
 using namespace std;
@@ -37,10 +38,10 @@ using namespace std;
 namespace scidb {
 
 /**
- * @brief The operator: setopt().
+ * @brief The operator: _setopt().
  *
  * @par Synopsis:
- *   setopt( option [, newValue] )
+ *   _setopt( option [, newValue] )
  *
  * @par Summary:
  *   Gets/Sets a config option at runtime.
@@ -71,26 +72,53 @@ namespace scidb {
 class LogicalSetopt: public LogicalOperator
 {
 public:
-	LogicalSetopt(const string& logicalName, const std::string& alias)
+    LogicalSetopt(const string& logicalName, const std::string& alias)
     : LogicalOperator(logicalName, alias)
-	{
-		ADD_PARAM_CONSTANT("string");
-    	ADD_PARAM_VARIES()
-	}
+    {
+        ADD_PARAM_CONSTANT("string");
+        ADD_PARAM_VARIES();
+    }
 
-	std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
-	{
-		std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
-		res.push_back(END_OF_VARIES_PARAMS());
-		if (_parameters.size() == 1)
-			res.push_back(PARAM_CONSTANT("string"));
-		return res;
-	}
+    std::vector<std::shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    {
+        std::vector<std::shared_ptr<OperatorParamPlaceholder> > res;
+        res.push_back(END_OF_VARIES_PARAMS());
+        if (_parameters.size() == 1) {
+            res.push_back(PARAM_CONSTANT("string"));
+        }
+        return res;
+    }
+
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have the proper permissions
+        assert(_parameters.size() >= 1 && _parameters.size() <= 2);
+
+        std::string permissions;
+        if (_parameters.size() == 2)
+        {
+            permissions.push_back(scidb::permissions::Administrate);
+        }
+
+        return permissions;
+    }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, std::shared_ptr< Query> query)
-	{
+    {
         assert(schemas.size() == 0);
         assert(_parameters.size() >= 1 && _parameters.size() <= 2);
+
+        if (_parameters.size() == 2)
+        {
+            std::string whatToChange = evaluate(
+                reinterpret_cast<std::shared_ptr<OperatorParamLogicalExpression> &>(
+                    _parameters[0])->getExpression(), query, TID_STRING).getString();
+            if( whatToChange.compare("security") == 0)
+            {
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OPTION_NOT_ALLOWED)
+                    << whatToChange;
+            }
+        }
 
         vector<AttributeDesc> attributes;
         attributes.push_back( AttributeDesc((AttributeID)0, "old",  TID_STRING, 0, 0));
@@ -101,11 +129,13 @@ public:
         const size_t nInstances = query->getInstancesCount();
         const size_t end = nInstances>0 ? nInstances-1 : 0;
         dimensions[0] = DimensionDesc("No", 0, 0, end, end, 1, 0);
-        return ArrayDesc("Option", attributes, dimensions, defaultPartitioning());
-	}
+        return ArrayDesc("Option", attributes, dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
+    }
 };
 
-DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSetopt, "setopt")
+DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalSetopt, "_setopt")
 
 
 }  // namespace scidb

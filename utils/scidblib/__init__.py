@@ -25,3 +25,13 @@ class AppError(Exception):
     """An exception class that multiple modules in scidblib may use."""
     pass
 
+import counter
+import pgpass_updater
+import util
+import scidb_afl as afl
+import scidb_control as control
+import scidb_math as math
+import scidb_progress as progress
+import scidb_psf as psf
+import scidb_schema as schema
+import statistics

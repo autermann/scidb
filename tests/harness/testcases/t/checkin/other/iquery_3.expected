@@ -26,12 +26,12 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(catalogue,'${TES
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} 0,'coffee',0,'CCD'
-{4} 51,'chocolate',150.4,''
-{5} 61,'',10,'nice'
-{7} 81,'tea',0,'lemon'
-{8} 91,'',90.1,''
-{9} 0,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{4} 51,'chocolate',150.4,null
+{5} 61,null,10,'nice'
+{7} 81,'tea',null,'lemon'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(catalogue1,'${TEST_DATA_DIR}/iquery_3.txt')">
@@ -50,90 +50,90 @@ SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(catalogue3,'${TE
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} 0,'coffee',0,'CCD'
-{4} 51,'chocolate',150.4,''
-{5} 61,'',10,'nice'
-{7} 81,'tea',0,'lemon'
-{8} 91,'',90.1,''
-{9} 0,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{4} 51,'chocolate',150.4,null
+{5} 61,null,10,'nice'
+{7} 81,'tea',null,'lemon'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(catalogue4,'${TEST_DATA_DIR}/iquery_3.txt')">
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} 0,'coffee',null,'CCD'
-{4} 51,'chocolate',150.4,''
+{3} null,'coffee',null,'CCD'
+{4} 51,'chocolate',150.4,null
 {5} 61,null,10,'nice'
 {7} 81,'tea',null,'lemon'
-{8} 91,null,90.1,''
-{9} 0,null,100,'Lays'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery -c $IQUERY_HOST -p $IQUERY_PORT -aq "load(catalogue5,'${TEST_DATA_DIR}/iquery_3.txt')">
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} null,'coffee',0,'CCD'
+{3} null,'coffee',null,'CCD'
 {4} 51,'chocolate',150.4,null
-{5} 61,'',10,'nice'
-{7} 81,'tea',0,'lemon'
-{8} 91,'',90.1,null
-{9} null,'',100,'Lays'
+{5} 61,null,10,'nice'
+{7} 81,'tea',null,'lemon'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
 SCIDB QUERY : <store(filter(catalogue,true),catalogue2)>
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} 0,'coffee',0,'CCD'
-{4} 51,'chocolate',150.4,''
-{5} 61,'',10,'nice'
-{7} 81,'tea',0,'lemon'
-{8} 91,'',90.1,''
-{9} 0,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{4} 51,'chocolate',150.4,null
+{5} 61,null,10,'nice'
+{7} 81,'tea',null,'lemon'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
 SCIDB QUERY : <store(filter(catalogue,true),catalogue6)>
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} 0,'coffee',0,'CCD'
-{4} 51,'chocolate',150.4,''
-{5} 61,'',10,'nice'
-{7} 81,'tea',0,'lemon'
-{8} 91,'',90.1,''
-{9} 0,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{4} 51,'chocolate',150.4,null
+{5} 61,null,10,'nice'
+{7} 81,'tea',null,'lemon'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
 SCIDB QUERY : <store(filter(catalogue,true),catalogue7)>
 {id} code,type,price,review
 {1} 21,'ice cream',50.5,'mango'
 {2} 31,'soft drink',45.25,'coca cola'
-{3} 0,'coffee',0,'CCD'
-{4} 51,'chocolate',150.4,''
-{5} 61,'',10,'nice'
-{7} 81,'tea',0,'lemon'
-{8} 91,'',90.1,''
-{9} 0,'',100,'Lays'
+{3} null,'coffee',null,'CCD'
+{4} 51,'chocolate',150.4,null
+{5} 61,null,10,'nice'
+{7} 81,'tea',null,'lemon'
+{8} 91,null,90.1,null
+{9} null,null,100,'Lays'
 {10} 11,'bread',35.2,'brown'
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,0,'coffee',0,'CCD'
-4,51,'chocolate',150.4,''
-5,61,'',10,'nice'
-7,81,'tea',0,'lemon'
-8,91,'',90.1,''
-9,0,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+4,51,'chocolate',150.4,null
+5,61,null,10,'nice'
+7,81,'tea',null,'lemon'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(0,'coffee',0,'CCD'),{4}(51,'chocolate',150.4,''),{5}(61,'',10,'nice')];{7}[{7}(81,'tea',0,'lemon'),{8}(91,'',90.1,''),{9}{9}(0,'',100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue1 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue1 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
@@ -148,95 +148,95 @@ id,code,type,price,review
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue1 )'>
 {1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue2 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue2 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,0,'coffee',0,'CCD'
-4,51,'chocolate',150.4,''
-5,61,'',10,'nice'
-7,81,'tea',0,'lemon'
-8,91,'',90.1,''
-9,0,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+4,51,'chocolate',150.4,null
+5,61,null,10,'nice'
+7,81,'tea',null,'lemon'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue2 )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(0,'coffee',0,'CCD'),{4}(51,'chocolate',150.4,''),{5}(61,'',10,'nice')];{7}[{7}(81,'tea',0,'lemon'),{8}(91,'',90.1,''),{9}{9}(0,'',100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue3 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue3 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,0,'coffee',0,'CCD'
-4,51,'chocolate',150.4,''
-5,61,'',10,'nice'
-7,81,'tea',0,'lemon'
-8,91,'',90.1,''
-9,0,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+4,51,'chocolate',150.4,null
+5,61,null,10,'nice'
+7,81,'tea',null,'lemon'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue3 )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(0,'coffee',0,'CCD'),{4}(51,'chocolate',150.4,''),{5}(61,'',10,'nice')];{7}[{7}(81,'tea',0,'lemon'),{8}(91,'',90.1,''),{9}{9}(0,'',100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue4 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue4 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,0,'coffee',null,'CCD'
-4,51,'chocolate',150.4,''
+3,null,'coffee',null,'CCD'
+4,51,'chocolate',150.4,null
 5,61,null,10,'nice'
 7,81,'tea',null,'lemon'
-8,91,null,90.1,''
-9,0,null,100,'Lays'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue4 )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(0,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,''),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,''),{9}{9}(0,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue5 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue5 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,null,'coffee',0,'CCD'
+3,null,'coffee',null,'CCD'
 4,51,'chocolate',150.4,null
-5,61,'',10,'nice'
-7,81,'tea',0,'lemon'
-8,91,'',90.1,null
-9,null,'',100,'Lays'
+5,61,null,10,'nice'
+7,81,'tea',null,'lemon'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue5 )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',0,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,'',10,'nice')];{7}[{7}(81,'tea',0,'lemon'),{8}(91,'',90.1,null),{9}{9}(null,'',100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue6 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue6 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,0,'coffee',0,'CCD'
-4,51,'chocolate',150.4,''
-5,61,'',10,'nice'
-7,81,'tea',0,'lemon'
-8,91,'',90.1,''
-9,0,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+4,51,'chocolate',150.4,null
+5,61,null,10,'nice'
+7,81,'tea',null,'lemon'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue6 )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(0,'coffee',0,'CCD'),{4}(51,'chocolate',150.4,''),{5}(61,'',10,'nice')];{7}[{7}(81,'tea',0,'lemon'),{8}(91,'',90.1,''),{9}{9}(0,'',100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
-SCIDB QUERY : <iquery  -o lcsv+ -aq 'scan ( catalogue7 )'>
+SCIDB QUERY : <iquery  -o csv+:l -aq 'scan ( catalogue7 )'>
 id,code,type,price,review
 1,21,'ice cream',50.5,'mango'
 2,31,'soft drink',45.25,'coca cola'
-3,0,'coffee',0,'CCD'
-4,51,'chocolate',150.4,''
-5,61,'',10,'nice'
-7,81,'tea',0,'lemon'
-8,91,'',90.1,''
-9,0,'',100,'Lays'
+3,null,'coffee',null,'CCD'
+4,51,'chocolate',150.4,null
+5,61,null,10,'nice'
+7,81,'tea',null,'lemon'
+8,91,null,90.1,null
+9,null,null,100,'Lays'
 10,11,'bread',35.2,'brown'
 
 SCIDB QUERY : <iquery  -o lsparse -aq 'scan ( catalogue7 )'>
-{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(0,'coffee',0,'CCD'),{4}(51,'chocolate',150.4,''),{5}(61,'',10,'nice')];{7}[{7}(81,'tea',0,'lemon'),{8}(91,'',90.1,''),{9}{9}(0,'',100,'Lays'),{10}(11,'bread',35.2,'brown')]
+{1}[{1}(21,'ice cream',50.5,'mango'),{2}(31,'soft drink',45.25,'coca cola'),{3}{3}(null,'coffee',null,'CCD'),{4}(51,'chocolate',150.4,null),{5}(61,null,10,'nice')];{7}[{7}(81,'tea',null,'lemon'),{8}(91,null,90.1,null),{9}{9}(null,null,100,'Lays'),{10}(11,'bread',35.2,'brown')]
 
 SCIDB QUERY : <remove(catalogue)>
 Query was executed successfully

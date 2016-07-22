@@ -276,7 +276,7 @@ double getTimeInSecs()
         assert(false);
         throw std::runtime_error(ss.str());
     }
-    return (ts.tv_sec + ts.tv_nsec*1e-9);
+    return (static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9);
 }
 void reportTiming(log4cxx::LoggerPtr& logger, const char* info, double newTime, double oldTime)
 {
@@ -521,7 +521,7 @@ TileApplyChunkIterator::TileApplyChunkIterator(TileApplyArrayIterator const& arr
         }
         break;
         case BindInfo::BI_ATTRIBUTE:
-        if (static_cast<AttributeID>(bindInfo.resolvedId) == arrayIterator._inputAttrID)
+        if (safe_static_cast<AttributeID>(bindInfo.resolvedId) == arrayIterator._inputAttrID)
         {
             _iterators[i] = inputIterator;
         } else {
@@ -605,16 +605,17 @@ TileApplyArrayIterator::TileApplyArrayIterator(TileApplyArray const& array,
     for (size_t i = 0, n = _iterators.size(); i < n; ++i)
     {
         BindInfo const& bindInfo = bindings[i];
+        AttributeID resolvedId = safe_static_cast<AttributeID>(bindInfo.resolvedId);
         switch (bindInfo.kind)
         {
         case BindInfo::BI_ATTRIBUTE:
-        if ((AttributeID) bindInfo.resolvedId == inAttrID)
+        if (resolvedId == inAttrID)
         {
             _iterators[i] = inputIterator;
         }
         else
         {
-            _iterators[i] = inputArray->getConstIterator(bindInfo.resolvedId);
+            _iterators[i] = inputArray->getConstIterator(resolvedId);
         }
         break;
         case BindInfo::BI_COORDINATE:

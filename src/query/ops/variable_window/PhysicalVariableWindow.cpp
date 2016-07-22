@@ -34,7 +34,7 @@
 #include <array/MemArray.h>
 #include <log4cxx/logger.h>
 
-#include "VariableWindow.h"
+#include "VariableWindowMessage.h"
 
 // Logger for operator. static to prevent visibility of variable outside of file
 static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.query.ops.variable_window"));
@@ -148,7 +148,7 @@ private:
                         }
                     }
                 }
-                countMapping.setInputAttributeId(j);
+                countMapping.setInputAttributeId(safe_static_cast<AttributeID>(j));
                 resultMappings.push_back(countMapping);
             }
         }
@@ -695,9 +695,9 @@ public:
                     }
 
                     //process all the window edges inside the chunk edge:
-                    ChunkEdge::iterator iter2 = chunkEdge->begin();
-                    ChunkEdge::iterator liter2 = leftEdge->begin();
-                    while(iter2 != chunkEdge->end())
+                    CoordsToWindowEdge::iterator iter2 = (*chunkEdge)().begin();
+                    CoordsToWindowEdge::iterator liter2 = (*leftEdge)().begin();
+                    while(iter2 != (*chunkEdge)().end())
                     {
                         Coordinates const& axisPos = iter2->first;
                         std::shared_ptr<WindowEdge>& rightWEdge = iter2->second;
@@ -707,8 +707,8 @@ public:
                                                                       " nVals "<<rightWEdge->getNumValues());
 
                         bool needToForward = false;
-                        liter2 = leftEdge->find(axisPos);
-                        if( liter2 != leftEdge->end())
+                        liter2 = (*leftEdge)().find(axisPos);
+                        if( liter2 != (*leftEdge)().end())
                         {
                             std::shared_ptr<WindowEdge>& leftWEdge = liter2->second;
                             if(leftWEdge->getNumValues() < _nPreceding + _nFollowing)
@@ -716,7 +716,7 @@ public:
                                 needToForward = true;
                             }
                             rightWEdge->addLeftEdge(leftWEdge);
-                            liter2 = leftEdge->erase(liter2);
+                            liter2 = (*leftEdge)().erase(liter2);
                         }
                         else
                         {
@@ -743,12 +743,12 @@ public:
                         //if there is a forwarding chunk edge then add incomplete windows to it
                         if(forwardChunkEdge.get() && needToForward)
                         {
-                            (*forwardChunkEdge)[axisPos] = rightWEdge;
+                            (*forwardChunkEdge)()[axisPos] = rightWEdge;
                         }
                         iter2++;
                     }
                     //forward the chunk edge if there is data in it
-                    if(forwardChunkEdge.get() && forwardChunkEdge->size())
+                    if(forwardChunkEdge.get() && (*forwardChunkEdge)().size())
                     {
                         isFinished = false;
                         Coordinates const& coordsToUse = lastChunkInRun.size() ? lastChunkInRun : nextChunkPos;
@@ -838,10 +838,10 @@ public:
             axisPos[_dimNum] = 0;
             Value const& v = sciter->getItem();
 
-            std::shared_ptr<WindowEdge>& rightWedge = (*currentRightEdge)[axisPos];
+            std::shared_ptr<WindowEdge>& rightWedge = (*currentRightEdge)()[axisPos];
             if(currentLeftEdge.get())
             {
-                std::shared_ptr<WindowEdge>& leftWedge = (*currentLeftEdge)[axisPos];
+                std::shared_ptr<WindowEdge>& leftWedge = (*currentLeftEdge)()[axisPos];
                 if (leftWedge.get()==0)
                 {
                     leftWedge.reset(new WindowEdge());
@@ -886,8 +886,8 @@ public:
         }
         if(_nFollowing == 0 || !haveNextChunk)
         {
-            ChunkEdge::iterator iter = currentRightEdge->begin();
-            while(iter!= currentRightEdge->end())
+            CoordsToWindowEdge::iterator iter = (*currentRightEdge)().begin();
+            while(iter!= (*currentRightEdge)().end())
             {
                 Coordinates const& edgePos = iter->first;
                 Coordinates valuePos = edgePos;
@@ -910,8 +910,8 @@ public:
             //Next chunk is on a different instance. So we need to forward some window edges to that instance.
             //But we can only forward those window edges that have enough values.
             std::shared_ptr<ChunkEdge> edgeToForward(new ChunkEdge());
-            ChunkEdge::iterator iter = currentRightEdge->begin();
-            while(iter!= currentRightEdge->end())
+            CoordsToWindowEdge::iterator iter = (*currentRightEdge)().begin();
+            while(iter!= (*currentRightEdge)().end())
             {
                 Coordinates const& axisPos = iter->first;
                 std::shared_ptr<WindowEdge>& wEdge = iter->second;
@@ -927,7 +927,7 @@ public:
                                                             " nCoords "<<wEdge->getNumCoords()<<
                                                               " nVals "<<wEdge->getNumValues()<<
                                                                " to n "<<nextInstance);
-                (*edgeToForward)[axisPos] = wEdge;
+                (*edgeToForward)()[axisPos] = wEdge;
                 iter ++;
             }
             outMessages[nextInstance]._chunkEdges[chunkPos] = edgeToForward;
@@ -943,8 +943,8 @@ public:
         while(iter!=leftEdges.end())
         {
             std::shared_ptr<ChunkEdge>& leftEdge = iter->second;
-            ChunkEdge::iterator iter2 = leftEdge->begin();
-            while(iter2!=leftEdge->end())
+            CoordsToWindowEdge::iterator iter2 = (*leftEdge)().begin();
+            while(iter2!=(*leftEdge)().end())
             {
                 Coordinates valuePos = iter2->first;
                 std::shared_ptr<WindowEdge>& leftWedge = iter2->second;
@@ -1091,10 +1091,9 @@ public:
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-#if 0
-        runVariableWindowUnitTests();
-#endif
         assert(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
         std::shared_ptr<Array> srcArray = ensureRandomAccess(inputArrays[0], query);
 
         _srcDesc = srcArray->getArrayDesc();
@@ -1134,7 +1133,7 @@ public:
             useAxialSync = true;
         }
 
-        double avgValuesInChunk = _localCellCount * 1.0 / stats._localChunkCount;
+        double avgValuesInChunk = static_cast<double>(_localCellCount) / stats._localChunkCount;
         size_t estimatedCellsInMemory = 0;
 
         //If most axes are on separate nodes and everyone is working on their own axis, then

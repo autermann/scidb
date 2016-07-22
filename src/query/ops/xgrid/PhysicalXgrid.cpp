@@ -27,11 +27,11 @@
  *      Author: Knizhnik
  */
 
-#include "query/Operator.h"
-#include "array/Metadata.h"
-#include "array/Array.h"
-#include "query/ops/xgrid/XgridArray.h"
+#include "LogicalXgrid.h"
+#include "XgridArray.h"
 
+#include <array/Metadata.h>
+#include <array/Array.h>
 
 namespace scidb {
 
@@ -40,6 +40,8 @@ using namespace std;
 
 class PhysicalXgrid : public  PhysicalOperator
 {
+    LogicalXgrid::ScaleFactors  _scaleFactors;
+
   public:
     PhysicalXgrid(std::string const& logicalName,
                   std::string const& physicalName,
@@ -79,19 +81,47 @@ class PhysicalXgrid : public  PhysicalOperator
         return PhysicalBoundaries(outStart, outEnd, inputBoundaries[0].getDensity());
     }
 
+    virtual void inspectLogicalOp(LogicalOperator const& lop)
+    {
+        // Extract scale factors for use here on the coordinator.
+        LogicalXgrid const& lox = dynamic_cast<LogicalXgrid const&>(lop);
+        _scaleFactors = lox.getScaleFactors();
+
+        // Encode the scale factors into my "control cookie" so that
+        // non-coordinator instances can also know them.
+        if (!_scaleFactors.empty()) {
+            stringstream ss;
+            for (int64_t i : _scaleFactors) {
+                ss << ' ' << i;
+            }
+            setControlCookie(ss.str());
+        }
+    }
+
     //TODO:OPTAPI check negative case
     /***
-	 * Xgrid is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
-	 * that overrides the chunkiterator method.
-	 */
+     * Xgrid is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
+     * that overrides the chunkiterator method.
+     */
     std::shared_ptr<Array> execute(
-            vector< std::shared_ptr<Array> >& inputArrays,
-            std::shared_ptr<Query> query)
+        vector< std::shared_ptr<Array> >& inputArrays,
+        std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 1);
-		assert(_parameters.size() == _schema.getDimensions().size());
-		return std::shared_ptr<Array>(new XgridArray(_schema, inputArrays[0]));
-	 }
+        // On workers, decode scale factors from control cookie.
+        if (!query->isCoordinator() && !getControlCookie().empty()) {
+            SCIDB_ASSERT(_scaleFactors.empty());
+            istringstream iss(getControlCookie());
+            string token;
+            while (iss >> token) {
+                _scaleFactors.push_back(lexical_cast<LogicalXgrid::ScaleFactor>(token));
+            }
+        }
+            
+        assert(inputArrays.size() == 1);
+        assert(_parameters.size() == _schema.getDimensions().size());
+        assert(_scaleFactors.empty() || _scaleFactors.size() == _schema.getDimensions().size());
+        return XgridArray::create(_schema, _scaleFactors, inputArrays[0]);
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalXgrid, "xgrid", "physicalXgrid")

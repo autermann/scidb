@@ -125,7 +125,7 @@ namespace scidb
     {
         uint64_t mask = array.mask;
       TryPos:
-        for (int i = inPos.size(); --i >= 0;) {
+        for (int i = safe_static_cast<int>(inPos.size()); --i >= 0;) {
             if (!((mask >> i) & 1)) {
                 while (++inPos[i] <= lastPos[i]) {
                     if (inputIterator->setPosition(inPos)) {
@@ -151,7 +151,7 @@ namespace scidb
         firstPos = inputIterator->getFirstPosition();
         lastPos = inputIterator->getLastPosition();
         uint64_t mask = array.mask;
-        for (int i = inPos.size(); --i >= 0;) {
+        for (int i = safe_static_cast<int>(inPos.size()); --i >= 0;) {
             if (!((mask >> i) & 1)) {
                 inPos[i] = firstPos[i] - shift;
                 shift = 0;
@@ -308,7 +308,7 @@ namespace scidb
         uint64_t mask = array.mask;
         chunkInitialized = false;
       TryPos:
-        for (int i = inPos.size(); --i >= 0;) {
+        for (int i = safe_static_cast<int>(inPos.size()); --i >= 0;) {
             if (!((mask >> i) & 1)) {
                 while ((inPos[i] += dims[i].getChunkInterval()) <= dims[i].getEndMax()) {
                     if (inputIterator->setPosition(inPos)) {
@@ -348,7 +348,7 @@ namespace scidb
         Dimensions const& dims = array.inputDims;
         int j = -1;
         uint64_t mask = array.mask;
-        for (int i = 0, n = inPos.size(); i < n ; mask >>= 1, i++) {
+        for (int i = 0, n = safe_static_cast<int>(inPos.size()); i < n ; mask >>= 1, i++) {
             if (!(mask & 1)) {
                 inPos[i] = dims[i].getStartMin();
                 j = i;

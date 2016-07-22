@@ -29,10 +29,6 @@ Assumptions:
   - 'iquery' is in your path.
 """
 
-#
-# Whether to print traceback, upon an exception
-#
-_print_traceback_upon_exception = True
 
 import argparse
 import sys
@@ -44,10 +40,6 @@ from scidblib import scidb_psf
 
 def main():
     """The main function gets command-line argument as a pattern, and removes all arrays with that pattern.
-
-    @exception AppError if something goes wrong.
-    @note If print_traceback_upon_exception (defined at the top of the script) is True,
-          stack trace will be printed. This is helpful during debugging.
     """
     parser = argparse.ArgumentParser(
                                      description='Remove all SciDB arrays whose names match a given pattern.',
@@ -67,6 +59,8 @@ def main():
                         help='User name to be passed to iquery.')
     parser.add_argument('-P', '--user-password',
                         help='User password to be passed to iquery.')
+    parser.add_argument('-v', '--verbose ', default=True,
+                        help='display verbose output.')
     parser.add_argument('regex', metavar='REGEX', type=str, nargs='?', default='.*',
                         help='''Regular expression to match against array names.
                         The utility will remove arrays whose names match the regular expression.
@@ -77,21 +71,19 @@ def main():
                         )
 
     args = parser.parse_args()
-    if not args.user_name:      args.user_name = 'root'
-    if not args.user_password:  args.user_password = 'Paradigm4'
 
 
     try:
-        namespaces = scidb_afl.get_namespace_names()
+        iquery_cmd = scidb_afl.get_iquery_cmd(args)
+        namespaces = scidb_afl.get_namespace_names(iquery_cmd)
         for namespace in namespaces:
             print "\nSearching namespace: ", namespace
 
             names = scidb_afl.get_array_names(
-                iquery_cmd = scidb_afl.get_iquery_cmd(),
+                iquery_cmd = iquery_cmd,
                 temp_only=args.temp_only,
                 namespace=namespace)
 
-            iquery_cmd = scidb_afl.get_iquery_cmd(args)
             names_to_remove = []
 
             for name in names:
@@ -115,14 +107,12 @@ def main():
 
             if namespace != 'public':
                 names = scidb_afl.get_array_names(
-                    iquery_cmd = scidb_afl.get_iquery_cmd(),
+                    iquery_cmd=iquery_cmd,
                     temp_only=args.temp_only,
                     namespace=namespace)
                 if not names:
                     scidb_afl.afl(
-                        iquery_cmd
-                            + ' -U ' + args.user_name
-                            + ' -P ' + args.user_password,
+                        iquery_cmd,
                         'drop_namespace(\'' + namespace + '\');')
 
                     print "namespace " + namespace + " removed"
@@ -133,7 +123,7 @@ def main():
         print >> sys.stderr, '------ Exception -----------------------------'
         print >> sys.stderr, e
 
-        if _print_traceback_upon_exception:
+        if args.verbose:
             print >> sys.stderr, '------ Traceback (for debug purpose) ---------'
             traceback.print_exc()
 

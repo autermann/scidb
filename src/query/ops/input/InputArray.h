@@ -91,7 +91,8 @@ namespace scidb
         /// @}
 
         static ArrayDesc generateShadowArraySchema(ArrayDesc const& targetArray,
-                                                   std::string const& shadowArrayName);
+                                                   std::string const& shadowArrayName,
+                                                   std::shared_ptr<Query> const& query);
 
         /// @returns true iff the named format is supported
         static bool isSupportedFormat(std::string const& format);
@@ -113,14 +114,6 @@ namespace scidb
         void redistributeShadowArray(std::shared_ptr<Query>& query);
         void scheduleSG(std::shared_ptr<Query> const& query);
         void resetShadowChunkIterators();
-        void adjustArrayDistributionForParallelMode(PartitioningSchema ps)
-        {
-            SCIDB_ASSERT(ps!=psUndefined);
-            SCIDB_ASSERT(ps!=psUninitialized);
-            SCIDB_ASSERT(parallelLoad);
-            SCIDB_ASSERT(getArrayDesc().getPartitioningSchema()==psUndefined);
-            desc.setPartitioningSchema(ps);
-        }
 
         ChunkLoader*    _chunkLoader;
         size_t          _currChunkIndex;

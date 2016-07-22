@@ -56,7 +56,7 @@ namespace scidb {
     // Set the inputIterator on the base since it was initialized to NULL
     // in the DelegateArrayIterator base constructor above.
     inputIterator =
-      inputArray->getConstIterator(attrID == 0 ? 0 : pattrDesc->getId());
+        inputArray->getConstIterator(attrID == 0 ? AttributeID(0) : pattrDesc->getId());
 
     _position.resize(parrayDesc.getDimensions().size()+1);
 
@@ -68,7 +68,7 @@ namespace scidb {
       // containing the empty bitmap.
       // The output chunks for attribute 0 depend on the input chunks for
       // the data attributes.
-      AttributeID nAttrs = parrayDesc.getAttributes(true).size();
+      AttributeID nAttrs = safe_static_cast<AttributeID>(parrayDesc.getAttributes(true).size());
       _inputArrayIterators.reserve(nAttrs);
       _inputArrayIterators.push_back(inputIterator);
       for (AttributeID i = 1; i < nAttrs; ++i) {
@@ -379,7 +379,7 @@ namespace scidb {
       success = success && (*citer)->setPosition(mapped);
     }
 
-    AttributeID visitingAttr = *(pos.end()-1);
+    AttributeID visitingAttr = safe_static_cast<AttributeID>(*(pos.end()-1));
     if (success && visitingAttr < _inputChunkIterators.size()) {
         _visitingAttribute = visitingAttr;
         return true;
@@ -407,7 +407,9 @@ namespace scidb {
 					 AttributeID attrId)
     : DelegateChunkIterator(chunk, iterationMode),
       _value(TypeLibrary::getType(TID_BOOL)),
-      _nAttrs(chunk->getDelegateArray().getInputArray()->getArrayDesc().getAttributes(true).size()),
+      _nAttrs(
+          safe_static_cast<AttributeID>(
+              chunk->getDelegateArray().getInputArray()->getArrayDesc().getAttributes(true).size())),
       _visitingAttribute(0),
       _currentPosition(0)
   {
@@ -458,7 +460,7 @@ namespace scidb {
     // according to the first N-1 coordinates.  The last coordinate is
     // the attribute index which must be set independently.
     Coordinates mapped(pos.begin(), pos.end()-1);
-    AttributeID visitingAttr = *(pos.end()-1);
+    AttributeID visitingAttr = safe_static_cast<AttributeID>(*(pos.end()-1));
     if (visitingAttr < _nAttrs &&
         inputIterator->setPosition(mapped)) {
         _visitingAttribute = visitingAttr;

@@ -29,6 +29,8 @@
 
 #include <query/Operator.h>
 #include <smgr/io/Storage.h>
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 
@@ -140,6 +142,7 @@ public:
 
         return res;
     }
+
     private:
 
     std::string getArrayNameForStore() const
@@ -152,7 +155,65 @@ public:
         return arrayName;
     }
 
+    /// @return  validated partitioning scheme specified by the user
+    /// @throws scidb::SystemException if the scheme is unsupported
+    /// @todo XXX TODO: change PartitioningSchema to DistributionId
+    PartitioningSchema getPartitioningSchema(const std::shared_ptr<Query>& query) const
+    {
+        ASSERT_EXCEPTION(_parameters[0], "Partitioning schema is not specified by the user");
+        OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[0].get());
+        const PartitioningSchema ps = static_cast<PartitioningSchema>( evaluate(lExp->getExpression(), query, TID_INT32).getInt32());
+        if (! isValidPartitioningSchema(ps, false)  && ps != psLocalInstance)
+        {
+            // Do not allow optional data associated with the partitioning schema
+            throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_REDISTRIBUTE_ERROR);
+        }
+        return ps;
+    }
+
+    /// @return logical instance ID specified by the user, or ALL_INSTANCE_MASK if not specified
+    InstanceID getInstanceId(const std::shared_ptr<Query>& query) const
+    {
+        InstanceID instanceId = ALL_INSTANCE_MASK;
+        if (_parameters.size() >=2 )
+        {
+            OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[1].get());
+            instanceId = static_cast<InstanceID>( evaluate(lExp->getExpression(), query, TID_INT64).getInt64());
+        }
+        instanceId = (instanceId==COORDINATOR_INSTANCE_MASK) ? query->getInstanceID() : instanceId;
+        return instanceId;
+    }
+
+    /// @return the coordinate offset specified by the user, or empty offset if not specified
+    DimensionVector getOffsetVector(const vector<ArrayDesc> & inputSchemas,
+                                    const std::shared_ptr<Query>& query) const
+    {
+        if (_parameters.size() <= 4) {
+            return DimensionVector();
+        }
+
+        const Dimensions&  dims = inputSchemas[0].getDimensions();
+        DimensionVector result(dims.size());
+        ASSERT_EXCEPTION(_parameters.size() == dims.size() + 4,
+                         "Invalid coordinate offset is specified");
+
+        for (size_t i = 0; i < result.numDimensions(); ++i) {
+            OperatorParamLogicalExpression* lExp = static_cast<OperatorParamLogicalExpression*>(_parameters[i+4].get());
+            result[i] = static_cast<Coordinate>( evaluate(lExp->getExpression(), query, TID_INT64).getInt64());
+        }
+        return result;
+    }
+
     public:
+
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to create the array in the namespace
+        std::string permissions;
+        permissions.push_back(scidb::permissions::namespaces::CreateArray);
+        return permissions;
+    }
+
     /**
      * The schema of output array is the same as input
      */
@@ -162,17 +223,24 @@ public:
         ArrayDesc const& desc = inputSchemas[0];
 
         //validate the partitioning schema
-        const PartitioningSchema ps = (PartitioningSchema)
-            evaluate(((std::shared_ptr<OperatorParamLogicalExpression>&)_parameters[0])->getExpression(), query, TID_INT32).getInt32();
-        if (! isValidPartitioningSchema(ps, false)) // false = not allow optional data associated with the partitioning schema
-        {
-            throw USER_EXCEPTION(SCIDB_SE_REDISTRIBUTE, SCIDB_LE_REDISTRIBUTE_ERROR);
-        }
+        const PartitioningSchema ps = getPartitioningSchema(query) ;
+        InstanceID localInstance = getInstanceId(query);
+        DimensionVector offset = getOffsetVector(inputSchemas,query);
+
+        // use the query live set because we dont know better
+        ArrayResPtr arrRes = query->getDefaultArrayResidency();
+
+        size_t redundancy = DEFAULT_REDUNDANCY;
 
         // get the name of the supplied result array
         std::string resultArrayName = getArrayNameForStore();
         if (resultArrayName.empty()) {
             resultArrayName = desc.getName();
+        } else {
+            // notice we are ignoring the catalog information
+            // PhysicalUpdate::preSingleExecute() should correct that
+            arrRes = query->getDefaultArrayResidencyForWrite();
+            redundancy = Config::getInstance()->getOption<size_t>(CONFIG_REDUNDANCY);
         }
         if (isDebug()) {
             if (_parameters.size() >= 4) {
@@ -182,7 +250,28 @@ public:
                 assert(lExp->getExpectedType()==TypeLibrary::getType(TID_BOOL));
             }
         }
-        return ArrayDesc(resultArrayName, desc.getAttributes(), desc.getDimensions(), ps);
+        std::string distCtx;
+        if (ps == psLocalInstance) {
+            ASSERT_EXCEPTION((localInstance < query->getInstancesCount()),
+                             "The specified instance is larger than total number of instances");
+            stringstream ss;
+            ss<<localInstance;
+            distCtx = ss.str();
+        }
+        std::shared_ptr<CoordinateTranslator> translator;
+        if (!offset.isEmpty()) {
+            translator = OffsetCoordinateTranslator::createOffsetMapper(offset);
+        }
+        ArrayDistPtr arrDist = ArrayDistributionFactory::getInstance()->construct(ps,
+                                                                                  redundancy,
+                                                                                  distCtx,
+                                                                                  translator,
+                                                                                  0);
+        return ArrayDesc(resultArrayName,
+                         desc.getAttributes(),
+                         desc.getDimensions(),
+                         arrDist,
+                         arrRes);
     }
 
     void inferArrayAccess(std::shared_ptr<Query>& query)
@@ -201,10 +290,14 @@ public:
 
         SystemCatalog::getInstance()->getArrayDesc(resultArrayName, SystemCatalog::ANY_VERSION, srcDesc, dontThrow);
 
+        std::string arrayName;
+        std::string namespaceName;
+        query->getNamespaceArrayNames(resultArrayName, namespaceName, arrayName);
+
         const SystemCatalog::LockDesc::LockMode lockMode =
             srcDesc.isTransient() ? SystemCatalog::LockDesc::XCL : SystemCatalog::LockDesc::WR;
 
-        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(resultArrayName,
+        std::shared_ptr<SystemCatalog::LockDesc>  lock(make_shared<SystemCatalog::LockDesc>(namespaceName, arrayName,
                                                                                        query->getQueryID(),
                                                                                        Cluster::getInstance()->getLocalInstanceId(),
                                                                                        SystemCatalog::LockDesc::COORD,

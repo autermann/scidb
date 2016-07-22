@@ -105,11 +105,19 @@ public:
             dstArraySize *= dstDimensions[i].getLength();
             if (dstDimensions[i].getChunkOverlap() != 0)
                 throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR2);
+            if (dstDimensions[i].isAutochunked())
+                throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED)
+                    << getLogicalName();
         }
-        if (srcArraySize != dstArraySize)
+        if (srcArraySize != dstArraySize) {
             throw USER_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_RESHAPE_ERROR3);
+        }
 
-        return ArrayDesc(dstArrayDesc.getName(), srcAttributes, dstDimensions, defaultPartitioning());
+        return ArrayDesc(dstArrayDesc.getName(),
+                         srcAttributes,
+                         dstDimensions,
+                         createDistribution(psUndefined),
+                         srcArrayDesc.getResidency());
     }
 };
 

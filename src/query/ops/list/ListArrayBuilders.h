@@ -142,23 +142,13 @@ struct ListLibrariesArrayBuilder : ListArrayBuilder
 struct ListAggregatesArrayBuilder : ListArrayBuilder
 {
     size_t const _cellCount;
-
-    enum
-    {
-        AGGREGATE_NAME,
-        TYPEID_NAME,
-        LIBRARY_NAME,
-        EMPTY_INDICATOR,
-        NUM_ATTRIBUTES
-    };
-
+    bool const   _showSys;
 
     void       list(const std::string&,const TypeId&,const std::string&);
     Attributes getAttributes()                                const;
     Dimensions getDimensions(std::shared_ptr<Query> const&) const;
 
-public:
-    ListAggregatesArrayBuilder(size_t cellCount);
+    ListAggregatesArrayBuilder(size_t cellCount, bool showSys);
 };
 
 /**

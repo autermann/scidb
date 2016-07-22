@@ -59,10 +59,15 @@ An Example ==================================================
 
 update("PhysicalFoo.cpp checkpoint",{name="root/Foo",available=1GiB,allocated=0B,peakusage=0B,allocations=0,features="FC"})
 =============================================================
+.DemoRawAllocation: before size = 0, after size = 0
+DemoArenaAwareNew: before size = 0, after size = 0
+DemoSmartPointers: before size = 0, after size = 0
+DemoSTLContainers: before size = 0, after size = 0
+DemoMultiLevelContainers: before size = 0, after size = 0
 
 
 
-OK (68 tests)
+OK (69 tests)
 
 
 

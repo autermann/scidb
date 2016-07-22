@@ -2,7 +2,7 @@
 # Note we filter on library='scidb' so the test passes regardless of which libraries are loaded.
 --setup
 --test
---set-format csv
+--set-format csv:l
 
 --echo Internal operators only.
 filter(list('operators', true), internal and library='scidb')

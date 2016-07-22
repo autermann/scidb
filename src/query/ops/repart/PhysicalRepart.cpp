@@ -65,14 +65,19 @@ public:
         return sourceBoundaries[0];
     }
 
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext>const& sourceDistribution,
-                                                    std::vector<ArrayDesc>const& inputSchemas) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext>const& inputDistributions,
+                                                      std::vector<ArrayDesc>const& inputSchemas) const
     {
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(inputDistributions[0].getArrayResidency());
         if (isNoop(inputSchemas[0]))
         {
-            return sourceDistribution[0];
+            mySchema->setDistribution(inputDistributions[0].getArrayDistribution());
         }
-        return RedistributeContext(psUndefined);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     virtual bool outputFullChunks(std::vector<ArrayDesc>const& inputSchemas) const
@@ -112,6 +117,7 @@ public:
                                                  query,
                                                  timing,
                                                  AUTO);
+        SCIDB_ASSERT(res->getArrayDesc().getDistribution()->getPartitioningSchema() == psUndefined);
         return res;
     }
 };

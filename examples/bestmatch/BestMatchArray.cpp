@@ -259,7 +259,7 @@ namespace scidb
         std::shared_ptr<ConstArrayIterator> patIterator = pattern->getConstIterator(attrID < nPatternAttributes ? attrID : patternIteratorAttr);
         std::shared_ptr<ConstArrayIterator> catIterator;
         if (attrID >= nPatternAttributes && attrID < nPatternAttributes + nCatalogAttributes) {
-            catIterator = catalog->getConstIterator(attrID - nPatternAttributes);
+            catIterator = catalog->getConstIterator(attrID - safe_static_cast<AttributeID>(nPatternAttributes));
         }
         return new BestMatchArrayIterator(*this, attrID, patIterator, catIterator);
     }
@@ -271,7 +271,7 @@ namespace scidb
         ArrayDesc const& catalogDesc = catalog->getArrayDesc();
         nPatternAttributes = patternDesc.getAttributes(true).size();
         nCatalogAttributes = catalogDesc.getAttributes(true).size();
-        patternIteratorAttr = patternDesc.getEmptyBitmapAttribute() != NULL ? patternDesc.getEmptyBitmapAttribute()->getId() : 0;
-        catalogIteratorAttr = catalogDesc.getEmptyBitmapAttribute() != NULL ? catalogDesc.getEmptyBitmapAttribute()->getId() : 0;
+        patternIteratorAttr = patternDesc.getEmptyBitmapAttribute() != NULL ? patternDesc.getEmptyBitmapAttribute()->getId() : static_cast<AttributeID>(0);
+        catalogIteratorAttr = catalogDesc.getEmptyBitmapAttribute() != NULL ? catalogDesc.getEmptyBitmapAttribute()->getId() : static_cast<AttributeID>(0);
     }
 }

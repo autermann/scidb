@@ -28,18 +28,19 @@
  * explain_logical operator / Physical implementation.
  */
 
+#include <query/Operator.h>
+
+#include <SciDBAPI.h>
+#include <array/TupleArray.h>
+#include <query/OperatorLibrary.h>
+#include <query/QueryPlan.h>
+#include <query/QueryProcessor.h>
+#include <query/optimizer/Optimizer.h>
+#include <util/Thread.h>
+
 #include <string.h>
 
-#include "query/Operator.h"
-#include "query/OperatorLibrary.h"
-#include "array/TupleArray.h"
-#include "query/QueryProcessor.h"
-#include "query/optimizer/Optimizer.h"
-#include <util/Thread.h>
-#include "SciDBAPI.h"
-
-using namespace std;
-using namespace boost;
+using std::string;
 
 namespace scidb
 {
@@ -55,7 +56,8 @@ public:
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
                                                  const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(psLocalInstance);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     void preSingleExecute(std::shared_ptr<Query> query)
@@ -96,7 +98,7 @@ public:
         _result = tuples;
     }
 
-    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         if (!_result)
         {

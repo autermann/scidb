@@ -804,7 +804,10 @@ public:
     }
 };
 
-ArrayDesc getRankingSchema(ArrayDesc const& inputSchema, AttributeID rankedAttributeID, bool dualRank = false);
+ArrayDesc getRankingSchema(ArrayDesc const& inputSchema,
+                           std::shared_ptr<Query> const& query,
+                           AttributeID rankedAttributeID,
+                           bool dualRank = false);
 
 //inputArray must be distributed round-robin
 std::shared_ptr<Array> buildRankArray(std::shared_ptr<Array>& inputArray,
@@ -997,11 +1000,12 @@ public:
 
     virtual DelegateArrayIterator* createArrayIterator(AttributeID attrID) const
     {
-        size_t attrIDInput = 0;
+        AttributeID attrIDInput = 0;
         if (attrID+1 < desc.getAttributes().size()) { // not EmptyTag
             attrIDInput = _projection[attrID];
         } else {                                         // EmptyTag
-            attrIDInput = inputArray->getArrayDesc().getAttributes().size()-1;
+            attrIDInput = safe_static_cast<AttributeID>(
+                inputArray->getArrayDesc().getAttributes().size()-1);
         }
         return new DelegateArrayIterator(*this, attrID, inputArray->getConstIterator(attrIDInput));
     }

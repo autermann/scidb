@@ -139,7 +139,15 @@ public:
         }
 
         dimensions[0] = DimensionDesc("No", 0, 0, 0, 0, 1, 0);
-        return ArrayDesc("logical_plan", attributes, dimensions, defaultPartitioning());
+
+        stringstream ss;
+        ss << query->getInstanceID();
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        return ArrayDesc("logical_plan", attributes, dimensions,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

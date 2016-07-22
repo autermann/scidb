@@ -127,9 +127,10 @@ public:
 	 * Substitute is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 2);
+        assert(inputArrays.size() == 2);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
         //if no parameters are given, we assume we are substituting all nullable attributes
         vector<bool> substituteAttrs (inputArrays[0]->getArrayDesc().getAttributes().size(), _parameters.size() == 0 ? true : false);
@@ -139,11 +140,10 @@ public:
             substituteAttrs[attId] = true;
         }
 
-        std::shared_ptr<Array> input1 = redistributeToRandomAccess(inputArrays[1], query, psReplication,
-                                                              ALL_INSTANCE_MASK,
-                                                              std::shared_ptr<CoordinateTranslator>(),
-                                                              0,
-                                                              std::shared_ptr<PartitioningSchemaData>());
+        std::shared_ptr<Array> input1 = redistributeToRandomAccess(inputArrays[1],
+                                                                   createDistribution(psReplication),
+                                                                   inputArrays[0]->getArrayDesc().getResidency(),
+                                                                   query);
 
         return make_shared<SubstituteArray>(_schema, inputArrays[0], input1, substituteAttrs);
     }

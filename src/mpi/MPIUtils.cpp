@@ -97,20 +97,25 @@ std::string getIpcFile(const std::string& installPath,
 bool parseSharedMemoryIpcName(const std::string& fileName,
                                      const std::string& clusterUuid,
                                      uint64_t& instanceId,
-                                     uint64_t& queryId,
+                                     QueryID& queryId,
                                      uint64_t& launchId)
 {
+    uint64_t coordId(0);
+    uint64_t id(0);
     if (getShmIpcType()==SharedMemoryIpc::SHM_TYPE) {
 
         string format("SciDB-");
         format += clusterUuid;
-        format += "-%" PRIu64 "-%" PRIu64 "-%" PRIu64 "%n";
+        // notice the dot, QueryID's string representation uses a dot
+        format += "-%" PRIu64 ".%" PRIu64 "-%" PRIu64 "-%" PRIu64 "%n";
         int n=0;
-        int rc = ::sscanf(fileName.c_str(), format.c_str(), &queryId, &instanceId, &launchId, &n);
-        if (rc == EOF || rc < 3) {
+        int rc = ::sscanf(fileName.c_str(), format.c_str(),
+                          &coordId, &id, &instanceId, &launchId, &n);
+        if (rc == EOF || rc < 4) {
             // ignore file with unknown name
             return false;
         }
+        queryId = QueryID(coordId,id);
         return true;
     }
     if (getShmIpcType()!=SharedMemoryIpc::FILE_TYPE) {
@@ -118,11 +123,13 @@ bool parseSharedMemoryIpcName(const std::string& fileName,
         throw std::logic_error("Unknown IPC mode");
     }
     int n=0;
-    int rc = ::sscanf(fileName.c_str(), "%" PRIu64 ".%" PRIu64 "%n", &queryId, &launchId, &n);
-    if (rc == EOF || rc < 2) {
+    int rc = ::sscanf(fileName.c_str(), "%" PRIu64 ".%" PRIu64 ".%" PRIu64 "%n",
+                      &coordId, &id, &launchId, &n);
+    if (rc == EOF || rc < 3) {
         // ignore file with unknown name
         return false;
     }
+    queryId = QueryID(coordId,id);
     return true;
 }
 
@@ -298,7 +305,7 @@ getScidbMPIEnvVar(const uint32_t shmType,
 bool
 parseScidbMPIEnvVar(const string& envVarValue,
                     const string& clusterUuid,
-                    uint64_t& queryId,
+                    QueryID& queryId,
                     uint64_t& launchId)
 {
   string uuid;
@@ -314,19 +321,23 @@ parseScidbMPIEnvVar(const string& envVarValue,
 bool
 parseScidbMPIEnvVar(const string& envVarValue,
                     uint32_t& shmType,
-                    uint64_t& queryId,
+                    QueryID& queryId,
                     uint64_t& launchId,
                     string& clusterUuid)
 {
+  uint64_t coordId(0);
+  uint64_t id(0);
   std::vector<char> buf(envVarValue.size()+1);
-  string format("%" PRIu32 ".%" PRIu64 ".%" PRIu64 ".%s""%n");
+  string format("%" PRIu32 ".%" PRIu64 ".%" PRIu64 ".%" PRIu64 ".%s""%n");
   int n=0;
-  int rc = ::sscanf(envVarValue.c_str(), format.c_str(), &shmType, &queryId, &launchId, &buf[0], &n);
-  if (rc == EOF || rc < 3) {
+  int rc = ::sscanf(envVarValue.c_str(), format.c_str(),
+                    &shmType, &coordId, &id, &launchId, &buf[0], &n);
+  if (rc == EOF || rc < 4) {
     return false;
   }
   buf[buf.size()-1]='\0';
   clusterUuid = string(&buf[0]);
+  queryId = QueryID(coordId, id);
   return true;
 }
 
@@ -439,7 +450,7 @@ double getTimeInSecs()
         assert(false);
         throw std::runtime_error(ss.str());
     }
-    return (ts.tv_sec + ts.tv_nsec*1e-9);
+    return (static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9);
 }
 
 bool hasExpired(double startTime, double timeout)

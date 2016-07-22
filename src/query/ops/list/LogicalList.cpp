@@ -30,7 +30,10 @@
 #include <smgr/io/Storage.h>
 #include <util/DataStore.h>
 #include "ListArrayBuilders.h"
+#include <usr_namespace/NamespacesCommunicator.h>
 #include <usr_namespace/NamespaceDesc.h>
+#include <usr_namespace/RoleDesc.h>
+#include <usr_namespace/SecurityCommunicator.h>
 #include <usr_namespace/UserDesc.h>
 
 /****************************************************************************/
@@ -140,7 +143,7 @@ struct LogicalList : LogicalOperator
 
         if (what == "aggregates") {
             ListAggregatesArrayBuilder builder(
-                AggregateLibrary::getInstance()->getNumAggregates());
+                AggregateLibrary::getInstance()->getNumAggregates(), showSys);
             return builder.getSchema(query);
         } else if (what == "arrays") {
             ListArraysArrayBuilder builder;
@@ -162,12 +165,12 @@ struct LogicalList : LogicalOperator
             {
                 size += i->second.size();
             }
-            size += 2; // for hardcoded iif and missing_reason
+            size += 3; // for hardcoded iif, missing_reason and sizeof
             attributes.push_back(AttributeDesc(1,"profile",      TID_STRING, 0,0));
             attributes.push_back(AttributeDesc(2,"deterministic",TID_BOOL,   0,0));
             attributes.push_back(AttributeDesc(3,"library",      TID_STRING, 0,0));
         } else if (what == "macros") {
-            return logicalListMacros(); // see Parser.h
+            return logicalListMacros(query); // see Parser.h
         } else if (what == "queries") {
             ListQueriesArrayBuilder builder;
             return builder.getSchema(query);
@@ -192,13 +195,40 @@ struct LogicalList : LogicalOperator
         } else if (what == "users") {
             // There is already a name field.
             std::vector<UserDesc> users;
-            SystemCatalog::getInstance()->getUsers(users);
+            scidb::security::Communicator::getUsers(users);
             size=users.size();
+            attributes.push_back(AttributeDesc(1, "id",  TID_UINT64,0,0));
+        } else if (what == "roles") {
+            // There is already a name field.
+            std::vector<RoleDesc> roles;
+            scidb::namespaces::Communicator::getRoles(roles);
+            size=roles.size();
         } else if (what == "namespaces") {
             // There is already a name field.
             std::vector<NamespaceDesc> namespaces;
-            SystemCatalog::getInstance()->getNamespaces(namespaces);
-            size=namespaces.size();
+            scidb::namespaces::Communicator::getNamespaces(namespaces);
+
+            // Get the total # of namespaces.
+            size = namespaces.size();
+
+            // Now subtract one for each namespace which we do not have permission to list.
+            std::string permissions;
+            permissions.push_back(scidb::permissions::namespaces::ListArrays);
+            for(std::vector<NamespaceDesc>::const_iterator it = namespaces.begin();
+                it != namespaces.end();
+                ++it)
+            {
+                try
+                {
+                    scidb::namespaces::Communicator::checkNamespacePermissions(
+                        query->getSession(), (*it), permissions);
+                }
+                catch(const scidb::Exception& e)
+                {
+                    size--;
+                }
+            }
+
         } else {
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
                                        SCIDB_LE_LIST_ERROR1,
@@ -210,7 +240,8 @@ struct LogicalList : LogicalOperator
         return ArrayDesc(what, attributes,
                          vector<DimensionDesc>(1, DimensionDesc("No", 0, 0, chunkInterval-1,
                                                                 chunkInterval-1, chunkInterval, 0)),
-                         defaultPartitioning());
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
     }
 };
 

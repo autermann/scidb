@@ -239,15 +239,28 @@ inline Value::Value()
     assert(consistent());                                // Check consistency
 }
 
+// We have given up on the Value class, so will just tolerate the warnings it generates.
+// Better approaches are welcome.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+
 /**
  *  Construct a value to represent an object of length 'n', and initialize its
  *  internal storage with zeros.
  */
 inline Value::Value(size_t n)
             : _code(MR_DATUM),
-              _size(n),
               _data(0)
 {
+    if (n > std::numeric_limits<size_type>::max())
+    {
+        fail(SCIDB_LE_VALUE_TOO_BIG);                    // ...throw exception
+    }
+    else
+    {
+        _size = static_cast<size_type>(n);               // Safe cast
+    }
+
     if (large(n))                                        // Expect large data?
     {
         _data = calloc(n);                               // ...allocate it now
@@ -312,10 +325,18 @@ inline Value::Value(const Type& t,asTile_t)
  */
 inline Value::Value(void* v,size_t n)
             : _code(MR_DATUM),
-              _size(n),
               _data(0)
 {
     assert(implies(n!=0,v!=0));                          // Validate arguments
+
+    if (n > std::numeric_limits<size_type>::max())
+    {
+        fail(SCIDB_LE_VALUE_TOO_BIG);                    // ...throw exception
+    }
+    else
+    {
+        _size = static_cast<size_type>(n);               // Safe cast
+    }
 
     if (large(n))                                        // Expect large data?
     {
@@ -375,9 +396,9 @@ inline Value::~Value()
  *  qualifies the reason for this value being marked as null, or return -1 if
  *  the value is not in fact missing at all.
  */
-inline int32_t Value::getMissingReason() const
+inline Value::reason Value::getMissingReason() const
 {
-    return isNull() ? _code : -1;                        // Return the reason
+    return reason(isNull() ? _code : -1);                // Return the reason
 }
 
 /**
@@ -398,6 +419,7 @@ inline int32_t Value::getMissingReason() const
 inline void Value::setNull(reason reason)
 {
     assert(!isTile());                                   // Once tile, always
+    assert(isValidMissingReason(reason));                // Caller error!
 
     _code = reason;                                      // Record the reason
 
@@ -510,6 +532,11 @@ inline void* Value::setSize(size_t n)
 {
     assert(!isTile());                                   // Once tile, always
 
+    if (n > std::numeric_limits<size_type>::max())
+    {
+        fail(SCIDB_LE_VALUE_TOO_BIG);                    // ...throw exception
+    }
+
     _code = MR_DATUM;                                    // Now carrying datum
 
     if (large(n))                                        // New size is large?
@@ -525,7 +552,7 @@ inline void* Value::setSize(size_t n)
                 _data = malloc(n);                       // .....allocate now
             }
 
-            _size = n;                                   // ....store new size
+            _size = static_cast<size_type>(n);           // ....store new size
         }
 
         assert(consistent());                            // ...all looks good
@@ -535,7 +562,7 @@ inline void* Value::setSize(size_t n)
     {
         reset();                                         // ...free the buffer
         _data = 0;                                       // ...reset the datum
-        _size = n;                                       // ...record new size
+        _size = static_cast<size_type>(n);               // ...record new size
 
         assert(consistent());                            // ...all looks good
         return  &_data;                                  // ...return pointer
@@ -810,7 +837,7 @@ inline void Value::reset()
         arena::free(_data);                              // ...so free it now
     }
 }
-
+#pragma GCC diagnostic pop
 /****************************************************************************/
 
 /**

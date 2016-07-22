@@ -53,6 +53,7 @@ ${INSTALL} ccache
 ${INSTALL} fop docbook-xsl
 
 # Testing:
+${INSTALL} bc
 ${INSTALL} postgresql-8.4 postgresql-contrib-8.4
 
 # ScaLAPACK tests:
@@ -92,6 +93,7 @@ ${INSTALL} ccache
 ${INSTALL} fop docbook-xsl
 
 # Testing:
+${INSTALL} bc
 ${INSTALL} postgresql-9.3 postgresql-contrib-9.3
 
 # ScaLAPACK tests:
@@ -131,6 +133,7 @@ ${INSTALL} ccache
 ${INSTALL} fop libxslt docbook-style-xsl
 
 # Testing:
+${INSTALL} bc
 ${INSTALL} postgresql postgresql-server postgresql-contrib python-argparse
 
 # ScaLAPACK tests:

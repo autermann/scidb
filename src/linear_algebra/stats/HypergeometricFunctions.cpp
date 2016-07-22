@@ -82,7 +82,9 @@ stats_hygecdf(double x, double m, double n, double k, bool lower_tail, Value* re
     return;
   }
 
-  hypergeometric_distribution<double> h(m, k, m+n);
+  hypergeometric_distribution<double> h(static_cast<unsigned int>(m),
+                                        static_cast<unsigned int>(k),
+                                        static_cast<unsigned int>(m+n));
 
   if (lower_tail) {
     res->setDouble(boost::math::cdf(h, x));
@@ -150,7 +152,9 @@ stats_hygepmf(const Value** args, Value *res, void*)
   double m = args[1]->getDouble();
   double n = args[2]->getDouble();
   double k = args[3]->getDouble();
-  hypergeometric_distribution <> h(m, k, m+n);
+  hypergeometric_distribution<> h(static_cast<unsigned int>(m),
+                                  static_cast<unsigned int>(k),
+                                  static_cast<unsigned int>(m+n));
 
   res->setDouble(boost::math::pdf(h, x));
 }
@@ -173,7 +177,9 @@ stats_hygequant(const Value** args, Value *res, void*)
   double n = args[2]->getDouble();
   double k = args[3]->getDouble();
   bool lower_tail = args[4]->getBool();
-  hypergeometric_distribution <> h(m, k, m+n);
+  hypergeometric_distribution<> h(static_cast<unsigned int>(m),
+                                  static_cast<unsigned int>(k),
+                                  static_cast<unsigned int>(m+n));
 
   if(lower_tail) {
     res->setDouble(boost::math::quantile(h, p));

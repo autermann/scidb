@@ -134,7 +134,7 @@ SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(skip(8),
 
 SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(skip(8),skip(8),skip(8),string)' errors 100>
 {x,y,z} name
-{1,1,1} ''
+{1,1,1} null
 
 SCIDB QUERY : <load CString from current instance 'ZxZsparse2.bcp' as '(skip,skip,skip,string)'>
 {x,y,z} name

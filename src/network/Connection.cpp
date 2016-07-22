@@ -27,15 +27,18 @@
  *      Author: roman.simakov@gmail.com
  */
 
-#include <log4cxx/logger.h>
-#include <boost/bind.hpp>
-#include <memory>
+#include <network/Connection.h>
 
 #include <network/NetworkManager.h>
-#include <network/Connection.h>
+
+#include <system/Config.h>
 #include <system/Exceptions.h>
 #include <util/Notification.h>
 #include <util/session/Session.h>
+
+#include <log4cxx/logger.h>
+#include <boost/bind.hpp>
+#include <memory>
 
 using namespace std;
 using namespace boost;
@@ -70,7 +73,6 @@ void Connection::start()
     assert(!_error);
 
     _session = std::make_shared<Session>();
-    ASSERT_EXCEPTION(_session.get()!=nullptr, "NULL _session");
 
     std::string securityMode = scidb::Config::getInstance()->
         getOption<string>(CONFIG_SECURITY);
@@ -89,7 +91,6 @@ void Connection::start()
         _session->setAuthenticatedState(
             scidb::Session::AUTHENTICATION_STATE_E_AUTHORIZED);
     }
-
 
     _connectionState = CONNECTED;
     getRemoteIp();
@@ -136,11 +137,10 @@ void Connection::handleReadMessage(
 
    if(!_messageDesc->validate() ||
       _messageDesc->getMessageHeader().getSourceInstanceID() == _sourceInstanceID) {
-      LOG4CXX_ERROR(logger, "Connection::handleReadMessage: unknown/malformed message, closing connection");
-      if (_connectionState == CONNECTED) {
-         abortMessages();
-         disconnectInternal();
-      }
+      LOG4CXX_ERROR(logger, "Connection::handleReadMessage: unknown/malformed message,"
+                            " closing connection");
+      using namespace boost::asio::error;
+      handleReadError(make_error_code(eof));
       return;
    }
 
@@ -158,13 +158,10 @@ void Connection::handleReadMessage(
    LOG4CXX_TRACE(logger, "Connection::handleReadMessage: "
             << "messageType="
             << _messageDesc->getMessageHeader().getMessageType()
-
             << "; from instanceID="
             << _messageDesc->getMessageHeader().getSourceInstanceID()
-
             << " ; recordSize="
             << _messageDesc->getMessageHeader().getRecordSize()
-
             << " ; messageDesc.binarySize="
             << _messageDesc->getMessageHeader().getBinarySize());
 }
@@ -192,26 +189,23 @@ void Connection::handleReadRecordPart(
             _sourceInstanceID);
 
    if (!_messageDesc->parseRecord(bytes_transferr)) {
-      LOG4CXX_ERROR(logger,
-        "Network error in handleReadRecordPart: cannot parse record for "
-        << " msgID="
-        << _messageDesc->getMessageHeader().getMessageType()
-        << ", closing connection");
+       LOG4CXX_ERROR(logger,
+                     "Network error in handleReadRecordPart: cannot parse record for "
+                     << " msgID="
+                     << _messageDesc->getMessageHeader().getMessageType()
+                     << ", closing connection");
 
-      if (_connectionState == CONNECTED) {
-         abortMessages();
-         disconnectInternal();
-      }
-      return;
+       using boost::asio::error::make_error_code;
+       using boost::asio::error::eof;
+       handleReadError(make_error_code(eof));
+       return;
    }
    _messageDesc->prepareBinaryBuffer();
 
    LOG4CXX_TRACE(logger,
         "handleReadRecordPart: "
-
             << " messageType="
             << _messageDesc->getMessageHeader().getMessageType()
-
             << " ; messageDesc.binarySize="
             << _messageDesc->getMessageHeader().getBinarySize());
 
@@ -246,8 +240,8 @@ void Connection::handleReadBinaryPart(
    }
    assert(_messageDesc);
 
-   assert(  _messageDesc->getMessageHeader().getBinarySize() ==
-            bytes_transferr);
+   assert(_messageDesc->getMessageHeader().getBinarySize() ==
+          bytes_transferr);
 
    std::shared_ptr<MessageDesc> msgPtr;
    _messageDesc.swap(msgPtr);
@@ -315,7 +309,9 @@ void Connection::setRemoteQueueState(NetworkManager::MessageQueueType mqt,  uint
     {
         ScopedMutexLock mutexLock(_mutex);
 
-        connStatus = _messageQueue.setRemoteState(mqt, size, localGenId, remoteGenId, localSn, remoteSn);
+        connStatus = _messageQueue.setRemoteState(mqt, size,
+                                                  localGenId, remoteGenId,
+                                                  localSn, remoteSn);
 
         LOG4CXX_TRACE(logger, "setRemoteQueueSize: remote queue size = "
                       << size <<" for instanceID="<<_instanceID << " for queue "<<mqt);
@@ -333,7 +329,8 @@ void Connection::setRemoteQueueState(NetworkManager::MessageQueueType mqt,  uint
 bool
 Connection::publishQueueSizeIfNeeded(const std::shared_ptr<const NetworkManager::ConnectionStatus>& connStatus)
 {
-    // mutex must be locked
+    SCIDB_ASSERT(_mutex.isLockedByThisThread());
+
     if (!connStatus) {
         return false;
     }
@@ -409,7 +406,6 @@ void Connection::handleSendMessage(const boost::system::error_code& error,
    }
 
    if (_connectionState == CONNECTED) {
-       abortMessages();
        disconnectInternal();
    }
    if (_instanceID == INVALID_INSTANCE) {
@@ -437,7 +433,7 @@ void Connection::pushNextMessage()
    typedef std::list<std::shared_ptr<MessageDesc> > MessageDescList;
    std::shared_ptr<MessageDescList> msgs = make_shared<MessageDescList>();
    size_t size(0);
-   const size_t maxSize(32*KiB);
+   const size_t maxSize(32*KiB); //XXX TODO: pop all the messages!!!
 
    while (true) {
        std::shared_ptr<MessageDesc> messageDesc = popMessage();
@@ -547,7 +543,6 @@ void Connection::onResolve(std::shared_ptr<asio::ip::tcp::resolver>& resolver,
                         << _query->host_name() << ":" << _query->service_name());
 
        }
-       abortMessages();
        disconnectInternal();
        _networkManager.reconnect(_instanceID);
        return;
@@ -589,7 +584,6 @@ void Connection::onConnect(std::shared_ptr<asio::ip::tcp::resolver>& resolver,
                        << getPeerId() << ", "
                        << _query->host_name() << ":" << _query->service_name());
       }
-      abortMessages();
       disconnectInternal();
       _error = err;
       _networkManager.reconnect(_instanceID);
@@ -687,7 +681,7 @@ void Connection::detachQuery(QueryID queryID)
 
 void Connection::disconnectInternal()
 {
-   LOG4CXX_TRACE(logger, "Disconnecting from " << getPeerId());
+   LOG4CXX_DEBUG(logger, "Disconnecting from " << getPeerId());
    _socket.close();
    _connectionState = NOT_CONNECTED;
    _query.reset();
@@ -727,14 +721,13 @@ void Connection::handleReadError(const boost::system::error_code& error)
       LOG4CXX_TRACE(logger, "Sender disconnected");
    }
    if (_connectionState == CONNECTED) {
-      abortMessages();
       disconnectInternal();
    }
 }
 
 Connection::~Connection()
 {
-   LOG4CXX_DEBUG(logger, "Destroying connection to " << getPeerId());
+   LOG4CXX_TRACE(logger, "Destroying connection to " << getPeerId());
    abortMessages();
    disconnectInternal();
 }
@@ -846,9 +839,11 @@ std::shared_ptr<MessageDesc> Connection::getControlMessage()
     std::shared_ptr<MessageDesc> msgDesc = make_shared<MessageDesc>(mtControl);
     assert(msgDesc);
 
+    namespace gpb = google::protobuf;
+
     std::shared_ptr<scidb_msg::Control> record = msgDesc->getRecord<scidb_msg::Control>();
-    google::protobuf::uint64 localGenId=0;
-    google::protobuf::uint64 remoteGenId=0;
+    gpb::uint64 localGenId=0;
+    gpb::uint64 remoteGenId=0;
     assert(record);
     {
         ScopedMutexLock mutexLock(_mutex);
@@ -863,9 +858,9 @@ std::shared_ptr<MessageDesc> Connection::getControlMessage()
                       <<", remoteGenId=" << remoteGenId);
 
         for (uint32_t mqt = (NetworkManager::mqtNone+1); mqt < NetworkManager::mqtMax; ++mqt) {
-            const google::protobuf::uint64 localSn   = _messageQueue.getLocalSeqNum(NetworkManager::MessageQueueType(mqt));
-            const google::protobuf::uint64 remoteSn  = _messageQueue.getRemoteSeqNum(NetworkManager::MessageQueueType(mqt));
-            const google::protobuf::uint32 id        = mqt;
+            const gpb::uint64 localSn   = _messageQueue.getLocalSeqNum(NetworkManager::MessageQueueType(mqt));
+            const gpb::uint64 remoteSn  = _messageQueue.getRemoteSeqNum(NetworkManager::MessageQueueType(mqt));
+            const gpb::uint32 id        = mqt;
             scidb_msg::Control_Channel* entry = record->add_channels();
             assert(entry);
             entry->set_id(id);
@@ -873,19 +868,19 @@ std::shared_ptr<MessageDesc> Connection::getControlMessage()
             entry->set_remote_sn(remoteSn);
         }
     }
-    google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>* entries = record->mutable_channels();
-    for(google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>::iterator iter = entries->begin();
+    gpb::RepeatedPtrField<scidb_msg::Control_Channel>* entries = record->mutable_channels();
+    for(gpb::RepeatedPtrField<scidb_msg::Control_Channel>::iterator iter = entries->begin();
         iter != entries->end(); ++iter) {
         scidb_msg::Control_Channel& entry = (*iter);
         assert(entry.has_id());
         const NetworkManager::MessageQueueType mqt = static_cast<NetworkManager::MessageQueueType>(entry.id());
-        const google::protobuf::uint64 available = _networkManager.getAvailable(NetworkManager::MessageQueueType(mqt), _instanceID);
+        const gpb::uint64 available = _networkManager.getAvailable(NetworkManager::MessageQueueType(mqt), _instanceID);
         entry.set_available(available);
     }
 
     if (logger->isTraceEnabled()) {
-        const google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>& channels = record->channels();
-        for(google::protobuf::RepeatedPtrField<scidb_msg::Control_Channel>::const_iterator iter = channels.begin();
+        const gpb::RepeatedPtrField<scidb_msg::Control_Channel>& channels = record->channels();
+        for(gpb::RepeatedPtrField<scidb_msg::Control_Channel>::const_iterator iter = channels.begin();
             iter != channels.end(); ++iter) {
             const scidb_msg::Control_Channel& entry = (*iter);
             const NetworkManager::MessageQueueType mqt  = static_cast<NetworkManager::MessageQueueType>(entry.id());

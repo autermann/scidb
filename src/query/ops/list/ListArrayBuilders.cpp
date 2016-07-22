@@ -21,7 +21,7 @@
 */
 
 /****************************************************************************/
-
+#include <iostream>
 #include <boost/assign/list_of.hpp>                      // For list_of()
 #include "ListArrayBuilders.h"
 
@@ -37,7 +37,7 @@ Attributes ListChunkDescriptorsArrayBuilder::getAttributes() const
 {
     return list_of
     (AttributeDesc(STORAGE_VERSION,   "svrsn",TID_UINT32,0,0))
-    (AttributeDesc(INSTANCE_ID,       "insn", TID_UINT32,0,0))
+    (AttributeDesc(INSTANCE_ID,       "insn", TID_UINT64,0,0))
     (AttributeDesc(DATASTORE_GUID,    "dguid",TID_UINT64,0,0))
     (AttributeDesc(DISK_HEADER_POS,   "dhdrp",TID_UINT64,0,0))
     (AttributeDesc(DISK_OFFSET,       "doffs",TID_UINT64,0,0))
@@ -84,7 +84,7 @@ Attributes ListChunkMapArrayBuilder::getAttributes() const
 {
     return list_of
     (AttributeDesc(STORAGE_VERSION,  "svrsn",TID_UINT32,0,0))
-    (AttributeDesc(INSTANCE_ID,      "instn",TID_UINT32,0,0))
+    (AttributeDesc(INSTANCE_ID,      "instn",TID_UINT64,0,0))
     (AttributeDesc(DATASTORE_GUID,   "dguid",TID_UINT64,0,0))
     (AttributeDesc(DISK_HEADER_POS,  "dhdrp",TID_UINT64,0,0))
     (AttributeDesc(DISK_OFFSET,      "doffs",TID_UINT64,0,0))
@@ -210,8 +210,10 @@ void ListLibrariesArrayBuilder::list(const PluginManager::Plugin& e)
 
 /****************************************************************************/
 
-ListAggregatesArrayBuilder::ListAggregatesArrayBuilder(size_t cellCount)
- : ListArrayBuilder("aggregates"),_cellCount(cellCount)
+ListAggregatesArrayBuilder::ListAggregatesArrayBuilder(size_t cellCount, bool showSys)
+ : ListArrayBuilder("aggregates")
+ , _cellCount(cellCount)
+ , _showSys(showSys)
 {}
 
 Dimensions ListAggregatesArrayBuilder::getDimensions(std::shared_ptr<Query> const& query) const
@@ -223,20 +225,32 @@ Dimensions ListAggregatesArrayBuilder::getDimensions(std::shared_ptr<Query> cons
 
 Attributes ListAggregatesArrayBuilder::getAttributes() const
 {
-    return list_of
-    (AttributeDesc(AGGREGATE_NAME,"name",   TID_STRING,0,0))
-    (AttributeDesc(TYPEID_NAME,   "typeid", TID_STRING,0,0))
-    (AttributeDesc(LIBRARY_NAME,  "library",TID_STRING,0,0))
-    (emptyBitmapAttribute(EMPTY_INDICATOR));
+    Attributes attrs = list_of
+        (AttributeDesc(0, "name",   TID_STRING,0,0))
+        (AttributeDesc(1, "typeid", TID_STRING,0,0))
+        (AttributeDesc(2, "library",TID_STRING,0,0));
+    if (_showSys) {
+        attrs.push_back(AttributeDesc(3, "internal", TID_BOOL,0,0));
+        attrs.push_back(emptyBitmapAttribute(4));
+    } else {
+        attrs.push_back(emptyBitmapAttribute(3));
+    }
+    return attrs;
 }
 
 void ListAggregatesArrayBuilder::list(const std::string& name,const TypeId& type,const std::string& lib)
 {
-    beginElement();
-    write(AGGREGATE_NAME,name);
-    write(TYPEID_NAME,   type);
-    write(LIBRARY_NAME,  lib);
-    endElement();
+    bool isSys = (name.find('_') == 0);
+    if (!isSys || _showSys) {
+        beginElement();
+        write(0, name);
+        write(1, type);
+        write(2, lib);
+        if (_showSys) {
+            write(3, isSys);
+        }
+        endElement();
+    }
 }
 
 /****************************************************************************/
@@ -272,7 +286,7 @@ void ListDataStoresArrayBuilder::list(DataStore const& item)
 Attributes ListQueriesArrayBuilder::getAttributes() const
 {
     return list_of
-    (AttributeDesc(QUERY_ID,     "query_id",     TID_UINT64,  0,0))
+    (AttributeDesc(QUERY_ID,     "query_id",     TID_STRING,  0,0))
     (AttributeDesc(COORDINATOR,  "coordinator",  TID_UINT64,  0,0))
     (AttributeDesc(QUERY_STR,    "query_string", TID_STRING,  0,0))
     (AttributeDesc(CREATION_TIME,"creation_time",TID_DATETIME,0,0))
@@ -285,14 +299,19 @@ Attributes ListQueriesArrayBuilder::getAttributes() const
 void ListQueriesArrayBuilder::list(std::shared_ptr<Query> const& query)
 {
     const bool resolveLocalInstanceID = true;
-
+    std::stringstream qs;
     beginElement();
+    qs << query->getQueryID();
+
     write(QUERY_STR,    query->queryString);
-    write(QUERY_ID,     query->getQueryID());
+    write(QUERY_ID,     qs.str());
     write(COORDINATOR,  query->getPhysicalCoordinatorID(resolveLocalInstanceID));
     write(CREATION_TIME,query->getCreationTime());
-    write(ERROR_CODE,   query->getErrorCode());
-    write(ERROR,        query->getErrorDescription());
+
+    std::shared_ptr<Exception> error(query->getError());
+
+    write(ERROR_CODE,   error ? error->getLongErrorCode() : 0);
+    write(ERROR,        error ? error->getErrorMessage() : "");
     write(IDLE,         query->idle());
     endElement();
 }

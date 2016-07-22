@@ -424,7 +424,8 @@ def make_packages (scidbEnv):
     extra_env["SCIDB_SOURCE_PATH"]=scidbEnv.source_path
     cmdList=[bin_path,
              "build_fast",
-             scidbEnv.args.package_path]
+             scidbEnv.args.package_path,
+             "paradigm4"]
     ret = executeIt(cmdList,
                     env=extra_env,
                     cwd=scidbEnv.build_path)
@@ -771,7 +772,7 @@ def initall(scidbEnv):
 
 
 def getScidbPidsCmd(dbName=None):
-    cmd = "ps --no-headers -e -o pid,cmd | awk \'{print $1 \" \" $2}\' | grep SciDB-000"
+    cmd = "ps --no-headers -e -o pid,cmd | awk \'{print $1 \" \" $2}\' | grep SciDB-0"
     if dbName:
         cmd = cmd + " | grep \'%s\'"%(dbName)
     cmd = cmd + " | awk \'{print $1}\'"
@@ -899,10 +900,8 @@ def runTests(scidbEnv, testsPath, srcTestsPath, commands=[]):
         "--skip-tests=" + skipTests,
         "--root-dir=" + testRootDir])
 
-    if scidbEnv.args.user_name and scidbEnv.args.user_password:
-        cmdList.extend([
-            "--user-name="     + scidbEnv.args.user_name,
-            "--user-password=" + scidbEnv.args.user_password])
+    if scidbEnv.args.auth_file:
+        cmdList.extend(["--auth-file={0}".format(scidbEnv.args.auth_file)])
 
     if scidbEnv.args.all:
         pass  # nothing to add
@@ -1201,8 +1200,7 @@ SCIDB_NAME - the name of the SciDB database to be tested, default = mydb"""+
     subParser.add_argument('--timing-file', default='', help="path to the file containing test names and their running times (obtained from the harness tests log).")
     subParser.add_argument('--add-disabled', default='', help="path to the file containing test names to add to the end of disable.tests.")
     subParser.add_argument('--disabled-tests', default='', help="path to the custom disable.tests file (will be used in place of the default one).")
-    subParser.add_argument('--user-name', default='', help="specify the user-name (should also specify passowrd)")
-    subParser.add_argument('--user-password', default='', help="specify the user password")
+    subParser.add_argument('--auth-file', default='', help="specify the authentication file which contains the user name and password")
     subParser.set_defaults(func=tests)
 
 
@@ -1228,8 +1226,7 @@ SCIDB_PLUGIN_TESTS - the subdirectory wrt the plugin build path where the the sc
     subParser.add_argument('--timing-file', default='', help="path to the file containing test names and their running times (obtained from the harness tests log).")
     subParser.add_argument('--add-disabled', default='', help="path to the file containing test names to add to the end of disable.tests.")
     subParser.add_argument('--disabled-tests', default='', help="path to the custom disable.tests file (will be used in place of the default one).")
-    subParser.add_argument('--user-name', default='', help="specify the user-name (should also specify passowrd)")
-    subParser.add_argument('--user-password', default='', help="specify the user password")
+    subParser.add_argument('--auth-file', default='', help="specify the authentication file which contains the user name and password")
     subParser.set_defaults(func=pluginTests)
 
     subParser = subparsers.add_parser('cleanup', usage=

@@ -842,7 +842,7 @@ class Array;
 
 /**
  * Iterator through all array elements. This iterator combines array and chunk iterators.
- * Please notice that using that using random positioning in array can cause very significant degradation of performance
+ * Please notice that using random positioning in array can cause very significant degradation of performance.
  */
 class ConstItemIterator : public ConstChunkIterator
 {

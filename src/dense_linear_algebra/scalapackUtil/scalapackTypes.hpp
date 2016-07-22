@@ -33,7 +33,7 @@
 
 #include <sys/types.h>
 #include "system/Constants.h"
-
+#include <util/Utility.h>
 
 //
 //      This file is a home-brew alternative to using e.g. a BLAST-style interface
@@ -106,6 +106,15 @@ namespace slpp {
 
     typedef int32_t int_t ; // MAIN ADAPTATION: change this to match how the scalapack we link to has been compiled
                             //
+
+    // Convenience method to cast larger bit-sized integral values
+    // to slpp::int_t. 
+    template <typename T>
+    inline int_t int_cast(T t)
+    {
+        return scidb::safe_static_cast<int_t>(t);
+    }
+
     // the only standardized aggregate type used in our "slpp" interface so far.
     // the capitals here help identify variables that are exactly the same as their
     // Fortran counterparts -- so capitals suggest FORTRAN variables used from C/C++ code.

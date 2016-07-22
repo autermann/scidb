@@ -21,16 +21,22 @@
 */
 package org.scidb;
 
+import java.sql.*;
 import junit.framework.TestCase;
+
+import org.scidb.client.AuthenticationFile;
+import org.scidb.client.ConfigUser;
+import org.scidb.client.ConfigUserException;
+import org.scidb.jdbc.Connection;
 import org.scidb.jdbc.IResultSetWrapper;
 import org.scidb.jdbc.IStatementWrapper;
 
-import java.sql.*;
 
 public class JDBCBasicTestCase extends TestCase
 {
     private static String iqueryHost = "localhost";
     private static String iqueryPort = "1239";
+    private static String iqueryAuthFile = "";
 
     private Connection conn;
 
@@ -42,6 +48,11 @@ public class JDBCBasicTestCase extends TestCase
     public static void setIqueryPort(String port)
     {
         iqueryPort = port;
+    }
+
+    public static void setAuthFileName(String authFile)
+    {
+        iqueryAuthFile = authFile;
     }
 
     public JDBCBasicTestCase(String s)
@@ -61,9 +72,22 @@ public class JDBCBasicTestCase extends TestCase
 
         String connString = "jdbc:scidb://";
 
-        connString += iqueryHost + ":" + iqueryPort + "/";
+        // connString += iqueryHost + ":" + iqueryPort + "/";
+        // conn = DriverManager.getConnection(connString);
 
-        conn = DriverManager.getConnection(connString);
+        conn = new Connection(iqueryHost, Integer.parseInt(iqueryPort));
+
+        try
+        {
+            ConfigUser configUser =  ConfigUser.getInstance();
+            configUser.verifySafeFile(iqueryAuthFile, false);
+            AuthenticationFile authFile = new AuthenticationFile(iqueryAuthFile);
+            conn.getSciDBConnection().startNewClient(authFile.getUserName(), authFile.getUserPassword());
+        }
+        catch (Exception e)
+        {
+            System.out.println(e);
+        }
     }
 
     public void tearDown() throws SQLException {

@@ -51,7 +51,7 @@ namespace scidb
  * @par Summary:
  *   <br>
  *   The input_array may have any attributes or dimensions. The index_array must have a single dimension and a single
- *   non-nullable attribute. The index array data must be sorted, unique values with no empty cells between them (though
+ *   attribute. The index array data must be sorted, unique values with no empty cells between them (though
  *   it does not necessarily need to be populated to the upper bound). The third argument must correctly refer to one
  *   of the attributes of the input array - the looked-up attribute. This attribute must have the same datatype as the
  *   only attribute of the index array. The comparison "<" function must be registered in SciDB for this datatype.
@@ -76,7 +76,7 @@ namespace scidb
  *
  * @par Input:
  *   <br> input_array <..., input_attribute: type,... > [*]
- *   <br> index_array <index_attribute: type not null> [dimension=0:any,any,any]
+ *   <br> index_array <index_attribute: type> [dimension=0:any,any,any]
  *   <br> input_attribute                --the name of the input attribute
  *   <br> [output_attribute_name]        --the name for the output attribute if desired
  *   <br> ['memory_limit=MEMORY_LIMIT']  --the memory limit to use MB)
@@ -133,8 +133,12 @@ public:
         ArrayDesc const& index = schemas[1];
         //The settings object also checks the input schemas for validity
         IndexLookupSettings settings(input, index, _parameters, true, query);
-        ArrayDesc result (input.getName(), input.getAttributes(true), input.getDimensions(), defaultPartitioning());
-        AttributeDesc newAttribute(input.getAttributes(true).size(),
+
+        ArrayDesc result (input.getName(), input.getAttributes(true), input.getDimensions(),
+                          input.getDistribution(),
+                          input.getResidency());
+
+        AttributeDesc newAttribute(safe_static_cast<AttributeID>(input.getAttributes(true).size()),
                                    settings.getOutputAttributeName(),
                                    TID_INT64,
                                    AttributeDesc::IS_NULLABLE,

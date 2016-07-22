@@ -10,7 +10,7 @@ Query was executed successfully
 
 SCIDB QUERY : <show(LongString)>
 {i} schema
-{0} 'LongString<I:int64,J:int64,V:double NULL DEFAULT null,W:string> [Line=0:*,6,0]'
+{0} 'LongString<I:int64,J:int64,V:double,W:string> [Line=0:*,6,0]'
 
 SCIDB QUERY : <scan(LongString)>
 {Line} I,J,V,W

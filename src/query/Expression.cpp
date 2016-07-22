@@ -91,12 +91,12 @@ ExpressionContext::ExpressionContext(Expression& expression):
     }
 }
 
-const Value& ExpressionContext::operator[](int i) const
+const Value& ExpressionContext::operator[](size_t i) const
 {
     return _context[i];
 }
 
-Value& ExpressionContext::operator[](int i)
+Value& ExpressionContext::operator[](size_t i)
 {
     _contextChanged = true;
     return _context[i];
@@ -290,14 +290,14 @@ void Expression::addVariableInfo(const std::string& name, const TypeId& type)
 }
 
 BindInfo
-Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
+Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayNameOrg,
                            const string& referenceName, const std::shared_ptr<Query>& query)
 {
     BindInfo bind;
     const Attributes& attrs = arrayDesc.getAttributes();
     for (size_t i = 0; i < attrs.size(); i++)
     {
-        if (attrs[i].getName() == referenceName && attrs[i].hasAlias(arrayName))
+        if (attrs[i].getName() == referenceName && attrs[i].hasAlias(arrayNameOrg))
         {
             bind.kind = BindInfo::BI_ATTRIBUTE;
             bind.resolvedId = i;
@@ -310,7 +310,7 @@ Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
 
     const Dimensions& dims = arrayDesc.getDimensions();
     for (size_t i = 0; i < dims.size(); i++) {
-        if (dims[i].hasNameAndAlias(referenceName, arrayName))
+        if (dims[i].hasNameAndAlias(referenceName, arrayNameOrg))
         {
             bind.kind = BindInfo::BI_COORDINATE;
             bind.resolvedId = i;
@@ -320,6 +320,16 @@ Expression::resolveContext(const ArrayDesc& arrayDesc, const string& arrayName,
     }
 
     bind.type = TID_VOID;
+
+    if(	(arrayNameOrg != "") &&
+		!ArrayDesc::isQualifiedArrayName(arrayNameOrg))
+    {
+        // Try to resolve using a qualified array name.
+        std::string arrayName = ArrayDesc::makeQualifiedArrayName(
+            arrayDesc.getNamespaceName(), arrayNameOrg);
+        bind = resolveContext(arrayDesc, arrayName, referenceName, query);
+    }
+
     return bind;
 }
 
@@ -341,20 +351,25 @@ BindInfo Expression::resolveContext(const std::shared_ptr<AttributeReference>& r
         }
     }
 
+    // Look for ref->getArrayName() in each of the input schemas
+    std::string arrayName = ref->getArrayName();
     for (size_t a = 0; a < _inputSchemas.size(); a++)
     {
-       bind = resolveContext(_inputSchemas[a], ref->getArrayName(), ref->getAttributeName(), query);
+        bind = resolveContext(_inputSchemas[a], arrayName, ref->getAttributeName(), query);
         if (bind.type != TID_VOID) {
             bind.inputNo = a;
             return bind;
         }
     }
-    bind = resolveContext(_outputSchema, ref->getArrayName(), ref->getAttributeName(), query);
+
+    // Look for ref->getArrayName() in the output schema
+    bind = resolveContext(_outputSchema, arrayName, ref->getAttributeName(), query);
     if (bind.type != TID_VOID) {
         bind.inputNo = ~0;
         return bind;
     }
 
+    // ref->getArrayName() not found, throw an exception
     throw USER_QUERY_EXCEPTION(SCIDB_SE_QPROC, SCIDB_LE_REF_NOT_FOUND, ref->getParsingContext())
         << (ref->getArrayName() + "." + ref->getAttributeName());
 }
@@ -488,7 +503,7 @@ Expression::internalCompile(std::shared_ptr<LogicalExpression> expr,
         vector<TypeId> funcArgTypes(e->getArgs().size());
         // Reverse order is needed to provide evaluation from left to right
         bool argumentsAreConst = true;
-        for (int i = e->getArgs().size() - 1; i >=0 ; i--)
+        for (int i = safe_static_cast<int>(e->getArgs().size()) - 1; i >=0 ; i--)
         {
             size_t newSkipIndex = skipIndex;
             bool newSkipValue = skipValue;

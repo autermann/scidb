@@ -112,7 +112,14 @@ public:
         Dimensions dims(1);
         dims[0] = DimensionDesc("i", 0, 0, 0, 0, 1, 0);
 
-        return ArrayDesc("Help",atts,dims, defaultPartitioning());
+        stringstream ss;
+        ss << query->getInstanceID();
+        ArrayDistPtr localDist = ArrayDistributionFactory::getInstance()->construct(psLocalInstance,
+                                                                                    DEFAULT_REDUNDANCY,
+                                                                                    ss.str());
+        return ArrayDesc("Help",atts,dims,
+                         localDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

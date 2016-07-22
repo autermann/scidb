@@ -142,11 +142,13 @@ public:
                                        srcDim.getCurrStart(),
                                        srcDim.getCurrEnd(),
                                        srcDim.getEndMax(),
-                                       srcDim.getChunkInterval(),
+                                       srcDim.getRawChunkInterval(),
                                        0);
         }
 
-        ArrayDesc output (schemas[0].getName(), Attributes(), outDims, defaultPartitioning());
+        ArrayDesc output (schemas[0].getName(), Attributes(), outDims,
+                          schemas[0].getDistribution(),
+                          schemas[0].getResidency());
         for(size_t i =3; i<_parameters.size(); i++)
         {
             bool isInOrderAggregation = true;
@@ -157,7 +159,10 @@ public:
         if ( schemas[0].getEmptyBitmapAttribute())
         {
             AttributeDesc const* eAtt = schemas[0].getEmptyBitmapAttribute();
-            output.addAttribute(AttributeDesc( output.getAttributes().size(), eAtt->getName(), eAtt->getType(), eAtt->getFlags(), eAtt->getDefaultCompressionMethod()));
+            output.addAttribute(
+                AttributeDesc(safe_static_cast<AttributeID>(output.getAttributes().size()),
+                              eAtt->getName(), eAtt->getType(), eAtt->getFlags(),
+                              eAtt->getDefaultCompressionMethod()));
         }
         else
         {

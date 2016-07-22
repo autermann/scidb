@@ -105,15 +105,14 @@ public:
     {
         //Here we write out the bmp file header. This is taken from the example at http://en.wikipedia.org/wiki/BMP_file_format
         uint32_t const headerSize = 122;
-
-        uint32_t const dataSize = _numCells*sizeof(uint32_t);
-        uint8_t* dataSizePtr = (uint8_t*) &dataSize;
+        uint32_t const dataSize = safe_static_cast<uint32_t>(_numCells*sizeof(uint32_t));
+        uint8_t const * dataSizePtr = reinterpret_cast<const  uint8_t*>(&dataSize);
         uint32_t const totalSize = headerSize + dataSize;
-        uint8_t* totalSizePtr = (uint8_t*) &totalSize;
-        uint32_t const nRows = _nRows;
-        uint8_t* nRowsPtr = (uint8_t*) &nRows;
-        uint32_t const nCols = _nCols;
-        uint8_t* nColsPtr = (uint8_t*) &nCols;
+        uint8_t const * totalSizePtr = reinterpret_cast<const uint8_t*>(&totalSize);
+        uint32_t const nRows = static_cast<uint32_t>(_nRows);
+        uint8_t const * nRowsPtr = reinterpret_cast<const uint8_t*>(&nRows);
+        uint32_t const nCols = static_cast<uint32_t>(_nCols);
+        uint8_t const * nColsPtr = reinterpret_cast<const uint8_t*>(&nCols);
         uint8_t header[headerSize];
         memset(&header[0], 0, headerSize);
 
@@ -154,10 +153,10 @@ public:
         header[72]=0x69;
         header[73]=0x57;
 
-        if( fwrite(&header, headerSize, 1, file) != 1)
+        if( scidb::fwrite(&header, headerSize, 1, file) != 1)
             return 0;
 
-        if( fwrite(&_imageData[0], _numCells*sizeof(uint32_t), 1, file) != 1 )
+        if( scidb::fwrite(&_imageData[0], _numCells*sizeof(uint32_t), 1, file) != 1 )
             return 0;
 
         return totalSize;
@@ -181,8 +180,15 @@ class PhysicalSaveBmp: public PhysicalOperator
     virtual DistributionRequirement getDistributionRequirement (const std::vector< ArrayDesc> & inputSchemas) const
     {
         vector<RedistributeContext> requiredDistribution(1);
-        requiredDistribution[0] = RedistributeContext(psLocalInstance, std::shared_ptr<CoordinateTranslator>(), 0);
+        requiredDistribution[0] = RedistributeContext(_schema.getDistribution(),_schema.getResidency());
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
+    }
+
+    virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
+    {
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /**
@@ -254,7 +260,7 @@ class PhysicalSaveBmp: public PhysicalOperator
             ++(*aiters[2]);
         }
 
-        FILE* f = fopen(filepath.c_str(), "wb");
+        FILE* f = scidb::fopen(filepath.c_str(), "wb");
         if(!f)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "savebmp can't open the target file!";
@@ -265,7 +271,7 @@ class PhysicalSaveBmp: public PhysicalOperator
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "savebmp can't write the target file!";
         }
-        fclose(f);
+        scidb::fclose(f);
 
         std::shared_ptr<Array> dstArray(new MemArray(_schema,query));
         Coordinates outPos(1);
@@ -284,7 +290,7 @@ class PhysicalSaveBmp: public PhysicalOperator
         Chunk& outChunk2 = daiter2->newChunk(outPos);
         std::shared_ptr<ChunkIterator>dciter2 = outChunk2.getIterator(query);
         dciter2->setPosition(outPos);
-        outValue.setDouble(fileSize * 1.0 / MiB);
+        outValue.setDouble(static_cast<double>(fileSize) / MiB);
         dciter2->writeItem(outValue);
         dciter2->flush();
 

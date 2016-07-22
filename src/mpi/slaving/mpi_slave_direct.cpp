@@ -58,7 +58,7 @@ typedef uint64_t InstanceID;
 uint64_t str2uint64(const char *str);
 uint32_t str2uint32(const char *str);
 int initMpi(int argc, char* argv[]);
-int runScidbCommands(uint32_t port,
+int runScidbCommands(uint16_t port,
                       const std::string& clusterUuid,
                       QueryID queryId,
                       InstanceID instanceId,
@@ -143,7 +143,7 @@ uint32_t str2uint32(const char *str)
 {
     char *ptr=0;
     errno = 0;
-    int32_t num = strtol(str,&ptr,10);
+    int32_t num = scidb::safe_static_cast<int32_t>(strtol(str,&ptr,10));
     if (errno !=0 || str == 0 || (*str) == 0 || (*ptr) != 0 || num<0) {
         cerr << "SLAVE: Invalid numeric string for uint32_t: " << str << std::endl;
         exit(9);
@@ -181,7 +181,7 @@ int initMpi(int argc, char* argv[])
 }
 
 
-int runScidbCommands(uint32_t port,
+int runScidbCommands(uint16_t port,
                          const std::string& clusterUuid,
                          QueryID queryId,
                          InstanceID instanceId,

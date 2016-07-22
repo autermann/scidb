@@ -91,7 +91,7 @@ private:
     ArrayDesc                                       desc;
     Dimensions const&                               dims;
     size_t                                          nDims;
-    size_t                                          nAttrs;
+    const size_t                                          nAttrs;
     std::vector<Value>                                   values;
     std::vector<CachedChunks>                            chunks;
     std::vector<std::shared_ptr<ChunkIterator> >       chunkIterators;

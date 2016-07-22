@@ -26,9 +26,9 @@
  *  Created on: Mar 9, 2010
  */
 
-#include "query/Operator.h"
-#include "system/Exceptions.h"
-
+#include <query/Operator.h>
+#include <query/AutochunkFixer.h>
+#include <system/Exceptions.h>
 
 namespace scidb
 {
@@ -65,6 +65,8 @@ namespace scidb
  */
 class LogicalTranspose : public LogicalOperator
 {
+    AutochunkFixer  _fixer;
+
 public:
     /**
      * Create the transpose operator.
@@ -75,6 +77,11 @@ public:
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_INPUT()
+    }
+
+    std::string getInspectable() const override
+    {
+        return _fixer.str();
     }
 
     /**
@@ -93,13 +100,26 @@ public:
         Dimensions const& dims(schema.getDimensions());
         Dimensions transDims(dims.size());
 
+        _fixer.clear();
         for (size_t i = 0, n = dims.size(); i < n; i++)
         {
+            _fixer.takeDimension(n-i-1).fromArray(0).fromDimension(i);
             transDims[n-i-1] = dims[i];
         }
 
-        return ArrayDesc(schema.getName(), schema.getAttributes(), transDims, defaultPartitioning());
-	}
+        ArrayDistPtr dist;
+        if (schema.getDistribution()->getPartitioningSchema() == psByRow) {
+            dist = createDistribution(psByCol);
+        } else if (schema.getDistribution()->getPartitioningSchema() == psByCol) {
+            dist = createDistribution(psByRow);
+        } else {
+            dist = createDistribution(psUndefined);
+        }
+
+        return ArrayDesc(schema.getName(), schema.getAttributes(), transDims,
+                         dist,
+                         schema.getResidency());
+    }
 
 };
 

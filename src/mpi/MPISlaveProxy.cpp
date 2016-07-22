@@ -196,7 +196,7 @@ void MpiSlaveProxy::sendCommand(mpi::Command& cmd, std::shared_ptr<MpiOperatorCo
     const std::vector<std::string>& args = cmd.getArgs();
     google::protobuf::RepeatedPtrField<std::string>* msgArgs = cmdPtr->mutable_args();
     assert(msgArgs);
-    msgArgs->Reserve(args.size());
+    msgArgs->Reserve(safe_static_cast<int>(args.size()));
     for (std::vector<std::string>::const_iterator iter = args.begin(); iter != args.end(); ++iter) {
         cmdPtr->add_args(*iter);
     }
@@ -219,6 +219,8 @@ void MpiSlaveProxy::sendCommand(mpi::Command& cmd, std::shared_ptr<MpiOperatorCo
 /// @todo XXX TODO tigor: make it timeout ? TBD
 int64_t MpiSlaveProxy::waitForStatus(std::shared_ptr<MpiOperatorContext>& ctx, bool raise)
 {
+    ScopedWaitTimer timer(PTCW_EXT);
+
     if (!_connection) {
         throw (InvalidStateException(REL_FILE, __FUNCTION__, __LINE__)
                << "No connection to MPI slave");

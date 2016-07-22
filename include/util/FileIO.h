@@ -53,6 +53,14 @@
  *    users grab a reference to the singleton clas FileManager
  *    and use it to open individual File objects.
  *
+ * 3) "stdio" wrappers.  These are functions in scidb::
+ *    that have the same signature as stdio functions (fread_unlocked() etc)
+ *    but which have the same time accounting added as the
+ *    two categories above.  Note that
+ *    macros such as getc() ungetc() are not included
+ *    and we discourage their being added because they do not have
+ *    unlocked stdio equivalents.
+ *
  * @author Konstantin Knizhnik <knizhnik@garret.ru>
  * @author sfridella@paradigm4.com
  */
@@ -417,6 +425,42 @@ namespace scidb
         int _fd;
     };
 
-}
+    /*
+     * Low-level FILE* interface --- global functions
+     *
+     * A number of import / export facilities use libc
+     * buffered io such as fread() and fwrite()
+     * The following scidb-scoped functions allow
+     * these to be timed in the same manner as the ones
+     * above.  Note this is not an endorsement of using
+     * FILE*-based io in SciDB -- this is merely a
+     * technique for intercepting and meauring these
+     * calls.
+     *
+     * Note that unlike the File:: methods above,
+     * these add no error checking or retry, they
+     * only add timing
+     *
+     * Note that these functions can be skipped by
+     * referring explicitly to the functions in
+     * global scope, e.g. "::fread"
+     */
+
+     FILE *fopen(const char *path, const char *mode);
+     FILE *fdopen(int fd, const char *mode);
+     FILE *freopen(const char *path, const char *mode, FILE *stream);
+     [[deprecated("fread_unlocked is supported, fread is not")]]
+     size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+     size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream);
+     size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+     size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+     int fprintf(FILE* stream, const char* format, ...);
+     int fflush(FILE *stream);
+     int fclose(FILE *fp);
+     // note feof, ferror, fileno are excluded
+     // as they generally do not make blocking system calls
+
+
+} // namespace scidb
 
 #endif

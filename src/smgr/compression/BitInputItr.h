@@ -46,7 +46,7 @@ namespace scidb
     int32_t get(uint8_t &dst, const size_t bits);
 
      // close out the _src itr, return # of bytes written
-    int32_t close()
+    size_t close()
     {
       return _src->close();
     }

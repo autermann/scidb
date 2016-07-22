@@ -36,7 +36,7 @@ SCIDB QUERY : <store(join(intensityFlat,plus),saveExample)>
 
 SCIDB QUERY : <show(saveExample)>
 {i} schema
-{0} 'saveExample<exposure:string,elapsedTime:int64,measuredIntensity:int64 NULL DEFAULT null,elevation:int64> [i=0:24,5,0]'
+{0} 'saveExample<exposure:string,elapsedTime:int64,measuredIntensity:int64,elevation:int64> [i=0:24,5,0]'
 
 SCIDB QUERY : <scan(saveExample)>
 [Query was executed successfully, ignoring data output by this query.]

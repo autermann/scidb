@@ -193,7 +193,7 @@ def eliminateAndStore(what, name, autoCleanup=True):
 #"-ocsv+"   # for explicit row,column printing
 #"-osparse" # enable this when debugging distribution issues
 
-def afl(input, format="-ocsv", timeIt=False):
+def afl(input, format="-ocsv:l", timeIt=False):
     cmdList=[_iqueryBin, "-p", _basePort, "-c", _targetHost, format, "-w16", "-aq", input]
     if _timePrefix and timeIt:
        cmdList.insert(0,_timePrefix)
@@ -205,7 +205,7 @@ def afl(input, format="-ocsv", timeIt=False):
     return ret
 #
 # Run a given AFL with collecting the result into a buffer, which is returned
-def aflResult(input, format="-ocsv", timeIt=False):
+def aflResult(input, format="-ocsv:l", timeIt=False):
     # XXX TODO: get rid of the file altogether ?
     outFile = "/tmp/afl.%s.out" % os.getpid()
     cmdList=[_iqueryBin, "-p", _basePort, "-c", _targetHost, format, "-w16", "-aq", input]

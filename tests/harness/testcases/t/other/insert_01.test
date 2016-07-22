@@ -27,7 +27,7 @@ scan(B)
 insert(A,D)
 
 # Fails because any explicit repart() is almost certainly wrong.
---error --code scidb::SCIDB_SE_OPERATOR::SCIDB_LE_REPART_FORBIDDEN "insert(repart(D,<val:double> [x=0:3,2,0]),D)"
+--error --code scidb::SCIDB_SE_OPERATOR::SCIDB_LE_BAD_EXPLICIT_REPART "insert(repart(D,<val:double> [x=0:3,2,0]),D)"
 
 # For backward compat, it works OK iff the manual repart() is the same as would have been done automatically.
 insert(repart(D, <val:double> [x=0:3,4,0]),D)

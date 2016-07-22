@@ -549,8 +549,6 @@ public:
     virtual void overrideCount(Value& state, uint64_t newCount)   = 0;
 };
 
-class ListAggregatesArrayBuilder;  // forward reference
-
 class AggregateLibrary: public Singleton<AggregateLibrary>
 {
 private:
@@ -621,7 +619,7 @@ public:
     {}
 
     void setInputAttributeId(AttributeID id) { _inputAttributeId = id; }
-    int64_t getInputAttributeId() const { return _inputAttributeId; }
+    AttributeID getInputAttributeId() const { return _inputAttributeId; }
     bool validAttributeId() const { return _inputAttributeId != INVALID_ATTRIBUTE_ID; }
 
     AggregatePtr getAggregate(size_t i) const { return _aggregates[i]; }

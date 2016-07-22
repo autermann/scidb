@@ -29,31 +29,28 @@
  * @brief SciDB API implementation to communicate with instance by network
  */
 
-#include <stdlib.h>
-#include <string>
-#include <memory>
-#include <log4cxx/logger.h>
-#include <log4cxx/basicconfigurator.h>
-
-
-#include "SciDBAPI.h"
-#include "network/Connection.h"
-#include "network/MessageUtils.h"
-#include "array/StreamArray.h"
-#include "system/Exceptions.h"
-#include "util/PluginManager.h"
-#include "util/Singleton.h"
-
+#include <array/StreamArray.h>
 #include <boost/bind.hpp>
-
+#include <fstream>
+#include <log4cxx/basicconfigurator.h>
+#include <log4cxx/logger.h>
+#include <memory>
+#include <network/Connection.h>
+#include <network/MessageUtils.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
-
-
-#include <fstream>
-
+#include <regex>
+#include "SciDBAPI.h"
+#include <stdlib.h>
+#include <string>
+#include <system/Exceptions.h>
+#include <system/ErrorCodes.h>
+#include <util/AuthenticationFile.h>
+#include <util/ConfigUser.h>
+#include <util/PluginManager.h>
+#include <util/Singleton.h>
 
 
 using namespace std;
@@ -280,7 +277,71 @@ private:
         }
         SHA512_Final(digest.data(), &ctx);
 
-        return _convertToBase64(digest.data(), digest.size());
+        return _convertToBase64(digest.data(), safe_static_cast<int>(digest.size()));
+    }
+
+    void getUserInfo(
+        const std::string &     fileName,
+        std::string &           userName,
+        std::string &           userPassword) const
+    {
+        if(fileName.length() == 0)
+        {
+            userName        = "";
+            userPassword    = "";
+            return;
+        }
+
+
+        try
+        {
+            scidb::ConfigUser::verifySafeFile(fileName);
+
+            // New file format 2016_01_07
+            scidb::AuthenticationFile af(fileName);
+            userName     = af.getUserName();
+            userPassword = af.getUserPassword();
+        } catch(const scidb::Exception& e) {
+            std::string err = e.what();
+
+            if(err.find("SCIDB_LE_ERROR_IN_CONFIGURATION_FILE") != string::npos) {
+#if 1
+                // Older file format support (keep for a period of time (two releases?) then remove
+                // and use the code in the #else section
+                stringstream ss;
+                ss  << "WARNING:  Exception=" << e.what() << std::endl
+                    << "    Trying previous authentication file format" << std::endl;
+                LOG4CXX_DEBUG(logger, ss.str());
+
+                try
+                {
+                    scidb::ConfigUser *cfgUser = scidb::ConfigUser::getInstance();
+                    cfgUser->addOptions();
+                    cfgUser->parse(0, NULL, fileName.c_str());
+
+                    userName        = cfgUser->getUserName();
+                    userPassword    = cfgUser->getUserPassword();
+                }  catch(const scidb::Exception& e) {
+                    ss  << "EXCEPTION:  SciDBRemote - " << e.what() << std::endl
+                        << "  Authentication file format unreadable" << std::endl;
+                    LOG4CXX_ERROR(logger, ss.str());
+                    throw;
+                }
+#else
+                stringstream ss;
+                ss  << "EXCEPTION:  SciDBRemote - " << e.what() << std::endl
+                    << "  Authentication file " << fileName << " format unreadable" << std::endl;
+                LOG4CXX_ERROR(logger, ss.str());
+                throw;
+#endif
+            } else {
+                stringstream ss;
+                ss  << "EXCEPTION:  SciDBRemote - " << e.what() << std::endl
+                    << "  Authentication file " << fileName << " format unreadable" << std::endl;
+                LOG4CXX_ERROR(logger, ss.str());
+                throw;
+            }
+        }
     }
 
 public:
@@ -319,12 +380,13 @@ public:
 
         LOG4CXX_TRACE(logger, "Send " << (afl ? "AFL" : "AQL") << " for preparation " << queryString);
 
+        ASSERT_EXCEPTION(connection!=NULL,"NULL connection");
         std::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(queryMessage);
 
         if (resultMessage->getMessageType() != mtQueryResult) {
             assert(resultMessage->getMessageType() == mtError);
 
-            makeExceptionFromErrorMessageAndThrow(resultMessage);
+            makeExceptionFromErrorMessageAndThrowOnClient(resultMessage);
         }
 
         std::shared_ptr<scidb_msg::QueryResult> queryResultRecord =
@@ -367,19 +429,20 @@ public:
         queryMessage->getRecord<scidb_msg::Query>()->set_program_options(programOptions);
         queryMessage->setQueryID(queryResult.queryID);
 
-        if (!queryResult.queryID) {
+        if (!queryResult.queryID.isValid()) {
             LOG4CXX_TRACE(logger, "Send " << (afl ? "AFL" : "AQL") << " for execution " << queryString);
         }
         else {
             LOG4CXX_TRACE(logger, "Send prepared query " << queryResult.queryID << " for execution");
         }
 
+        ASSERT_EXCEPTION(connection!=NULL,"NULL connection");
         std::shared_ptr<MessageDesc> resultMessage = static_cast<BaseConnection*>(connection)->sendAndReadMessage<MessageDesc>(queryMessage);
 
         if (resultMessage->getMessageType() != mtQueryResult) {
             assert(resultMessage->getMessageType() == mtError);
 
-            makeExceptionFromErrorMessageAndThrow(resultMessage);
+            makeExceptionFromErrorMessageAndThrowOnClient(resultMessage);
         }
 
         // Processing result message
@@ -389,6 +452,7 @@ public:
 
         LOG4CXX_TRACE(logger, "Result for query " << queryResult.queryID);
 
+        queryResult.autoCommit = queryResultRecord->auto_commit();
         queryResult.selective = queryResultRecord->selective();
         if (queryResult.selective)
         {
@@ -397,7 +461,7 @@ public:
             {
                 Value defaultValue;
                 if (queryResultRecord->attributes(i).default_missing_reason() >= 0) {
-                    defaultValue.setNull(queryResultRecord->attributes(i).default_missing_reason());
+                    defaultValue.setNull(safe_static_cast<Value::reason>(queryResultRecord->attributes(i).default_missing_reason()));
                 } else {
                     defaultValue.setData(queryResultRecord->attributes(i).default_value().data(),  queryResultRecord->attributes(i).default_value().size());
                 }
@@ -405,8 +469,8 @@ public:
                         queryResultRecord->attributes(i).id(),
                         queryResultRecord->attributes(i).name(),
                         queryResultRecord->attributes(i).type(),
-                        queryResultRecord->attributes(i).flags(),
-                        queryResultRecord->attributes(i).default_compression_method(),
+                        safe_static_cast<int16_t>(queryResultRecord->attributes(i).flags()),
+                        safe_static_cast<int16_t>(queryResultRecord->attributes(i).default_compression_method()),
                         std::set<std::string>(),
                         0, &defaultValue)
                 );
@@ -449,7 +513,7 @@ public:
             queryResult.explainLogical = queryResultRecord->explain_logical();
             queryResult.explainPhysical = queryResultRecord->explain_physical();
 
-            const ArrayDesc arrayDesc(queryResultRecord->array_name(), attributes, dimensions, defaultPartitioning());
+            const ArrayDesc arrayDesc(queryResultRecord->array_name(), attributes, dimensions, ArrayDistPtr(), ArrayResPtr());
 
             queryResult.array = std::shared_ptr<Array>(new ClientArray(( BaseConnection*)connection,
                                                                          arrayDesc, queryResult.queryID, queryResult));
@@ -464,13 +528,14 @@ public:
 
         LOG4CXX_TRACE(logger, "Canceling query for execution " << queryID);
 
+        ASSERT_EXCEPTION(connection!=NULL,"NULL connection");
         std::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(cancelQueryMessage);
 
         //  assert(resultMessage->getMessageType() == mtError);
         if (resultMessage->getMessageType() == mtError) {
             std::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
             if (error->short_error_code() != SCIDB_E_NO_ERROR)
-                makeExceptionFromErrorMessageAndThrow(resultMessage);
+                makeExceptionFromErrorMessageAndThrowOnClient(resultMessage);
         } else {
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_MESSAGE_TYPE2) << resultMessage->getMessageType();
         }
@@ -484,12 +549,13 @@ public:
 
         LOG4CXX_TRACE(logger, "Completing query for execution " << queryID);
 
+        ASSERT_EXCEPTION(connection!=NULL,"NULL connection");
         std::shared_ptr<MessageDesc> resultMessage = (( BaseConnection*)connection)->sendAndReadMessage<MessageDesc>(completeQueryMessage);
 
         if (resultMessage->getMessageType() == mtError) {
             std::shared_ptr<scidb_msg::Error> error = resultMessage->getRecord<scidb_msg::Error>();
             if (error->short_error_code() != SCIDB_E_NO_ERROR)
-                makeExceptionFromErrorMessageAndThrow(resultMessage);
+                makeExceptionFromErrorMessageAndThrowOnClient(resultMessage);
         } else {
             throw USER_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_UNKNOWN_MESSAGE_TYPE2) << resultMessage->getMessageType();
         }
@@ -497,16 +563,14 @@ public:
 
     void newClientStart(
         void* connection,
-        const std::string &name,
-        const std::string &password) const
+        const std::string &userInfoFileName) const
     {
+        std::string name;
+        std::string password;
+
         log4cxx::LoggerPtr logger = log4cxx::Logger::getRootLogger();
 
-        LOG4CXX_DEBUG(logger,
-            "newClientStart("
-                << "  name="     << name     << ","
-                << "  password=********)");
-
+        ASSERT_EXCEPTION(connection!=NULL,"NULL connection");
         scidb::BaseConnection *baseConnection =
             static_cast<scidb::BaseConnection*>(connection);
 
@@ -547,20 +611,19 @@ public:
                             << strMessage
                             << " type=" << (uint32_t) messageType);
 
-                        LOG4CXX_DEBUG(logger,
-                            "newClientStart getInputFromFile("
-                            << strMessage << ", "
-                            << "  name=" << name << ", "
-                            << "  password=********)");
-
                         transform(
                             strMessage.begin(),
                             strMessage.end(),
                             strMessage.begin(),
                             ::tolower );
                         if(strMessage.compare("login:") == 0) {
+                            getUserInfo(userInfoFileName, name, password);
                             userResponse = name;
                         } else if(strMessage.compare("password:") == 0) {
+                            if(password.length() == 0)
+                            {
+                                getUserInfo(userInfoFileName, name, password);
+                            }
                             userResponse = _hashPassword(password);
                         } else {
                             userResponse = "Unknown request";
@@ -572,10 +635,16 @@ public:
 
                         if(0 == userResponse.length())
                         {
-                            LOG4CXX_ERROR(logger, "invalid buffer length");
+                            std::stringstream ss;
+                            ss  << "User response - invalid buffer length"
+                                << " - auth-file=" << userInfoFileName;
+
+                            LOG4CXX_ERROR(logger, "SCIDB_LE_AUTHENTICATION_ERROR - " << ss.str());
+
                             throw USER_EXCEPTION(
                                 scidb::SCIDB_SE_INTERNAL,
-                                scidb::SCIDB_LE_INVALID_BUFFER_LENGTH);
+                                scidb::SCIDB_LE_AUTHENTICATION_ERROR)
+                                    << ss.str();
                         }
                     }
 
@@ -649,7 +718,7 @@ ConstChunk const* ClientArray::nextChunk(AttributeID attId, MemChunk& chunk)
     if (chunkDesc->getMessageType() != mtChunk) {
         assert(chunkDesc->getMessageType() == mtError);
 
-        makeExceptionFromErrorMessageAndThrow(chunkDesc);
+        makeExceptionFromErrorMessageAndThrowOnClient(chunkDesc);
     }
 
     std::shared_ptr<scidb_msg::Chunk> chunkMsg = chunkDesc->getRecord<scidb_msg::Chunk>();

@@ -200,7 +200,7 @@ void TypeLibrary::registerBuiltInTypes()
     {
         const builtin& bti = builtins[i];
 
-        Type t(bti.name, bti.bits);
+        Type t(bti.name, static_cast<uint32_t>(bti.bits));
 
         _instance._registerType(t);
         _instance._builtinTypesById [bti.name] = t;
@@ -471,7 +471,10 @@ string Value::Formatter::format(TypeId const& type, Value const& value) const
         if (value.getMissingReason() == 0) {
             ss << _nullRepr;
         } else {
-            ss << '?' << value.getMissingReason();
+            // This needs to be cast to integer so that the character
+            // value will not be output to ss.
+            // e.g. ?34 not ?" (since ASCII 34 is the " character)
+            ss << '?' << static_cast<int>(value.getMissingReason());
         }
     } else if ( TID_DOUBLE == type ) {
         double val = value.get<double>();
@@ -542,7 +545,7 @@ string Value::Formatter::format(TypeId const& type, Value const& value) const
 
         char buf[STRFTIME_BUF_LEN];
         struct tm tm;
-        time_t dt = static_cast<time_t>(value.getDateTime());
+        time_t dt = value.getDateTime();
 
         gmtime_r(&dt, &tm);
         strftime(buf, sizeof(buf), DEFAULT_STRFTIME_FORMAT, &tm);
@@ -881,11 +884,11 @@ double ValueToDouble(const TypeId& type, const Value& value)
     if ( TID_DOUBLE == type ) {
         return value.getDouble();
     } else if ( TID_INT64 == type ) {
-        return value.getInt64();
+        return static_cast<double>(value.getInt64());
     } else if ( TID_INT32 == type ) {
-        return value.getInt32();
+        return static_cast<double>(value.getInt32());
     } else if ( TID_CHAR == type ) {
-        return value.getChar();
+        return static_cast<double>(value.getChar());
     } else if ( TID_STRING == type ) {
         double d;
         int n;
@@ -906,11 +909,11 @@ double ValueToDouble(const TypeId& type, const Value& value)
     } else if ( TID_UINT32 == type ) {
         return value.getUint32();
     } else if ( TID_UINT64 == type ) {
-        return value.getUint64();
+        return static_cast<double>(value.getUint64());
     } else if (( TID_INDICATOR == type ) || ( TID_BOOL == type )) {
         return value.getBool();
     } else if ( TID_DATETIME == type ) {
-        return value.getDateTime();
+        return static_cast<double>(value.getDateTime());
     } else {
         throw SYSTEM_EXCEPTION(SCIDB_SE_TYPE_CONVERSION, SCIDB_LE_TYPE_CONVERSION_ERROR)
             << type << "double";
@@ -1021,6 +1024,8 @@ void Value::fail(int e)
 bool Value::consistent() const
 {
     assert(_code >= -2);                                 // Check status code
+    assert(_code <= std::numeric_limits<int8_t>::max()); // ...carefully
+    // _code must be either -1 or in the range [0, 127]
     assert(implies(large(_size), _data!=0));             // Check data buffer
     assert(implies(_size==0,_data==0 || isTile()));      // Check buffer size
     assert(implies(isTile(),_tile!=0));                  // Check tile pointer

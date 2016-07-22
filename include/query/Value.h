@@ -49,7 +49,8 @@ class Value : boost::equality_comparable<Value>
 public:                   // Supporting Types
     enum    asData_t          {asData};                  // Has actual datum
     enum    asTile_t          {asTile};                  // Has an RLEPayload*
-    typedef uint8_t           reason;                    // Why is it missing?
+    typedef int8_t            reason;                    // Why is it missing?
+    typedef uint32_t          size_type;                 // Max supported size
     class                     Formatter;                 // Forward decl
 
 public:                   // Construction
@@ -84,14 +85,15 @@ public:                   // Operations
             uint16_t          getUint16()          const {return get<uint16_t>();}
             uint32_t          getUint32()          const {return get<uint32_t>();}
             uint64_t          getUint64()          const {return get<uint64_t>();}
-            uint64_t          getDateTime()        const {return get<uint64_t>();}
+            time_t            getDateTime()        const {return get<time_t>();}
+    static_assert(sizeof(time_t) == 8, "DateTime is serialized as a 64 bit number");
             float             getFloat()           const {return get<float>   ();}
             double            getDouble()          const {return get<double>  ();}
-            size_t            size()               const {return _size;}
+            size_type         size()               const {return _size;}
             void*             data()               const;
             RLEPayload*       getTile()            const {assert(_code==MR_TILE);return _tile;}
       const char*             getString()          const;
-            int32_t           getMissingReason()   const;
+            reason            getMissingReason()   const;
 
 public:                   // Output support
             std::string       toString(TypeId const& typeId) const
@@ -220,7 +222,7 @@ private:                  // Representation
 
 private:                  // Representation
             int32_t           _code;                     // >=0 for 'missing'
-            uint32_t          _size;                     // Size of the buffer
+            size_type         _size;                     // Size of the buffer
     union { void*             _data;                     // The data buffer
             RLEPayload*       _tile; };                  // The tile pointer
 };

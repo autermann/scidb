@@ -59,13 +59,13 @@ public:
 				_counter = _nThreads;
 
 				_semThreads.release(_nThreads - 1);
-				_semMainThread.enter(_nThreads - 1);
+				_semMainThread.enter(_nThreads - 1, PTCW_BAR);
 
 				return;
 			}
 		}
 
-		_semThreads.enter();
+		_semThreads.enter(PTCW_BAR);
 		_semMainThread.release();
 	}
 };

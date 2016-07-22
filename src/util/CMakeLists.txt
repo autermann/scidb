@@ -44,6 +44,7 @@ set (util_src
     TsvParser.cpp
     Job.cpp
     JobQueue.cpp
+    PerfTime.cpp
     Semaphore.cpp
     Thread.cpp
     ThreadPool.cpp

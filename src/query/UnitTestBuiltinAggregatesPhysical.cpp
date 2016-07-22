@@ -83,7 +83,8 @@ public:
         vector< std::shared_ptr<ArrayIterator> > arrayIters(array.getArrayDesc().getAttributes(true).size());
         vector< std::shared_ptr<ChunkIterator> > chunkIters(arrayIters.size());
 
-        for (size_t i = 0; i < arrayIters.size(); i++)
+        AttributeID iterSize = safe_static_cast<AttributeID>(arrayIters.size());
+        for (AttributeID i = 0; i < iterSize; i++)
         {
             arrayIters[i] = array.getIterator(i);
 
@@ -327,7 +328,7 @@ public:
         uint8_t  range;
 
         if(min >= max) return;
-        range = max - min;
+        range = safe_static_cast<uint8_t>(max - min);
 
         // Round down entries to 32 bit boundary
         entries = entries / sizeof(uint32_t);
@@ -338,7 +339,7 @@ public:
         uint8_t *dest = rValue.getData<uint8_t>();
         for(n = 0;  n < entries;  n += 4)
         {
-            uint32_t value = ::random();
+            uint32_t value = static_cast<uint32_t>(::random());
             dest[n+0] = static_cast<uint8_t>((value % range) + min);  value >>= 8;
             dest[n+1] = static_cast<uint8_t>((value % range) + min);  value >>= 8;
             dest[n+2] = static_cast<uint8_t>((value % range) + min);  value >>= 8;
@@ -346,7 +347,7 @@ public:
         }
 
         // Fill in stragglers
-        uint32_t value = ::random();
+        uint32_t value = static_cast<uint32_t>(::random());
         entries = rValue.size();
         if(n < entries) { dest[n++] = static_cast<uint8_t>((value % range) + min);  value >>= 8; }
         if(n < entries) { dest[n++] = static_cast<uint8_t>((value % range) + min);  value >>= 8; }

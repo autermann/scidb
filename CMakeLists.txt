@@ -41,6 +41,7 @@ else()
 endif()
 
 project(SciDB C CXX Fortran)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
 file(READ "${CMAKE_SOURCE_DIR}/version" _SCIDB_VERSION)
@@ -68,25 +69,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo) # Default value
 endif(NOT CMAKE_BUILD_TYPE)
 
-find_package(Subversion)
-if (${CMAKE_VERSION} VERSION_GREATER 2.8 OR ${CMAKE_VERSION} VERSION_EQUAL 2.8)
-    find_package(Git)
-endif()
-if(Subversion_SVN_EXECUTABLE)
-    EXECUTE_PROCESS(COMMAND ${Subversion_SVN_EXECUTABLE} info . OUTPUT_VARIABLE Subversion_INFO_OUT
-        ERROR_VARIABLE Subversion_svn_info_error RESULT_VARIABLE Subversion_svn_info_result
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if (Subversion_svn_info_result EQUAL 0)
-        # Get version from SVN working copy by default
-        Subversion_WC_INFO(${CMAKE_SOURCE_DIR} SciDB)
-        set(SCIDB_REVISION "${SciDB_WC_REVISION}")
-        message(STATUS "Reading revision from svn: ${SCIDB_REVISION}")
-        file(WRITE "${CMAKE_BINARY_DIR}/revision" ${SCIDB_REVISION})
-    endif()
-endif()
-if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git/svn/.metadata")
-    # Get version from git-svn working copy
-    execute_process(COMMAND ${GIT_EXECUTABLE} svn find-rev master
+find_package(Git)
+if(GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    # Get revision from git working copy
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-list --abbrev-commit -1 HEAD
         OUTPUT_VARIABLE SCIDB_REVISION
         RESULT_VARIABLE GIT_EXEC_RES
         OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -97,7 +83,7 @@ if(NOT SCIDB_REVISION AND GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git/sv
         MESSAGE(FATAL_ERROR "Can not invoke GIT ${GIT_EXECUTABLE}. Check binary!")
     endif()
 
-    message(STATUS "Reading revision from git-svn: ${SCIDB_REVISION}")
+    message(STATUS "Reading revision from git: ${SCIDB_REVISION}")
 
     file(WRITE "${CMAKE_BINARY_DIR}/revision" ${SCIDB_REVISION})
 endif()
@@ -131,8 +117,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pedantic -W -Wextra -Wall -W
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-system-headers -isystem /opt/local/include/ -isystem /usr/local/include/")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_LIMIT_MACROS")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPROJECT_ROOT=\\\"${CMAKE_SOURCE_DIR}/\\\"")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wconversion")
 
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-DNDEBUG -O3 -fno-omit-frame-pointer -g -ggdb3")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-DNDEBUG -O3 -fno-omit-frame-pointer -g -ggdb3 -Wno-error")
 set(CMAKE_CXX_FLAGS_PROFILE "-O2 -pg -DNDEBUG")
 set(CMAKE_CXX_FLAGS_CC "-fprofile-arcs -ftest-coverage -g -O0 -DCLEAN_EXIT")
 set(CMAKE_CXX_FLAGS_VALGRIND "-g -O0 -DCLEAN_EXIT")
@@ -364,7 +351,7 @@ include_directories("${CMAKE_SOURCE_DIR}/include")
 include_directories("${CMAKE_SOURCE_DIR}/utils")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/src")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/utils")
-include_directories(${Boost_INCLUDE_DIRS})
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(${PROTOBUF_INCLUDE_DIR})
 include_directories(${LOG4CXX_INCLUDE_DIRS})
 include_directories(${LIBPQXX_INCLUDE_DIRS})
@@ -427,6 +414,9 @@ if (CDASH_CONFIG)
   ADD_TEST(P4Install "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/p4/install.sh ${CDASH_CONFIG})
   ADD_TEST(P4Test "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "prepare_run")
   ADD_TEST(P4Result "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "collect_cleanup")
+  ADD_TEST(NamespaceInstall "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/p4/install_namespace.sh ${CDASH_CONFIG})
+  ADD_TEST(NamespaceTest "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "prepare_run")
+  ADD_TEST(NamespaceResult "/bin/bash" ${CMAKE_BINARY_DIR}/cdash2/scidb/harness.sh ${CDASH_CONFIG} "collect_cleanup")
   #
   # TEST INSTALL TIMEOUT
   #
@@ -451,10 +441,13 @@ if (CDASH_CONFIG)
 
   set_tests_properties (ScidbInstall PROPERTIES TIMEOUT ${INSTALL_TIMEOUT})
   set_tests_properties (P4Install PROPERTIES TIMEOUT ${INSTALL_TIMEOUT})
+  set_tests_properties (NamespaceInstall PROPERTIES TIMEOUT ${INSTALL_TIMEOUT})
   set_tests_properties (ScidbTest PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
   set_tests_properties (P4Test PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
+  set_tests_properties (NamespaceTest PROPERTIES TIMEOUT ${HARNESS_TEST_TIMEOUT})
   set_tests_properties (ScidbResult PROPERTIES TIMEOUT ${RESULTS_COLLECTION_TIMEOUT})
   set_tests_properties (P4Result PROPERTIES TIMEOUT ${RESULTS_COLLECTION_TIMEOUT})
+  set_tests_properties (NamespaceResult PROPERTIES TIMEOUT ${RESULTS_COLLECTION_TIMEOUT})
 endif()
 #
 # Custom uninstall target

@@ -27,8 +27,10 @@
  * @author poliocough@gmail.com
  */
 
-#include "query/Operator.h"
 #include "TransposeArray.h"
+
+#include <query/Operator.h>
+#include <query/AutochunkFixer.h>
 
 using namespace std;
 using namespace boost;
@@ -68,23 +70,35 @@ class PhysicalTranspose: public PhysicalOperator
             std::vector<RedistributeContext> const& inputDistributions,
             std::vector< ArrayDesc> const& inputSchemas) const
     {
-        RedistributeContext inputDistro = inputDistributions[0];
+        assertConsistency(inputSchemas[0], inputDistributions[0]);
 
-        if (inputDistro == RedistributeContext(psByRow)) {
-            return RedistributeContext(psByCol);
+        const RedistributeContext& inputDistro = inputDistributions[0];
+
+        if (inputDistro.getPartitioningSchema() == psByRow) {
+            ASSERT_EXCEPTION(_schema.getDistribution()->getPartitioningSchema() == psByCol,
+                             "Invalid array distribution in LogicalTranspose, psByCol expected");
         }
-        else if (inputDistro == RedistributeContext(psByCol)) {
-            return RedistributeContext(psByRow);
+        else if (inputDistro.getPartitioningSchema() == psByCol) {
+            ASSERT_EXCEPTION(_schema.getDistribution()->getPartitioningSchema() == psByRow,
+                             "Invalid array distribution in LogicalTranspose, psByRow expected");
         } else {
             //TODO:OPTAPI mapper
-            return RedistributeContext(psUndefined);
+            ASSERT_EXCEPTION(_schema.getDistribution()->getPartitioningSchema() == psUndefined,
+                             "Invalid array distribution in LogicalTranspose, psUndefined expected");
         }
+
+        ArrayDesc* mySchema = const_cast<ArrayDesc*>(&_schema);
+        mySchema->setResidency(inputDistro.getArrayResidency());
+
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     /**
      * @see PhysicalOperator::getOutputBoundaries
      */
-    virtual PhysicalBoundaries getOutputBoundaries(std::vector<PhysicalBoundaries> const& inputBoundaries, std::vector< ArrayDesc> const& inputSchemas) const
+    virtual PhysicalBoundaries getOutputBoundaries(std::vector<PhysicalBoundaries> const& inputBoundaries,
+                                                   std::vector< ArrayDesc> const& inputSchemas) const
     {
         if (inputBoundaries[0].isEmpty()) {
             return PhysicalBoundaries::createEmpty(_schema.getDimensions().size());
@@ -108,14 +122,27 @@ class PhysicalTranspose: public PhysicalOperator
         return PhysicalBoundaries(newStart, newEnd, inputBoundaries[0].getDensity());
     }
 
+    /// Get the stringified AutochunkFixer so we can fix up the intervals in execute().
+    /// @see LogicalTranspose::getInspectable()
+    void inspectLogicalOp(LogicalOperator const& lop) override
+    {
+        setControlCookie(lop.getInspectable());
+    }
+
     /**
      * @see PhysicalOperator::execute
      */
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
+
+        AutochunkFixer af(getControlCookie());
+        af.fix(_schema, inputArrays);
+
         std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
         std::shared_ptr<CoordinateSet> inputChunkPositions = inputArray->findChunkPositions();
+
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(inputArray->getArrayDesc().getResidency()));
         return make_shared<TransposeArray>(_schema, inputArray, inputChunkPositions, query);
     }
 };

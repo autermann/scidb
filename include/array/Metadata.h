@@ -40,11 +40,14 @@
 #include <set>
 
 #include <boost/operators.hpp>
-#include <boost/serialization/set.hpp>
+#include <boost/serialization/level.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/set.hpp>
 
+#include <array/ArrayDistributionInterface.h>
 #include <array/Coordinate.h>
 #include <query/TypeSystem.h>
+#include <system/Cluster.h>
 
 namespace scidb
 {
@@ -56,6 +59,8 @@ class LogicalOpDesc;
 class ObjectNames;
 class PhysicalOpDesc;
 class Value;
+class ArrayDistribution;
+class ArrayResidency;
 
 /**
  * Vector of AttributeDesc type
@@ -67,19 +72,9 @@ typedef std::vector<AttributeDesc> Attributes;
  */
 typedef std::vector<DimensionDesc> Dimensions;
 
-/**
- * Vector of InstanceDesc type
- */
-typedef std::vector<InstanceDesc> Instances;
-
 typedef std::vector<LogicalOpDesc> LogicalOps;
 
 typedef std::vector<PhysicalOpDesc> PhysicalOps;
-
-/**
- * Instance identifier
- */
-typedef uint64_t InstanceID;
 
 /**
  * Array identifier
@@ -101,152 +96,15 @@ typedef uint64_t VersionID;
  */
 typedef uint32_t AttributeID;
 
-/**
- * Note: this id is used in messages serialized by GPB and be careful with changing this type.
- */
-typedef uint64_t QueryID;
-
 typedef uint64_t OpID;
 
 const VersionID   LAST_VERSION          = (VersionID)-1;
 const VersionID   ALL_VERSIONS          = (VersionID)-2;
-const InstanceID  CLIENT_INSTANCE       = ~0;  // Connection with this instance id is client connection
-const InstanceID  INVALID_INSTANCE      = ~0;  // Invalid instanceID for checking that it's not registered
-const QueryID     INVALID_QUERY_ID      = ~0;
 const ArrayID     INVALID_ARRAY_ID      = ~0;
-const AttributeID INVALID_ATTRIBUTE_ID  = ~0;
+const AttributeID INVALID_ATTRIBUTE_ID  = static_cast<uint32_t>(~0);
 const size_t      INVALID_DIMENSION_ID  = ~0;
 const std::string DEFAULT_EMPTY_TAG_ATTRIBUTE_NAME = "EmptyTag";
 
-/**
- * Partitioning schema shows how an array is distributed among the SciDB instances.
- *
- * Guidelines for introducing a new partitioning schema:
- *   - Add to enum PartitioningSchema (right above psMax).
- *   - Modify the doxygen comments in LogicalSG.cpp.
- *   - Modify redistribute() to handle the new partitioning schema.
- *   - Modify std::ostream& operator<<(std::ostream& stream, const RedistributeContext& dist). (See Operator.cpp)
- *   - If the partitioning schema uses extra data:
- *   -    Modify doesPartitioningSchemaHaveOptionalData.
- *   -    Derive a class from PartitioningSchemaData.
- *   -    When modifying redistribute(), consider the extra data for the new partitioning schema.
- */
-enum PartitioningSchema
-{
-    psUninitialized = -1, // e.g. _ps after ArrayDesc::ArrayDesc()
-    psMIN = 0,
-    psReplication = psMIN,
-    psHashPartitioned,
-    psLocalInstance,
-    psByRow,
-    psByCol,
-    psUndefined,        // a range of meanings, including sometimes "wildcard"
-                        // TODO: replace with psWildcard and others as required
-    psGroupby,
-    psScaLAPACK,
-    // A newly introduced partitioning schema should be added before this line.
-    psEND
-};
-
-/**
- * defaultPartitioning
- *
- * Most of the code was assuming that arrays are scanned and stored in
- * psHashPartitioned Partitioning (currently a category of ArrayDistribution).
- * Therefore there were many "psHashPartitioned" scatter about the code that
- * logically mean "whatever the default PartitioningSchema is".  We are moving on
- * a path toward generalizing what distributions can be stored.  The first attempt
- * will be to extend tempArrays to psReplication, psByRow, and psByCol.  When that
- * is working we will enable it for dbArrays.  Later we will move on to distributions
- * which require additional parameterizations to be stored, such as the 2D
- * ScaLAPACK.
- *
- * As scaffolding for that effort, we are making the "default" PartitioningSchema
- * configurable.  This will allow us to (1) experiment with performance of alternate
- * distributions for certain workflows and (2) start fixing the query compiler/optimizer
- * to insert SGs without assuming that psHashPartitioned is the universal goal.
- *
- * Then we can add a create array parameterization for particular distributions
- * and drive the query tree's output toward that. (e.g. right now, for iterated spgemm,
- * psByRow and psByCol are far more efficient than psHashed)
- *
- * Once this is working for TEMP arrays, we can allow it for general arrays
- *
- * Once this all works correctly via create statements, we will no longer be managing
- * "ps" outside of ArrayDesc's and ArrayDistributions, this function should no longer be referenced
- * and this scaffolding removed.
- */
-inline PartitioningSchema defaultPartitioning()
-{
-    // you MAY NOT change this from psHashPartitioned at this time
-    // this is scaffolding code that is locating all the places where
-    // psHashPartitioned is assumed which need to be generalized.
-    // there are further changes in the optimizer that must be planned first
-    // and then we can decide which PartitioningSchema variable is the
-    // definitive one.  Until then, the code will read "defaultParitioning()"
-    // and the reader should think "psHashPartitioned"
-
-    return psHashPartitioned;
-
-}
-
-/**
- * Whether a partitioning schema has optional data.
- */
-inline bool doesPartitioningSchemaHaveData(PartitioningSchema ps)
-{
-    return ps==psGroupby || ps==psScaLAPACK; // TODO: || ps==psLocalInstance ?
-}
-
-/**
- * Whether an uint32_t is a valid partitioning schema.
- *
- */
-inline bool isValidPartitioningSchema(PartitioningSchema ps, bool allowOptionalData=true)
-{
-    bool isLegalRange = ((psMIN <= ps) && (ps < psEND));
-    if (!isLegalRange)
-    {
-        return false;
-    }
-
-    if (!allowOptionalData && doesPartitioningSchemaHaveData((PartitioningSchema)ps))
-    {
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * The base class for optional data for certain PartitioningSchema.
- */
-class PartitioningSchemaData
-{
-public:
-    virtual ~PartitioningSchemaData() {}
-
-    /**
-     * return which partitioning schema this type of data is for.
-     */
-    virtual PartitioningSchema getID() = 0;
-};
-
-/**
- * The class for the optional data for psGroupby.
- */
-struct PartitioningSchemaDataGroupby : PartitioningSchemaData
-{
-    /**
-     * Whether each dimension is a groupby dim.
-     */
-    std::vector<bool> _arrIsGroupbyDim;
-
-    virtual PartitioningSchema getID()
-    {
-        return psGroupby;
-    }
-};
 
 /**
  * Coordinates mapping mode
@@ -364,95 +222,6 @@ protected:
     std::string _baseName;
 };
 
-/**
- * Syntactic sugar to represent an n-dimensional vector.
- */
-class DimensionVector : boost::equality_comparable<DimensionVector>,
-                        boost::additive<DimensionVector>
-{
-public:
-    /**
-     * Create a zero-length vector in numDims dimensions.
-     * @param[in] numDims number of dimensions
-     */
-    DimensionVector(size_t numDims = 0)
-        : _data(numDims,0)
-    {}
-
-    /**
-     * Create a vector based on values.
-     * @param[in] vector values
-     */
-    DimensionVector(const Coordinates& values)
-        : _data(values)
-    {}
-
-    /**
-     * Check if this is a "NULL" vector.
-     * @return true iff the vector has 0 dimensions.
-     */
-    bool isEmpty() const
-    {
-        return _data.empty();
-    }
-
-    /**
-     * Get the number of dimensions.
-     * @return the number of dimensions
-     */
-    size_t numDimensions() const
-    {
-        return _data.size();
-    }
-
-    Coordinate& operator[] (size_t index)
-    {
-        return isDebug() ? _data.at(index) : _data[index];
-    }
-
-    const Coordinate& operator[] (size_t index) const
-    {
-        return isDebug() ? _data.at(index) : _data[index];
-    }
-
-    DimensionVector& operator+= (const DimensionVector&);
-    DimensionVector& operator-= (const DimensionVector&);
-
-    friend bool operator== (const DimensionVector & a, const DimensionVector & b)
-    {
-        return a._data == b._data;
-    }
-
-    void clear()
-    {
-        _data.clear();
-    }
-
-    operator const Coordinates& () const
-    {
-        return _data;
-    }
-
-    /**
-     * Retrieve a human-readable description.
-     * Append a human-readable description of this onto str. Description takes up
-     * one or more lines. Append indent spacer characters to the beginning of
-     * each line.
-     * @param[out] str buffer to write to
-     * @param[in] indent number of spacer characters to start every line with.
-     */
-    void toString(std::ostringstream &,int indent = 0) const;
-
-    template<class Archive>
-    void serialize(Archive& a,unsigned version)
-    {
-        a & _data;
-    }
-
-private:
-    Coordinates _data;
-};
-
 
 /**
  * Descriptor of array. Used for getting metadata of array from catalog.
@@ -467,7 +236,7 @@ public:
     enum ArrayFlags
     {
         TRANSIENT    = 0x10,    ///< Represented as a MemArray held in the transient array cache: see TransientCache.h for details.
-        INVALID      = 0x20     ///< The array is no longer in a consinstent state and should be removed from the database.
+        INVALID      = 0x20     ///< The array is no longer in a consistent state and should be removed from the database.
     };
 
     /**
@@ -478,14 +247,38 @@ public:
     /**
      * Construct partial array descriptor (without id, for adding to catalog)
      *
-     * @param name array name
+     * @param namespaceName The name of the namespace the array is in
+     * @param arrayName array name
      * @param attributes vector of attributes
      * @param dimensions vector of dimensions
-     * @param ps partitioning schema of this array
+     * @param arrDist array distribution
+     * @param arrRes array residency
      * @param flags array flags from ArrayDesc::ArrayFlags
      */
-    ArrayDesc(const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
-              PartitioningSchema ps, int32_t flags = 0);
+    ArrayDesc(const std::string &namespaceName,
+              const std::string &arrayName,
+              const Attributes& attributes,
+              const Dimensions &dimensions,
+              const ArrayDistPtr& arrDist,
+              const ArrayResPtr& arrRes,
+              int32_t flags = 0);
+
+    /**
+     * Construct partial array descriptor (without id, for adding to catalog)
+     *
+     * @param arrayName array name
+     * @param attributes vector of attributes
+     * @param dimensions vector of dimensions
+     * @param arrDist array distribution
+     * @param arrRes array residency
+     * @param flags array flags from ArrayDesc::ArrayFlags
+     */
+    ArrayDesc(const std::string &arrayName,
+              const Attributes& attributes,
+              const Dimensions &dimensions,
+              const ArrayDistPtr& arrDist,
+              const ArrayResPtr& arrRes,
+              int32_t flags = 0);
 
     /**
      * Construct full descriptor (for returning metadata from catalog)
@@ -493,15 +286,43 @@ public:
      * @param arrId the unique array ID
      * @param uAId the unversioned array ID
      * @param vId the version number
-     * @param name array name
+     * @param namespaceName The name of the namespace the array is in
+     * @param arrayName array name
      * @param attributes vector of attributes
      * @param dimensions vector of dimensions
-     * @param ps partitioning schema of this array
+     * @param arrDist array distribution
+     * @param arrRes array residency
      * @param flags array flags from ArrayDesc::ArrayFlags
      */
     ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
-              const std::string &name, const Attributes& attributes, const Dimensions &dimensions,
-              PartitioningSchema ps, int32_t flags = 0);
+              const std::string &namespaceName,
+              const std::string &arrayName,
+              const Attributes& attributes,
+              const Dimensions &dimensions,
+              const ArrayDistPtr& arrDist,
+              const ArrayResPtr& arrRes,
+              int32_t flags = 0);
+
+    /**
+     * Construct full descriptor (for returning metadata from catalog)
+     *
+     * @param arrId the unique array ID
+     * @param uAId the unversioned array ID
+     * @param vId the version number
+     * @param arrayName array name
+     * @param attributes vector of attributes
+     * @param dimensions vector of dimensions
+     * @param arrDist array distribution
+     * @param arrRes array residency
+     * @param flags array flags from ArrayDesc::ArrayFlags
+     */
+    ArrayDesc(ArrayID arrId, ArrayUAID uAId, VersionID vId,
+              const std::string &arrayName,
+              const Attributes& attributes,
+              const Dimensions &dimensions,
+              const ArrayDistPtr& arrDist,
+              const ArrayResPtr& arrRes,
+              int32_t flags = 0);
 
     /**
      * Copy constructor
@@ -509,6 +330,55 @@ public:
     ArrayDesc(ArrayDesc const& other);
 
    ~ArrayDesc() { }
+
+    /**
+     * Given a fully qualified array name of the form "namespace_name.array_name"
+     * split it into its constituent parts.  If the qualifiedArrayName is not qualified 
+     * then namespaceName will not be modified.
+     *
+     * @param[in] qualifiedArrayName    Potentially qualified array name of the form 
+     *                                  "namespace_name.array_name"
+     * @param[out] namespaceName        If qualifiedArrayName is qualified, 'namespace_name' from 
+     *                                  qualifiedArrayName.  Otherwise, not modified
+     * @param[out] arrayName            'array_name' portion of the fullyQualifiedArrayName
+     */
+    static void splitQualifiedArrayName(
+        const std::string &     qualifiedArrayName,
+        std::string &           namespaceName,
+        std::string &           arrayName);
+
+
+    /**
+     * Given a potentially fully qualified array name of the form "namespace_name.array_name"
+     * retrieve the arrayName portion.
+     *
+     * @param[in] arrayName A potentially fully qualified array name
+     * @return The unqualified portion of the array name
+     */
+    static std::string getUnqualifiedArrayName(
+        const std::string &           arrayName);
+
+    /**
+     * Make a fully qualified array name from a namespace name and an array name
+     * If arrayName is already fully-qualified it is returned without modification
+     * @param namespaceName The name of the namespace to use in the fully-qualified name
+     * @param arrayName The name of the array to use in the fully-qualified name
+     */
+    static std::string makeQualifiedArrayName(
+        const std::string &           namespaceName,
+        const std::string &           arrayName);
+
+    /**
+     * Determine if an array name is qualified or not
+     * @return true qualified, false otherwise
+     */
+    static bool isQualifiedArrayName(
+        const std::string &           arrayName);
+
+    /**
+     * Make a fully qualified array name for this instance of namespaceName and arrayName.
+     */
+    std::string getQualifiedArrayName() const;
 
     /**
      * Assignment operator
@@ -561,16 +431,34 @@ public:
      */
     const std::string& getName() const
     {
-        return _name;
+        return _arrayName;
     }
 
     /**
      * Set name of array
-     * @param name array name
+     * @param arrayName array name
      */
-    void setName(const std::string& name)
+    void setName(const std::string& arrayName)
     {
-        _name = name;
+        _arrayName = arrayName;
+    }
+
+    /**
+     * Get name of the namespace the array belongs to
+     * @return namespace name
+     */
+    const std::string& getNamespaceName() const
+    {
+        return _namespaceName;
+    }
+
+    /**
+     * Set name of namespace the array belongs to
+     * @param namespaceName The namespace name
+     */
+    void setNamespaceName(const std::string& namespaceName)
+    {
+        _namespaceName = namespaceName;
     }
 
     /**
@@ -716,9 +604,16 @@ public:
 
     /**
      * Get position of the chunk for the given coordinates
-     * @param[inout] pos  an element position goes in, a chunk position goes out (not including overlap).
+     * @param[in,out] pos  an element position goes in, a chunk position goes out (not including overlap).
      */
     void getChunkPositionFor(Coordinates& pos) const;
+
+    /**
+     * Get position of the chunk for the given coordinates from a supplied Dimensions vector
+     * @param[in] dims     dimensions to use in computing a chunk position from an element position
+     * @param[in,out] pos  an element position goes in, a chunk position goes out (not including overlap).
+     */
+    static void getChunkPositionFor(Dimensions const& dims, Coordinates& pos);
 
     /**
      * @return whether a given position is a chunk position.
@@ -781,6 +676,11 @@ public:
     bool hasOverlap() const;
 
     /**
+     * Checks if any dimension has an unspecified (autochunked) chunk interval.
+     */
+    bool isAutochunked() const;
+
+    /**
      * Return true if the array is marked as being 'transient'. See proposal
      * 'TransientArrays' for more details.
      */
@@ -817,26 +717,11 @@ public:
     }
 
     /**
-     * Get partitioning schema
-     */
-    PartitioningSchema getPartitioningSchema() const
-    {
-        assert(isPermitted(_ps)); // prevent psUninitialized from leaking
-        return _ps;
-    }
-
-    /**
-     * Set partitioning schema
-     */
-    void setPartitioningSchema(PartitioningSchema ps)
-    {
-        assert(isPermitted(ps)); // prevent psUninitialized from leaking
-       _ps = ps;
-    }
-
-    /**
      * Add alias to all objects of schema
-     *
+     * tigor: Whenever the AFL/AQL keyword 'as ABC',
+     * tigor: ABC is attached to all? the names of the metadata as aliases.
+     * tigor: The algorith for assigning aliases is not formal/consistent
+     * tigor: (e.i. propagation through a binary op) and mostly works as implemented.
      * @param alias alias name
      */
     void addAlias(const std::string &alias);
@@ -853,15 +738,73 @@ public:
         ar & _arrId;
         ar & _uAId;
         ar & _versionId;
-        ar & _name;
+        ar & _namespaceName;  // Note:  deal with backwards compatability of the save format
+        ar & _arrayName;
         ar & _attributes;
         ar & _dimensions;
         ar & _flags;
-        ar & _ps;
+
+        // XXX TODO: improve serialization of residency and distribution
+        // XXX TODO: the default residency does not need to be sent out ? it is the liveness set.
+
+        PartitioningSchema ps;
+        std::string psCtx;
+        size_t redundancy;
+        size_t instanceShift;
+        Coordinates offset;
+        std::vector<InstanceID> residency;
+
+        // serialize distribution + residency
 
         if (Archive::is_loading::value)
         {
+            // de-serializing data
+            ar & ps;
+            ar & psCtx;
+            ar & redundancy;
+            ar & instanceShift;
+            ar & offset;
+            ar & residency;
+
+            SCIDB_ASSERT(!_residency);
+            SCIDB_ASSERT(!_distribution);
+
+            std::shared_ptr<CoordinateTranslator> translator =
+               ArrayDistributionFactory::createOffsetTranslator(offset);
+
+            ASSERT_EXCEPTION(instanceShift < residency.size(),
+                             "Serialized distribution instance shift is "
+                             "greater than residency size");
+
+            _distribution = ArrayDistributionFactory::getInstance()->construct(ps,
+                                                                               redundancy,
+                                                                               psCtx,
+                                                                               translator,
+                                                                               instanceShift);
+            ASSERT_EXCEPTION(_distribution,
+                             "Serialized array descriptor has no distribution");
+
+            _residency = createDefaultResidency(PointerRange<InstanceID>(residency));
+
             locateBitmapAttribute();
+
+        } else {
+            // serializing data
+            ps = _distribution->getPartitioningSchema();
+            psCtx = _distribution->getContext();
+            redundancy = _distribution->getRedundancy();
+            ArrayDistributionFactory::getTranslationInfo(_distribution.get(), offset, instanceShift);
+
+            residency.reserve(_residency->size());
+            for (size_t i=0; i < _residency->size(); ++i) {
+                residency.push_back(_residency->getPhysicalInstanceAt(i));
+            }
+            ar & ps;
+            ar & psCtx;
+            ar & redundancy;
+            ar & instanceShift;
+            ar & offset;
+            ar & residency;
         }
     }
 
@@ -886,13 +829,17 @@ public:
      * @param srcDesc source array schema
      * @param dstDesc target array schema
      * @param options bit mask of options to toggle certain conformity checks
-     * @param ignorePs wether to ignore the PartitioningSchema; true by default
      */
     static void checkConformity(ArrayDesc const& srcDesc, ArrayDesc const& dstDesc, unsigned options = 0);
 
+    /**
+     * Check if all dimension names and attribute names are unique.
+     */
+    bool areNamesUnique() const;
+
     /** Option flags for use with checkConformity() */
     enum ConformityOptions {
-        IGNORE_PSCHEME  = 0x01, /**< Partitioning schemes need not match */
+        IGNORE_PSCHEME  = 0x01, /**< Array distributions and residencies need not match */
         IGNORE_OVERLAP  = 0x02, /**< Chunk overlaps need not match */
         IGNORE_INTERVAL = 0x04, /**< Chunk intervals need not match */
         SHORT_OK_IF_EBM = 0x08  /**< Src dim can be shorter if src array has empty bitmap */
@@ -910,7 +857,7 @@ public:
      *
      *  @code
      *              sameSchema(
-     *                  schmaInstance,
+     *                  schemaInstance,
      *                  SchemaFieldSelector()
      *                      .startMin(true)
      *                      .endMax(true));
@@ -957,18 +904,18 @@ public:
     };
 
     /**
-     * Determine whether two arrays have the same schema filtered by a field selector
+     * Determine whether two schemas are equivalent, based on a field selector
      * @returns true IFF the selected fields within the schema match
      * @throws internal error if dimension sizes do not match.
      */
     bool sameSchema(ArrayDesc const& other, SchemaFieldSelector const &sel) const;
 
     /**
-     * Determine whether two arrays have the same schema (non-filtered)
+     * Determine whether two schemas have the same dimension parameters
      * @returns true IFF the schemas match
      * @throws internal error if dimension sizes do not match.
      */
-    bool sameSchema(ArrayDesc const& other) const
+    bool sameShape(ArrayDesc const& other) const
     {
         return sameSchema(other,
             SchemaFieldSelector()
@@ -996,7 +943,7 @@ public:
      * @returns true IFF all dimensions have same startMin and endMax
      * @throws internal error if dimension sizes do not match.
      */
-    bool sameDimensions(ArrayDesc const& other) const
+    bool sameDimensionRanges(ArrayDesc const& other) const
     {
         return sameSchema(other,
             SchemaFieldSelector()
@@ -1006,15 +953,16 @@ public:
 
     void replaceDimensionValues(ArrayDesc const& other);
 
+    //XXX TODO: we should globally replace getDistribution()->getPartitioningSchema() with getDistributionCode()
+    ArrayDistPtr getDistribution() const { SCIDB_ASSERT(_distribution); return _distribution; }
+    void setDistribution(ArrayDistPtr const& dist) { SCIDB_ASSERT(dist); _distribution=dist; }
+
+    ArrayResPtr getResidency() const { SCIDB_ASSERT(_residency); return _residency; }
+    void setResidency(ArrayResPtr const& res) { SCIDB_ASSERT(res); _residency=res; }
+
 private:
     void locateBitmapAttribute();
     void initializeDimensions();
-
-    /**
-     * @parm ps the PS the inquiry concerns
-     * @return true or false
-     */
-    bool isPermitted(PartitioningSchema ps) const ;
 
     /**
      * The Versioned Array Identifier - unique ID for every different version of a named array.
@@ -1036,13 +984,17 @@ private:
      */
     VersionID _versionId;
 
-    std::string _name;
+    std::string _namespaceName;
+    std::string _arrayName;
     Attributes _attributes;
     Attributes _attributesWithoutBitmap;
     Dimensions _dimensions;
     AttributeDesc* _bitmapAttr;
     int32_t _flags;
-    PartitioningSchema _ps;
+    /// Method for distributing chunks across instances
+    ArrayDistPtr _distribution;
+    /// Instance over which array chunks are distributed
+    ArrayResPtr _residency;
 };
 
 /**
@@ -1061,7 +1013,7 @@ public:
      * Construct empty attribute descriptor (for receiving metadata)
      */
     AttributeDesc();
-    virtual ~AttributeDesc() {}
+    ~AttributeDesc() {}         // value class, non-virtual d'tor
 
     /**
      * Construct full attribute descriptor
@@ -1165,7 +1117,7 @@ public:
     bool isEmptyIndicator() const;
 
     /**
-     * Get default compression method for this attribute: it is possible to specify explictely different
+     * Get default compression method for this attribute: it is possible to specify explicitly different
      * compression methods for each chunk, but by default one returned by this method is used
      */
     uint16_t getDefaultCompressionMethod() const;
@@ -1179,7 +1131,7 @@ public:
      * Get attribute flags
      * @return attribute flags
      */
-    int getFlags() const;
+    int16_t getFlags() const;
 
     /**
      * Return type size or var size (in bytes) or 0 for truly variable size.
@@ -1196,10 +1148,10 @@ public:
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * @param[out] output stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream&,int indent = 0) const;
+    void toString (std::ostream&, int indent = 0) const;
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -1253,11 +1205,21 @@ class DimensionDesc : public ObjectNames, boost::equality_comparable<DimensionDe
 {
 public:
     /**
+     * Special (non-positive) chunk interval values.
+     */
+    enum SpecialIntervals {
+        UNINITIALIZED = 0,      //< chunkInterval value not yet initialized.
+        AUTOCHUNKED   = -1,     //< chunkInterval will (eventually) be automatically computed.
+        PASSTHRU      = -2,     //< redimension uses chunkInterval from another corresponding input dimension
+        LAST_SPECIAL = -3,     // All enums must be greater than this. This MUST be the last.
+    };
+
+    /**
      * Construct empty dimension descriptor (for receiving metadata)
      */
     DimensionDesc();
 
-    virtual ~DimensionDesc() {}
+    virtual ~DimensionDesc() final {} // value class; no more subclassing
 
     /**
      * Construct full descriptor (for returning metadata from catalog)
@@ -1320,7 +1282,6 @@ public:
 
     bool operator == (DimensionDesc const&) const;
 
-
     /**
      * @brief replace the values, excluding the name, with those from another descriptor
      */
@@ -1329,7 +1290,7 @@ public:
         setStartMin(other.getStartMin());
         setEndMax(other.getEndMax());
 
-        setChunkInterval(other.getChunkInterval());
+        setRawChunkInterval(other.getRawChunkInterval());
         setChunkOverlap(other.getChunkOverlap());
 
         setCurrStart(other.getCurrStart());
@@ -1401,16 +1362,95 @@ public:
     uint64_t getCurrLength() const;
 
     /**
+     * Get the chunk interval (during query execution)
+     *
      * @return the chunk interval in this dimension, not including overlap.
+     * @throws ASSERT_EXCEPTION if interval is unspecified (aka autochunked)
+     * @see getRawChunkInterval
+     * @see https://trac.scidb.net/wiki/Development/components/Rearrange_Ops/RedimWithAutoChunkingFS
+     *
+     * @description
+     * Ordinarily #getChunkInterval() would be a simple accessor, but due to autochunking, chunk
+     * intervals may not be knowable until actual query execution.  Specifically, operators must be
+     * prepared to handle unknown chunk intervals right up until the inputArrays[] are received by
+     * their PhysicalFoo::execute() method.  The input arrays are guaranteed to have fully resolved
+     * chunk intervals, so it is safe to #getChunkInterval() in execute() methods and in the Array
+     * subclass objects that they build.
+     *
+     * @p At all other times (parsing, schema inference, optimization, maybe elsewhere), code most
+     * be prepared to Do The Right Thing(tm) when it encounters a DimensionDesc::AUTOCHUNKED chunk
+     * interval.  Specifically, code must either call #getRawChunkInterval() and take appropriate
+     * action if the return value is AUTOCHUNKED, or else guard calls to #getChunkInterval() by
+     * first testing the #DimensionDesc::isAutochunked() predicate.  What a particular operator does
+     * for autochunked dimensions depends on the operator.  Many operators merely need to propragate
+     * the autochunked interval up the inferSchema() tree using getRawChunkInterval(), but other
+     * code may require more thought.
+     *
+     * @p There was no #getRawChunkInterval() before autochunking, so by placing an ASSERT_EXCEPTION
+     * in this "legacy" #getChunkInterval() method we intend to catch all the places in the code
+     * that need to change (hopefully during development rather than during QA).
+     *
+     * @note Only redimension() and repart() may have autochunked *schema parameters*, all other
+     *       operators must disallow that---either by using #getRawChunkInterval() or by testing
+     *       with isAutochunked(), and possibly throwing SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED.
+     *       Autochunked input schemas (as opposed to parameter schemas) are permitted everywhere in
+     *       the logical plan, and their intervals should be propagated up the query tree with
+     *       #getRawChunkInterval().  If an operator has particular constraints on input chunk
+     *       intervals (as gemm() and svd() do), it should @i try to make the checks at logical
+     *       inferSchema() time, but if it cannot because one or more intervals are unspecified, it
+     *       @b must do the checks at physical execute() time, when all unknown autochunked
+     *       intervals will have been resolved.  During query execution it's safe to call
+     *       #getChunkInterval() without any checking.
      */
     int64_t getChunkInterval() const
+    {
+        ASSERT_EXCEPTION(isIntervalResolved(), "Caller not yet modified for autochunking.");
+        return _chunkInterval;
+    }
+
+    /**
+     * Get the possibly-not-yet-specified chunk interval (during query planning)
+     *
+     * @return the raw chunk interval in this dimension (not including overlap), or AUTOCHUNKED.
+     * @see getChunkInterval
+     * @note Callers that are autochunk-aware should call this version rather
+     *       than getChunkInterval().  Other callers would presumably not be
+     *       prepared for a return value of AUTOCHUNKED.
+     */
+    int64_t getRawChunkInterval() const
     {
         return _chunkInterval;
     }
 
     /**
+     * @return the chunk interval in this dimension, or useMe if the interval is autochunked.
+     */
+    int64_t getChunkIntervalIfAutoUse(int64_t useMe) const
+    {
+        return _chunkInterval == AUTOCHUNKED ? useMe : _chunkInterval;
+    }
+
+    /**
+     * @return true iff interval in this dimension is autochunked.
+     */
+    bool isAutochunked() const
+    {
+        return _chunkInterval == AUTOCHUNKED;
+    }
+
+    bool isIntervalResolved() const
+    {
+        SCIDB_ASSERT(_chunkInterval > LAST_SPECIAL);
+        // UNINITIALIZED counts as "resolved" because there is no other value
+        // that is going to 'magically' replace it, whereas, these two will be
+        // replaced at execution time.
+        return _chunkInterval != AUTOCHUNKED && _chunkInterval != PASSTHRU;
+    }
+
+    /**
      * @return chunk overlap in this dimension.
-     * @note Given base coordinate Xi, a chunk stores data with coordinates in [Xi-getChunkOverlap(), Xi+getChunkInterval()+getChunkOverlap()].
+     * @note Given base coordinate Xi, a chunk stores data with coordinates in
+     *       [Xi-getChunkOverlap(), Xi+getChunkInterval()+getChunkOverlap()].
      */
     int64_t getChunkOverlap() const
     {
@@ -1422,10 +1462,10 @@ public:
      * Append a human-readable description of this onto str. Description takes up
      * one or more lines. Append indent spacer characters to the beginning of
      * each line. Call toString on interesting children. Terminate with newline.
-     * @param[out] str buffer to write to
+     * @param[out] os output stream to write to
      * @param[in] indent number of spacer characters to start every line with.
      */
-    virtual void toString (std::ostringstream&,int indent = 0) const;
+    void toString (std::ostream&, int indent = 0) const;
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version)
@@ -1461,15 +1501,19 @@ public:
 
     void setChunkInterval(int64_t i)
     {
-        assert(i >= 1);
+        assert(i > 0);
+        _chunkInterval = i;
+    }
 
+    void setRawChunkInterval(int64_t i)
+    {
+        assert(i > 0 || i == AUTOCHUNKED || i == PASSTHRU);
         _chunkInterval = i;
     }
 
     void setChunkOverlap(int64_t i)
     {
         assert(i >= 0);
-
         _chunkOverlap = i;
     }
 
@@ -1488,8 +1532,9 @@ private:
     /**
      * The length of the chunk along this dimension, excluding overlap.
      *
-     * Chunk Interval is often used as part of coordinate math and coordinates are signed int64. To make life easier
-     * for everyone, chunk interval is also signed for the moment. Same with position_t in RLE.h.
+     * Chunk Interval is often used as part of coordinate math and coordinates are signed int64. To
+     * make life easier for everyone, chunk interval is also signed for the moment. Same with
+     * position_t in RLE.h.
      */
     int64_t _chunkInterval;
 
@@ -1500,91 +1545,6 @@ private:
     int64_t _chunkOverlap;
 
     ArrayDesc* _array;
-};
-
-/**
- * Descriptor of instance
- */
-class InstanceDesc
-{
-public:
-    /**
-     * Construct empty instance descriptor (for receiving metadata)
-     */
-    InstanceDesc();
-
-    /**
-     * Construct partial instance descriptor (without id, for adding to catalog)
-     *
-     * @param host ip or hostname where instance running
-     * @param port listening port
-     * @param path to the binary
-     */
-    InstanceDesc(const std::string &host, uint16_t port, const std::string &path);
-
-    /**
-     * Construct full instance descriptor
-     *
-     * @param instance_id instance identifier
-     * @param host ip or hostname where instance running
-     * @param port listening port
-     * @param online instance status (online or offline)
-     */
-    InstanceDesc(uint64_t instance_id, const std::string &host,
-                 uint16_t port,
-                 uint64_t onlineTs,
-                 const std::string &path);
-
-    /**
-     * Get instance identifier
-     * @return instance identifier
-     */
-    uint64_t getInstanceId() const
-    {
-        return _instance_id;
-    }
-
-    /**
-     * Get instance hostname or ip
-     * @return instance host
-     */
-    const std::string& getHost() const
-    {
-        return _host;
-    }
-
-    /**
-     * Get instance listening port number
-     * @return port number
-     */
-    uint16_t getPort() const
-    {
-        return _port;
-    }
-
-    /**
-     * @return time when the instance marked itself online
-     */
-    uint64_t getOnlineSince() const
-    {
-        return _online;
-    }
-
-    /**
-     * Get instance binary path
-     * @return path to the instance's binary
-     */
-    const std::string& getPath() const
-    {
-        return _path;
-    }
-
-private:
-    uint64_t    _instance_id;
-    std::string _host;
-    uint16_t    _port;
-    uint64_t    _online;
-    std::string _path;
 };
 
 /**
@@ -1606,7 +1566,9 @@ public:
      * @param module Operator module
      * @param entry Operator entry in module
      */
-    LogicalOpDesc(const std::string& name, const std::string& module, const std::string& entry) :
+    LogicalOpDesc(const std::string& name,
+                  const std::string& module,
+                  const std::string& entry) :
         _name(name),
         _module(module),
         _entry(entry)
@@ -1703,7 +1665,8 @@ public:
      * @return
      */
     PhysicalOpDesc(OpID physicalOpId, const std::string& logicalOpName,
-                const std::string& name, const std::string& module, const std::string& entry) :
+                   const std::string& name, const std::string& module,
+                   const std::string& entry) :
         _physicalOpId(physicalOpId),
         _logicalOpName(logicalOpName),
         _name(name),
@@ -1830,7 +1793,11 @@ inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
 {
     //XXX: This does not check to see if some other attribute does not already have the same name
     //     and it would be faster to mutate the structure, not copy. See also ArrayDesc::addAttribute
-    return ArrayDesc(desc.getName(), addEmptyTagAttribute(desc.getAttributes()), desc.getDimensions(), desc.getPartitioningSchema());
+    return ArrayDesc(desc.getName(),
+                     addEmptyTagAttribute(desc.getAttributes()),
+                     desc.getDimensions(),
+                     desc.getDistribution(),
+                     desc.getResidency());
 }
 
 /**
@@ -1840,7 +1807,9 @@ inline ArrayDesc addEmptyTagAttribute(ArrayDesc const& desc)
  * @param[in]  withOverlap   Whether overlap is respected.
  * @return the first chunk position
  */
-inline Coordinates computeFirstChunkPosition(Coordinates const& chunkPos, Dimensions const& dims, bool withOverlap = true)
+inline Coordinates computeFirstChunkPosition(Coordinates const& chunkPos,
+                                             Dimensions const& dims,
+                                             bool withOverlap = true)
 {
     assert(chunkPos.size() == dims.size());
     if (!withOverlap) {
@@ -1867,7 +1836,9 @@ inline Coordinates computeFirstChunkPosition(Coordinates const& chunkPos, Dimens
  * @param[in]  withOverlap   Whether overlap is respected.
  * @return the last chunk position
  */
-inline Coordinates computeLastChunkPosition(Coordinates const& chunkPos, Dimensions const& dims, bool withOverlap = true)
+inline Coordinates computeLastChunkPosition(Coordinates const& chunkPos,
+                                            Dimensions const& dims,
+                                            bool withOverlap = true)
 {
     assert(chunkPos.size() == dims.size());
 
@@ -1903,7 +1874,9 @@ size_t getChunkNumberOfElements(Coordinates const& low, Coordinates const& high)
  * @param[in]  withOverlap   Whether overlap is respected.
  * @return     #cells in the space the cell covers
  */
-inline size_t getChunkNumberOfElements(Coordinates const& chunkPos, Dimensions const& dims, bool withOverlap = true)
+inline size_t getChunkNumberOfElements(Coordinates const& chunkPos,
+                                       Dimensions const& dims,
+                                       bool withOverlap = true)
 {
     Coordinates lo(computeFirstChunkPosition(chunkPos,dims,withOverlap));
     Coordinates hi(computeLastChunkPosition (chunkPos,dims,withOverlap));
@@ -1916,7 +1889,7 @@ inline size_t getChunkNumberOfElements(Coordinates const& chunkPos, Dimensions c
  */
 void printDimNames(std::ostream&, const Dimensions&);
 void printSchema(std::ostream&,const Dimensions&);
-void printSchema(std::ostream&,const DimensionDesc&);
+void printSchema(std::ostream&,const DimensionDesc&,bool verbose=false);
 void printSchema(std::ostream&,const ArrayDesc&);
 void printNames (std::ostream&,const ObjectNames::NamesType&);
 std::ostream& operator<<(std::ostream&,const Attributes&);
@@ -1924,7 +1897,6 @@ std::ostream& operator<<(std::ostream&,const ArrayDesc&);
 std::ostream& operator<<(std::ostream&,const AttributeDesc&);
 std::ostream& operator<<(std::ostream&,const DimensionDesc&);
 std::ostream& operator<<(std::ostream&,const Dimensions&);
-std::ostream& operator<<(std::ostream&,const InstanceDesc&);
 std::ostream& operator<<(std::ostream&,const ObjectNames::NamesType&);
 
 } // namespace

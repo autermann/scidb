@@ -31,13 +31,12 @@ save(t4128_b, '/tmp/t4128_b.scidb')
 # We do not check vs. the original CSV input file because we know it
 # did not use the same CSV dialect as we now use on output.
 --echo Save as CSV, reload as CSV, resave, check for diffs.
-save(t4128_a, '/tmp/t4128n.csv', -2, 'csv')
---shell --command "sed 1d /tmp/t4128n.csv > /tmp/t4128.csv"
+save(t4128_a, '/tmp/t4128.csv', -2, 'csv')
 load(t4128_b, '/tmp/t4128.csv', -2, 'csv')
 save(t4128_b, '/tmp/t4128_b.csv', -2, 'csv')
 --echo Final CSV output:
 --shell --store --command "cat /tmp/t4128_b.csv"
---shell --store --command "diff /tmp/t4128n.csv /tmp/t4128_b.csv"
+--shell --store --command "diff /tmp/t4128.csv /tmp/t4128_b.csv"
 
 # We need to use a shadow array here because of an apparent bug in GNU libcsv.
 # When a double-quote is quoted at the end of a double-quoted field, there's
@@ -45,20 +44,18 @@ save(t4128_b, '/tmp/t4128_b.csv', -2, 'csv')
 # Hopefully this won't occur in practice... we memorialize the bad behavior
 # here in this test so that if it ever breaks, perhaps the real bug is fixed!
 --echo Same test but with double quoting (exhibits libcsv bug):
-save(t4128_a, '/tmp/t4128n.csv', -2, 'csv:d')
---shell --command "sed 1d /tmp/t4128n.csv > /tmp/t4128.csv"
+save(t4128_a, '/tmp/t4128.csv', -2, 'csv:d')
 load(t4128_b, '/tmp/t4128.csv', -2, 'csv:d', 100, t4128_b_shadow)
 save(t4128_b, '/tmp/t4128_b.csv', -2, 'csv:d')
 --echo Final CSV-with-double-quotes output:
 --shell --store --command "cat /tmp/t4128_b.csv"
---shell --store --command "diff /tmp/t4128n.csv /tmp/t4128_b.csv || true"
+--shell --store --command "diff /tmp/t4128.csv /tmp/t4128_b.csv || true"
 --stop-igdata
 scan(t4128_b_shadow)
 --start-igdata
 
 --echo Same test but using TSV.
-save(t4128_a, '/tmp/t4128n.tsv', -2, 'tsv')
---shell --command "sed 1d /tmp/t4128n.tsv > /tmp/t4128.tsv"
+save(t4128_a, '/tmp/t4128.tsv', -2, 'tsv')
 load(t4128_b, '/tmp/t4128.tsv', -2, 'tsv')
 save(t4128_b, '/tmp/t4128_b.tsv', -2, 'tsv')
 --echo Final TSV output (with pipes):

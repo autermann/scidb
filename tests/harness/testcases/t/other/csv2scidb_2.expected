@@ -101,30 +101,30 @@ SCIDB QUERY : <load ( Raw_CSVLoad_2, '/tmp/csv2scidb_test_2.load', -2, 'tsv' )>
 
 SCIDB QUERY : <load ( Raw_CSVLoad_3, '/tmp/csv2scidb_test_3.load', -2, 'csv' )>
 {Line} Probe_ID,Platform_ID,Entrez_Gene_ID,Symbol,Synonyms,Description,TaxOn_ID,Count_Gene,Count_RefSeq,Unique_to_Gene,Unique_to_Genome,Unique_to_RefSeq
-{0} '213828_x_at','HG_U133_Plus_2',100133109,'','','',9606,10,15,false,false,false
-{1} '213826_s_at','HG_U133_Plus_2',100133109,'','','',9606,9,14,false,false,false
-{2} '210040_at','HG_U133_Plus_2',100288047,'','','',9606,3,5,false,false,false
-{3} '209262_s_at','HG_U133_Plus_2',100291887,'','','',9606,3,4,false,true,false
-{4} '213354_s_at','HG_U133_Plus_2',100291887,'','','',9606,3,4,false,false,false
-{5} '203735_x_at','HG_U133_Plus_2',100290488,'','','',9606,28,36,false,false,false
-{6} '229179_at','HG_U133_Plus_2',100288901,'','','',9606,2,4,false,false,false
-{7} '230554_at','HG_U133_Plus_2',100291873,'','','',9606,2,3,false,false,false
-{8} '214069_at','HG_U133_Plus_2',100291873,'','','',9606,3,5,false,false,false
+{0} '213828_x_at','HG_U133_Plus_2',100133109,null,null,null,9606,10,15,false,false,false
+{1} '213826_s_at','HG_U133_Plus_2',100133109,null,null,null,9606,9,14,false,false,false
+{2} '210040_at','HG_U133_Plus_2',100288047,null,null,null,9606,3,5,false,false,false
+{3} '209262_s_at','HG_U133_Plus_2',100291887,null,null,null,9606,3,4,false,true,false
+{4} '213354_s_at','HG_U133_Plus_2',100291887,null,null,null,9606,3,4,false,false,false
+{5} '203735_x_at','HG_U133_Plus_2',100290488,null,null,null,9606,28,36,false,false,false
+{6} '229179_at','HG_U133_Plus_2',100288901,null,null,null,9606,2,4,false,false,false
+{7} '230554_at','HG_U133_Plus_2',100291873,null,null,null,9606,2,3,false,false,false
+{8} '214069_at','HG_U133_Plus_2',100291873,null,null,null,9606,3,5,false,false,false
 
 SCIDB QUERY : <load ( Raw_CSVLoad_4, '/tmp/csv2scidb_test_4.load', -2, 'csv' )>
 [Query was executed successfully, ignoring data output by this query.]
 
 SCIDB QUERY : <subarray (Raw_CSVLoad_4, 0,100)>
 {Line} Probe_ID,Platform_ID,Entrez_Gene_ID,Symbol,Synonyms,Description,TaxOn_ID,Count_Gene,Count_RefSeq,Unique_to_Gene,Unique_to_Genome,Unique_to_RefSeq
-{0} '213828_x_at','HG_U133_Plus_2',100133109,'','','',9606,10,15,false,false,false
-{1} '213826_s_at','HG_U133_Plus_2',100133109,'','','',9606,9,14,false,false,false
-{2} '210040_at','HG_U133_Plus_2',100288047,'','','',9606,3,5,false,false,false
-{3} '209262_s_at','HG_U133_Plus_2',100291887,'','','',9606,3,4,false,true,false
-{4} '213354_s_at','HG_U133_Plus_2',100291887,'','','',9606,3,4,false,false,false
-{5} '203735_x_at','HG_U133_Plus_2',100290488,'','','',9606,28,36,false,false,false
-{6} '229179_at','HG_U133_Plus_2',100288901,'','','',9606,2,4,false,false,false
-{7} '230554_at','HG_U133_Plus_2',100291873,'','','',9606,2,3,false,false,false
-{8} '214069_at','HG_U133_Plus_2',100291873,'','','',9606,3,5,false,false,false
+{0} '213828_x_at','HG_U133_Plus_2',100133109,null,null,null,9606,10,15,false,false,false
+{1} '213826_s_at','HG_U133_Plus_2',100133109,null,null,null,9606,9,14,false,false,false
+{2} '210040_at','HG_U133_Plus_2',100288047,null,null,null,9606,3,5,false,false,false
+{3} '209262_s_at','HG_U133_Plus_2',100291887,null,null,null,9606,3,4,false,true,false
+{4} '213354_s_at','HG_U133_Plus_2',100291887,null,null,null,9606,3,4,false,false,false
+{5} '203735_x_at','HG_U133_Plus_2',100290488,null,null,null,9606,28,36,false,false,false
+{6} '229179_at','HG_U133_Plus_2',100288901,null,null,null,9606,2,4,false,false,false
+{7} '230554_at','HG_U133_Plus_2',100291873,null,null,null,9606,2,3,false,false,false
+{8} '214069_at','HG_U133_Plus_2',100291873,null,null,null,9606,3,5,false,false,false
 
 SCIDB QUERY : <show ( Raw_CSVLoad_4 )>
 {i} schema

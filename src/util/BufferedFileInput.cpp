@@ -140,7 +140,7 @@ bool BufferedFileInput::initialize()
 void BufferedFileInput::FillBufferJob::run()
 {
     // i is the buffer ID to fill
-    short i = 0;
+    int i = 0;
 
     // prepare ErrorChecker for Event.wait() in the while loop
     Event::ErrorChecker ec = bind(&queryAndScannerValid, _query, _pState);
@@ -171,7 +171,7 @@ void BufferedFileInput::FillBufferJob::run()
 
         // fill the buffer
         theBuffer._loaded = true;
-        theBuffer._sizeTotal = ::fread(theBuffer._buffer.get(), 1, _bufferSize, _f);
+        theBuffer._sizeTotal = scidb::fread_unlocked(theBuffer._buffer.get(), 1, _bufferSize, _f);
         theBuffer._index = 0;
         if (theBuffer._sizeTotal < _bufferSize) {
             // EOF or error.

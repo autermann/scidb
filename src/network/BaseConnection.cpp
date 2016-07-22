@@ -167,7 +167,7 @@ MessageDesc::init(MessageID messageType)
     _messageHeader.setRecordSize( 0 );
     _messageHeader.setBinarySize( 0 );
     _messageHeader.setMessageType( static_cast<uint16_t>(messageType) );
-    _messageHeader.setQueryID( 0 );
+    _messageHeader.setQueryID(INVALID_QUERY_ID);
 
     if (messageType != mtNone) {
         _record = createRecordByType(messageType);
@@ -400,7 +400,7 @@ BaseConnection::~BaseConnection()
     disconnect();
 }
 
-void BaseConnection::connect(string address, uint16_t port)
+void BaseConnection::connect(string address, uint32_t port)
 {
    LOG4CXX_DEBUG(logger, "Connecting to " << address << ":" << port)
 

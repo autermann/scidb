@@ -4,7 +4,8 @@
 # Testing arrays with multiple versions
 
 load_library('misc')
-store (build (<v : int64> [I=0:3,1,0], I), NODE_ID)
+
+--igdata "store (build (<v : int64> [I=0:127,1,0], I), NODE_ID)"
 
 create array INH_UINT32 <X:uint32> [chromid=1:5,1,0,pos=1:25000,2500,0,id=1:43,43,0]
 create array INH_CH <ref:char>     [chromid=1:5,1,0,pos=1:25000,2500,0,id=1:43,43,0]
@@ -12,10 +13,7 @@ create array INH_DOUBLE <X:double> [chromid=1:5,1,0,pos=1:25000,2500,0,id=1:43,4
 
 --test
 #limit virtual memory size to 2GB
-apply(NODE_ID, foo, setMemCap (0, 2*1024*1024*1024))
-apply(NODE_ID, foo, setMemCap (1, 2*1024*1024*1024))
-apply(NODE_ID, foo, setMemCap (2, 2*1024*1024*1024))
-apply(NODE_ID, foo, setMemCap (3, 2*1024*1024*1024))
+aggregate(filter(apply(NODE_ID, foo, setMemCap (instanceid(), 2*1024*1024*1024)), foo=-1), count(*))
 
 --start-igdata
 
@@ -41,10 +39,7 @@ aggregate(filter(join(INHXXX_2 as left, INHXXX@2 as right), left.X<>right.X or l
 
 --cleanup
 #un-limit virtual memory size
-apply(NODE_ID, foo, setMemCap (0, -1))
-apply(NODE_ID, foo, setMemCap (1, -1))
-apply(NODE_ID, foo, setMemCap (2, -1))
-apply(NODE_ID, foo, setMemCap (3, -1))
+aggregate(filter(apply(NODE_ID, foo, setMemCap (instanceid(), -1)), foo=-1), count(*))
 
 remove(INH_UINT32)
 remove(INH_CH)

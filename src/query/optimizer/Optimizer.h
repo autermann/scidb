@@ -31,20 +31,15 @@
 #ifndef OPTIMIZER_H_
 #define OPTIMIZER_H_
 
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-
+#include <boost/noncopyable.hpp>
 #include <memory>
-
-#include "system/Config.h"
-#include "query/QueryPlan.h"
-#include "system/SciDBConfigOptions.h"
-#include "query/OperatorLibrary.h"
 
 namespace scidb
 {
+class LogicalQueryPlanNode;
+class Query;
+class LogicalPlan;
+class PhysicalPlan;
 
 /**
  * The abstract class for optimization. Inherit this class to

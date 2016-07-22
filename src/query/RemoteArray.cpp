@@ -40,9 +40,9 @@
 #include <query/RemoteArray.h>
 #include <query/Statistics.h>
 #include <system/Exceptions.h>
+#include <system/Warnings.h>
 
 using namespace std;
-using namespace boost;
 
 namespace scidb
 {
@@ -201,7 +201,7 @@ RemoteMergedArray::RemoteMergedArray(const ArrayDesc& arrayDesc,
   _messages(arrayDesc.getAttributes().size(), vector< MessageState >(getStreamCount()))
 {
     static const size_t MAX_MUTEX_NUM = 100;
-    const uint32_t nMutexes = std::min(arrayDesc.getAttributes().size(), MAX_MUTEX_NUM);
+    const size_t nMutexes = std::min(arrayDesc.getAttributes().size(), MAX_MUTEX_NUM);
     _mutexes.resize(nMutexes);
     _localArray = query->getCurrentResultArray();
 }

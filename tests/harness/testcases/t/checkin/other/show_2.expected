@@ -46,7 +46,7 @@ SCIDB QUERY : <show(Ts_d)>
 
 SCIDB QUERY : <show(Ts_ns)>
 {i} schema
-{0} 'Ts_ns<a:int64 DEFAULT 5 COMPRESSION \'null suppression\'> [x=-2:3,2,1]'
+{0} 'Ts_ns<a:int64 COMPRESSION \'null suppression\'> [x=-2:3,2,1]'
 
 SCIDB QUERY : <show(Ts_be)>
 {i} schema
@@ -66,7 +66,7 @@ SCIDB QUERY : <show(Ts_nf)>
 
 SCIDB QUERY : <show(T2)>
 {i} schema
-{0} 'T2<a:string,b:int32 DEFAULT 9 COMPRESSION \'null filter\'> [x=-2:3,2,1]'
+{0} 'T2<a:string,b:int32 COMPRESSION \'null filter\'> [x=-2:3,2,1]'
 
 SCIDB QUERY : <remove(Ts)>
 Query was executed successfully

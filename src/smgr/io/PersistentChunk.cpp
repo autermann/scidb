@@ -199,10 +199,10 @@ void PersistentChunk::setAddress(const ArrayDesc& ad, const StorageAddress& firs
     _hdr.storageVersion = SCIDB_STORAGE_FORMAT_VERSION;
     _hdr.size = 0;
     _hdr.compressedSize = 0;
-    _hdr.compressionMethod = compressionMethod;
+    _hdr.compressionMethod = safe_static_cast<int8_t>(compressionMethod);
     _hdr.arrId = _addr.arrId;
     _hdr.attId = _addr.attId;
-    _hdr.nCoordinates = _addr.coords.size();
+    _hdr.nCoordinates = safe_static_cast<int16_t>(_addr.coords.size());
     _hdr.flags = 0;
     _hdr.pos.hdrPos = 0;
     calculateBoundaries(ad);
@@ -224,7 +224,7 @@ int PersistentChunk::getCompressionMethod() const
 void PersistentChunk::setCompressionMethod(int method)
 {
     assert(method>=0);
-    _hdr.compressionMethod=method;
+    _hdr.compressionMethod=safe_static_cast<int8_t>(method);
 }
 
 void* PersistentChunk::getData(const ArrayDesc& desc)

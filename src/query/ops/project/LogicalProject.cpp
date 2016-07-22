@@ -97,8 +97,8 @@ public:
         Attributes newAttributes;
         const Attributes &oldAttributes = schemas[0].getAttributes();
         bool includesIndicator = false;
-        size_t n = _parameters.size();
-        for (size_t i = 0; i < n; i++)
+        AttributeID n = safe_static_cast<AttributeID>(_parameters.size());
+        for (AttributeID i = 0; i < n; i++)
         {
         	const AttributeDesc &attr =
         		oldAttributes[((std::shared_ptr<OperatorParamReference>&)_parameters[i])->getObjectNo()];
@@ -116,8 +116,10 @@ public:
                                                       indicator->getAliases()));
             }
         }
-        return ArrayDesc(schemas[0].getName(), newAttributes, schemas[0].getDimensions(), defaultPartitioning());
-	}
+        return ArrayDesc(schemas[0].getName(), newAttributes, schemas[0].getDimensions(),
+                         schemas[0].getDistribution(),
+                         schemas[0].getResidency());
+    }
 };
 
 DECLARE_LOGICAL_OPERATOR_FACTORY(LogicalProject, "project")

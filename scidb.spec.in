@@ -3,21 +3,22 @@
 %bcond_with insource
 %define scidb               PKGNAME-VERSION_MAJOR.VERSION_MINOR
 %define scidb_boost         scidb-VERSION_MAJOR.VERSION_MINOR-libboost
-%define scidb_boost_version 1.54.0-VERSION_PATCH
+%define scidb_boost_version 1.54.0-0
 %define scidb_mpich2        scidb-VERSION_MAJOR.VERSION_MINOR-mpich2
 %define scidb_cityhash      scidb-VERSION_MAJOR.VERSION_MINOR-cityhash
 %define compiler_override   CC=/opt/rh/devtoolset-3/root/usr/bin/gcc MPICH_CC=/opt/rh/devtoolset-3/root/usr/bin/gcc CXX=/opt/rh/devtoolset-3/root/usr/bin/g++ MPICH_CXX=/opt/rh/devtoolset-3/root/usr/bin/g++ FC=/opt/rh/devtoolset-3/root/usr/bin/gfortran MPICH_FC=/opt/rh/devtoolset-3/root/usr/bin/gfortran
 %define debug_package %{nil}
 Name: %{scidb}
 Version: VERSION_PATCH
-Release: BUILD
-URL: http://scidb.org
+Release: 1
+URL: http://www.Paradigm4.com
 %if %{without insource}
 Source: scidb.tar.gz
 %endif
 Group: Applications/Databases
 Summary: SciDB - database for extra large data processing
-License: GPLv3
+Vendor: Paradigm4, Inc.
+License: Paradigm4
 #Some packages versions which we build by ourself forced to avoid using versions from CentOS or EPEL
 BuildRequires: cmake
 BuildRequires: make
@@ -80,6 +81,7 @@ Requires(postun): %{_sbindir}/update-alternatives
 
 %description
 SciDB - database for extra large data processing
+ BUILD
 
 %package -n %{scidb}-dbg
 Summary: Description: SciDB - database for extra large data processing (debug symbols)
@@ -88,13 +90,15 @@ Requires: %{scidb} = %{version}-%{release}
 Requires: gdb
 Requires: devtoolset-3-gdb
 %description -n %{scidb}-dbg
-Description: SciDB - database for extra large data processing (debug symbols)
+SciDB - database for extra large data processing (debug symbols)
+ BUILD
 
 %package -n %{scidb}-client
 Summary: SciDB client library
 Group: Applications/Databases
 %description -n %{scidb}-client
 SciDB client library
+ BUILD
 
 %package -n %{scidb}-client-dbg
 Summary: SciDB client library (debug symbols)
@@ -104,6 +108,7 @@ Requires: gdb
 Requires: devtoolset-3-gdb
 %description -n %{scidb}-client-dbg
 SciDB client library (debug symbols)
+ BUILD
 
 %package -n %{scidb}-utils
 Summary: SciDB querying tool and other utilities
@@ -111,6 +116,7 @@ Group: Applications/Databases
 Requires: %{scidb}-client >= %{version}-%{release}
 %description -n %{scidb}-utils
 SciDB querying tool and other utilities
+ BUILD
 
 %package -n %{scidb}-utils-dbg
 Summary: SciDB querying tool and other utilities (debug symbols)
@@ -120,6 +126,7 @@ Requires: gdb
 Requires: devtoolset-3-gdb
 %description -n %{scidb}-utils-dbg
 SciDB querying tool and other utilities (debug symbols)
+ BUILD
 
 %package -n %{scidb}-dev-tools
 Summary: SciDB developer and tester utilities
@@ -130,6 +137,7 @@ Requires: valgrind
 Requires: lsof
 %description -n %{scidb}-dev-tools
 SciDB developer and tester utilities
+ BUILD
 
 %package -n %{scidb}-dev-tools-dbg
 Summary: SciDB developer and tester utilities (debug symbols)
@@ -139,6 +147,7 @@ Requires: gdb
 Requires: devtoolset-3-gdb
 %description -n %{scidb}-dev-tools-dbg
 SciDB developer and tester utilities (debug symbols)
+ BUILD
 
 %package -n %{scidb}-plugins
 Summary: SciDB server and client plugins
@@ -146,6 +155,7 @@ Group: Applications/Databases
 Requires: %{scidb}-client = %{version}-%{release}
 %description -n %{scidb}-plugins
 SciDB server and client plugins
+ BUILD
 
 %package -n %{scidb}-plugins-dbg
 Summary: SciDB developer and tester utilities (debug symbols)
@@ -155,6 +165,7 @@ Requires: gdb
 Requires: devtoolset-3-gdb
 %description -n %{scidb}-plugins-dbg
 SciDB developer and tester utilities (debug symbols)
+ BUILD
 
 %package -n %{scidb}-client-python
 Summary: SciDB client library python connector
@@ -163,6 +174,7 @@ Requires: python
 Requires: %{scidb}-client >= %{version}-%{release} 
 %description -n %{scidb}-client-python
 SciDB client library python connector
+ BUILD
 
 %package -n %{scidb}-client-python-dbg
 Summary: SciDB client library python connector (debug symbols)
@@ -172,6 +184,7 @@ Requires: gdb
 Requires: devtoolset-3-gdb
 %description -n %{scidb}-client-python-dbg
 SciDB client library python connector (debug symbols)
+ BUILD
 
 %package -n %{scidb}-dev
 Summary: SciDB headers
@@ -179,6 +192,7 @@ Group: Applications/Databases
 Requires: %{scidb}-client >= %{version}-%{release} 
 %description -n %{scidb}-dev
 SciDB headers
+ BUILD
 
 %package -n %{scidb}-jdbc
 Summary: SciDB Java connector
@@ -188,9 +202,10 @@ Requires: java-1.8.0-openjdk-devel
 Requires: junit
 %description -n %{scidb}-jdbc
 SciDB Java connector
+ BUILD
 
 %package -n %{scidb}-all
-Summary: SciDB metapackage which install entire SciDB
+Summary: SciDB metapackage which installs entire SciDB
 Group: Applications/Databases
 Requires: %{scidb} = %{version}-%{release}
 Requires: %{scidb}-client = %{version}-%{release}
@@ -199,9 +214,10 @@ Requires: %{scidb}-plugins = %{version}-%{release}
 Requires: %{scidb}-client-python = %{version}-%{release}
 %description -n %{scidb}-all
 Install entire SciDB
+ BUILD
 
 %package -n %{scidb}-all-coord
-Summary: SciDB metapackage which install entire SciDB and PostgreSQL
+Summary: SciDB metapackage which installs entire SciDB and PostgreSQL
 Group: Applications/Databases
 Requires: %{scidb} = %{version}-%{release}
 Requires: %{scidb}-client = %{version}-%{release}
@@ -213,6 +229,7 @@ Requires: postgresql-contrib >= 8.4, postgresql-server < 8.5
 Requires: sudo
 %description -n %{scidb}-all-coord
 Install entire SciDB and PostgreSQL
+ BUILD
 
 %if %{without insource}
 %prep

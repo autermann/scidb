@@ -115,8 +115,8 @@ public:
             }
             for(AttributeID i =0; i<_outputLineSize; ++i)
             {
-               _outputChunkIterators[ _splitOnDimension ? 0 : i]->setPosition(_outputPosition);
-               _outputChunkIterators[ _splitOnDimension ? 0 : i]->writeItem(_outputLine[i]);
+                _outputChunkIterators[ _splitOnDimension ? AttributeID(0) : i]->setPosition(_outputPosition);
+                _outputChunkIterators[ _splitOnDimension ? AttributeID(0) : i]->writeItem(_outputLine[i]);
                if(_splitOnDimension)
                {
                    ++(_outputPosition[3]);
@@ -200,9 +200,11 @@ public:
         return true;
     }
 
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&,
+                                                      std::vector<ArrayDesc> const&) const
     {
-        return RedistributeContext(psUndefined);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)

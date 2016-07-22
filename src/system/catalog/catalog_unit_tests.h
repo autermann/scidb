@@ -81,12 +81,11 @@ public:
          ArrayID uAId = SystemCatalog::getInstance()->getNextArrayId();
          ArrayDesc array = ArrayDesc("test_array", 0, 0, att, dim);
          array.setIds(uAId, uAId, VersionID(0));
-         ArrayID id = SystemCatalog::getInstance()->addArray(
-             NamespaceDesc("public"), array);
+         ArrayID id = SystemCatalog::getInstance()->addArray(array);
 
 		CPPUNIT_ASSERT(id == uAId);
 
-                SystemCatalog::getInstance()->deleteArray(id);
+         SystemCatalog::getInstance()->deleteArray(id);
 	}
 
 	void getArrayByName()

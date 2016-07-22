@@ -51,8 +51,9 @@ void                                    loadModule(const std::string&);
 
 /****************************************************************************/
 
-ArrayDesc                               logicalListMacros ();
-std::shared_ptr<Array>                physicalListMacros(const arena::ArenaPtr&);
+ArrayDesc                               logicalListMacros (const std::shared_ptr<Query>& query);
+std::shared_ptr<Array>                physicalListMacros(const arena::ArenaPtr&,
+                                                         const std::shared_ptr<Query>& query);
 
 /****************************************************************************/
 }

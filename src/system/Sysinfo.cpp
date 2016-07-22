@@ -49,9 +49,9 @@ enum {
     DEFAULT_L3_CACHE_BYTES = 2*MiB
 };
 
-int Sysinfo::getNumberOfCPUs()
+long Sysinfo::getNumberOfCPUs()
 {
-    int nCores = sysconf(_SC_NPROCESSORS_ONLN);
+    long nCores = sysconf(_SC_NPROCESSORS_ONLN);
     int usedCpuLimit =
 #ifndef SCIDB_CLIENT
         Config::getInstance()->getOption<int>(CONFIG_OPERATOR_THREADS);
@@ -61,19 +61,19 @@ int Sysinfo::getNumberOfCPUs()
     return usedCpuLimit != 0 && nCores > usedCpuLimit ? usedCpuLimit : nCores;
 }
 
-int Sysinfo::getCPUCacheSize(int level)
+long Sysinfo::getCPUCacheSize(int level)
 {
     // Cache values from OS so we needn't always make system calls.
-    static int l1_size = -1;
-    static int l2_size = -1;
-    static int l3_size = -1;
+    static long l1_size = -1;
+    static long l2_size = -1;
+    static long l3_size = -1;
 
     // Add up the requested cache sizes.
     //
     // Frankly, I do not understand why the sum of two cache sizes is
     // a useful number, but I won't mess with it now.
     //
-    int cache_size = 0;
+    long cache_size = 0;
     if (level & CPU_CACHE_L1) {
         if (l1_size < 0) {
 #ifdef _SC_LEVEL1_DCACHE_SIZE

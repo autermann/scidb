@@ -64,7 +64,7 @@ public:
      * @param[in]    percentNull a number from 0 to 100, where 0 means never generate null, and 100 means always generate null
      * @return       the value from the parameter
      */
-    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, int nullReason)
+    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, Value::reason nullReason)
     {
         assert(percentNull>=0 && percentNull<=100);
 
@@ -134,7 +134,8 @@ public:
         vector< std::shared_ptr<ArrayIterator> > arrayIters(array.getArrayDesc().getAttributes(true).size());
         vector< std::shared_ptr<ChunkIterator> > chunkIters(arrayIters.size());
 
-        for (size_t i = 0; i < arrayIters.size(); i++)
+        AttributeID iterSize = safe_static_cast<AttributeID>(arrayIters.size());
+        for (AttributeID i = 0; i < iterSize; i++)
         {
             arrayIters[i] = array.getIterator(i);
             chunkIters[i] =
@@ -207,7 +208,9 @@ public:
         }
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), start, end, chunkInterval, 0);
-        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
+        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
 
         // Sort Keys
         SortingAttributeInfos sortingAttributeInfos;
@@ -245,7 +248,8 @@ public:
             Value t1[1];
             Value t2[1];
             size_t itemCount = 0;
-            std::shared_ptr<ConstArrayIterator> constArrayIter = sortedArray->getConstIterator(j);
+            std::shared_ptr<ConstArrayIterator> constArrayIter =
+                sortedArray->getConstIterator(safe_static_cast<AttributeID>(j));
             constArrayIter->reset();
             while (!constArrayIter->end())
             {
@@ -290,7 +294,7 @@ public:
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        srand(time(NULL));
+        srand(static_cast<unsigned int>(time(NULL)));
 
         testOnce_SortArray(query, TID_INT64, 0, 1000, 1, true, 100);
         testOnce_SortArray(query, TID_INT64, 0, 1000, 1, false, 100);

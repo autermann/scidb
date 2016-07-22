@@ -9,12 +9,12 @@ load_library('linear_algebra')
 
 # load
 --justrun "remove(GRAPH_TRIPLETS_6_9)"
-create array GRAPH_TRIPLETS_6_9 <v0:int64, v1:int64, w:float>[dummy=0:*,1000*1000,0]
+create array GRAPH_TRIPLETS_6_9 <v0:int64, v1:int64, w:float NOT NULL>[dummy=0:*,1000*1000,0]
 --shell --store --command "iquery -c $IQUERY_HOST -p $IQUERY_PORT -naq "load(GRAPH_TRIPLETS_6_9, '${TEST_DATA_DIR}/graph_triplets6_9.scidb.txt')""
 
 
 --justrun "remove(TRANSPOSE_GRAPH_WEIGHTS_6_9)"
-create array TRANSPOSE_GRAPH_WEIGHTS_6_9 <w:float>[v1=0:5,10,0, v0=0:5,10,0]
+create array TRANSPOSE_GRAPH_WEIGHTS_6_9 <w:float NOT NULL>[v1=0:5,10,0, v0=0:5,10,0]
 
 
 # turn list of triplets into adjacency matrix
@@ -24,7 +24,7 @@ store(project(apply(redimension(GRAPH_TRIPLETS_6_9,TRANSPOSE_GRAPH_WEIGHTS_6_9),
 # and switch to weights (probabilities of transition) of  1/(num edges in column)
 # by dividing 1 by the sum of the column
 --justrun "remove(TRANSITION_PROBABILITY_COLS)"
-store(substitute(project(apply(cross_join(TRANSPOSE_GRAPH_EDGES as E, aggregate(TRANSPOSE_GRAPH_EDGES, sum(e), v0) as SUM, E.v0, SUM.v0), prob, float(float(E.e)/SUM.e_sum)), prob), build(<v:float>[dc=0:0,1,0],NaN)), TRANSITION_PROBABILITY_COLS)
+store(substitute(project(apply(cross_join(TRANSPOSE_GRAPH_EDGES as E, aggregate(TRANSPOSE_GRAPH_EDGES, sum(e), v0) as SUM, E.v0, SUM.v0), prob, float(float(E.e)/SUM.e_sum)), prob), build(<v:float NOT NULL>[dc=0:0,1,0],NaN)), TRANSITION_PROBABILITY_COLS)
 --stop-igdata
 --test
 

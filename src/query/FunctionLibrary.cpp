@@ -355,7 +355,9 @@ addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIME), TypeId(TID
     addVFunction(FunctionDescription(">=", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint8, Uint8, Bool>, 0));
     addVFunction(FunctionDescription(">", list_of(TID_UINT8)(TID_UINT8), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint8, Uint8, Bool>, 0));
 
+    #if 0 // UnaryMinus on an unsigned number doesn't make much sense
     addVFunction(FunctionDescription("-", list_of(TID_UINT8), TypeId(TID_UINT8), &rle_unary_func<UnaryMinus, Uint8, Uint8>, 0));
+    #endif
 
     addVConverter(TID_UINT8, TID_UINT16, &rle_unary_func<UnaryConverter, Uint8, Uint16>, 2);
     addVConverter(TID_UINT8, TID_UINT32, &rle_unary_func<UnaryConverter, Uint8, Uint32>, 3);
@@ -382,7 +384,9 @@ addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIME), TypeId(TID
     addVFunction(FunctionDescription(">=", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint16, Uint16, Bool>, 0));
     addVFunction(FunctionDescription(">", list_of(TID_UINT16)(TID_UINT16), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint16, Uint16, Bool>, 0));
 
+    #if 0 // UnaryMinus on an unsigned number doesn't make much sense
     addVFunction(FunctionDescription("-", list_of(TID_UINT16), TypeId(TID_UINT16), &rle_unary_func<UnaryMinus, Uint16, Uint16>, 0));
+    #endif
 
     addVConverter(TID_UINT16, TID_UINT8, &rle_unary_func<UnaryConverter, Uint16, Uint8>, TRUNCATE_CONVERSION_COST);
     addVConverter(TID_UINT16, TID_UINT32, &rle_unary_func<UnaryConverter, Uint16, Uint32>, 2);
@@ -409,7 +413,9 @@ addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIME), TypeId(TID
     addVFunction(FunctionDescription(">=", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint32, Uint32, Bool>, 0));
     addVFunction(FunctionDescription(">", list_of(TID_UINT32)(TID_UINT32), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint32, Uint32, Bool>, 0));
 
+    #if 0 // UnaryMinus on an unsigned number doesn't make much sense
     addVFunction(FunctionDescription("-", list_of(TID_UINT32), TypeId(TID_UINT32), &rle_unary_func<UnaryMinus, Uint32, Uint32>, 0));
+    #endif
 
     addVConverter(TID_UINT32, TID_UINT8, &rle_unary_func<UnaryConverter, Uint32, Uint8>, TRUNCATE_CONVERSION_COST*2);
     addVConverter(TID_UINT32, TID_UINT16, &rle_unary_func<UnaryConverter, Uint32, Uint16>, TRUNCATE_CONVERSION_COST);
@@ -436,7 +442,9 @@ addFunction(FunctionDescription("day_of_week", list_of(TID_DATETIME), TypeId(TID
     addVFunction(FunctionDescription(">=", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryGreaterOrEq, Uint64, Uint64, Bool>, 0));
     addVFunction(FunctionDescription(">", list_of(TID_UINT64)(TID_UINT64), TypeId(TID_BOOL), &rle_binary_func<BinaryGreater, Uint64, Uint64, Bool>, 0));
 
+    #if 0 // UnaryMinus on an unsigned number doesn't make much sense
     addVFunction(FunctionDescription("-", list_of(TID_UINT64), TypeId(TID_UINT64), &rle_unary_func<UnaryMinus, Uint64, Uint64>, 0));
+    #endif
 
     addVConverter(TID_UINT64, TID_UINT8, &rle_unary_func<UnaryConverter, Uint64, Uint8>, TRUNCATE_CONVERSION_COST*3);
     addVConverter(TID_UINT64, TID_UINT16, &rle_unary_func<UnaryConverter, Uint64, Uint16>, TRUNCATE_CONVERSION_COST*2);
@@ -651,6 +659,16 @@ bool FunctionLibrary::_findFunction(const std::string& name,
                 outputType = inputArgTypes[1];
             }
             funcDescription = FunctionDescription ("iif", inputTypes, outputType, &iif);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    if (!tile && lowCaseName == "sizeof") {
+        if (inputArgTypes.size() == 1) {
+            funcDescription = FunctionDescription("sizeof", inputArgTypes, TID_UINT64, &sizeofDatum);
             return true;
         }
         else {

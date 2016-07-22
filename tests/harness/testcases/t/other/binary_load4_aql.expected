@@ -187,7 +187,7 @@ SCIDB QUERY : <load A55 from '/tmp/a33.txt' as '(skip(4),int32)' errors 100 shad
 {2,2,1} 6.91483e+08
 {2,2,2} 8.25372e+08
 {1,3,1} 8.25372e+08
-{1,3,2} 0
+{1,3,2} null
 
 SCIDB QUERY : <select count(*) from A55_shad>
 {i} count

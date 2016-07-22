@@ -48,9 +48,11 @@ public:
     /**
      * The Constructor records the start time unless told not to do so.
      */
-    ElapsedMilliSeconds(bool nostart = false) {
-        if (!nostart)
-        {
+    ElapsedMilliSeconds(bool nostart = false)
+    {
+        if (nostart) {
+            timerclear(&_startTime);
+        } else {
             restart();
         }
     }

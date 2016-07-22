@@ -97,6 +97,7 @@ public:
                                      std::shared_ptr<Query> query)
    {
       assert(inputArrays.size() == 1);
+      checkOrUpdateIntervals(_schema, inputArrays[0]);
 
       std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
 

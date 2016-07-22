@@ -29,6 +29,7 @@ import com.google.protobuf.GeneratedMessage;
 
 import org.scidb.util.InputStreamWithReadall;
 import org.scidb.client.SciDBException;
+import org.scidb.client.QueryID;
 
 /**
  * Base class for constructing network messages locally and from socket stream
@@ -140,7 +141,7 @@ public abstract class Message
         buf.putLong(getRecordSize());
         buf.putLong(getHeader().binarySize);
         buf.putLong(getHeader().sourceInstanceID);
-        buf.putLong(getHeader().queryID);
+        getHeader().queryID.writeToBuffer(buf);
         buf.flip();
         os.write(buf.array());
         if (_record != null) {
@@ -197,15 +198,15 @@ public abstract class Message
     public static class Header
     {   /// Must match the server network protocol version
         ///     (in src/network/BaseConnection.h)
-        private static final short _NET_PROTOCOL_CURRENT_VER = 7;
+        private static final short _NET_PROTOCOL_CURRENT_VER = 8;
 
-        public static final int headerSize = 40;
+        public static final int headerSize = 48;
         public short netProtocolVersion; // uint16_t
         public short messageType; // uint16_t
         public long recordSize; // uint64_t v7, uint32_t v6
         public long binarySize; // uint64_t v7, uint32_t v6
         public long sourceInstanceID; // uint64_t
-        public long queryID; // uint64_t
+        public QueryID queryID; // sizeof(struct {uint64_t; uint64_t;})
 
         /**
          * Default void constructor
@@ -217,7 +218,7 @@ public abstract class Message
             sourceInstanceID = ~0;
             recordSize = 0;
             binarySize = 0;
-            queryID = 0;
+            queryID = null;
         }
 
 
@@ -227,9 +228,10 @@ public abstract class Message
          * @param queryId Query ID
          * @param messageType Message type
          */
-        public Header(long queryId, int messageType)
+        public Header(QueryID queryId, int messageType)
         {
             this();
+            assert(queryId != null);
             this.messageType = (short) messageType;
             this.queryID = queryId;
         }
@@ -259,8 +261,7 @@ public abstract class Message
             res.recordSize = buf.getLong();
             res.binarySize = buf.getLong();
             res.sourceInstanceID = buf.getLong();
-            res.queryID = buf.getLong();
-
+            res.queryID = QueryID.parseFromBuffer(buf);
             return res;
         }
 
@@ -300,14 +301,14 @@ public abstract class Message
          * @param execute true=execute, false=prepare
          */
         public Query(
-            long queryId,
+            QueryID queryId,
             String queryString,
             Boolean afl,
             String programOptions,
             Boolean execute)
         {
-            super(new Message.Header(
-                queryId, execute ? mtExecuteQuery : mtPrepareQuery));
+            super(new Message.Header(queryId==null ? new QueryID() : queryId,
+                                     execute ? mtExecuteQuery : mtPrepareQuery));
 
             ScidbMsg.Query.Builder recBuilder =
                 ScidbMsg.Query.newBuilder();
@@ -489,7 +490,7 @@ public abstract class Message
          * @param attributeId Attribute to fetch
          * @param arrayName Array name to fetch
          */
-        public Fetch(long queryId, int attributeId, String arrayName)
+        public Fetch(QueryID queryId, int attributeId, String arrayName)
         {
             super(new Message.Header(queryId, mtFetch));
             ScidbMsg.Fetch.Builder recBuilder = ScidbMsg.Fetch.newBuilder();
@@ -558,7 +559,7 @@ public abstract class Message
      */
     public static class CompleteQuery extends Message
     {
-        public CompleteQuery(long queryId)
+        public CompleteQuery(QueryID queryId)
         {
             super(new Message.Header(queryId, mtCompleteQuery));
         }
@@ -569,7 +570,7 @@ public abstract class Message
      */
     public static class AbortQuery extends Message
     {
-        public AbortQuery(long queryId)
+        public AbortQuery(QueryID queryId)
         {
             super(new Message.Header(queryId, mtCancelQuery));
         }
@@ -581,9 +582,10 @@ public abstract class Message
      */
     public static class NewClientStart extends Message
     {
-        public NewClientStart(long queryId)
+        public NewClientStart(QueryID queryId)
         {
-            super(new Message.Header(queryId, mtNewClientStart));
+            super(new Message.Header(queryId==null ? new QueryID() : queryId,
+                                     mtNewClientStart));
 
             ScidbMsg.NewClientStart.Builder recBuilder =
                 ScidbMsg.NewClientStart.newBuilder();
@@ -597,9 +599,10 @@ public abstract class Message
      */
     public static class SecurityMessageResponse extends Message
     {
-        public SecurityMessageResponse(long queryId, String response)
+        public SecurityMessageResponse(QueryID queryId, String response)
         {
-            super(new Message.Header(queryId, mtSecurityMessageResponse));
+            super(new Message.Header(queryId==null ? new QueryID() : queryId,
+                                     mtSecurityMessageResponse));
 
             ScidbMsg.SecurityMessageResponse.Builder recBuilder =
                 ScidbMsg.SecurityMessageResponse.newBuilder();

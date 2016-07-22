@@ -2,8 +2,8 @@
 load_library('linear_algebra')
 
 --start-query-logging
-create array SAleft <a:double>[x=0:10,3,0, y=0:8,3,0]
-create array SAright <b:double>[x=0:8,3,0, y=0:1,1,0]
+create array SAleft <a:double NOT NULL>[x=0:10,3,0, y=0:8,3,0]
+create array SAright <b:double NOT NULL>[x=0:8,3,0, y=0:1,1,0]
 
 --test
 store( filter(build(SAleft, x+y), true), SAleft )

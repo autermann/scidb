@@ -32,7 +32,7 @@ SCIDB QUERY : <SELECT max(attr1),min(attr1) INTO m4x4_max_min FROM m4x4>
 
 SCIDB QUERY : <show(m4x4_max_min)>
 {i} schema
-{0} 'm4x4_max_min<max:int32 NULL DEFAULT null,min:int32 NULL DEFAULT null> [i=0:0,1,0]'
+{0} 'm4x4_max_min<max:int32,min:int32> [i=0:0,1,0]'
 
 SCIDB QUERY : <SELECT max(attr2), min(attr2) FROM m4x4_2attr>
 [(30,0)]
@@ -66,7 +66,7 @@ SCIDB QUERY : <SELECT max(attr1) INTO tmp1 FROM m4x4 GROUP BY x>
 
 SCIDB QUERY : <show(tmp1)>
 {i} schema
-{0} 'tmp1<max:int32 NULL DEFAULT null> [x=0:3,4,0]'
+{0} 'tmp1<max:int32> [x=0:3,4,0]'
 
 SCIDB QUERY : <SELECT max(attr1) FROM m4x4 GROUP BY y>
 {y} max
@@ -90,7 +90,7 @@ SCIDB QUERY : < SELECT max(attr1), min(attr1) INTO tmp2 FROM m4x4 REGRID AS (PAR
 
 SCIDB QUERY : <show(tmp2)>
 {i} schema
-{0} 'tmp2<max:int32 NULL DEFAULT null,min_1:int32 NULL DEFAULT null> [x=0:1,4,0,y=0:1,4,0]'
+{0} 'tmp2<max:int32,min_1:int32> [x=0:1,4,0,y=0:1,4,0]'
 
 SCIDB QUERY : <regrid(m4x4, 2, 2, max(attr1), min(attr1))>
 [[(5,0),(7,2)],[(13,8),(15,10)]]
@@ -103,7 +103,7 @@ SCIDB QUERY : < SELECT sum(attr1) INTO tmp3 FROM m4x4 FIXED WINDOW AS (PARTITION
 
 SCIDB QUERY : <show(tmp3)>
 {i} schema
-{0} 'tmp3<sum:int64 NULL DEFAULT null> [x=0:3,4,0,y=0:3,4,0]'
+{0} 'tmp3<sum:int64> [x=0:3,4,0,y=0:3,4,0]'
 
 SCIDB QUERY : <window (m4x4,1,1,1,1,sum(attr1))>
 [[(10),(18),(24),(18)],[(27),(45),(54),(39)],[(51),(81),(90),(63)],[(42),(66),(72),(50)]]
@@ -195,7 +195,7 @@ SCIDB QUERY : <rename(Farquar,winners)>
 
 SCIDB QUERY : <show(winners)>
 {i} schema
-{0} 'winners<event:string,person:string,year:int64,time:double,country:string,country_id:int64> [i=0:*,1000000,0]'
+{0} 'winners<event:string,person:string,year:int64,time:double,country:string,country_id:int64 NOT NULL> [i=0:*,1000000,0]'
 
 SCIDB QUERY : <scan(winners)>
 {i} event,person,year,time,country,country_id

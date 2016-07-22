@@ -70,14 +70,8 @@ public:
         SCIDB_ASSERT(modifiedPtrs.size() == 1);
 
         if (inputNeedsRepart(inputSchemas[0])) {
-            if (modifiedPtrs[0] != NULL) {
-                // We need a repart(), but the user is trying to force an inadequate one on us.
-                throw USER_EXCEPTION(SCIDB_SE_OPTIMIZER, SCIDB_LE_OP_WINDOW_ERROR2);
-            }
-
             // OK, we're free to choose our own repartitioning!
             modifiedPtrs[0] = getRedimensionOrRepartitionSchema(inputSchemas[0]);
-
         } else {
             // All good as-is.
             modifiedPtrs.clear();
@@ -102,17 +96,30 @@ public:
                 overlap = neededOverlap;
             }
 
+            int64_t rawChunkInterval = inDim.getRawChunkInterval();
+            if (inDim.isAutochunked()) {
+                rawChunkInterval = DimensionDesc::PASSTHRU;
+                // Note: If the child is a repart/redimension this will throw in the optimizer
+                // since the overlap in the explicit repart/redimension will not
+                // match this needed overlap.
+                //
+                // Other operators will get a  repart with a passthrough chunk specified
+                // that will be handled in the redimension/repart execute().
+            }
+
             dims.push_back( DimensionDesc(inDim.getBaseName(),
                                           inDim.getNamesAndAliases(),
                                           inDim.getStartMin(),
                                           inDim.getCurrStart(),
                                           inDim.getCurrEnd(),
                                           inDim.getEndMax(),
-                                          inDim.getChunkInterval(),
+                                          rawChunkInterval,
                                           overlap));
         }
 
-        _redimRepartSchemas.push_back(make_shared<ArrayDesc>(inputSchema.getName(), attrs, dims, defaultPartitioning()));
+        _redimRepartSchemas.push_back(make_shared<ArrayDesc>(inputSchema.getName(), attrs, dims,
+                                                             inputSchema.getDistribution(),
+                                                             inputSchema.getResidency()));
         return _redimRepartSchemas.back().get();
     }
 
@@ -122,7 +129,9 @@ public:
         for (size_t i = 0, n = dims.size(); i < n; i++)
         {
             DimensionDesc const& srcDim = dims[i];
-            if (static_cast<uint64_t>(srcDim.getChunkInterval()) != srcDim.getLength() &&
+            bool justOneChunk = !srcDim.isAutochunked() &&
+                static_cast<uint64_t>(srcDim.getChunkInterval()) == srcDim.getLength();
+            if (!justOneChunk &&
                 srcDim.getChunkOverlap() < std::max(_window[i]._boundaries.first, _window[i]._boundaries.second))
             {
                 return true;
@@ -139,6 +148,7 @@ public:
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         SCIDB_ASSERT(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
 
         std::shared_ptr<Array> inputArray = ensureRandomAccess(inputArrays[0], query);
         ArrayDesc const& inDesc = inputArray->getArrayDesc();
@@ -169,7 +179,7 @@ public:
 
                 aggregates.push_back(agg);
 
-                if (inAttId == (AttributeID) -1)
+                if (inAttId == INVALID_ATTRIBUTE_ID)
                 {
                     //for count(*); optimize later
                     inputAttrIDs.push_back(0);

@@ -96,7 +96,12 @@ public:
             attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
         }
         attributes = addEmptyTagAttribute(attributes);
-        return ArrayDesc("parse", attributes, dimensions, defaultPartitioning());
+
+        ArrayDistPtr undefDist = ArrayDistributionFactory::getInstance()->construct(psUndefined,
+                                                                                    DEFAULT_REDUNDANCY);
+        return ArrayDesc("parse", attributes, dimensions,
+                         undefDist,
+                         query->getDefaultArrayResidency());
     }
 
 };

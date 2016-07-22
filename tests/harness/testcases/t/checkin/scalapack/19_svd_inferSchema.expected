@@ -64,7 +64,7 @@ r,i,u
 
 SCIDB QUERY : <show(tmp)>
 i,schema
-0,'tmp<u:double> [r=0:0,32,0,i=0:0,32,0]'
+0,'tmp<u:double NOT NULL> [r=0:0,32,0,i=0:0,32,0]'
 
 SCIDB QUERY : <scan(tmp)>
 r,i,u
@@ -79,7 +79,7 @@ i,sigma
 
 SCIDB QUERY : <show(tmp)>
 i,schema
-0,'tmp<sigma:double> [i=0:0,32,0]'
+0,'tmp<sigma:double NOT NULL> [i=0:0,32,0]'
 
 SCIDB QUERY : <scan(tmp)>
 i,sigma
@@ -94,7 +94,7 @@ i,c,v
 
 SCIDB QUERY : <show(tmp)>
 i,schema
-0,'tmp<v:double> [i=0:0,32,0,c=0:0,32,0]'
+0,'tmp<v:double NOT NULL> [i=0:0,32,0,c=0:0,32,0]'
 
 SCIDB QUERY : <scan(tmp)>
 i,c,v

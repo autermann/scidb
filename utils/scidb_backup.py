@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#
+
 # BEGIN_COPYRIGHT
 #
 # Copyright (C) 2008-2015 SciDB, Inc.
@@ -18,9 +18,7 @@
 # along with SciDB.  If not, see <http://www.gnu.org/licenses/agpl-3.0.html>
 #
 # END_COPYRIGHT
-#
-#-------------------------------------------------------------------------------
-# Imports:
+
 import argparse
 import sys
 import os
@@ -32,7 +30,14 @@ import time
 import itertools
 import functools
 import signal
+import textwrap
+
+import scidblib.scidb_schema as SCHEMA
+
+from collections import namedtuple
 from distutils.util import strtobool
+
+_args = None # Global reference to program args.
 
 def print_and_flush(msg,stream=sys.stdout):
     """ Write the string message to the specified output stream and flush that
@@ -50,20 +55,33 @@ class AppError(Exception):
 
 #-------------------------------------------------------------------------------
 class ProgramArgs:
-    #-------------------------------------------------------------------------
+    # Can anyone tell me why a bare argparse.Namespace object is not sufficient?
     def __init__(self,args):
-        descMsg = 'Backup and restore utility for SciDB array data.  ' \
-            'The utility saves/restores scidb arrays into folder(s) specified by the user (positional dir argument).  ' \
-            'It must be run on the coordinator host in either save or restore mode (--save or --restore options respectively).  ' \
-            'Each array will be saved into its own file under the specified folder(s). The utility treats positional dir ' \
-            'argument as a "base" folder name: if --parallel option is not used, then all arrays are saved into the base folder on the coordinator. ' \
-            'If --parallel option is specified, then the utility saves all arrays into multiple folders (one per each scidb ' \
-            'instance).  These parallel folders are saved on their respective cluster hosts: host0 with instances 0 and 1 will ' \
-            'have folders base.0 and base.1 while host1 with instances 2 and 3 will have folders base.2 and base.3. Conversely, when user ' \
-            'restores the previously saved arrays, the restore operation must be run with the same options as the original save (e.g. ' \
-            'if --parallel option was used to save, then it has to be specified during the restore).  By default, the utility saves all arrays. ' \
-            'However, if user decides to save only a few arrays, that can be accomplished by filtering the array names via --filter option.  ' \
-            'IMPORTANT: iquery executable must be in the PATH.'
+        descMsg = textwrap.dedent("""
+            Backup and restore utility for SciDB array data.
+
+            The utility saves/restores scidb arrays into folder(s) specified
+            by the user (positional dir argument).  It must be run on the
+            coordinator host in either save or restore mode (--save or
+            --restore options respectively).  Each array will be saved into
+            its own file under the specified folder(s). The utility treats
+            positional dir argument as a "base" folder name: if --parallel
+            option is not used, then all arrays are saved into the base
+            folder on the coordinator.  If --parallel option is specified,
+            then the utility saves all arrays into multiple folders (one for
+            each scidb instance).  These parallel folders are saved on their
+            respective cluster hosts: host0 with instances 0 and 1 will have
+            folders base.0 and base.1 while host1 with instances 2 and 3
+            will have folders base.2 and base.3. Conversely, when user
+            restores the previously saved arrays, the restore operation must
+            be run with the same options as the original save (that is, if
+            --parallel option was used to save, then it has to be specified
+            during the restore).  By default, the utility saves all arrays.
+            However, if user decides to save only a few arrays, that can be
+            accomplished by filtering the array names via --filter option.
+
+            IMPORTANT: iquery executable must be in the PATH.
+        """)
 
         self._parser = argparse.ArgumentParser(
             description=descMsg,
@@ -82,8 +100,8 @@ class ProgramArgs:
             nargs=1,
             choices=['binary','text','store','opaque'],
             help="""Format for saving array data in files (allowed values are binary, text, store, or opaque).
-                 Using text format to backup/restore array data is not recommended because overlap regions are not saved;
-                 use store format instead."""
+                 Using text format to backup/restore array data is not recommended because overlap
+                 regions are not saved; use store format instead."""
             )
         self._parser.add_argument(
             '-r',
@@ -93,8 +111,8 @@ class ProgramArgs:
             nargs=1,
             choices=['binary','text','store','opaque'],
             help="""Format for saving array data in files (allowed values are binary, text, store, or opaque).
-                 Using text format to backup/restore array data is not recommended because overlap regions are not saved;
-                 use store format instead."""
+                 Using text format to backup/restore array data is not recommended because overlap
+                 regions are not saved; use store format instead."""
             )
         self._parser.add_argument(
             '-d',
@@ -134,7 +152,8 @@ class ProgramArgs:
             metavar='PATTERN',
             type=types.StringType,
             nargs=1,
-            help='Python regex pattern to match against array names (escape and/or quote as necessary to avoid shell expansion)'
+            help="""Python regex pattern to match against array names (escape and/or quote as
+                 necessary to avoid shell expansion)"""
             )
         self._parser.add_argument(
             '-p',
@@ -156,6 +175,12 @@ class ProgramArgs:
             action='store_true',
             help='force silent removal of arrays before restoring them'
             )
+        self._parser.add_argument(
+            '--auth-file',
+            type=types.StringType,
+            default=None,
+            help='Authentication file for SciDB user.'
+            )
 
         # Put all of the parser arguments and values into a dictionary for
         # easier retrieval.
@@ -173,6 +198,7 @@ class ProgramArgs:
         self._argsDict['host'] = self._args.host
         self._argsDict['port'] = self._args.port
         self._argsDict['ssh_port'] = self._args.ssh_port
+        self._argsDict['auth-file'] = self._args.auth_file
 
         if (types.ListType == type(self._argsDict['save'])):
             self._argsDict['save'] = self._argsDict['save'][0]
@@ -183,7 +209,7 @@ class ProgramArgs:
         if (types.ListType == type(self._argsDict['filter'])):
             self._argsDict['filter'] = self._argsDict['filter'][0]
 
-        if (not (self._argsDict['filter'] is None)):
+        if self._argsDict['filter'] is not None:
             self._argsDict['filter'] = self._argsDict['filter'].replace('\"','')
             self._argsDict['filter'] = self._argsDict['filter'].replace('\'','')
 
@@ -202,13 +228,212 @@ class ProgramArgs:
         return D
     def print_help(self):
         self._parser.print_help()
-##############################################################################
+
+
 def yesNoQuestion(q):
     while True:
         try:
             return strtobool(raw_input(q).lower())
         except ValueError:
             sys.stdout.write('Please type \'y\' or \'n\'.\n')
+
+def no_ver_name(name):
+    """Strip version suffix from array name."""
+    return name.split('@')[0]
+
+# This is a normalized Manifest entry.
+ArrayMetadata = namedtuple('ArrayMetadata',
+                           ("name",    # array name
+                            "ns",      # namespace, default 'public'
+                            "format",  # format, may be per-array for binary backups
+                            "uaid",    # unversioned array id (v0 compatibility)
+                            "file_name", # where array data is stored
+                            "schema",  # schema
+                            "bin_schema")) # flat schema of unpacked binary data, if any
+
+class Manifest(object):
+
+    """
+    An object for reading and writing backup directory .manifest files.
+    """
+
+    _BEGIN_METADATA = "%{"
+    _END_METADATA = "%}"
+
+    def __init__(self, filename=None):
+        self.clear()
+        if filename is not None:
+            self.load(filename)
+
+    def clear(self):
+        """Reset internal state to freshly minted object."""
+        self.metadata = dict()
+        self.filename = None
+        self.items = []
+        self._lineno = 0
+
+    @property
+    def version(self):
+        return self.metadata.get('version')
+
+    @version.setter
+    def version(self, value):
+        assert isinstance(value, int)
+        self.metadata['version'] = value
+
+    def __len__(self):
+        return len(self.items)
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def update(self, *args, **kwargs):
+        """Update metadata section's key/value pairs."""
+        self.metadata.update(*args, **kwargs)
+
+    def append(self, item):
+        if isinstance(item, ArrayMetadata):
+            self.items.append(item)
+        else:
+            raise ValueError("Cannot append {0} to Manifest".format(item))
+
+    def extend(self, item_list):
+        def bad_item(x):
+            return not isinstance(x, ArrayMetadata)
+        if any(map(bad_item, item_list)):
+            raise ValueError("Cannot extend {0} into Manifest".format(item_list))
+        self.items.extend(item_list)
+
+    def load(self, filename):
+        """Read and parse a .manifest file.
+
+        If the first line of the file is _BEGIN_METADATA, parse the metadata
+        and continue.  Otherwise this is a version 0 manifest file.
+        """
+        self.clear()
+        self.filename = filename
+        with open(filename) as F:
+            line1 = F.readline().strip()
+            self._lineno = 1
+            if line1 == Manifest._BEGIN_METADATA:
+                self._parse_metadata(F)
+                assert 'version' in self.metadata, "%s: No version found in metadata" % filename
+                method = "_load_v%d" % self.metadata['version']
+                try:
+                    Manifest.__dict__[method](self, F)
+                except KeyError:
+                    raise RuntimeError("Manifest file version {0} not supported".format(self.version))
+            elif '|' in line1:
+                # A version 1 file, but written before we implemented
+                # the metadata section.  No problem.
+                self.metadata['version'] = 1
+                self._load_v1(F, line1)
+            else:
+                self.metadata['version'] = 0
+                self._load_v0(F, line1)
+
+    def _parse_metadata(self, FH):
+        """Parse metadata section of .manifest file.
+
+        The format of the metadata section is as similar to config.ini
+        as we can make it without actually pulling in a config.ini
+        parser.  Right now it's pretty simple: we expect a decimal
+        version number and nothing more:
+
+            %{
+            # Comments are OK.
+            version = 1
+            %}
+        """
+        line = None
+        while True:
+            line = FH.readline()
+            if not line:
+                raise RuntimeError("Manifest file metadata section is malformed")
+            line = line.strip()
+            if not line:
+                continue        # Blank line.
+            if line == Manifest._END_METADATA:
+                break
+            key, _, value = line.partition('=')
+            key = key.strip()
+            if key.startswith('#'):
+                continue        # Comments allowed.
+            if key.lower() == 'version':
+                self.metadata['version'] = int(value)
+            else:
+                self.metadata[key] = value
+
+    def _load_v0(self, FH, line1):
+        """Read and parse a version 0 .manifest file (15.7 and (maybe) earlier).
+
+        @param FH    file handle open for read
+        @param line1 first line of file (was already read in)
+
+        @note The v0 file format did not explicitly record binary schemas, so
+              these must be derived later.  See fix_v0_schemas().
+        """
+        NS = "public"
+        fmt = _args.get('restore')
+        BIN_SCHEMA = ''
+        line = line1
+        while True:
+            # Use partition and not split because schema contains commas.
+            array, _, rest = line.partition(',')
+            uaid, _, schema = rest.partition(',')
+            self.items.append(
+                ArrayMetadata(array, NS, fmt, int(uaid), array, schema, BIN_SCHEMA))
+            line = FH.readline()
+            if not line:
+                break
+            self._lineno += 1
+
+    def _load_v1(self, FH, line1=None):
+        """Read and parse a version 1 .manifest file (15.12 and maybe later).
+
+        @param FH    file handle open for read
+        @param line1 first line for older v1 manifests that had no metadata
+        """
+        def _load_v1_line(line):
+            fields = line.strip().split('|')
+            fields.insert(3, None) # No uaid in v1 manifests, use None.
+            if len(fields) + 1 == len(ArrayMetadata._fields):
+                # bin_schema was optional in early v1 manifests.
+                fields.append(None)
+            elif len(fields) != len(ArrayMetadata._fields):
+                raise RuntimeError("{0}:{1} - {2} fields but expecting {3}: {4}".format(
+                        self.filename, self._lineno, len(fields),
+                        len(ArrayMetadata._fields), line))
+            self.items.append(ArrayMetadata._make(fields))
+        if line1:
+            _load_v1_line(line1)
+        for line in FH:
+            self._lineno += 1
+            _load_v1_line(line)
+
+    def __str__(self):
+        """Print in v1 format."""
+        # Build metadata section.  It would be nice if entries were displayed in some deterministic
+        # order, but for now the dict() hash order is fine.  See collections.OrderedDict.
+        if 'version' not in self.metadata:
+            # Probably because this Manifest was built with
+            # extend()/append() rather than load().
+            self.metadata['version'] = 1
+        lines = [ Manifest._BEGIN_METADATA ]
+        lines.extend([" = ".join((k.lower(), str(self.metadata[k])))
+                      for k in self.metadata])
+        lines.append(Manifest._END_METADATA)
+
+        # Build per-array data lines.
+        for item in self.items:
+            lines.append('|'.join((item.name,
+                                   item.ns,
+                                   item.format,
+                                   item.file_name,
+                                   item.schema,
+                                   item.bin_schema)))
+        return '\n'.join(lines)
+
 
 ##############################################################################
 # abnormalExitWatchdog:
@@ -230,7 +455,7 @@ def abnormalExitWatchdog(procWaitFunc):
             abnormalExit = True
         except Exception, e:
             exceptMsg = 'Bad exception - exiting...\n'
-            exceptionMsg += e.message
+            exceptMsg += e.message
             abnormalExit = True
         finally:
             pass
@@ -255,6 +480,208 @@ def abnormalExitWatchdog(procWaitFunc):
                 raise AppError('\n'.join(msg_list))
         return (exitCode,output)
     return wrapper
+
+def namespace_wrap_query(ns,query):
+    if (ns == 'public'):
+        return query
+    return 'set_namespace(\'{0}\');{1}'.format(ns,query)
+
+#-------------------------------------------------------------------------
+# Get the iquery command as a list
+#-------------------------------------------------------------------------
+def getIqueryCmd(
+    host,
+    port,
+    auth_file=None,
+    flag_list=['-aq'],
+    query_cmd=None):
+
+    cmd_list = ['iquery']
+
+    if auth_file:
+        cmd_list.extend(['--auth-file', auth_file])
+
+    cmd_list.extend(['-c', host,'-p', port])
+    cmd_list.extend(flag_list)
+
+    if query_cmd:
+        cmd_list.extend([query_cmd])
+
+    return cmd_list
+
+
+def make_array_metadata_from_array_list_line(raw_info, ns='public', _cmdRunner=None):
+    """Create an ArrayMetadata object from one line of list('arrays') output."""
+
+    # I hesitate to make this a Manifest method because there's just too
+    # much unnecessary coupling here.  So I leave it as an external
+    # method.  All this code was formerly bundled into class
+    # array_metadata, in its constructor no less.  Ugh.
+
+    if _cmdRunner is None:
+        # The old code got a new one for every call, but that seems wasteful.
+        _cmdRunner = CommandRunner(ssh_port=_args.get('ssh_port'))
+
+    m = re.compile('([^,]+)[^\<]*(\<[^\]]+\])').match(raw_info)
+    name =  m.group(1).replace('\'','')
+    schema = m.group(2)
+    file_name = name
+    bin_schema = ''
+
+    fmt = ''
+    if _args.get('save'):
+        fmt = _args.get('save')
+    if _args.get('restore'):
+        fmt = _args.get('restore')
+    assert fmt, "Missing --save or --restore option"
+
+    if ns != 'public':
+        # This array belongs to a namespace: file name will have to include both
+        # array and namespace names.
+        file_name = '.'.join((name, ns))
+
+    if (schema[0] == '\''):
+        schema = schema[1:]
+
+    if (schema[-1] == '\''):
+        schema = schema[:-1]
+
+    # Need to remove \' characters from DEFAULT 'c' modifiers for char-type attributes.
+    schema = schema.replace('\\\'','\'')
+
+    # Binary fun...
+    if (_args.get('save') == 'binary' or _args.get('restore') == 'binary'):
+        # In case of binary format, we add extra fields to the listings.
+
+        # Need to temporarily put back \' characters into DEFAULT 'c' modifiers
+        # for char-type operators; show operator will enclose everything in single
+        # quotes: so inside single quotes need to be \-escaped.
+        temp_schema = schema.replace('\'','\\\'')
+
+        input_arg = name
+        if (_args.get('restore') == 'binary'):
+            input_arg = temp_schema
+
+        # Prepare and run the command to get 1D flat schema of the array.
+        show_query = namespace_wrap_query(
+            ns,
+            'show(\'unpack(input({0},\\\'/dev/null\\\'),__row)\',\'afl\')'.format(input_arg)
+            )
+
+        cmd = getIqueryCmd(
+            _args.get('host'),
+            _args.get('port'),
+            auth_file=_args.get('auth-file'),
+            flag_list=['-ocsv:l', '-aq'],
+            query_cmd=show_query)
+
+        exits,outs = _cmdRunner.waitForProcesses(
+            _cmdRunner.runSubProcesses([cmd]),
+            True
+            )
+        cutoff_line = 1
+        if ('set_namespace' in show_query):
+            cutoff_line = 2
+        # Brush up the raw query output.
+        text = outs[0][0].split('\n')[cutoff_line]
+        m = re.compile('<[^\]]+?\]').search(text)
+        if (m is None):
+            msg = ['Unable to extract schema string from show output:']
+            msg.append(text)
+            raise AppError('\n'.join(msg))
+        bin_schema = m.group().strip()
+        m = re.compile('<[^>]+?>').search(bin_schema)
+        if (m is None):
+            msg = ['Unable to extract schema attributes string from show output:']
+            msg.append(text)
+            raise AppError('\n'.join(msg))
+        attr_list = m.group().replace('>','')
+        attr_list = attr_list.replace('<','').split(',')
+        array_bin_fmt = []
+        for attr in attr_list:
+            m = re.compile('([^:]+:)([^\s]+)(.*)').match(attr)
+            if (m is None):
+                msg = ['Unable to extract attribute type:']
+                msg.append(attr)
+                raise AppError('\n'.join(msg))
+            fmt_string = m.group(2).strip()
+            modifiers = m.group(3).strip()
+            if (len(modifiers) > 0):
+                if (modifiers[:4].upper() == 'NULL'):
+                    fmt_string += ' NULL'
+            array_bin_fmt.append(fmt_string)
+        # Save the binary format.
+        fmt = '({0})'.format(','.join(array_bin_fmt))
+        # Save 1D schema
+        bin_schema = bin_schema.replace('\\\'','\'')
+
+    # Finally, construct and return some ArrayMetadata.
+    return ArrayMetadata._make((name, ns, fmt, None, # uaid
+                                file_name, schema, bin_schema))
+
+
+def fix_v0_schemas(manifest, _cmdRunner=None):
+    """Fix a v0 manifest: resolve binary schemas, adjust attribute nullability.
+
+    @description The v0 .manifest file format does not contain explicit
+    binary schemas, so we may need to derive them at runtime using the same
+    queries used by the 15.7 version of this script.
+
+    @p In addition, in 15.12 (v1), attributes became nullable by
+    default.  All schemas from the v0 manifest have to be adjusted
+    accordingly to preserve the semantics of the original array.
+
+    @param manifest a v0 Manifest object
+    @return v0 manifest with correct 'format', 'schema', and 'bin_schema' values
+    """
+    if _cmdRunner is None:
+        _cmdRunner = CommandRunner(ssh_port=_args.get('ssh_port'))
+    assert manifest.version == 0, "Implicit binary schema for v%d manifest??" % manifest.version
+
+    SHOW_QUERY = r"show('unpack(input({0}, \'/dev/null\'),__row)', 'afl')"
+
+    result = Manifest()
+    for md in manifest:
+        assert md.ns == 'public'
+
+        # The v0 md.schema was recorded by 15.7, with attributes NOT NULL by default.  Now
+        # attributes default to nullable, so we must reconstruct the schema to get correct
+        # nullability.
+        attrs, dims = SCHEMA.parse(md.schema, default_nullable=False)
+        schema = SCHEMA.unparse(attrs, dims, default_nullable=True)
+
+        bin_schema = md.bin_schema
+        format = md.format
+        if md.format == 'binary':
+
+            # Run 'show' query to infer binary backup file's schema.
+            assert not md.bin_schema
+            cmd = getIqueryCmd(
+                _args.get('host'),
+                _args.get('port'),
+                auth_file=_args.get('auth-file'),
+                flag_list=['-otsv', '-aq'],
+                query_cmd=SHOW_QUERY.format(schema))
+            exits,outs = _cmdRunner.waitForProcesses(
+                _cmdRunner.runSubProcesses([cmd]),
+                True
+                )
+            raw_output = outs[0][0].strip() # Ugh.
+
+            # Derive the binary format string from the binary schema.
+            m = re.search(r'<[^\]]+]', raw_output)
+            bin_schema = m.group()
+            attrs, dims = SCHEMA.parse(bin_schema)
+            types = [x.type for x in attrs]
+            nulls = [" null" if x.nullable else "" for x in attrs ]
+            format = "({0})".format(
+                ','.join((''.join(x) for x in zip(types, nulls))))
+
+        result.append(ArrayMetadata._make((md.name, md.ns, format, md.uaid,
+                                           md.file_name, schema, bin_schema)))
+    result.version = 0
+    return result
+
 ##############################################################################
 class CommandRunner:
     def __init__(self,ssh_port=22):
@@ -332,6 +759,8 @@ class CommandRunner:
             raise AppError('\n'.join(msg_list))
         self.pids[str(proc.pid)] = [stringLocalCmd,proc]
         return proc
+
+
     #-------------------------------------------------------------------------
     # runSShCommand: execute one command via ssh; the function relies on the
     #                fact that the specified user has the ability to run ssh
@@ -427,29 +856,25 @@ class ScidbCommander:
     def __init__(self, progArgs):
         self._iqueryHost = progArgs.get('host')
         self._iqueryPort = progArgs.get('port')
+        self._iqueryAuthFile = progArgs.get('auth-file')
         self._user = pwd.getpwuid(os.getuid())[0] # Collect some info: get username.
         self._cmdRunner = CommandRunner(ssh_port=progArgs.get('ssh_port'))
         # Run iquery and stash the cluster instance data for later use.
         self._hosts,self._instanceData = self._getHostInstanceData()
         self._coordinator = self._hosts[0] # Coordinator is always first.
 
-        self._list_arrays_query_command = [
-            'iquery',
-            '-c',
+        self._iquery_header = getIqueryCmd(
             self._iqueryHost,
-            '-p',
             self._iqueryPort,
-            '-ocsv',
-            '-aq',
-            'filter(list(\'arrays\'),temporary=false)'
-            ]
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-ocsv:l', '-aq'])
 
-        self._list_all_versions_arrays_query_command = \
-            self._list_arrays_query_command[:-1]
+        self._list_arrays_query_command = 'filter(list(\'arrays\'),temporary=false)'
 
-        self._list_all_versions_arrays_query_command.append(
-            'sort(filter(list(\'arrays\',true),temporary=false),aid)'
-            )
+        self._list_all_versions_arrays_query_command = 'sort(filter(list(\'arrays\',true),temporary=false),aid)'
+
+        self._list_namespaces_query_command = 'list(\'namespaces\')'
+
     #-------------------------------------------------------------------------
     # _getHostInstanceData: gets the information about all scidb instances
     #     currently running.  Basically, the function internalizes the scidb
@@ -477,16 +902,14 @@ class ScidbCommander:
     #     instance.
     #     Hosts are returned in a separate list.
     def _getHostInstanceData(self):
-        cmd = [
-            'iquery',
-            '-c',
+
+        cmd = getIqueryCmd(
             self._iqueryHost,
-            '-p',
             self._iqueryPort,
-            '-ocsv',
-            '-aq',
-            "list('instances')"
-            ] # Instances query.
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-ocsv:l', '-aq'],
+            query_cmd="list('instances')"
+            )
 
         proc = self._cmdRunner.runSubProcess(cmd)
         exits,outs = self._cmdRunner.waitForProcesses([proc],True)
@@ -496,7 +919,6 @@ class ScidbCommander:
         text = outs[0][0].strip().replace('\'','')
         err_text = outs[0][1].strip().replace('\'','')
         lines = text.split('\n')
-
         try:
             hostList = sorted(
                 [line.split(',') for line in lines[1:]],
@@ -515,36 +937,20 @@ class ScidbCommander:
             hostList
             )
         return hosts,instanceData
-    #-------------------------------------------------------------------------
-    # _getExistingScidbArrays: returns a list of arrays currently in the
-    #    database.
-    def _getExistingScidbArrays(self):
 
-        exits,outs = self._cmdRunner.waitForProcesses(
-            [self._cmdRunner.runSubProcess(self._list_arrays_query_command)],
-            True
-            )
-
-        if (any(exits)):
-            raise AppError('Could not run array list query!')
-
-        text = outs[0][0].strip() # Get the raw text
-        lines = text.split('\n')
-        arrayNames = [line.split(',')[0].replace('\'','') for line in lines[1:]]
-        return arrayNames
     #-------------------------------------------------------------------------
     # _removeArrays: delete specified arrays from scidb database.
-    def _removeArrays(self,arrays):
-        iqueryCmd = [
-            'iquery',
-            '-c',
+    def _removeArrays(self, manifest):
+
+        cmd = getIqueryCmd(
             self._iqueryHost,
-            '-p',
             self._iqueryPort,
-            '-ocsv',
-            '-naq'
-            ]
-        removeCmds = [iqueryCmd + ['remove(' + a + ')'] for a in arrays]
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-ocsv:l', '-naq']
+            )
+
+        removeCmds = [cmd + [namespace_wrap_query(md.ns,
+                        'remove({0})'.format(no_ver_name(md.name)))] for md in manifest]
 
         exits = []
         outs = []
@@ -657,26 +1063,6 @@ class ScidbCommander:
             reduce(reducer,zip(tokens,replacements),option) \
             for option in cmd
             ]
-    def _getCommandIterator(
-        self,
-        repTokens,
-        repData,
-        cmd,
-        precompute=False
-        ):
-        iterator = []
-        if (precompute):
-            tempIterator =  [
-                self._replaceTokensInCommand(zipStruct[0],zipStruct[1],zipStruct[2]) \
-                    for zipStruct in zip(itertools.cycle([repTokens]),repData,itertools.cycle([cmd]))
-                ]
-            iterator = (cmd for cmd in tempIterator)
-        else:
-            iterator = (
-                self._replaceTokensInCommand(zipStruct[0],zipStruct[1],zipStruct[2]) \
-                    for zipStruct in zip(itertools.cycle([repTokens]),repData,itertools.cycle([cmd]))
-                )
-        return iterator
 
     #-------------------------------------------------------------------------
     # cleanUpLinks: removes the links from instance data folders to backup
@@ -725,7 +1111,7 @@ class ScidbCommander:
                 )
             print_and_flush('Backup folder(s) deleted.')
     #-------------------------------------------------------------------------
-    def verifyBackup(self,args,arrayNames):
+    def verifyBackup(self,args, manifest):
         baseFolder = args.get('dir')
         _,baseFolderName = os.path.split(baseFolder)
         if (baseFolder[-1] == os.sep):
@@ -752,6 +1138,7 @@ class ScidbCommander:
             True
             )
         text = [t[0].strip().split('\n') for t in R[1]]
+        arrayNames = [md.file_name for md in manifest]
         # Now, we can test if all arrays are found in correct quantity.
         nInst = [ len(instD) for instD in instData]
         arrayChecks = [[ countCheck(z) for a in arrayNames] for z in zip(text,nInst)]
@@ -776,6 +1163,7 @@ class ScidbCommander:
             baseFolder = baseFolder[:-1]
         folderList = [baseFolder]
         dataPaths = []
+
         if (args.get('parallel')):
             # For save operation, both the folders and the links must be
             # created.
@@ -829,180 +1217,144 @@ class ScidbCommander:
         else: # This is a non-parallel operation: only one folder needed.
             if (not (os.path.isdir(baseFolder))):
                 os.makedirs(baseFolder)
-    #-------------------------------------------------------------------------
-    # _getArrayListingFromScidb: runs the specified array listing query and
-    #     and returns the array info list.
-    def _getArrayListingFromScidb(
-        self,
-        listArraysCmd
-        ):
-        proc = self._cmdRunner.runSubProcess(listArraysCmd)
-        exits,outs = self._cmdRunner.waitForProcesses([proc],True)
-        text = outs[0][0].strip()
-        arrayInfo = text.split('\n')
 
-        return arrayInfo[1:]
-    #-------------------------------------------------------------------------
-    # _getArrayListingFromBackup: gets the array listing info from the backed
-    #     backed up .manifest file.
-    def _getArrayListingFromBackup(
-        self,
-        manifest
-        ):
-        with open(manifest,'r') as fd:
-            contents = fd.read()
-        lines = [x for x in map(str.strip, contents.split('\n')) if x]
-        return lines
-
-    def _charEscapesInStringLists(self,s_list,action='add'):
+    def _load_libraries(self,libs):
+        """ Method for loading a list of libraries into SciDB.
+        @param libs list of library names to load
         """
-        The function works with a list of string lists to replace single
-        quote characters with escaped single quotes.  The function has 2
-        modes: replace single quotes with escaped single quotes and the
-        opposite (replace escaped single quotes with plain single quotes).
-        This is necessary in certain situations to deal with the shell
-        and afl syntax.
-        @param s_list list of string lists
-        @param action optional parameter that tells the function which
-               kind of replacements should take place ('add' or 'remove').
-        @return copy of the original list of string lists with all of the
-                strings correctly altered.
+        # Prepare SciDB for user and namespace queries.
+        query_header = list(self._iquery_header)
+        load_libraries_query = ';'.join(['load_library(\'{0}\')'.format(lib) for lib in libs])
+        load_libraries_cmd = query_header + [load_libraries_query]
+        exits,outs = self._cmdRunner.waitForProcesses(
+            [self._cmdRunner.runSubProcess(load_libraries_cmd)],
+            True
+            )
+        text = outs[0][0]
+        err = outs[0][1]
+        if (exits[0] != 0):
+            msg_list = ['Unable to load libraries:']
+            msg_list.extend(libs)
+            msg_list.append(text)
+            msg_list.append(err)
+            raise AppError('\n'.join(msg_list))
+
+    def _show_namespaces(self):
+        namespace_query = list(self._iquery_header)
+        namespace_query.extend(['list(\'namespaces\')'])
+        exits,outs = self._cmdRunner.waitForProcesses(
+            [self._cmdRunner.runSubProcess(namespace_query)],
+            True
+            )
+        text = outs[0][0]
+        existing_namespaces = [ns.replace('\'','') for ns in map(str.strip,text.split('\n')[1:]) if ns]
+        print 'Existing_namespaces=' + str(existing_namespaces)
+
+
+    def _create_namespace(self, namespace):
+        if (namespace == 'public'):
+            return True # Nothing to do
+
+        create_namespace_template = 'create_namespace(\'{0}\')'
+        create_namespace_cmd = self._iquery_header + [create_namespace_template.format(namespace)]
+
+        exits, outs = self._cmdRunner.waitForProcesses(
+            [self._cmdRunner.runSubProcess(create_namespace_cmd)],
+            False)  # Do not want an exception thrown on error
+
+        text = outs[0][0]
+        err  = outs[0][1]
+        if (exits[0] != 0):
+            if 'Error id: scidb::SCIDB_SE_SYSCAT::SCIDB_LE_NOT_UNIQUE' in err:
+                # everything is okay, the namespace already exists
+                return True
+            elif 'Error id: scidb::SCIDB_SE_QPROC::SCIDB_LE_LOGICAL_OP_DOESNT_EXIST' in err:
+                # we are in trust mode in which the namespaces library is
+                # not loaded and therefore the create_namespace operator
+                # is expected to not exist and the array should not be
+                # created.
+                return False
+            else:
+                msg_list = ['Cannot create namespace: {0}.'.format(namespace)]
+                msg_list.append(text)
+                msg_list.append(err)
+
+                raise AppError('\n'.join(msg_list))
+
+        return True
+
+    def _gather_manifest_from_scidb(self,list_query_cmd):
+        """ Collect the metadata info on all arrays in SciDB
+        @param list_query_cmd query to get the array listing from SciDB: it could
+               be either a plain query to list arrays or a query to list all versions
+               of arrays.
+        @return a Manifest object reflecting the selected arrays
         """
-        new_list = [list(l) for l in s_list]
-        for i in xrange(len(new_list)):
-            for j in xrange(len(new_list[i])):
-                if (action == 'add'):
-                    new_list[i][j] = new_list[i][j].replace('\'','\\\'')
-                    continue
-                if (action == 'remove'):
-                    new_list[i][j] = new_list[i][j].replace('\\\'','\'')
-                    continue
-        return new_list
 
-    #-------------------------------------------------------------------------
-    # _formatArrayInfo: puts the raw array listing information into a more
-    #     useful list structure for later use.
-    #     The listing info for arrays have the following structure:
-    #     [
-    #       [name1,id1,schema1,1dschema,binFmt],
-    #       [name2,id2,schema2,1dschema,binFmt],
-    #       ...
-    #       [nameN,idN,schemaN,1dschema,binFmt]
-    #     ]
-    #     The last two entries in each listing get added only during the
-    #     binary format operation since binary format requires redimension.
-    #
-    def _formatArrayInfo(
-        self,
-        rawArrayInfo, # Raw array listing from scidb query (in list form).
-        allVersions, # Flag for all versions mode.
-        nameFilter=None, # RegExp to filter array names..
-        binFmt=False, # Flag for binary format.
-        binFmtQTemplate=None # Binary format input array template.
-        ):
+        # First, figure out what namespaces are in SciDB.
+        namespace_query = list(self._iquery_header)
+        namespace_query.extend(['list(\'namespaces\')'])
+        exits,outs = self._cmdRunner.waitForProcesses(
+            [self._cmdRunner.runSubProcess(namespace_query)],
+            True
+            )
+        text = outs[0][0]
+        namespaces = [ns.replace('\'','') for ns in map(str.strip,text.split('\n')[1:]) if ns]
 
-        arrayInfo = list(rawArrayInfo)
-        # Remove array names from schema.
-        arrayInfo = [
-            re.compile('([^,]+),([^,]+),[^\<]*(\<[^\]]+\])').match(x) for x in arrayInfo
-            ]
-        arrayInfo = [
-            [x.group(1),x.group(2),x.group(3)] for x in arrayInfo if not (x is None)
-            ]
-
-        # Remove single quotes from the array names.
-        for aInfo in arrayInfo:
-            aInfo[0] = aInfo[0].replace('\'','')
-
-        # Need to remove \' characters from DEFAULT 'c' modifiers for char-type attributes.
-        arrayInfo = self._charEscapesInStringLists(arrayInfo,action='remove')
-
-        # Run the array names through the filter.
-        if (not (nameFilter is None)):
-            matches = [re.compile(nameFilter).match(x[0]) for x in arrayInfo]
-            arrayInfo = [arrayInfo[i] for i in range(len(matches)) if not (matches[i] is None)]
-
-        # In case of all versions, we only keep version-ed names.
-        if (allVersions):
-            matches = [re.compile('.*\@[0-9]+').match(x[0]) for x in arrayInfo]
-            arrayInfo = [
-                arrayInfo[i] for i in range(len(matches)) if not (matches[i] is None)
-                ]
-
-        if (binFmt):
-            # In case of binary format, we add extra fields to the listings.
-
-            # Need to temporarily put back \' characters into DEFAULT 'c' modifiers
-            # for char-type operators; show operator will enclose everything in single
-            # quotes: so inside single quotes need to be \-escaped.
-            tempArrayInfo = self._charEscapesInStringLists(arrayInfo,action='add')
-
-            # Prepare the command to query the database for additional info:
-            # binary format operations require redimensioning.
-            cmdTemplate = binFmtQTemplate
-            nameTokens = ['<name>','<id>','<schema>']
-            cmds = [[reduce(lambda x,y: x.replace(*y),zip(nameTokens,ai),c) for c in cmdTemplate] for ai in tempArrayInfo]
+        # Extract array name listings from each namespace.
+        manifest = Manifest()
+        for ns in namespaces:
+            list_query = self._iquery_header + [namespace_wrap_query(ns,list_query_cmd)]
             exits,outs = self._cmdRunner.waitForProcesses(
-                self._cmdRunner.runSubProcesses(cmds),
+                [self._cmdRunner.runSubProcess(list_query)],
                 True
                 )
-            # Brush up the raw query output.
-            textOuts = [o[0].split('\n')[1] for o in outs]
-            binFmts = []
-            bin_schemas = []
-            for text in textOuts:
-                m = re.compile('<[^\]]+?\]').search(text)
-                if (m is None):
-                    msg = ['Unable to extract schema string from show output:']
-                    msg.append(text)
-                    raise AppError('\n'.join(msg))
-                bin_schema = m.group().strip()
-                bin_schemas.append(bin_schema)
-                m = re.compile('<[^>]+?>').search(bin_schema)
-                if (m is None):
-                    msg = ['Unable to extract schema attributes string from show output:']
-                    msg.append(text)
-                    raise AppError('\n'.join(msg))
-                attr_list = m.group().replace('>','')
-                attr_list = attr_list.replace('<','').split(',')
-                array_bin_fmt = []
-                for attr in attr_list:
-                    m = re.compile('([^:]+:)([^\s]+)(.*)').match(attr)
-                    if (m is None):
-                        msg = ['Unable to extract attribute type:']
-                        msg.append(attr)
-                        raise AppError('\n'.join(msg))
-                    fmt_string = m.group(2).strip()
-                    modifiers = m.group(3).strip()
-                    if (len(modifiers) > 0):
-                        if (modifiers[:4].upper() == 'NULL'):
-                            fmt_string += ' NULL'
-                    array_bin_fmt.append(fmt_string)
-                binFmts.append(array_bin_fmt)
+            text = outs[0][0]
 
-            binFmts = ['(' + ','.join(bf) + ')' for bf in binFmts]
+            if (ns == 'public'):
+                # Query will look like "list('arrays');"
+                # The response will look similiar to:
+                #
+                # {No} name,uaid,aid,schema,availability,temporary
+                # {0} 'A1',13,13,'A1<a:int32> [i=0:9,2,0]',true,false
+                #
+                # We ignore the line starting with "{No}"
+                cutoff_line = 1
+            else:
+                # Query will look like "set_namespace('ns1');  list('arrays');"
+                # and we want to ignore the result of the set_namespace;
+                # The response will look similiar to:
+                #
+                # Query was executed successfully
+                # {No} name,uaid,aid,schema,availability,temporary
+                # {0} 'A2',14,14,'A2<a:int32> [i=0:9,2,0]',true,false
+                #
+                # We ignore the line beginning with "Query" and the
+                # line beginning with "{No}".  The line beginning with
+                # "Query" was generated by the set_namespace call.
+                cutoff_line = 2
 
-            bin_schemas = self._charEscapesInStringLists([bin_schemas],action='remove')[0]
+            # Since there are 2 queries in the same call, skip first 2 lines of the output.
+            array_lines = [a for a in map(str.strip,text.split('\n')[cutoff_line:]) if a]
 
-            # Attach extra fields to the array info listings.
-            arrayInfo = [x[0] + [x[1],x[2]] for x in zip(arrayInfo,bin_schemas,binFmts)]
+            if (_args.get('allVersions')): # Remove un-versioned array names from the list.
+                array_lines = [al for al in array_lines if '@' in re.compile('^[^,]+').search(al).group()]
 
-        return arrayInfo
+            fn = lambda x : make_array_metadata_from_array_list_line(x, ns)
+            ns_metadata = map(fn, array_lines)
+            # Pare down the list according to the user-specified array name filter.
+            if (_args.get('filter')):
+                ns_metadata = [md for md in ns_metadata if re.compile(_args.get('filter')).match(md.name)]
+
+            manifest.extend(ns_metadata)
+
+        return manifest
+
     #-------------------------------------------------------------------------
-    # _saveManifest: saves array info listings into .manifest file for later
-    #     retrieval by the restore operation.
-    def _saveManifest(self,manifest,fmtArrayInfo):
-        # Only save the name,id, and original array schema since the rest of
-        # the info can be retrieved later (for binary format).
-        saveInfo = [','.join(x[:3]) for x in fmtArrayInfo]
-        text = '\n'.join(saveInfo)
-        fd = open(manifest,'w')
-        fd.write(text)
-        fd.close()
-    #-------------------------------------------------------------------------
-    # _saveOptsFile: record options used during the save operation to prevent
+    # _buildSaveOpts: record options used during the save operation to prevent
     #     acidental option mismatches during the restore operations.
-    def _saveOptsFile(self,optsFile,args):
+    @staticmethod
+    def _buildSaveOpts(args):
         argsDict = args.getAllArgs()
         text = []
         if (not (args.get('save') is None)):
@@ -1018,29 +1370,16 @@ class ScidbCommander:
         if (args.get('zip')):
             text.append('-z')
         text.append(args.get('dir'))
-
-        fd = open(optsFile,'w')
-        fd.write(' '.join(text))
-        fd.close()
+        return ' '.join(text)
     #-------------------------------------------------------------------------
     # _runSave: saves all arrays (one-by-one) in either parallel or
     #     non-parallel mode without zip option.
     def _runSave(
         self,
-        fmtArrayInfo,  # Info for arrays from list operator with extra stuff.
-        inputArrayExp, # Either array name or unpack(<name>,__row) for binary.
-        saveFmts, # Format to save arrays in (different for formats).
+        manifest,   # Manifest object.
         baseFolder, # Backup folder path.
         parallel=False # Parallel mode flag.
         ):
-
-        # Extract plain array names from array information.
-        arrayNames = [x[0] for x in fmtArrayInfo]
-
-        # Set up a list of formats for the save operator; the format could be
-        # a simple string like 'auto' or a more complicated string like
-        # '(int64,double)' for binary save.
-        fmts = [saveFmts[i] for i in range(len(fmtArrayInfo))]
 
         idNum = '0' # Zero means "save to coordinator", while "-1" means
                     # "save to all instances" (parallel mode).
@@ -1055,123 +1394,89 @@ class ScidbCommander:
             _,baseFolderName = os.path.split(baseFolder)
             saveFolder = baseFolderName
 
-        # This is the main save query command template: it still contains
-        # unreplaced tokens like <name> (will be replaced by array name).
-        q = 'save(' + inputArrayExp + ',' + \
-            '\'' + os.path.join(saveFolder,'<name>') + '\',' + \
-            idNum + \
-            ', <fmt>)'
-        # These are the save commands: one for each array.  The list is
-        # "reduced": each string in the command is run through the replacement
-        # function to insert real array names and folder paths where
-        # necessary.
-        # A side note: the commands are organized into a generator (not a
-        # list).  This is done to control the size of the list since it
-        # can get rather large.  During the array save loop, each command is
-        # evaluated/"materialized" by the generator.
-        cmds = (
-            ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', reduce(lambda x,y: x.replace(*y),[('<name>',z[0]),('<fmt>',z[1])],q)] \
-            for z in zip(arrayNames,fmts)
-        )
+        cmd_header = getIqueryCmd(
+            self._iqueryHost,
+            self._iqueryPort,
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-naq'])
 
-        savedArrays = 0
-        for i in range(len(arrayNames)): # Save all of the arrays.
-            cmd = cmds.next()
-            print_and_flush('Archiving array {0}'.format(arrayNames[i]))
-
+        saved_arrays = 0
+        for md in manifest:
+            print_and_flush('Archiving array {0}'.format(md.name))
+            save_cmd = list(cmd_header)
+            input_expr = md.name
+            if _args.get('save') == 'binary':
+                input_expr = 'unpack({0},__row)'.format(md.name)
+            save_query = 'save({0},\'{1}\',{2},\'{3}\')'.format(
+                input_expr,
+                os.path.join(saveFolder,md.file_name),
+                idNum,
+                md.format
+                )
+            save_query = namespace_wrap_query(md.ns, save_query)
+            save_cmd.extend([save_query])
             # Run save command, wait for its completion, and get its exit
             # codes and output.
             exits,outs = self._cmdRunner.waitForProcesses(
-                [self._cmdRunner.runSubProcess(cmd)],
+                [self._cmdRunner.runSubProcess(save_cmd)],
                 True
                 )
 
             text = outs[0][0].strip() # Print iquery output for the user.
             print_and_flush(text)
-            savedArrays += 1
-        print_and_flush('Saved arrays: {0}'.format(savedArrays))
+            saved_arrays += 1
+        print_and_flush('Saved arrays: {0}'.format(saved_arrays))
+
     #-------------------------------------------------------------------------
     # _runZipSave: save arrays with gzip in non-parallel mode.
     #
     def _runZipSave(
         self,
-        fmtArrayInfo,  # Info for arrays from list operator with extra stuff.
-        inputArrayExp, # Either array name or unpack(<name>,__row) for binary.
-        saveFmts, # Format to save arrays in (different for formats).
+        manifest, # Manifest object.
         baseFolder # Backup folder path.
         ):
 
-        # Extract plain array names from array information.
-        arrayNames = [x[0] for x in fmtArrayInfo]
+        cmd_header = getIqueryCmd(
+            self._iqueryHost,
+            self._iqueryPort,
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-naq'])
 
-        # Set up a list of formats for the save operator; the format could be
-        # a simple string like 'auto' or a more complicated string like
-        # '(int64,double)' for binary save.
-        fmts = [saveFmts[i] for i in range(len(fmtArrayInfo))]
+        saved_arrays = 0
 
-        # This is the main save query command template: it still contains
-        # unreplaced tokens like <name> (will be replaced by array name).
-        q = 'save(' + inputArrayExp + ',' + \
-            '\'' + os.path.join(baseFolder,'<name>') + '\',' + \
-            '0' + \
-            ', <fmt>)'
-
-        # Path to the named pipe where the save operator will be storing data.
-        pipeName = os.path.join(baseFolder,'<name>')
-
-        # Set up pipe making shell commands here for each array.
-        makePipeCmd = ['rm', '-f',pipeName, ';','mkfifo','--mode=666',pipeName]
-
-        # Set up the gzip commands here for each array.  The command lists
-        # have several shell commands in them: gzip the pipe contents and
-        # move/rename the named pipe to the array name (final file name).
-        gzipCmd = [
-            'gzip',
-            '-c',
-            '<',
-            os.path.join(baseFolder,'<name>'),
-            '>',
-            os.path.join(baseFolder,'<name>.gz'),
-            '&&',
-            'mv',
-            os.path.join(baseFolder,'<name>.gz'),
-            os.path.join(baseFolder,'<name>')
-            ]
-
-        # These are the save commands: one for each array.  They are
-        # "reduced": each string in the command is run through the replacement
-        # function to insert real array names and folder paths where
-        # necessary.
-        # Note that all three command lists below are set up as generators (not
-        # precomputed lists).  This is done to control the space used up by
-        # data since these command lists tend to get rather large.
-
-        repTokens = ['<name>','<fmt>']
-        repData = zip(arrayNames,fmts)
-        fullQuery = ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-ocsv','-naq', q]
-
-        cmds = self._getCommandIterator(repTokens,repData,fullQuery,True)
-        makePipeCmds = self._getCommandIterator(repTokens,repData,makePipeCmd,True)
-        gzipCmds = self._getCommandIterator(repTokens,repData,gzipCmd,True)
-
-        savedArrays = 0
-        for i in range(len(arrayNames)):
-            arrayName = arrayNames[i]
-            makePipeCmd = makePipeCmds.next()
-            saveArrayCmd = cmds.next()
-            gzipCmd = gzipCmds.next()
-
-            print_and_flush('Archiving array {0}'.format(arrayName))
-
+        for md in manifest:
+            print_and_flush('Archiving array {0}'.format(md.name))
+            input_expr = md.name
+            if (_args.get('save') == 'binary'):
+                input_expr = 'unpack({0},__row)'.format(md.name)
+            pipeName = os.path.join(baseFolder,md.file_name)
+            makePipeCmd = ['rm', '-f',pipeName, ';','mkfifo','--mode=666',pipeName]
+            gzipCmd = [
+                'gzip',
+                '-c',
+                '<',
+                pipeName,
+                '>',
+                '{0}.gz'.format(pipeName),
+                '&&',
+                'mv',
+                '{0}.gz'.format(pipeName),
+                pipeName
+                ]
             # Make the named pipe and wait for the command to complete (no
             # need to read the output).
-            self._cmdRunner.waitForProcesses(
+            exits,outs = self._cmdRunner.waitForProcesses(
                 [self._cmdRunner.runSubProcess(makePipeCmd,useShell=True)],
                 False
                 )
+
+            save_query = 'save({0},\'{1}\',0,\'{2}\')'.format(input_expr,pipeName,md.format)
+            save_query = namespace_wrap_query(md.ns, save_query)
+            save_query_cmd = cmd_header + [save_query]
+
             # Start the iquery save command into the named pipe and do not
             # wait for completion.
-            mainProc = self._cmdRunner.runSubProcess(saveArrayCmd)
+            mainProc = self._cmdRunner.runSubProcess(save_query_cmd)
 
             # Start gzip/move shell command and wait for its completion: when
             # this command is done, save operator is done, gzip is done, and
@@ -1185,100 +1490,101 @@ class ScidbCommander:
 
             text = outs[0][0].strip() # Print iquery output for user.
             print_and_flush(text)
-            savedArrays += 1
+            saved_arrays += 1
 
-        print_and_flush('Saved arrays: {0}'.format(savedArrays))
+        print_and_flush('Saved arrays: {0}'.format(saved_arrays))
     #-------------------------------------------------------------------------
     # _runParallelZipSave: save all arrays in parallel mode and with gzip.
     #
     def _runParallelZipSave(
         self,
-        fmtArrayInfo,  # Info for arrays from list operator with extra stuff.
-        inputArrayExp, # Either array name or unpack(<name>,__row) for binary.
-        saveFmts, # Format to save arrays in (different for formats).
+        manifest,  # Manifest object.
         baseFolder # Backup folder path.
         ):
 
-        # Extract plain array names from array information.
-        arrayNames = [x[0] for x in fmtArrayInfo]
-
-        # Set up a list of formats for the save operator; the format could be
-        # a simple string like 'auto' or a more complicated string like
-        # '(int64,double)' for binary save.
-        fmts = [saveFmts[i] for i in range(len(fmtArrayInfo))]
-
         _,baseFolderName = os.path.split(baseFolder);
 
-        # This is the main save query command template: it still contains
-        # unreplaced tokens like <name> (will be replaced by array name).
-        q = 'save(' + inputArrayExp + ',' + \
-            '\'' + os.path.join(baseFolderName,'<name>') + '\',' + \
-            '-1' + \
-            ', <fmt>)'
+        input_expr = ''
+        saved_arrays = 0
 
-        # These are the save commands: one for each array.  The list is
-        # "reduced": each string in the command is run through the replacement
-        # function to insert real array names and folder paths where
-        # necessary.
+        cmd_header = getIqueryCmd(
+            self._iqueryHost,
+            self._iqueryPort,
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-naq'])
 
-        cmds = (
-            ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', reduce(lambda x,y: x.replace(*y),[('<name>',z[0]),('<fmt>',z[1])],q)] \
-            for z in zip(arrayNames,fmts)
-        )
-        # Path to the named pipe where the save operator will be storing data.
-        pipeName = os.path.join(baseFolder + '.<i>','<name>')
+        for md in manifest:
+            print_and_flush('Archiving array {0}'.format(md.name))
 
-        # Set up pipe making shell commands here for each array.
-        makePipeCmd = ['rm', '-f',pipeName, ';','mkfifo','--mode=666',pipeName + ';']
+            # Set up pipe making shell commands here for each array.
+            pipeName = os.path.join(baseFolder + '.<i>',md.file_name)
 
-        # Set up the gzip commands here for each array.  The command lists
-        # have several shell commands in them: gzip the pipe contents and
-        # move/rename the named pipe to the array name (final file name).
-        gzipCmd = [
-            'gzip',
-            '-c',
-            '<',
-            pipeName,
-            '>',
-            pipeName + '.gz',
-            '&',
-            'export',
-            'GZ_EXIT_CODES=\"$GZ_EXIT_CODES $!\";'
-            ]
-        # Final command template: move/rename .gz file to its final
-        # (array) name.
-        moveCmd = [
-            'mv',
-            pipeName + '.gz',
-            pipeName + ';'
-            ]
-        reducers = map(lambda a: lambda x: [('<i>',x[1]),('<name>',a)],arrayNames)
+            makePipeCmd = ['rm', '-f',pipeName, ';','mkfifo','--mode=666',pipeName + ';']
 
-        allMakePipeCmds = (self._prepInstanceCommands(list(makePipeCmd),r) for r in reducers)
-        allGzipCmds = (self._prepInstanceCommands(list(gzipCmd),r,trim=False,end='wait $GZ_EXIT_CODES') for r in reducers)
-        allMoveCmds = (self._prepInstanceCommands(list(moveCmd),r) for r in reducers)
+            # Set up the gzip commands here for each array.  The command lists
+            # have several shell commands in them: gzip the pipe contents and
+            # move/rename the named pipe to the array name (final file name).
+            gzipCmd = [
+                'gzip',
+                '-c',
+                '<',
+                pipeName,
+                '>',
+                pipeName + '.gz',
+                '&',
+                'export',
+                'GZ_EXIT_CODES=\"$GZ_EXIT_CODES $!\";'
+                ]
 
-        savedArrays = 0
-        for i in range(len(arrayNames)):
-            makePipeCmdList = allMakePipeCmds.next()
-            saveArrayCmd = cmds.next()
-            gzipCmdList = allGzipCmds.next()
-            moveCmdList = allMoveCmds.next()
+            # Final command template: move/rename .gz file to its final
+            # (array) name.
+            moveCmd = [
+                'mv',
+                pipeName + '.gz',
+                pipeName + ';'
+                ]
 
-            print_and_flush('Archiving array {0}'.format(arrayNames[i]))
+            input_expr = md.name
+            if (_args.get('save') == 'binary'):
+                input_expr = 'unpack({0},__row)'.format(md.name)
+
+            save_query = 'save({0},\'{1}\',-1,\'{2}\')'.format(
+                input_expr,
+                os.path.join(baseFolderName,md.file_name),
+                md.format
+                )
+            namespace_wrap_query(md.ns, save_query)
+            save_query_cmd = cmd_header + [save_query]
+
+            reducer = lambda x: [('<i>',x[1])]
+            make_pipe_cmds = self._prepInstanceCommands(
+                list(makePipeCmd),
+                reducer
+                )
+            gzip_cmds = self._prepInstanceCommands(
+                list(gzipCmd),
+                reducer,
+                trim=False,
+                end='wait $GZ_EXIT_CODES'
+                )
+            move_cmds = self._prepInstanceCommands(
+                list(moveCmd),
+                reducer
+                )
+
             # Make the named pipe and wait for the command to complete (no
             # need to read the output).
             self._cmdRunner.waitForProcesses(
                 self._cmdRunner.runSshCommands(
                     self._user,
                     self._hosts,
-                    makePipeCmdList
+                    make_pipe_cmds
                     ),
                 False
                 )
             # Start the iquery save command into the named pipes and do not
             # wait for completion.
-            mainProc = self._cmdRunner.runSubProcess(saveArrayCmd)
+            mainProc = self._cmdRunner.runSubProcess(save_query_cmd)
 
             # Start gzip/move shell command and wait for its completion: when
             # this command is done, save operator is done, gzip is done, and
@@ -1287,7 +1593,7 @@ class ScidbCommander:
                 self._cmdRunner.runSshCommands(
                     self._user,
                     self._hosts,
-                    gzipCmdList
+                    gzip_cmds
                     ),
                 False
                 )
@@ -1299,7 +1605,7 @@ class ScidbCommander:
                 self._cmdRunner.runSshCommands(
                     self._user,
                     self._hosts,
-                    moveCmdList
+                    move_cmds
                     ),
                 False
                 )
@@ -1307,36 +1613,22 @@ class ScidbCommander:
             text = outs[0][0].strip() # Print iquery output for user.
             print_and_flush(text)
 
-            savedArrays += 1
-        print_and_flush('Saved arrays: {0}'.format(savedArrays))
+            saved_arrays += 1
+        print_and_flush('Saved arrays: {0}'.format(saved_arrays))
     #-------------------------------------------------------------------------
     # _runRestore: restore all arrays in parallel or in non-parallel modes.
     #
     def _runRestore(
         self,
-        fmtArrayInfo,  # Formatted array info listing.
-        restoreQuery, # Query with the store operator.
-        restoreFmts, # Format to restore arrays in (different for formats).
+        manifest,   # The Manifest object.
         baseFolder, # Base backup folder path.
         parallel=False # Parallel mode flag.
         ):
-
-        # Extract plain array names from array information.
-        arrayNames = [x[0] for x in fmtArrayInfo]
-
-        # If names have version numbers, strip them out and keep unversioned
-        # array names separately.
-        noVerArrayNames = list(arrayNames)
-        m = map(re.compile('\@[0-9]+').search,arrayNames)
-
-        if (all(m)):
-            noVerArrayNames = [z[0].replace(z[1].group(),'') for z in zip(noVerArrayNames,m)]
 
         idNum = '0' # Zero means "save to coordinator", while "-1" means
                     # "save to all instances" (parallel mode).
         restoreFolder = baseFolder # By default, absolute restore folder is
                                    # assumed.
-
         if (parallel):
             idNum = '-1' # Parallel mode: save to all instances
             # Similarly, in parallel mode save folder value for the save
@@ -1346,46 +1638,49 @@ class ScidbCommander:
             _,baseFolderName = os.path.split(baseFolder) # Use relative path.
             restoreFolder = baseFolderName
 
-        # This is the main save query command template: it still contains
-        # unreplaced tokens like <name> (will be replaced by array name).
-        q = restoreQuery
+        restoreQuery = 'store(input({0},\'{1}\',{2},\'{3}\'),{4})'
+        metadata_func = lambda md: [
+            md.schema,
+            os.path.join(restoreFolder,md.file_name),
+            idNum,
+            md.format,
+            no_ver_name(md.name)
+            ]
 
-        # These are replacement tokens and values that will be used below to
-        # transform command templates into actual commands.
-        repTokens = ['<fname>','<id>','<schema>','<fmt>','<opt>']
-        repData = [fmtArrayInfo[i] + [restoreFmts[i],idNum] for i in range(len(fmtArrayInfo))]
+        if (_args.get('restore') == 'binary'):
+            restoreQuery = 'store(redimension(input({0},\'{1}\',{2},\'{3}\'),{4}),{5})'
+            metadata_func = lambda md: [
+                md.bin_schema,
+                os.path.join(restoreFolder,md.file_name),
+                idNum,
+                md.format,
+                md.schema,
+                no_ver_name(md.name)
+                ]
 
-        if (len(fmtArrayInfo[0]) > 3): # Binary format requires extra information.
-            repTokens = ['<fname>','<id>','<schema>','<bin_schema>','<fmt>','<opt>']
-            repData = [fmtArrayInfo[i] + [idNum] for i in range(len(fmtArrayInfo))]
+        restored_arrays = 0
 
-        # Array name might be different from the non-versioned name.  During
-        # restore operation array info is coming from the manifest file.  If
-        # user saved all versions of arrays, filenames will have @X suffixes,
-        # but we need unversion-ed names of those same array for restoring
-        # them.
-        repTokens.append('<name>')
-        repData = [z[1] + [z[0]] for z in zip(noVerArrayNames,repData)]
+        cmd_header = getIqueryCmd(
+            self._iqueryHost,
+            self._iqueryPort,
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-naq'])
 
-        # These are the actual store commands.  Note that these are kept in a
-        # "generator" form (not a precomputed list).  This is done to keep
-        # memory usage low since these lists can get very large: generators
-        # compute only one value at a time.
-        cmds = (
-            ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', reduce(lambda x,y: x.replace(*y),zip(repTokens,repData[i]),q)] \
-            for i in range(len(fmtArrayInfo))
-            )
+        for md in manifest:
+            print_and_flush('Restoring array {0}'.format(md.name))
 
-        restoredArrays = 0
+            if False == self._create_namespace(md.ns):
+                print_and_flush('WARNING: namespace \'' + md.ns + '\' can not be created')
+                print_and_flush('         array \'' + md.name + '\' cannot be restored.')
+                print_and_flush('         Please load the plugin for namespace management (\'namespaces\'),')
+                print_and_flush('         or change the array namespace(s) to \'public\' in the')
+                print_and_flush('         <restore directory>/.manifest file(s)')
+                continue
 
-        for i in range(len(arrayNames)):
-            arrayName = arrayNames[i]
-            cmd = cmds.next()
-            noVerName = noVerArrayNames[i]
+            array_restore_query = restoreQuery.format(*metadata_func(md))
+            array_restore_query = namespace_wrap_query(md.ns, array_restore_query)
+            cmd = cmd_header + [array_restore_query]
 
-            print_and_flush('Restoring array {0}'.format(arrayName))
-            # Run restore command, wait for its completion, and get its exit
-            # codes and output.
             exits,outs = self._cmdRunner.waitForProcesses(
                 [self._cmdRunner.runSubProcess(cmd)],
                 True
@@ -1393,87 +1688,62 @@ class ScidbCommander:
 
             text = outs[0][0].strip() # Print iquery output for the user.
             print_and_flush(text)
-            restoredArrays += 1
-        print_and_flush('Restored arrays: {0}'.format(restoredArrays))
+            restored_arrays += 1
+        print_and_flush('Restored arrays: {0}'.format(restored_arrays))
+
     #-------------------------------------------------------------------------
     # _runZipRestore: restore all arrays with gzip option.
     #
     def _runZipRestore(
         self,
-        fmtArrayInfo,  # Formatted array info listings.
-        restoreQuery, # Store operator query template.
-        restoreFmts, # Format to restore arrays in (different for formats).
+        manifest,  # The Manifest object.
         baseFolder # Backup folder path.
         ):
 
-        # Extract plain array names from array information.
-        arrayNames = [x[0] for x in fmtArrayInfo]
+        restore_query_template = 'store(input({0},\'{1}\',0,\'{2}\'),{3})'
+        metadata_func = lambda md,p_name: [
+            md.schema,
+            p_name,
+            md.format,
+            no_ver_name(md.name)
+            ]
+        if (_args.get('restore') == 'binary'):
+            restore_query_template = 'store(redimension(input({0},\'{1}\',0,\'{2}\'),{3}),{4})'
+            metadata_func = lambda md,p_name: [
+                md.bin_schema,
+                p_name,
+                md.format,
+                md.schema,
+                no_ver_name(md.name)
+                ]
 
-        # If names have version numbers, strip them out and keep unversioned
-        # array names separately.
-        noVerArrayNames = list(arrayNames)
-        m = map(re.compile('\@[0-9]+').search,arrayNames)
-        if (all([not(x is None) for x in m])):
-            noVerArrayNames = [z[0].replace(z[1].group(),'') for z in zip(noVerArrayNames,m)]
+        restored_arrays = 0
 
-        idNum = '0' # Zero means "save to coordinator", while "-1" means
-                    # "save to all instances" (parallel mode).
+        cmd_header = getIqueryCmd(
+            self._iqueryHost,
+            self._iqueryPort,
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-naq'])
 
-        # This is the main save query command template: it still contains
-        # unreplaced tokens like <name> (will be replaced by array name).
-        q = restoreQuery
+        for md in manifest:
+            print_and_flush('Restoring array {0}'.format(md.name))
+            pipeName = os.path.join(baseFolder,'{0}.p'.format(md.file_name))
+            pipeCmd = ['rm','-f',pipeName,'>','/dev/null','2>&1',';','mkfifo','--mode=666',pipeName]
+            gzipCmd = ['gzip','-d','-c','<',os.path.join(baseFolder,md.file_name),'>',pipeName]
+            cleanupCmd = ['rm','-f',pipeName]
 
-        # These are replacement tokens and values that will be used below to
-        # transform command templates into actual commands.
-        repTokens = ['<fname>','<id>','<schema>','<fmt>','<opt>']
-        repData = [fmtArrayInfo[i] + [restoreFmts[i],idNum] for i in range(len(fmtArrayInfo))]
+            if False == self._create_namespace(md.ns):
+                print_and_flush('WARNING: namespace \'' + md.ns + '\' can not be created')
+                print_and_flush('         array \'' + md.name + '\' cannot be restored.')
+                print_and_flush('         Please load the plugin for namespace management (\'namespaces\'),')
+                print_and_flush('         or change the array namespace(s) to \'public\' in the')
+                print_and_flush('         <restore directory>/.manifest file(s)')
+                continue
 
-        if (len(fmtArrayInfo[0]) > 3): # Binary restore requires extra info.
-            repTokens = ['<fname>','<id>','<schema>','<bin_schema>','<fmt>','<opt>']
-            repData = [fmtArrayInfo[i] + [idNum] for i in range(len(fmtArrayInfo))]
+            restore_query = restore_query_template.format(*metadata_func(md,pipeName))
+            restore_query = namespace_wrap_query(md.ns, restore_query)
 
-        pipeName = os.path.join(baseFolder,'<fname>.p')
-        pipeCmd = ['rm','-f',pipeName,'>','/dev/null','2>&1',';','mkfifo','--mode=666',pipeName]
-
-        gzipCmd = ['gzip','-d','-c','<',os.path.join(baseFolder,'<fname>'),'>',pipeName]
-        cleanupCmd = ['rm','-f',pipeName]
-
-        # Start preparing the store query.
-        q = q.replace('<in_path>', pipeName)
-
-        # Array name might be different from the non-versioned name.  During
-        # restore operation array info is coming from the manifest file.  If
-        # user saved all versions of arrays, filenames will have @X suffixes,
-        # but we need unversion-ed names of those same array for restoring
-        # them.
-        repTokens.append('<name>')
-        repData = [z[1] + [z[0]] for z in zip(noVerArrayNames,repData)]
-
-        # These are the actual commands for scidb hosts.  They are put
-        # together by sending command templates through a series of
-        # string replacements.  Note that these are kept in "generator" form
-        # in order to keep memory usage in check as these lists can get rather
-        # large.
-
-        fullQuery =  ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', q]
-
-        cmds = self._getCommandIterator(repTokens,repData,fullQuery,True)
-        pipeCmds = self._getCommandIterator(repTokens,repData,pipeCmd,True)
-        gzipCmds = self._getCommandIterator(repTokens,repData,gzipCmd,True)
-        cleanupCmds = self._getCommandIterator(repTokens,repData,cleanupCmd,True)
-
-        restoredArrays = 0
-
-        for i in range(len(arrayNames)):
-
-            arrayName = arrayNames[i]
-            cmd = cmds.next()
-            pipeCmd = pipeCmds.next()
-            gzipCmd = gzipCmds.next()
-            cleanupCmd = cleanupCmds.next()
-            noVerName = noVerArrayNames[i]
-
-            print_and_flush('Restoring array {0}'.format(arrayName))
+            restore_cmd = cmd_header + [restore_query]
 
             self._cmdRunner.waitForProcesses(
                 [self._cmdRunner.runSubProcess(pipeCmd,useShell=True)],
@@ -1481,7 +1751,7 @@ class ScidbCommander:
                 )
             self._cmdRunner.runSubProcess(gzipCmd,useShell=True)
             exits,outs = self._cmdRunner.waitForProcesses(
-                [self._cmdRunner.runSubProcess(cmd)],
+                [self._cmdRunner.runSubProcess(restore_cmd)],
                 True
                 )
             self._cmdRunner.waitForProcesses(
@@ -1490,238 +1760,171 @@ class ScidbCommander:
                 )
             text = outs[0][0].strip() # Print iquery output for user.
             print_and_flush(text)
-            restoredArrays += 1
-        print_and_flush('Restored arrays: {0}'.format(restoredArrays))
+            restored_arrays += 1
+        print_and_flush('Restored arrays: {0}'.format(restored_arrays))
+
     #-----------------------------------------------------------------------------
     # _runParallelZipRestore: restore all arrays in parallel mode and with gzip
     #     option.
     def _runParallelZipRestore(
         self,
-        fmtArrayInfo,  # Info for arrays from list operator with extra stuff.
-        restoreQuery, # Query template for the store operator.
-        restoreFmts, # Format to restore arrays in (different for formats).
+        manifest,  # The Manifest object.
         baseFolder # Backup folder path.
         ):
 
-        # Extract plain array names from array information.
-        arrayNames = [x[0] for x in fmtArrayInfo]
-
-        # If names have version numbers, strip them out and keep unversioned
-        # array names separately.
-        noVerArrayNames = list(arrayNames)
-        m = map(re.compile('\@[0-9]+').search,arrayNames)
-        if (all([not(x is None) for x in m])):
-            noVerArrayNames = [z[0].replace(z[1].group(),'') for z in zip(noVerArrayNames,m)]
-
-        idNum = '-1' # Zero means "save to coordinator", while "-1" means
-                    # "save to all instances" (parallel mode).
-
         _,baseFolderName = os.path.split(baseFolder)
-        # This is the main save query command template: it still contains
-        # unreplaced tokens like <name> (will be replaced by array name).
-        q = restoreQuery
 
-        # These are replacement tokens and values that will be used below to
-        # transform command templates into actual commands.
-        repTokens = ['<fname>','<id>','<schema>','<fmt>','<opt>']
-        repData = [fmtArrayInfo[i] + [restoreFmts[i],idNum] for i in range(len(fmtArrayInfo))]
-
-        if (len(fmtArrayInfo[0]) > 3): # Binary restore requires extra info.
-            repTokens = ['<fname>','<id>','<schema>','<bin_schema>','<fmt>','<opt>']
-            repData = [fmtArrayInfo[i] + [idNum] for i in range(len(fmtArrayInfo))]
-
-        # Array name might be different from the non-versioned name.  During
-        # restore operation array info is coming from the manifest file.  If
-        # user saved all versions of arrays, filenames will have @X suffixes,
-        # but we need unversion-ed names of those same array for restoring
-        # them.
-        repTokens.append('<name>')
-        repData = [z[1] + [z[0]] for z in zip(noVerArrayNames,repData)]
-
-        # Set up all command templates.
-        pipeName = os.path.join(baseFolder + '.<i>','<fname>.p')
-        pipeCmd = ['rm','-f',pipeName,'>','/dev/null','2>&1',';','mkfifo','--mode=666',pipeName + '&&']
-
-        gzipCmd = [
-            'gzip',
-            '-d',
-            '-c',
-            '<',
-            os.path.join(baseFolder + '.<i>','<fname>'),
-            '>',
-            pipeName + '&',
-            'export GZ_EXIT_CODES=\"$GZ_EXIT_CODES $!\";'
+        restore_query_template = 'store(input({0},\'{1}\',-1,\'{2}\'),{3})'
+        metadata_func = lambda md,p_fname: [
+            md.schema,
+            os.path.join(baseFolderName,p_fname),
+            md.format,
+            no_ver_name(md.name)
             ]
-        cleanupCmd = ['rm','-f',pipeName + ';']
+        if (_args.get('restore') == 'binary'):
+            restore_query_template = 'store(redimension(input({0},\'{1}\',-1,\'{2}\'),{3}),{4})'
+            metadata_func = lambda md,p_fname: [
+                md.bin_schema,
+                os.path.join(baseFolderName,p_fname),
+                md.format,
+                md.schema,
+                no_ver_name(md.name)
+                ]
 
-        # Start preparing the store query.
-        q = q.replace('<in_path>',os.path.join(baseFolderName,'<fname>.p'))
+        arrays_restored = 0
 
-        # These are the actual commands for scidb hosts.  They are put
-        # together by sending command templates through a series of
-        # string replacements.  Note that these are kept in "generator" form
-        # in order to keep memory usage in check as these lists can get rather
-        # large.
-        cmds = (
-            ['iquery','-c',self._iqueryHost,'-p',self._iqueryPort,'-naq', reduce(lambda x,y: x.replace(*y),zip(x[0],x[1]),q)] \
-            for x in zip(itertools.cycle([repTokens]),repData)
-        )
-        # Reducers are small functions that, when given input (instance info
-        # list), produce a list of replacer tuples - [('<i>',x[1]),...].
-        # These are used to scrub the commands and substitute temporary tokens
-        # for actual data - <i> will be replaced by the scidb instance id in a
-        # command.  See contruction of repTokens and repData above.
-        # A side note: reducers cannot be a generator expression because it
-        # is being traversed multiple times (generators get exhausted after a
-        # single traverse).
-        reducers = [lambda x: zip(repTokens,repData[i]) + [('<i>',x[1])] for i in range(len(arrayNames))]
+        cmd_header = getIqueryCmd(
+            self._iqueryHost,
+            self._iqueryPort,
+            auth_file=self._iqueryAuthFile,
+            flag_list=['-naq'])
 
-        # Put together pipe-creation commands generator.
-        allPipeCmds = (self._prepInstanceCommands(pipeCmd,x) for x in reducers)
+        for md in manifest:
+            print_and_flush('Restoring array {0}'.format(md.name))
+            rel_pipeName = '{0}.p'.format(md.file_name)
+            pipeName = os.path.join(baseFolder + '.<i>',rel_pipeName)
 
-        # Put together gzip commands generator.
-        allGzipCmds = (self._prepInstanceCommands(gzipCmd,x,trim=False,end='wait $GZ_EXIT_CODES') for x in reducers)
+            pipeCmd = ['rm','-f',pipeName,'>','/dev/null','2>&1',';','mkfifo','--mode=666',pipeName + '&&']
 
-        # Put together cleanup commands generator.
-        allCleanupCmds = (self._prepInstanceCommands(cleanupCmd,x) for x in reducers)
+            if False == self._create_namespace(md.ns):
+                print_and_flush(textwrap.dedent("""
+                    WARNING: namespace '{0}' cannot be created, array '{1}' cannot be restored.
+                             Please load the plugin for namespace management ('namespaces'),
+                             or change the array namespace(s) to 'public' in the
+                             <restore directory>/.manifest file(s)""".format(md.ns, md.name)))
+                continue
 
-        arraysRestored = 0
+            restore_query = restore_query_template.format(*metadata_func(md,rel_pipeName))
+            restore_query = namespace_wrap_query(md.ns, restore_query)
 
-        for i in range(len(arrayNames)):
+            restore_query_cmd = cmd_header + [restore_query]
 
-            arrayName = arrayNames[i]
-            cmd=cmds.next()
-            pipeCmds = allPipeCmds.next()
-            gzipCmds = allGzipCmds.next()
-            cleanupCmds = allCleanupCmds.next()
-            noVerName = noVerArrayNames[i]
+            gzipCmd = [
+                'gzip',
+                '-d',
+                '-c',
+                '<',
+                os.path.join(baseFolder + '.<i>',md.file_name),
+                '>',
+                pipeName + '&',
+                'export GZ_EXIT_CODES=\"$GZ_EXIT_CODES $!\";'
+                ]
+            cleanupCmd = ['rm','-f',pipeName + ';']
 
-            print_and_flush('Restoring array {0}'.format(arrayName))
+            reducer = lambda x: [('<i>',x[1])]
+
+            # Put together pipe-creation commands generator.
+            pipe_cmds = self._prepInstanceCommands(pipeCmd,reducer)
+
+            # Put together gzip commands generator.
+            gzip_cmds = self._prepInstanceCommands(
+                gzipCmd,
+                reducer,
+                trim=False,
+                end='wait $GZ_EXIT_CODES'
+                )
+
+            # Put together cleanup commands generator.
+            cleanup_cmds = self._prepInstanceCommands(cleanupCmd,reducer)
 
             self._cmdRunner.waitForProcesses(
-                self._cmdRunner.runSshCommands(self._user,self._hosts,pipeCmds),
+                self._cmdRunner.runSshCommands(self._user,self._hosts,pipe_cmds),
                 False
                 )
-            self._cmdRunner.runSshCommands(self._user,self._hosts,gzipCmds)
+            self._cmdRunner.runSshCommands(self._user,self._hosts,gzip_cmds)
             exits,outs = self._cmdRunner.waitForProcesses(
-                [self._cmdRunner.runSubProcess(cmd)],
+                [self._cmdRunner.runSubProcess(restore_query_cmd)],
                 True
                 )
             self._cmdRunner.waitForProcesses(
-                self._cmdRunner.runSshCommands(self._user,self._hosts,cleanupCmds),
+                self._cmdRunner.runSshCommands(self._user,self._hosts,cleanup_cmds),
                 False
                 )
             text = outs[0][0].strip() # Print iquery output for user.
             print_and_flush(text)
-            arraysRestored += 1
-        print_and_flush('Restored arrays: {0}'.format(arraysRestored))
+            arrays_restored += 1
+        print_and_flush('Restored arrays: {0}'.format(arrays_restored))
     #-----------------------------------------------------------------------------
     # restoreArrays: determines what kind of restore function to call based on
     #     specified user arguments.
     def restoreArrays(self,args,manifestPath):
-
         # Grab the initial specified backup folder.
         baseFolder = args.get('dir')
         _,baseFolderName = os.path.split(baseFolder)
         if (baseFolder[-1] == os.sep):
             baseFolder = baseFolder[:-1]
 
-        # Obtain array list here.
-        arrayInfo = self._getArrayListingFromBackup(manifestPath)
-
-        if (len(arrayInfo) == 0):
-            print_and_flush('No arrays found in backup: eixiting.')
-            return
-
-        binFmt = False # Flag for binary format.
-        binQTemplate = None # Template to find out binary (1D) array schema.
-
-        # For non-binary backups, this is the restore query.
-        restoreQuery = 'store(input(<schema>,\'<in_path>\',<opt>,<fmt>),<name>)'
-        if (args.get('restore') == 'binary'):
-            binFmt = True
-            # For binary backups, this is the restore query with redimension.
-            restoreQuery = 'store(redimension(input(<bin_schema>,\'<in_path>\',<opt>,\'<fmt>\'),<schema>),<name>)'
-            # This is the query to determine 1d schema for the saved arrays.
-            binQTemplate = [
-                'iquery',
-                '-c',
-                self._iqueryHost,
-                '-p',
-                self._iqueryPort,
-                '-ocsv',
-                '-aq',
-                'show(\'unpack(input(<schema>,\\\'/dev/null\\\'),__row)\',\'afl\')'
-                ]
-
-        fmtArrayInfo = self._formatArrayInfo(
-            arrayInfo,
-            args.get('allVersions'),
-            args.get('filter'),
-            binFmt,
-            binQTemplate
-            )
+        manifest = Manifest(manifestPath)
+        if manifest.version == 0:
+            manifest = fix_v0_schemas(manifest)
 
         print_and_flush('Verifying backup...')
-        self.verifyBackup(args,[x[0] for x in fmtArrayInfo])
+        self.verifyBackup(args, manifest)
 
-        # Get the simple restore formats (in case of non-binary restore).
-        restoreFmts = ['\'' + args.get('restore') + '\'' for i in range(len(fmtArrayInfo))]
-
-        if (args.get('save') == 'binary'):
-            # In case of the binary restore, formats are not simple, and must
-            # be gathered from the formatted array listing info.
-            restoreFmts = [f[4] for f in fmtArrayInfo]
-
-        # Prior to restoring an array, it has to be deleted from the database.
-        # Usually, the list of arrays to remove is the same as the list of
-        # arrays to create (when --allVersions is specified, arrays to remove
-        # have no versioning suffixes).
-        arraysToRemove = set([fmtInfo[0].split('@')[0] for fmtInfo in fmtArrayInfo])
-
-        # If user chose the --force option, then the arrays will be silently
-        # removed before restoration.  Otherwise we check below if any of
-        # the arrays are still in the database.
         if (not args.get('force')):
+            # Query for listing arrays in scidb database.
+            listArraysCmd = self._list_arrays_query_command
+
+            if (args.get('allVersions')):
+                # If --allVersions option is set, then we need to grab all
+                # versions of arrays.  Scidb sorts the array list based on id so
+                # that when we reload arrays back, the versions of each array are
+                # loaded in correct order.
+                listArraysCmd = self._list_all_versions_arrays_query_command
+
             # Check that the database does not already have the arrays we are
             # about to remove.
-            existingArrays = self._getExistingScidbArrays()
+            existing_manifest = self._gather_manifest_from_scidb(listArraysCmd)
 
             # Just in case array names are version-ed, remove the versions for
             # set comparison.
-            intersection = set(existingArrays) & arraysToRemove
+            current_arrays = ['{0}.{1}'.format(no_ver_name(md.name), md.ns) for md in existing_manifest]
+            backup_arrays = ['{0}.{1}'.format(no_ver_name(md.name),md.ns) for md in manifest]
+            intersection = set(current_arrays) & set(backup_arrays)
 
             if (len(intersection) > 0):
-                msgList = ['The following arrays still exist:']
+                msgList = ['The following arrays still exist (array.namespace):']
                 msgList.extend([a for a in intersection])
                 msgList.append('Please remove them manually and re-run the restore operation!')
                 raise AppError('\n'.join(msgList))
         else:
-            self._removeArrays(arraysToRemove) # Remove all
+            self._removeArrays(manifest) # Remove all
 
         if (args.get('parallel')):
             if (args.get('zip')):
-                self._runParallelZipRestore(
-                    fmtArrayInfo,
-                    restoreQuery,
-                    restoreFmts,
-                    baseFolder
-                    )
+                self._runParallelZipRestore(manifest, baseFolder)
             else:
                 # This is a local parallel restore.
-                restoreQuery = restoreQuery.replace('<in_path>',os.path.join(baseFolderName,'<fname>'))
-                self._runRestore(fmtArrayInfo,restoreQuery,restoreFmts,baseFolder,True)
+                self._runRestore(manifest, baseFolder, parallel=True)
         else:
             if (args.get('zip')):
-                self._runZipRestore(fmtArrayInfo,restoreQuery,restoreFmts,baseFolder)
+                self._runZipRestore(manifest, baseFolder)
             else:
-                restoreQuery = restoreQuery.replace('<in_path>',os.path.join(baseFolder,'<fname>'))
-                self._runRestore(fmtArrayInfo,restoreQuery,restoreFmts,baseFolder)
+                self._runRestore(manifest, baseFolder)
     #-------------------------------------------------------------------------
     # saveArrays: determine which save method to call based on user-specified
     #     options
     def saveArrays(self,args,manifestPath,optsFilePath):
-
         # Get the user-specified value for the backup folder.
         baseFolder = args.get('dir')
         _,baseFolderName = os.path.split(baseFolder)
@@ -1736,75 +1939,37 @@ class ScidbCommander:
             # versions of arrays.  Scidb sorts the array list based on id so
             # that when we reload arrays back, the versions of each array are
             # loaded in correct order.
-
             listArraysCmd = self._list_all_versions_arrays_query_command
 
-        # Obtain array list here (filter out temp arrays).
-        arrayInfo = self._getArrayListingFromScidb(listArraysCmd)
-
-        binQTemplate = None # Query for determining 1d schema (binary format).
-        binFmt = False # Binary format flag.
-
-        inputArrayExp = '<name>' # For non-binary format, it is array name.
-
-        if (args.get('save') == 'binary'):
-            binFmt = True
-            binQTemplate = [ # Query to get array 1d schema (for binary).
-                'iquery',
-                '-c',
-                self._iqueryHost,
-                '-p',
-                self._iqueryPort,
-                '-ocsv',
-                '-aq',
-                'show(\'unpack(input(<name>,\\\'/dev/null\\\'),__row)\',\'afl\')'
-                ]
-            inputArrayExp = 'unpack(<name>,__row)' # For binary, it is an expression.
-
-        fmtArrayInfo = self._formatArrayInfo(
-            arrayInfo,
-            args.get('allVersions'),
-            args.get('filter'),
-            binFmt,
-            binQTemplate
-            )
-
-        # For non-binary saves, formats are simple string specifiers.
-        saveFmts = [args.get('save') for i in range(len(fmtArrayInfo))]
-
-        if (args.get('save') == 'binary'):
-            # For binary operations, formats are actual data types (already
-            # in formatted array listings).
-            saveFmts = [f[4] for f in fmtArrayInfo]
-
-        # Even though users specify "text", the actual parameter to the save
-        # operator is named "auto".
-        saveFmts = ['\'' + x.replace('text','auto') + '\'' for x in saveFmts]
-
-        # Save array listings in manifest and user selected options in
-        # save_opts file.
-        self._saveManifest(manifestPath,fmtArrayInfo)
-        self._saveOptsFile(optsFilePath,args)
+        savedOpts = self._buildSaveOpts(args)
+        manifest = self._gather_manifest_from_scidb(listArraysCmd)
+        manifest.update({"save-options": savedOpts})
+        with open(manifestPath, 'w') as F:
+            print >>F, manifest
+        # For now we still write the optsFilePath, but in the future we
+        # hope to rely on examining the 'save-options' entry in the
+        # manifest (made above).
+        with open(optsFilePath, 'w') as F:
+            print >>F, savedOpts
 
         if (args.get('parallel')):
             if (args.get('zip')):
                 self._runParallelZipSave(
-                    fmtArrayInfo,
-                    inputArrayExp,
-                    saveFmts,
+                    manifest,
                     baseFolder
                     )
             else:
-                # This is a local parallel save.
-                self._runSave(fmtArrayInfo,inputArrayExp,saveFmts,baseFolder,True)
+                # This is a plain parallel save.
+                self._runSave(manifest, baseFolder,parallel=True)
         else:
             if (args.get('zip')):
-                self._runZipSave(fmtArrayInfo,inputArrayExp,saveFmts,baseFolder)
+                self._runZipSave(manifest, baseFolder)
             else:
-                self._runSave(fmtArrayInfo,inputArrayExp,saveFmts,baseFolder)
+                self._runSave(manifest, baseFolder)
 
         print_and_flush('Verifying backup...')
-        self.verifyBackup(args,[x[0] for x in fmtArrayInfo])
+        self.verifyBackup(args, manifest)
+
 
 #-----------------------------------------------------------------------------
 # checkProgramArgs: perform checks on specified arguments beyond what the
@@ -1817,9 +1982,9 @@ def checkProgramArgs(args):
     if (args.get('delete')): # Done checking: this is a simple delete job.
         return
 
+    # TODO: Proper use of argparse could enforce this for you.
     if (actions.count(None) > 1):
         raise AppError('No action specified (--save FMT, --restore FMT)!')
-
     if (actions.count(None) <= 0):
         raise AppError('Both save and restore actions specified; please choose only one!')
 
@@ -1845,6 +2010,8 @@ def checkProgramArgs(args):
             raise AppError('Backup is corrupted; saved options file {0} is missing!'.format(optsFilePath))
 
 def main(argv=None):
+    global _args
+
     if (argv is None):
         argv = sys.argv[1:]
     # For proper subprocess management:
@@ -1852,6 +2019,7 @@ def main(argv=None):
 
     # Collect program arguments first:
     program_args = ProgramArgs(argv)
+    _args = program_args
 
     try:
         checkProgramArgs(program_args)

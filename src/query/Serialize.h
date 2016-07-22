@@ -25,10 +25,11 @@
 
 #include <string>
 
-#include "query/QueryPlan.h"
+#include "query/QueryPlanFwd.h"
 
 namespace scidb
 {
+class Expression;
 
 std::string serializePhysicalPlan(const std::shared_ptr<PhysicalPlan>&);
 std::string serializePhysicalExpression(const Expression&);

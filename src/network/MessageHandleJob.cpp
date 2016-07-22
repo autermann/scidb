@@ -27,23 +27,29 @@
  *      Author: roman.simakov@gmail.com
  */
 
-#include <log4cxx/logger.h>
-#include <memory>
+#include "MessageHandleJob.h"
 
-#include <array/DBArray.h>
 #include <network/MessageUtils.h>
 #include <network/NetworkManager.h>
-#include <network/MessageHandleJob.h>
+
+#include <array/DBArray.h>
 #include <query/Operator.h>
+#include <query/PullSGContext.h>
 #include <query/Query.h>
 #include <query/QueryProcessor.h>
+#include <query/RemoteArray.h>
+#include <query/executor/ScopedQueryThread.h>
 #include <smgr/io/Storage.h>
 #include <system/Cluster.h>
 #include <system/Exceptions.h>
 #include <system/Resources.h>
+#include <system/Warnings.h>
 #include <util/RWLock.h>
 #include <util/Thread.h>
-#include <query/PullSGContext.h>
+
+#include <log4cxx/logger.h>
+#include <memory>
+
 
 using namespace std;
 using namespace boost;
@@ -68,7 +74,7 @@ void MessageHandleJob::reschedule(uint64_t delayMicroSec)
         if (!_timer) {
             _timer = std::shared_ptr<asio::deadline_timer>(new asio::deadline_timer(getIOService()));
         }
-        int rc = _timer->expires_from_now(posix_time::microseconds(delayMicroSec));
+        size_t rc = _timer->expires_from_now(posix_time::microseconds(delayMicroSec));
         if (rc != 0) {
             throw (SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_SYSCALL_ERROR)
                    << "boost::asio::expires_from_now" << rc << rc << delayMicroSec);
@@ -156,9 +162,11 @@ ServerMessageHandleJob::ServerMessageHandleJob(const std::shared_ptr<MessageDesc
   _logicalSourceId(INVALID_INSTANCE),
   _mustValidateQuery(true)
 {
-    assert(_messageDesc->getSourceInstanceID() != CLIENT_INSTANCE);
+    const MembershipID minMembId(0);
+    InstMembershipPtr membership(Cluster::getInstance()->getInstanceMembership(minMembId));
+    membership->confirmMembership(_messageDesc->getSourceInstanceID());
 
-    const QueryID queryID = _messageDesc->getQueryID();
+    const QueryID& queryID = _messageDesc->getQueryID();
 
     LOG4CXX_TRACE(logger, "Creating a new job for message"
                   << " of type=" << _messageDesc->getMessageType()
@@ -166,18 +174,21 @@ ServerMessageHandleJob::ServerMessageHandleJob(const std::shared_ptr<MessageDesc
                   << " with message size=" << _messageDesc->getMessageSize()
                   << " for queryID=" << queryID);
 
-    if (queryID != 0) {
+    if (queryID.isValid()) {
         if (_messageDesc->getMessageType() == mtPreparePhysicalPlan) {
+            // TODO:  Try get-by-id, create if it fails.  We'll be here for each snippet!
             _query = Query::create(queryID,_messageDesc->getSourceInstanceID());
         } else {
             _query = Query::getQueryByID(queryID);
         }
     } else {
+        ASSERT_EXCEPTION(queryID.isFake(), "Invalid query ID in server message");
+
         LOG4CXX_TRACE(logger, "Creating fake query: type=" << _messageDesc->getMessageType()
                       << ", for message from instance=" << _messageDesc->getSourceInstanceID());
-       // create a fake query for the recovery mode
+
        std::shared_ptr<const scidb::InstanceLiveness> myLiveness =
-       Cluster::getInstance()->getInstanceLiveness();
+          Cluster::getInstance()->getInstanceLiveness();
        assert(myLiveness);
        _query = Query::createFakeQuery(INVALID_INSTANCE,
                                        Cluster::getInstance()->getLocalInstanceId(),
@@ -270,6 +281,26 @@ void ServerMessageHandleJob::dispatch(std::shared_ptr<WorkQueue>& requestQueue,
         assert(q);
         if (logger->isTraceEnabled()) {
             LOG4CXX_TRACE(logger, "ServerMessageHandleJob::dispatch: Operator queue size="<<q->size()
+                          << " for query ("<<queryID<<")");
+        }
+        enqueue(q);
+        return;
+    }
+    break;
+    case mtSyncResponse:
+    {
+        // mtSyncRequest/mtSyncResponse should follow the same path (dispatched to the same queues)
+        // as mtFetch/mtRemoteChunk to make sure there are not chunks in-flight. By itself,
+        // receiving mtSyncResponse does not guarantee that the remote instance will no longer
+        // send another mtRemoteChunk because of some earlier mtFetch requesting prefetching.
+        // To guarantee that no inbound mtRemoteChunks will be send, syncSG() needs to be preceded with
+        // the arrival of the EOFs for all array attributes.
+        std::shared_ptr<WorkQueue> q = _query->getBufferReceiveQueue();
+        assert(q);
+        if (logger->isTraceEnabled()) {
+            LOG4CXX_TRACE(logger, "ServerMessageHandleJob::dispatch: Operator receive queue size="
+                          << q->size()
+                          <<", messageType="<<mtRemoteChunk
                           << " for query ("<<queryID<<")");
         }
         enqueue(q);
@@ -433,8 +464,6 @@ void ServerMessageHandleJob::run()
                   << ", queryID=" << _messageDesc->getQueryID());
     try
     {
-        Query::setCurrentQueryID(_query->getQueryID());
-
         if (_mustValidateQuery) {
             Query::validateQueryPtr(_query);
         }
@@ -577,6 +606,8 @@ void ServerMessageHandleJob::handleInvalidMessage()
 void ServerMessageHandleJob::handlePreparePhysicalPlan()
 {
     static const char *funcName = "ServerMessageHandleJob::handlePreparePhysicalPlan: ";
+    ScopedActiveQueryThread saqt(_query);
+
     std::shared_ptr<scidb_msg::PhysicalPlan> ppMsg = _messageDesc->getRecord<scidb_msg::PhysicalPlan>();
 
     const string clusterUuid = ppMsg->cluster_uuid();
@@ -611,7 +642,10 @@ void ServerMessageHandleJob::handlePreparePhysicalPlan()
 
 void ServerMessageHandleJob::handleExecutePhysicalPlan()
 {
+   // NOTE: called by handlePreparePhysicalPlan, there is no message that drives this
+   //       perhaps this should be prefixed with an underscore and made private
    static const char *funcName = "ServerMessageHandleJob::handleExecutePhysicalPlan: ";
+
    try {
 
       if  (_query->isCoordinator()) {
@@ -651,6 +685,8 @@ void ServerMessageHandleJob::handleExecutePhysicalPlan()
 void ServerMessageHandleJob::handleQueryResult()
 {
     static const char *funcName = "ServerMessageHandleJob::handleQueryResult: ";
+    ScopedActiveQueryThread saqt(_query);
+
     if  (!_query->isCoordinator()) {
         handleInvalidMessage();
     }
@@ -852,7 +888,7 @@ void ServerMessageHandleJob::handleFetchChunk()
                   << attributeId << " for queryID=" << queryID
                   << " from instanceID="<< _messageDesc->getSourceInstanceID());
 
-    assert(queryID);
+    SCIDB_ASSERT(queryID.isValid());
     assert(queryID == _query->getQueryID());
 
     if (objType>PullSGArray::SG_ARRAY_OBJ_TYPE) {
@@ -1164,6 +1200,8 @@ void ServerMessageHandleJob::handleAbortQuery()
 void ServerMessageHandleJob::handleCommitQuery()
 {
     static const char *funcName = "ServerMessageHandleJob::handleCommitQuery: ";
+    ScopedActiveQueryThread saqt(_query);
+
 
     std::shared_ptr<scidb_msg::DummyQuery> record = _messageDesc->getRecord<scidb_msg::DummyQuery>();
     const string clusterUuid = record->cluster_uuid();

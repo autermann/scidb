@@ -56,6 +56,8 @@ public:
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         assert(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
         MaterializedArray::MaterializeFormat format = (MaterializedArray::MaterializeFormat)((std::shared_ptr<OperatorParamPhysicalExpression>&)_parameters[0])->getExpression()->evaluate().getUint32();
         return std::shared_ptr<Array>(new MaterializedArray(inputArrays[0], query, format));
     }

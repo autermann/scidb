@@ -1,5 +1,5 @@
 --setup
-create array A <a:int32> [x=0:2,3,0]
+create array A <a:int32 NOT NULL> [x=0:2,3,0]
 
 --test
 --error --code=scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE "filter(build(A,null),1)"

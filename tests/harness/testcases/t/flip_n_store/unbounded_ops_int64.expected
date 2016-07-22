@@ -2257,7 +2257,7 @@ SCIDB QUERY : <regrid(unbounded2,4,sum(x))>
 
 SCIDB QUERY : <attributes(unbounded2)>
 {No} name,type_id,nullable
-{0} 'x','int64',false
+{0} 'x','int64',true
 
 SCIDB QUERY : <rename(unbounded2, temp)>
 Query was executed successfully
@@ -2437,7 +2437,7 @@ SCIDB QUERY : <store(unbounded2,unbounded2_new)>
 {29} 29
 {30} 30
 
-SCIDB QUERY : <substitute(unbounded2,build(<a:bool>[x=0:30,2,0],true))>
+SCIDB QUERY : <substitute(unbounded2,build(<a:int64>[x=0:30,2,0],8))>
 {a} x
 {1} 1
 {2} 2

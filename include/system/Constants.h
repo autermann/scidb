@@ -39,6 +39,7 @@ namespace scidb {
 const char* SCIDB_VERSION();                        ///< The full version string      : maj.min.pat.bld
 const char* SCIDB_VERSION_PUBLIC();                 ///< The public version string    : maj.min.bld
 const char* SCIDB_BUILD_TYPE();                     ///< The build type               : release|debug|...
+const char* SCIDB_COMMIT();                         ///< The commit sha1
 const char* SCIDB_COPYRIGHT();                      ///< The official copyright string: Copyright (C) 2008-...
 const char* SCIDB_INSTALL_PREFIX();                 ///< The target installation path prefix
 

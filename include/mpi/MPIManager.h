@@ -71,7 +71,7 @@ namespace scidb
             virtual MessageID getMessageType() const        { return scidb::SYSTEM_NONE_MSG_ID; }
             virtual boost::asio::const_buffer getBinary()   { return boost::asio::const_buffer(NULL, 0); }
             virtual ~EofMessageDescription()                {}
-            virtual QueryID getQueryId() const              { return 0; }
+            virtual QueryID getQueryId() const              { return INVALID_QUERY_ID; }
             virtual ClientContext::Ptr getClientContext()   { return ClientContext::Ptr(); }
         };
 
@@ -398,8 +398,7 @@ namespace scidb
          */
         void cleanup();
 
-        static const std::string& getInstallPath(
-            const std::shared_ptr<const scidb::InstanceMembership>& membership);
+        static std::string getInstallPath(const InstMembershipPtr& membership);
 
         /// @note Enforces only a single context at a time (i.e. serializes queries which call this method).
         std::shared_ptr<MpiOperatorContext> checkAndSetCtx(const std::shared_ptr<scidb::Query>& query,

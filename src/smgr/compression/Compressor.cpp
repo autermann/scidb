@@ -100,15 +100,20 @@ namespace scidb
 
     size_t BZlibCompressor::compress(void* dst, const ConstChunk& chunk, size_t size)
     {
-        unsigned int dstLen = size;
-        int rc = BZ2_bzBuffToBuffCompress((char*)dst, &dstLen, (char*)chunk.getData(), size, blockSize100k, 0, workFactor);
+        unsigned int dstLen = safe_static_cast<uint32_t>(size);
+        int rc = BZ2_bzBuffToBuffCompress(static_cast<char*>(dst), &dstLen,
+                                          static_cast<char*>(chunk.getData()),
+                                          safe_static_cast<uint32_t>(size),
+                                          blockSize100k, 0, workFactor);
         return rc == BZ_OK ? dstLen : size;
     }
 
     size_t BZlibCompressor::decompress(void const* src, size_t size, Chunk& chunk)
     {
-        unsigned int dstLen = chunk.getSize();
-        int rc = BZ2_bzBuffToBuffDecompress((char*)chunk.getDataForLoad(), &dstLen, (char*)src, size, 0, 0);
+        unsigned int dstLen = safe_static_cast<uint32_t>(chunk.getSize());
+        int rc = BZ2_bzBuffToBuffDecompress(static_cast<char*>(chunk.getDataForLoad()), &dstLen,
+                                            const_cast<char *>(static_cast<const char*>(src)),
+                                            safe_static_cast<uint32_t>(size), 0, 0);
         return rc == BZ_OK ? dstLen : 0;
     }
 

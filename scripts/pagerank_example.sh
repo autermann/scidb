@@ -249,7 +249,7 @@ NULL_ELIMINATOR_Q="build(<dontcare1:double>[dontcare2=0:0,1,0],NaN)"
 LAST_VERT=$(( ${NROW}-1 ))      # TODO: assuming 0 is min
 
 # common schema for the Q_i vector and its sub-terms while computing it
-Q_VEC_SCHEMA="<q:float>[vtx=0:$LAST_VERT,$CSIZE,0, vectorDummy=0:0,1,0]"
+Q_VEC_SCHEMA="<q:float NOT NULL>[vtx=0:$LAST_VERT,$CSIZE,0, vectorDummy=0:0,1,0]"
 
 #
 # generate the vector of non-zero columns, NZ_COLS

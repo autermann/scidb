@@ -56,9 +56,11 @@ public:
 	 * Cast is a pipelined operator, hence it executes by returning an iterator-based array to the consumer
 	 * that overrides the chunkiterator method.
 	 */
-	std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
+    std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-		assert(inputArrays.size() == 1);
+        assert(inputArrays.size() == 1);
+        checkOrUpdateIntervals(_schema, inputArrays[0]);
+
         std::shared_ptr<Array> inputArray = inputArrays[0];
         if (_schema.getAttributes().size() != inputArray->getArrayDesc().getAttributes().size())
         {
@@ -67,7 +69,9 @@ public:
 
         CastArray::CastingMap castingMap;
 
-        for(AttributeID i = 0, n = _schema.getAttributes().size(); i < n; ++i)
+        for(AttributeID i = 0, n = safe_static_cast<AttributeID>(_schema.getAttributes().size());
+            i < n;
+            ++i)
         {
             TypeId from = inputArray->getArrayDesc().getAttributes()[i].getType();
             TypeId to = _schema.getAttributes()[i].getType();
@@ -93,10 +97,13 @@ public:
                     srcDim.getChunkOverlap());
         }
 
-        ArrayDesc dstSchema("", _schema.getAttributes(), dstDimensions, defaultPartitioning(), _schema.getFlags());
+        ArrayDesc dstSchema("", _schema.getAttributes(), dstDimensions,
+                            _schema.getDistribution(),
+                            _schema.getResidency(),
+                            _schema.getFlags());
 
         return std::shared_ptr<Array>(new CastArray(dstSchema, inputArray, castingMap));
-	 }
+    }
 };
 
 DECLARE_PHYSICAL_OPERATOR_FACTORY(PhysicalCast, "cast", "physicalCast")

@@ -65,8 +65,8 @@ class PhysicalRank: public PhysicalOperator
     typedef RowIterator<size_t> RIChunk;
 
 public:
-    PhysicalRank(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema):
-        PhysicalOperator(logicalName, physicalName, parameters, schema)
+    PhysicalRank(const std::string& logicalName, const std::string& physicalName, const Parameters& parameters, const ArrayDesc& schema)
+    : PhysicalOperator(logicalName, physicalName, parameters, schema)
     {
     }
 
@@ -80,7 +80,9 @@ public:
     virtual DistributionRequirement getDistributionRequirement(const std::vector<ArrayDesc> & inputSchemas) const
     {
         vector<RedistributeContext> requiredDistribution;
-        requiredDistribution.push_back(RedistributeContext(psHashPartitioned));
+        SCIDB_ASSERT(_schema.getResidency()->isEqual(Query::getValidQueryPtr(_query)->getDefaultArrayResidency()));
+        requiredDistribution.push_back(RedistributeContext(createDistribution(psHashPartitioned),
+                                                           _schema.getResidency()));
         return DistributionRequirement(DistributionRequirement::SpecificAnyOrder, requiredDistribution);
     }
 
@@ -90,14 +92,17 @@ public:
     }
 
     virtual RedistributeContext getOutputDistribution(const std::vector<RedistributeContext> & inputDistributions,
-                                                    const std::vector< ArrayDesc> & inputSchemas) const
+                                                      const std::vector< ArrayDesc> & inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        return RedistributeContext(_schema.getDistribution(),
+                                   _schema.getResidency());
     }
 
     std::shared_ptr<Array> execute(std::vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         std::shared_ptr<Array> inputArray = inputArrays[0];
+        checkOrUpdateIntervals(_schema, inputArray);
+
         if (inputArray->getSupportedAccess() == Array::SINGLE_PASS)
         {   //if input supports MULTI_PASS, don't bother converting it
             inputArray = ensureRandomAccess(inputArray, query);
@@ -157,7 +162,7 @@ public:
         if (groupBy.size() == dims.size()) {
             LOG4CXX_DEBUG(logger, "[Rank] Building AllRankedOneArray, because all the dimensions are involved.");
             std::shared_ptr<Array> allRankedOne = make_shared<AllRankedOneArray>(
-                getRankingSchema(inputSchema, rankedAttributeID),
+                getRankingSchema(inputSchema, query, rankedAttributeID),
                 inputArray, rankedAttributeID);
 
             timing.logTiming(logger, "[Rank] Building AllRankedOneArray", false);
@@ -169,8 +174,8 @@ public:
         LOG4CXX_DEBUG(logger, "[Rank] Begin redistribution (first phase of group-by rank).");
 
         // For every dimension, determine whether it is a groupby dimension
-        std::shared_ptr<PartitioningSchemaDataGroupby> psdGroupby = make_shared<PartitioningSchemaDataGroupby>();
-        psdGroupby->_arrIsGroupbyDim.reserve(dims.size());
+        std::vector<bool> psdGroupby;
+        psdGroupby.reserve(dims.size());
         for (size_t i=0; i<dims.size(); ++i)
         {
             bool isGroupbyDim = false;
@@ -180,9 +185,10 @@ public:
                     break;
                 }
             }
-
-            psdGroupby->_arrIsGroupbyDim.push_back(isGroupbyDim);
+            psdGroupby.push_back(isGroupbyDim);
         }
+
+        ArrayDistPtr groupByDist = std::make_shared<GroupByArrayDistribution>(DEFAULT_REDUNDANCY, psdGroupby);
 
         // Extract just the ranking attribute
         AttributeDesc rankedAttribute = inputSchema.getAttributes()[rankedAttributeID];
@@ -217,7 +223,9 @@ public:
                                        0);
         }
 
-        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims, defaultPartitioning());
+        ArrayDesc projectSchema(inputSchema.getName(), projectAttrs, projectDims,
+                                inputSchema.getDistribution(),
+                                inputSchema.getResidency());
 
         vector<AttributeID> projection(1);
         projection[0] = rankedAttributeID;
@@ -225,11 +233,10 @@ public:
         std::shared_ptr<Array> projected = make_shared<SimpleProjectArray>(projectSchema, inputArray, projection);
 
         // Redistribute, s.t. all records in the same group go to the same instance.
-        std::shared_ptr<Array> redistributed = redistributeToRandomAccess(projected, query, psGroupby,
-                                                                     ALL_INSTANCE_MASK,
-                                                                     std::shared_ptr<CoordinateTranslator>(),
-                                                                     0,
-                                                                     psdGroupby);
+        std::shared_ptr<Array> redistributed = redistributeToRandomAccess(projected,
+                                                                          groupByDist,
+                                                                          ArrayResPtr(), // default query residency
+                                                                          query);
         // timing
         timing.logTiming(logger, "[Rank] redistribute()");
         LOG4CXX_DEBUG(logger, "[Rank] Begin reading input array and appending to rcGroup, reporting a timing every 10 chunks.");
@@ -237,7 +244,10 @@ public:
         // Build a RowCollection, where each row is a group.
         // The attribute names are: [XXX, XXX_rank, XXX_chunkID, XXX_itemID]
         Attributes rcGroupAttrs;
-        ArrayDesc outputSchema = getRankingSchema(inputSchema, rankedAttributeID);
+        ArrayDesc outputSchema = getRankingSchema(inputSchema, query, rankedAttributeID);
+
+        SCIDB_ASSERT(outputSchema.getResidency()->isEqual(query->getDefaultArrayResidency()));
+
         const Attributes& outputAttrs = outputSchema.getAttributes();
         rcGroupAttrs.push_back(AttributeDesc(0, outputAttrs[0].getName(), outputAttrs[0].getType(),
                 outputAttrs[0].getFlags(), outputAttrs[0].getDefaultCompressionMethod()));
@@ -267,7 +277,7 @@ public:
                 size_t g = 0;   // g is the number of group-by dimensions whose coordinates have been copied out to 'group'.
                 const Coordinates& full = srcChunkIter->getPosition();
                 for (size_t i=0; i<dims.size(); ++i) {
-                    if (psdGroupby->_arrIsGroupbyDim[i]) {
+                    if (psdGroupby[i]) {
                         group[g++] = full[i];
                         if (g==groupBy.size()) {
                             break;
@@ -350,7 +360,7 @@ public:
         for (size_t rowId=0; rowId<rcGroupSorted.numRows(); ++rowId) {
             std::unique_ptr<RIGroup> riGroupSorted(rcGroupSorted.openRow(rowId));
             double prevRank = 1;
-            size_t processed = 0;
+            double processed = 0.0;
             Value prevValue;
             bool nullEncountered = false;
 
@@ -359,7 +369,7 @@ public:
 
                 if (!nullEncountered) {
                     if (!isNullOrNan(itemInRowCollectionGroup[0], type)) {
-                        if (processed > 0) {
+                        if (processed > 0.0) {
                             if (compareValue(prevValue, itemInRowCollectionGroup[0])) {
                                 prevRank = processed+1;
                                 prevValue = itemInRowCollectionGroup[0];
@@ -418,7 +428,6 @@ public:
 
         LOG4CXX_DEBUG(logger, "[Rank] finished!")
 
-        // return
         return dest;
     }
 };

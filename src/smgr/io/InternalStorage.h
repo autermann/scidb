@@ -473,8 +473,7 @@ namespace scidb
         uint64_t _logSizeLimit;      // transaciton log size limit
         uint64_t _logSize;
         int _currLog;
-        size_t _redundancy;
-        int _nInstances;
+        bool _redundancyEnabled;
         bool _syncReplication;
         bool _enableDeltaEncoding;
         bool _enableChunkmapRecovery;
@@ -626,9 +625,10 @@ namespace scidb
         /**
          * Determine if a given chunk is a primary replica on this instance
          * @param chunk to examine
+         * @param redundancy for the array of this chunk
          * @return true if the chunk is a primary replica
          */
-        bool isPrimaryReplica(PersistentChunk const* chunk);
+        bool isPrimaryReplica(PersistentChunk const* chunk, size_t redundancy);
 
         /**
          * Return summary disk usage information
@@ -718,7 +718,7 @@ namespace scidb
         /**
          * @see Storage::rollback
          */
-        void rollback(std::map<ArrayID,VersionID> const& undoUpdates);
+        void rollback(RollbackMap const& undoUpdates);
 
         /**
          * Read the storage description file to find path for chunk map file.
@@ -774,11 +774,6 @@ namespace scidb
          * @see Storage::getInstanceId
          */
         InstanceID getInstanceId() const;
-
-        /**
-         * @see Storage::getNumberOfInstances
-         */
-        size_t getNumberOfInstances() const;
 
         /**
          * @see Storage::getPrimaryInstanceId

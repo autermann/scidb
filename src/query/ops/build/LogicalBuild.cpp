@@ -30,6 +30,8 @@
 #include "query/Operator.h"
 #include "system/SystemCatalog.h"
 #include "system/Exceptions.h"
+#include <usr_namespace/NamespacesCommunicator.h>
+#include <usr_namespace/Permissions.h>
 
 using namespace std;
 
@@ -114,10 +116,24 @@ public:
         return res;
     }
 
+    std::string inferPermissions(std::shared_ptr<Query>& query)
+    {
+        // Ensure we have permissions to create the array in the namespace
+        std::string permissions;
+        ArrayDesc desc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
+        if (desc.getName().size() != 0)
+        {
+            permissions.push_back(scidb::permissions::namespaces::ReadArray);
+        }
+
+        return permissions;
+    }
+
     ArrayDesc inferSchema(std::vector<ArrayDesc> schemas, std::shared_ptr<Query> query)
     {
         assert(schemas.size() == 0);
         assert(_parameters.size() == 2 || _parameters.size() == 3);
+
         bool asArrayLiteral = false;
         if (_parameters.size() == 3)
         {
@@ -126,27 +142,43 @@ public:
         }
 
         ArrayDesc desc = ((std::shared_ptr<OperatorParamSchema>&)_parameters[0])->getSchema();
-        if(asArrayLiteral) {
-            desc.setPartitioningSchema(psLocalInstance);
-        }
 
-        if (!asArrayLiteral && desc.getAttributes(true).size() != 1)
+        if (!asArrayLiteral && desc.getAttributes(true).size() != 1) {
+
             throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_BUILD_ERROR2,
                                        _parameters[0]->getParsingContext());
+        }
 
         if (desc.getName().size() == 0)
         {
             desc.setName("build");
         }
 
+        // If an array name was used in the build use that as the namespaces.
+        // Otherwise, use the namespace name specified by set_namespace().
+        std::string arrayName = desc.getName();
+        std::string namespaceName = desc.getNamespaceName();
+        // query->getNamespaceArrayNames(arrayName, namespaceName, arrayName);
+        desc.setName(arrayName);
+        desc.setNamespaceName(namespaceName);
+
         // Check dimensions
         Dimensions const& dims = desc.getDimensions();
         for (size_t i = 0, n = dims.size();  i < n; i++)
         {
-			// Eventually this check should be removed.
+            if (dims[i].isAutochunked())
+            {
+                throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA,
+                                           SCIDB_LE_AUTOCHUNKING_NOT_SUPPORTED,
+                                           _parameters[0]->getParsingContext()) << getLogicalName();
+            }
+
+            // Eventually this check should be removed.
             if (dims[i].isMaxStar() && !asArrayLiteral)
+            {
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_OP_BUILD_ERROR3,
                                            _parameters[0]->getParsingContext());
+            }
         }
 
         if (asArrayLiteral)
@@ -169,9 +201,17 @@ public:
                 throw USER_QUERY_EXCEPTION(SCIDB_SE_INFER_SCHEMA, SCIDB_LE_INVALID_ARRAY_LITERAL,
                     _parameters[1]->getParsingContext());
             }
+
+            ArrayDistPtr localDist = std::make_shared<LocalArrayDistribution>(query->getInstanceID());
+            desc.setDistribution(localDist);
+        }
+        else
+        {
+            desc.setDistribution(defaultPartitioning());
         }
 
-        debug("inferSchema: returning schema with  partitioning:  " << desc.getPartitioningSchema() << ", asArrayLiteral: " << asArrayLiteral);
+        desc.setResidency(query->getDefaultArrayResidency());
+        debug("inferSchema: returning schema with distribution: " << desc.getDistribution() << ", asArrayLiteral: " << asArrayLiteral);
         return desc;
     }
 };

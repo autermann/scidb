@@ -27,6 +27,9 @@
  *      Author: roman.simakov@gmail.com
  */
 
+#include <query/FunctionLibrary.h>
+#include <query/OperatorLibrary.h>
+
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
 #include <log4cxx/propertyconfigurator.h>
@@ -34,6 +37,7 @@
 
 #include <memory>
 #include <boost/asio.hpp>
+#include <boost/io/ios_state.hpp>
 
 #include <dlfcn.h>
 #include <signal.h>
@@ -126,7 +130,7 @@ void runSciDB()
    }
    else
    {
-       seed = time(0) ^ (getpid() << 8);
+       seed = static_cast<unsigned int>(time(0) ^ (getpid() << 8));
        LOG4CXX_WARN(logger, "Can not open /dev/urandom. srandom will be initialized with fallback seed based on time and pid.");
    }
    srandom(seed);
@@ -218,7 +222,7 @@ void runSciDB()
    }
 
    size_t smallMemSize = cfg->getOption<size_t>(CONFIG_SMALL_MEMALLOC_SIZE);
-   if (smallMemSize>0 && (0==mallopt(M_MMAP_THRESHOLD, smallMemSize))) {
+   if (smallMemSize>0 && (0==mallopt(M_MMAP_THRESHOLD, safe_static_cast<int>(smallMemSize)))) {
 
        LOG4CXX_WARN(logger, "Failed to set small-memalloc-size");
    }
@@ -304,13 +308,14 @@ void printPrefix(const char * msg="")
    struct tm *date = localtime(&t);
    assert(date);
    if (date) {
-      cerr << date->tm_year+1900<<"-"
-           << date->tm_mon+1<<"-"
-           << date->tm_mday<<" "
-           << date->tm_hour<<":"
-           << date->tm_min<<":"
-           << date->tm_sec
-           << " ";
+       boost::io::ios_all_saver guard(cerr);
+       cerr << setfill('0')
+            << date->tm_year+1900 << "-"
+            << setw(2) << date->tm_mon + 1 << "-"
+            << setw(2) << date->tm_mday << " "
+            << setw(2) << date->tm_hour << ":"
+            << setw(2) << date->tm_min << ":"
+            << setw(2) << date->tm_sec << " ";
    }
    cerr << "(ppid=" << getpid() << "): " << msg;
 }
@@ -344,7 +349,8 @@ void checkPort()
             testAcceptor(ioService,
                          boost::asio::ip::tcp::endpoint(
                              boost::asio::ip::tcp::v4(),
-                             Config::getInstance()->getOption<int>(CONFIG_PORT)));
+                             safe_static_cast<uint16_t>(
+                                 Config::getInstance()->getOption<int>(CONFIG_PORT))));
             testAcceptor.close();
             ioService.stop();
             return;
@@ -440,8 +446,9 @@ void runWithWatchdog()
          time_t exitTime = time(NULL);
          assert(exitTime > 0);
 
-         if ((exitTime - forkTime) < forkTimeout) {
-            sleep(backOffFactor*(forkTimeout - (exitTime - forkTime)));
+         if ((exitTime - forkTime) < forkTimeout)
+         {
+            sleep(backOffFactor*(forkTimeout - static_cast<uint32_t>((exitTime - forkTime))));
             backOffFactor *= 2;
             backOffFactor = (backOffFactor < maxBackOffFactor) ? backOffFactor : maxBackOffFactor;
          } else {

@@ -61,6 +61,12 @@ namespace scidb
      *
      * Revision history:
      *
+     * SCIDB_STORAGE_FORMAT_VERSION = 10:
+     *    Author: tigor
+     *    Date:
+     *    Ticket:
+     *    Note: Allowing chunk header to track uint64 instance IDs
+     *
      * SCIDB_STORAGE_FORMAT_VERSION = 9:
      *    Author: Steve F.
      *    Date: 7/2/15
@@ -260,7 +266,7 @@ namespace scidb
          * The instance ID this chunk must occupy;
          * not equal to current instance id if this is a replica.
          */
-        uint32_t instanceId;
+        InstanceID instanceId;
 
         enum Flags {
             DELTA_CHUNK = 2,
@@ -295,7 +301,7 @@ namespace scidb
             }
             else
             {
-                flags &= ~(FLAG);
+                flags &= static_cast<uint8_t>(~(FLAG));
             }
         }
 

@@ -63,7 +63,7 @@ public:
      * @param[in]    percentNull a number from 0 to 100, where 0 means never generate null, and 100 means always generate null
      * @return       the value from the parameter
      */
-    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, int nullReason)
+    Value& genRandomValue(TypeId const& type, Value& value, int percentNull, Value::reason nullReason)
     {
         assert(percentNull>=0 && percentNull<=100);
 
@@ -172,14 +172,16 @@ public:
         const int percentAttachBitmap = 90;
         const int percentEmpty = 20;
         const int percentNullValue = 10;
-        const int missingReason = 0;
+        const Value::reason missingReason = 0;
 
         // Array schema
         vector<AttributeDesc> attributes(1);
         attributes[0] = AttributeDesc((AttributeID)0, "dummy_attribute",  type, AttributeDesc::IS_NULLABLE, 0);
         vector<DimensionDesc> dimensions(1);
         dimensions[0] = DimensionDesc(string("dummy_dimension"), start, end, chunkInterval, 0);
-        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions, defaultPartitioning());
+        ArrayDesc schema("dummy_array", addEmptyTagAttribute(attributes), dimensions,
+                         defaultPartitioning(),
+                         query->getDefaultArrayResidency());
 
         // Define two one-chunk arrays, simulating fragments appearing in different instances.
         MemArray arrayInstOne(schema,query), arrayInstTwo(schema,query);
@@ -285,7 +287,7 @@ public:
 
     std::shared_ptr<Array> execute(vector< std::shared_ptr<Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        srand(time(NULL));
+        srand(static_cast<unsigned int>(time(NULL)));
 
         for (Coordinate end=1; end<10; ++end) {
             for (int64_t interval=1; interval<15; ++interval) {

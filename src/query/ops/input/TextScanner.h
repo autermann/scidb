@@ -169,9 +169,9 @@ namespace scidb {
                     columnNo -= 1;
                 }
                 if (useDoubleBuffering) {
-                    doubleBuffer->myUngetc(ch);
+                    doubleBuffer->myUngetc(static_cast<char>(ch));
                 } else {
-                    ungetc(ch, filePtr);
+                    ungetc(static_cast<char>(ch), filePtr);
                 }
             }
         }
@@ -298,7 +298,7 @@ CommonCase:
             case '\'':
             case '\"':
             {
-                char begin = ch;
+                char begin = static_cast<char>(ch);
                 nStringBuf = 0;
                 tmpValue.clear();
                 while (true)

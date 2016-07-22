@@ -172,23 +172,6 @@ void WriteChunkToArrayFunc::verifyBitmap(ConstChunk const& dataChunk, ConstChunk
     assert(emptyBitmap->count() == payload->count());
 }
 
-InstanceID
-resolveDestInstance(PartitioningSchema ps,
-                    InstanceID destInstanceId,
-                    const std::shared_ptr<Query>& query)
-{
-    SCIDB_ASSERT(destInstanceId == COORDINATOR_INSTANCE_MASK ||
-                 destInstanceId == ALL_INSTANCE_MASK ||
-                 destInstanceId < query->getInstancesCount());
-
-    SCIDB_ASSERT(ps != psLocalInstance || destInstanceId != ALL_INSTANCE_MASK);
-
-    if (destInstanceId == COORDINATOR_INSTANCE_MASK) {
-        destInstanceId = (query->isCoordinator() ? query->getInstanceID() : query->getCoordinatorID());
-    }
-    return  destInstanceId;
-}
-
 const char* SerializedArray::SERIALIZED_DIM_NAME = "sErIaLaTtRiD";
 const char* SerializedArray::SERIALIZED_ATTR_NAME = "SeRiAlVoIdAtTr";
 
@@ -386,6 +369,13 @@ SerializedArray::SerializedChunkMerger::getMergedChunk(AttributeID attId,
                              "Chunk ArrayDescs dont match");
         } else {
             _finalMultiDesc = chunk->getArrayDesc();
+
+            ArrayDistPtr outputArrayDist = _multiDesc.getDistribution();
+            ArrayResPtr outputArrayRes = _multiDesc.getResidency();
+
+            _finalMultiDesc.setDistribution(outputArrayDist);
+            _finalMultiDesc.setResidency(outputArrayRes);
+
             SCIDB_ASSERT(isInitialized(_finalMultiDesc));
         }
     }
@@ -588,15 +578,13 @@ DeserializedArray::deserialize(ConstChunk const* inputChunk, MemChunk& chunk)
     chunk.setData(inputChunk);
 }
 
-std::shared_ptr<Array> getSerializedArray(std::shared_ptr<Array>& inputArray,
-                                      std::set<AttributeID>& attributeOrdering,
-                                      const std::shared_ptr<Query>& query,
-                                      PartitioningSchema ps,
-                                      InstanceID destInstanceId,
-                                      const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                      size_t shift,
-                                      const std::shared_ptr<PartitioningSchemaData>& psData,
-                                      bool enforceDataIntegrity)
+std::shared_ptr<Array>
+getSerializedArray(std::shared_ptr<Array>& inputArray,
+                   std::set<AttributeID>& attributeOrdering,
+                   const ArrayDistPtr& outputArrayDist,
+                   const ArrayResPtr& outputArrayRes,
+                   const std::shared_ptr<Query>& query,
+                   bool enforceDataIntegrity)
 {
     SinglePassArray* spa(NULL);
     if (inputArray->getSupportedAccess() == Array::SINGLE_PASS) {
@@ -618,28 +606,47 @@ std::shared_ptr<Array> getSerializedArray(std::shared_ptr<Array>& inputArray,
     SCIDB_ASSERT(attributeOrdering.size() <= multiAttrDesc.getAttributes().size());
     std::shared_ptr<Array> serializedArray = make_shared<SerializedArray>(inputArray, attributeOrdering);
 
-    // check and adjust the the destination instance if necessary
-    destInstanceId = resolveDestInstance(ps, destInstanceId, query);
-
     // create an instance locator that will use the non-serialized
     // (i.e. the input array) dimensions
-    SGInstanceLocator
-    serializedInstLocator(boost::bind(&SerializedArray::instanceForChunk,
-                                      _1, _2, _3,
-                                      multiAttrDesc,
-                                      Coordinates(),
-                                      SGInstanceLocator(boost::bind(&PullSGContext::instanceForChunk,
-                                                                  _1, _2, _3,
-                                                                  ps,
-                                                                  distMapper,
-                                                                  shift,
-                                                                  destInstanceId,
-                                                                  psData)) ));
+    std::shared_ptr<Array> tmp;
+    if (outputArrayRes &&
+        !outputArrayRes->isEqual(query->getDefaultArrayResidency())) {
+        // The desired residency is different from the query liveness set.
+        // We need to do some extra work in order to figure out the logical
+        // instance IDs wrt the query based on the desired residency.
+        SGInstanceLocator
+        serializedInstLocator(boost::bind(&SerializedArray::instanceForChunk,
+                                          _1, _2, _3,
+                                          multiAttrDesc,
+                                          Coordinates(),
+                                          SGInstanceLocator(boost::bind(&PullSGContext::instanceForChunk,
+                                                                        _1, _2, _3,
+                                                                        outputArrayDist,
+                                                                        outputArrayRes))));
+        tmp = pullRedistribute(serializedArray,
+                               outputArrayDist,
+                               outputArrayRes,
+                               query,
+                               serializedInstLocator,
+                               enforceDataIntegrity);
+    } else {
 
-    std::shared_ptr<Array> tmp = pullRedistribute(serializedArray,
-                                             query,
-                                             serializedInstLocator,
-                                             enforceDataIntegrity);
+        SGInstanceLocator
+        serializedInstLocator(boost::bind(&SerializedArray::instanceForChunk,
+                                          _1, _2, _3,
+                                          multiAttrDesc,
+                                          Coordinates(),
+                                          SGInstanceLocator(boost::bind(&PullSGContext::instanceForChunk,
+                                                                        _1, _2, _3,
+                                                                        outputArrayDist))));
+        tmp = pullRedistribute(serializedArray,
+                               outputArrayDist,
+                               ArrayResPtr(), // default query residency
+                               query,
+                               serializedInstLocator,
+                               enforceDataIntegrity);
+    }
+
     if (tmp == serializedArray ) {
         SCIDB_ASSERT(!query->getOperatorContext());
         return inputArray;
@@ -647,16 +654,14 @@ std::shared_ptr<Array> getSerializedArray(std::shared_ptr<Array>& inputArray,
     return tmp;
 }
 
-std::shared_ptr<Array> redistributeWithCallbackInAttributeOrder(std::shared_ptr<Array>& inputArray,
-                                                           PullSGArrayBlocking::ChunkHandler& chunkHandler,
-                                                           PartialChunkMergerList* mergers,
-                                                           const std::shared_ptr<Query>& query,
-                                                           PartitioningSchema ps,
-                                                           InstanceID destInstanceId,
-                                                           const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                                           size_t shift,
-                                                           const std::shared_ptr<PartitioningSchemaData>& psData,
-                                                           bool enforceDataIntegrity)
+std::shared_ptr<Array>
+redistributeWithCallbackInAttributeOrder(std::shared_ptr<Array>& inputArray,
+                                         PullSGArrayBlocking::ChunkHandler& chunkHandler,
+                                         PartialChunkMergerList* mergers,
+                                         const ArrayDistPtr& outputArrayDist,
+                                         const ArrayResPtr& outputArrayRes,
+                                         const std::shared_ptr<Query>& query,
+                                         bool enforceDataIntegrity)
 {
 
     const ArrayDesc& multiAttrDesc = inputArray->getArrayDesc();
@@ -666,20 +671,19 @@ std::shared_ptr<Array> redistributeWithCallbackInAttributeOrder(std::shared_ptr<
     // attributeOrdering maps the input attribute ID
     // to the sequential coordinate in the extra dimension.
     set<AttributeID> attributeOrdering;
-    for (AttributeID a=0, n=multiAttrDesc.getAttributes().size(); a < n; ++a) {
+    for (AttributeID a=0, n=safe_static_cast<AttributeID>(multiAttrDesc.getAttributes().size());
+         a < n;
+         ++a) {
         attributeOrdering.insert(a);
     }
     SCIDB_ASSERT(!attributeOrdering.empty());
 
     std::shared_ptr<Array> serializedArray = getSerializedArray(inputArray,
-                                                           attributeOrdering,
-                                                           query,
-                                                           ps,
-                                                           destInstanceId,
-                                                           distMapper,
-                                                           shift,
-                                                           psData,
-                                                           enforceDataIntegrity);
+                                                                attributeOrdering,
+                                                                outputArrayDist,
+                                                                outputArrayRes,
+                                                                query,
+                                                                enforceDataIntegrity);
     if (serializedArray == inputArray) {
         return inputArray;
     }
@@ -694,59 +698,64 @@ std::shared_ptr<Array> redistributeWithCallbackInAttributeOrder(std::shared_ptr<
     std::unordered_set<AttributeID> attributesToPull;
     attributesToPull.insert(0); // only one pseudo attribute
 
+    ArrayDesc outputArrayDesc(multiAttrDesc);
+    outputArrayDesc.setDistribution(outputArrayDist);
+    if (outputArrayRes) {
+        outputArrayDesc.setResidency(outputArrayRes);
+    } else {
+        outputArrayDesc.setResidency(query->getDefaultArrayResidency());
+    }
+
     // create a chunk merger that will convert chunk coordinates
     // from the serialized to the input dimensions
     std::shared_ptr<SerializedArray::SerializedChunkMerger >
-       handler(new SerializedArray::SerializedChunkMerger(multiAttrDesc,
-                                                    singleAttrDesc,
-                                                    mergers,
-                                                    chunkHandler,
-                                                    enforceDataIntegrity));
+       handler(new SerializedArray::SerializedChunkMerger(outputArrayDesc,
+                                                          singleAttrDesc,
+                                                          mergers,
+                                                          chunkHandler,
+                                                          enforceDataIntegrity));
     std::shared_ptr<scidb::MultiStreamArray::PartialChunkMerger> merger(handler);
     arrayToPull->setPartialChunkMerger(0, merger);
     SCIDB_ASSERT(!merger);
     SCIDB_ASSERT(handler);
 
-    PullSGArrayBlocking::ChunkHandler chunkDeserializer(boost::bind(&SerializedArray::SerializedChunkMerger::handleChunk,
-                                                                    handler, _1, _2, _3));
+    PullSGArrayBlocking::ChunkHandler
+       chunkDeserializer(boost::bind(&SerializedArray::SerializedChunkMerger::handleChunk,
+                                     handler, _1, _2, _3));
 
     // the chunk handler will also to convert the coordinates
     // from the serialized to the input dimensions
-    arrayToPull->pullAttributes(attributesToPull, chunkDeserializer);
-    arrayToPull->sync();
+    {
+        arrayToPull->pullAttributes(attributesToPull, chunkDeserializer);
+        arrayToPull->sync();
+    }
 
     return std::shared_ptr<Array>();
 }
 
-std::shared_ptr<Array> redistributeWithCallback(std::shared_ptr<Array>& inputArray,
-                                           PullSGArrayBlocking::ChunkHandler& chunkHandler,
-                                           PartialChunkMergerList* mergers,
-                                           const std::shared_ptr<Query>& query,
-                                           PartitioningSchema ps,
-                                           InstanceID destInstanceId,
-                                           const std::shared_ptr<CoordinateTranslator>& distMapper,
-                                           size_t shift,
-                                           const std::shared_ptr<PartitioningSchemaData>& psData,
-                                           bool enforceDataIntegrity)
+std::shared_ptr<Array>
+redistributeWithCallback(std::shared_ptr<Array>& inputArray,
+                         PullSGArrayBlocking::ChunkHandler& chunkHandler,
+                         PartialChunkMergerList* mergers,
+                         const ArrayDistPtr& outputArrayDist,
+                         const ArrayResPtr& outputArrayRes,
+                         const std::shared_ptr<Query>& query,
+                         bool enforceDataIntegrity)
 {
     if (inputArray->getSupportedAccess() == Array::SINGLE_PASS) {
         return redistributeWithCallbackInAttributeOrder(inputArray,
-                                               chunkHandler,
-                                               mergers,
-                                               query,
-                                               ps,
-                                               destInstanceId,
-                                               distMapper,
-                                               shift,
-                                               psData,
-                                               enforceDataIntegrity);
+                                                        chunkHandler,
+                                                        mergers,
+                                                        outputArrayDist,
+                                                        outputArrayRes,
+                                                        query,
+                                                        enforceDataIntegrity);
     }
-    std::shared_ptr<Array> tmp = pullRedistribute(inputArray, query, ps,
-                                             destInstanceId,
-                                             distMapper,
-                                             shift,
-                                             psData,
-                                             enforceDataIntegrity);
+    std::shared_ptr<Array> tmp = pullRedistribute(inputArray,
+                                                  outputArrayDist,
+                                                  outputArrayRes,
+                                                  query,
+                                                  enforceDataIntegrity);
     if (tmp == inputArray ) {
         SCIDB_ASSERT(!query->getOperatorContext());
         return inputArray;
@@ -758,7 +767,9 @@ std::shared_ptr<Array> redistributeWithCallback(std::shared_ptr<Array>& inputArr
     const ArrayDesc& desc = arrayToPull->getArrayDesc();
 
     if (mergers) {
-        for (AttributeID a=0, n=desc.getAttributes().size(); a < n; ++a) {
+        for (AttributeID a=0, n=safe_static_cast<AttributeID>(desc.getAttributes().size());
+             a < n;
+             ++a) {
             SCIDB_ASSERT(a < mergers->size());
             std::shared_ptr<MultiStreamArray::PartialChunkMerger>& merger = (*mergers)[a];
             if (merger) {
@@ -768,13 +779,17 @@ std::shared_ptr<Array> redistributeWithCallback(std::shared_ptr<Array>& inputArr
         }
     }
 
-    std::unordered_set<AttributeID> attributesToPull;
-    for (AttributeID a=0, n=desc.getAttributes().size(); a < n; ++a) {
-        attributesToPull.clear();
-        attributesToPull.insert(a);
-        arrayToPull->pullAttributes(attributesToPull, chunkHandler);
+    {
+        std::unordered_set<AttributeID> attributesToPull;
+        for (AttributeID a=0, n=safe_static_cast<AttributeID>(desc.getAttributes().size());
+             a < n;
+             ++a) {
+            attributesToPull.clear();
+            attributesToPull.insert(a);
+            arrayToPull->pullAttributes(attributesToPull, chunkHandler);
+        }
+        arrayToPull->sync();
     }
-    arrayToPull->sync();
 
     return tmp;
 }
